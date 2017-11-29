@@ -3,6 +3,8 @@ title: "EDT + Waze Joining"
 output:
   html_notebook:
     df_print: paged
+  html_document:
+    df_print: paged
 ---
 
 Initial work in mapping EDT and Waze incident data
@@ -14,7 +16,7 @@ Ideas:
 - Frequency of events - histograms of different Waze event frequencies within a day, for different event types (accident, jam, weather hazard, road closed), and same for EDT incident count frequencies within a day
 - Incident type by time of day
 - Duration of incidents
-- Spatial overlay of events - similar to Lia's slider idea, make a figure which builds up hotspots of Waze and EDT by day, have them fade out after some period of time
+- Spatial overlay of events - similar to Lia's slider idea, make a figure which builds up hotspots of Waze and EDT by day
 - Spatiotemporal join - Paul's 2x2 for time (early, laggy) and space (near, far) matching of EDT and Waze, by type. In the future, using data snapped to HPMS, use roadway classification as well, or could use day of week.
 
 
@@ -33,7 +35,6 @@ library(plotly) # do after ggplot2
 library(sp)
 library(maptools) # readShapePoly() and others
 library(mapproj) # for coord_map()
-library(dplyr)
 library(rgdal) # for readOGR(), needed for reading in ArcM shapefiles
 library(rgeos) # for gIntersection, to clip two shapefiles
 library(raster)
@@ -70,23 +71,59 @@ if(length(grep('EDT_Waze.RData', dir())) < 1){
 
 ### Initial mapping work
 
-```{r initialmap}
-# Make a MD map
-mdpoly <- map('state', 'Maryland')
+```{r fort.map, eval=FALSE, include=FALSE}
+# Currently not run -- this is the start of making a fortified dataframe for ggplot mapping, to turn into a plotly map.
+# Get points in polygons: events in each county
+proj4string(edt.shp) <- proj4string(waz.shp) <- proj4string(md_counties)
 
-# all points... 
-points(waz.shp$longitude, waz.shp$latitude,
-       pch = 16, 
-       cex = 0.5,
-       col = alpha('grey20', 0.1))
+md_pip <- over(waz.shp, md_counties[,"NAME"])
 
-# all points... 
-points(edt.shp$GPSLong_Ne, edt.shp$GPSLat,
-       pch = 21, 
-       cex = 0.5,
-       col = alpha('midnightblue', 0.2))
+waz.shp$NAME <- md_pip
+
+md_base <- ggplot(md_counties) + geom_map(data = md_counties, map = md_counties,
+                                            aes(x = long, y = lat, group = group, map_id = id),
+                                            color = "black", fill = NA) +
+  ylab(label="") + xlab(label="") +
+  theme_minimal() +
+  coord_map(projection="albers", lat = 39, lat1 = 45)
+```
+
+```{r plotlymap}
+counties <- map_data("county", "maryland")
+
+waz.shp$tooltiptext <- with(waz.shp@data, paste(city, alert_type, time, sep = "\n"))
+waz.shp$tooltiptext <- sub("NA", "", waz.shp$tooltiptext)
+
+edt.shp$tooltiptext <- with(edt.shp@data, paste(County, HighestInj, time, sep = "\n"))
+edt.shp$tooltiptext <- sub("NA", "", edt.shp$tooltiptext)
 
 
+map.p <- ggplot() +
+  ggtitle("2017-08-01 Spatial Overlay") +
+  geom_polygon(data = counties, aes(x = long, y = lat, group = group), 
+               color = "white", fill = "grey80") + theme_void() +
+coord_fixed(1.3) +
+
+  geom_point(data = waz.shp[format(waz.shp$time, "%d") == "01",]@data, # 2017-08-01 first
+             aes(
+               x = longitude, 
+               y = latitude, 
+               color = alert_type,
+                text = tooltiptext),
+             shape = 16) +
+
+  geom_point(data = edt.shp[format(edt.shp$time, "%d") == "01",]@data, # 2017-08-01 first
+             aes(
+               x = GPSLong_Ne, 
+               y = GPSLat, 
+               text = tooltiptext,
+               color = 'EDT'),
+             shape = 16) +
+  scale_color_brewer(palette = "Set1",
+                        name = "Waze Alert Type and EDT Crash")
+
+  
+ggplotly(map.p, tooltip = "text", width = 1000)
 
 ```
 
@@ -103,4 +140,55 @@ datatable(freq.tab,
           colnames = c("Day" = 1, "Alert Type" = 2, "Count"= 3),
           rownames = F,
           options = list(dom = "ftip"))
+```
+
+
+### Spatiotemporal join
+
+```{r stjoin, warning = F, eval = T} 
+
+# for each EDT event, find the number and distance for nearest neighbors in space and time from Waze data
+ex <- edt.shp@data
+
+distbreaks <- c(0, 0.1, 0.5, 1, 5, 10, 15, 25, 50, 100, 300, 1000)
+distcounts <- vector()
+
+for(i in 1:nrow(ex)){
+
+  daterangemin <- ex[i, 'time'] - 2*60*60
+  daterangemax <- ex[i, 'time'] + 2*60*60
+    
+  # find waze events within 3 hrs of this crash
+  
+  wx <- waz.shp[waz.shp$time > daterangemin & waz.shp$time < daterangemax,]
+  
+  if(nrow(wx) ==0) {
+    b <- rep(0, length(distbreaks))
+  } else {
+  w_sp <- SpatialPoints(coords = data.frame(wx$longitude, wx$latitude))
+  e_sp <- SpatialPoints(coords = data.frame(ex[i,'GPSLong_Ne'], ex[i,'GPSLat']))
+  
+  t1 <- spDists(w_sp, e_sp, longlat = T) # distance in km to each edt event
+  
+  # Sum of events with 0.1 to 100 mi in various chunks
+  b <- hist(t1, breaks = distbreaks, plot = F)$counts
+  }
+
+  distcounts <- rbind(distcounts, b)
+  
+  # Sum of events within 1 to 120 minutes
+  
+  }
+
+colnames(distcounts) = distbreaks[2:length(distbreaks)]
+rownames(distcounts) = ex$ID
+
+dm <- melt(distcounts)
+colnames(dm) <- c("ID", "Bin", "Count")
+dm$Bin <- as.factor(dm$Bin)
+
+gp <- ggplot(dm) + geom_histogram(aes(x = Count), bins = 50) + facet_wrap(~Bin) + ylab("Frequency") + xlab("Count of Waze Events")
+
+ggplotly(gp, width = 1000, tooltip = c("count"))
+
 ```
