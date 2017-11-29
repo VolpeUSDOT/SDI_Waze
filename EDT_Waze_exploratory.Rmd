@@ -1,0 +1,106 @@
+---
+title: "EDT + Waze Joining"
+output:
+  html_notebook:
+    df_print: paged
+---
+
+Initial work in mapping EDT and Waze incident data
+
+Started 2017-11-28
+
+Ideas:
+
+- Frequency of events - histograms of different Waze event frequencies within a day, for different event types (accident, jam, weather hazard, road closed), and same for EDT incident count frequencies within a day
+- Incident type by time of day
+- Duration of incidents
+- Spatial overlay of events - similar to Lia's slider idea, make a figure which builds up hotspots of Waze and EDT by day, have them fade out after some period of time
+- Spatiotemporal join - Paul's 2x2 for time (early, laggy) and space (near, far) matching of EDT and Waze, by type. In the future, using data snapped to HPMS, use roadway classification as well, or could use day of week.
+
+
+```{r setup, message = F, warning = F}
+# Read in libraries and set working directory
+knitr::opts_chunk$set(echo = T, warning=F, message=F)
+options(width = 2400, stringsAsFactors = F)
+
+library(ggplot2)
+library(tidyverse)
+library(maps) # for mapping base layers
+library(reshape)
+library(DT) # for datatable
+# devtools::install_github("ropensci/plotly") # for latest version
+library(plotly) # do after ggplot2
+library(sp)
+library(maptools) # readShapePoly() and others
+library(mapproj) # for coord_map()
+library(dplyr)
+library(rgdal) # for readOGR(), needed for reading in ArcM shapefiles
+library(rgeos) # for gIntersection, to clip two shapefiles
+library(raster)
+
+wazedir <- "W:/SDI Pilot Projects/Waze/Working Documents"
+knitr::opts_knit$set(root.dir = wazedir) 
+```
+
+```{r dataimport}
+# Initial run: Start with the projected EDT and Waze data that Lia has prepared. It appears this is just the one week of August data for MD; use aa pilot, expand to other periods after. Clean these data and save as .RData. If already done, load the processed data.
+
+if(length(grep('EDT_Waze.RData', dir())) < 1){
+  waz.shp <- readOGR(dsn = ".", "Waze_sample_projected")
+  edt.shp <- readOGR(dsn = ".", "EDT_sample_projected")
+  
+  # Fix time values: convert pub_millis to usable POSIX date class
+  waz.shp$time <- as.POSIXct(waz.shp$pub_millis/1000, origin = "1970-01-01", tz="America/New_York")
+  # Convert crashdate and time in EDT to POSIX
+  edt.time <- paste(as.character(edt.shp$CrashDate), " ",
+                    edt.shp$HourofDay, ":",
+                    formatC(as.numeric(as.character(edt.shp$MinuteofDa)), width = 2, flag = "0"), sep = "")
+  edt.shp$time <- strptime(edt.time, format = "%Y/%m/%d %H:%M", tz="America/New_York")
+
+  # Read in county data from Census
+  counties <- readOGR("CensusCounty/.")
+  md_counties <- counties[counties$STATEFP == 24,]
+
+  # Save imported waze and EDT files as .RData for faster import after the first time
+  save(file = "EDT_Waze.RData", list = c("waz.shp", "edt.shp", "md_counties"))
+} else { load('EDT_Waze.RData') }
+
+
+```
+
+### Initial mapping work
+
+```{r initialmap}
+# Make a MD map
+mdpoly <- map('state', 'Maryland')
+
+# all points... 
+points(waz.shp$longitude, waz.shp$latitude,
+       pch = 16, 
+       cex = 0.5,
+       col = alpha('grey20', 0.1))
+
+# all points... 
+points(edt.shp$GPSLong_Ne, edt.shp$GPSLat,
+       pch = 21, 
+       cex = 0.5,
+       col = alpha('midnightblue', 0.2))
+
+
+
+```
+
+### Interactive table of Waze events by day 
+
+```{r freqevents}
+# make a table of frequency of alert_type by day
+freq.tab <- aggregate(uuid ~ format(time, "%d") + alert_type,
+          FUN = length,
+          data = waz.shp@data)
+
+datatable(freq.tab,
+          filter = 'top',
+          colnames = c("Day" = 1, "Alert Type" = 2, "Count"= 3),
+          rownames = F,
+          options = list(dom = "ftip"))
+```
