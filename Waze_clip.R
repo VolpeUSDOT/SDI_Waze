@@ -20,9 +20,7 @@ outputdir <- "W:/SDI Pilot Projects/Waze/MASTER Data Files/Waze Aggregated/By mo
 setwd(wazedir)
 
 # Read in Waze data
-# Files are >250 Mb. Try fread for faster import; not much faster in this case
-
-# d <- read.csv(file.path(wazemonthdir, dir(wazemonthdir)[5])) # July 
+# Files are >250 Mb. Sometimes data.table::fread is faster for files like these; not in this case. Just use read.csv.
 
 # Read in county data from Census
 counties <- readOGR("CensusCounty/.")
@@ -30,22 +28,29 @@ md_counties <- counties[counties$STATEFP == 24,]
 
 monthfiles <- dir(wazemonthdir)
 
-starttime <- Sys.Date()
+
+monthfiles[c(2, 3, 4, 6, 7, 8)] # started w July, doing manually because connection slow
+
 
 # <><><><><><><><><><><><><><><><><><><><>
 # Start loop ----
-for(i in monthfiles){
-
-  system.time(d <- read.csv(file.path(wazemonthdir, i))) # 6 min for July
-
+for(i in monthfiles[c(2, 3, 4, 6, 7, 8)]){ # change back to all files when done with manual steps
+  
+  starttime <- Sys.time()
+  
+  system.time(d <- read.csv(file.path(wazemonthdir, i))) # 3-4 min for July, up to 4x slower on VPN
+  
+  # original file size in MB
+  orig.file.size <- file.info(file.path(wazemonthdir, i))$size/1000000
+  orig.nrow <- nrow(d)
 # <><><><><><><><><><><><><><><><><><><><>
 # Convert data into comparable classes ----
 # Make the waze data into a SpatialPointsDataFrame for comparison with the state polygon.
   
-  # Discard unneeded columns
-  dropcols <- match(c("V1","X", "X.1", "X.2"), names(d))
-  d <- d[,is.na(match(1:length(d), dropcols))]
-  
+  # Discard unneeded columns. Discarding two date colums bc have pubMillis, will make a POSIX datetime column from this. For now, also dropping 'filename', revisit this.
+  dropcols <- match(c("V1","X", "X.1", "X.2", "X.3", "pubMillis_date", "date", "filename"), names(d))
+  d <- d[,is.na(match(1:ncol(d), dropcols))]
+
   # Read datetime correctly
   d$time <- as.POSIXct(d$pubMillis/1000, origin = "1970-01-01", tz="America/New_York") # Time zone will need to be correctly configured for other States.
   
@@ -73,11 +78,20 @@ for(i in monthfiles){
 # Export ----
 # Save as .csv, .RData, and ShapeFile
   irda <- sub("csv", "RData", i)
+  ishp <- sub("csv", "", i)
+
+  save(list = "d", file = file.path(outputdir, irda) )
   
   write.csv(d@data, file = file.path(outputdir, i), row.names = F)
-  save(d, file = file.path(outputdir, i) )
-  writeOGR(obj=d, dsn=outputdir, driver="ESRI Shapefile")
   
-  cat(i, "complete \n", Sys.time()-starttime, "elapsed \n\n")
+#  writeOGR(obj=d, dsn=file.path(outputdir, ishp), driver="ESRI Shapefile")
+  timediff <- round(Sys.time()-starttime, 2)
+  cat(i, "complete \n", timediff, attr(timediff, "units"), "elapsed \n\n")
+  
+  new.file.size <- file.info(file.path(outputdir, i))$size/1000000
+  new.nrow <- nrow(d@data)
+  
+  cat(".csv reduced from", orig.file.size, "to", new.file.size, "\n\n",
+      orig.nrow - new.nrow, "rows of out-of-state data removed \n\n", rep("<>",20), "\n")
   
 }
