@@ -1,5 +1,7 @@
 # Creating weekly Waze data from clipped, trimmed monthly data
 
+# !!! Note: used pubMillis from the aggregated data for this. Now I see that that is the start time of the incident, while months were aggregated based on last pull. So there can be many weeks from one month. This will be fixed after revisiting the initial aggregation code. 
+
 # <><><><><><><><><><><><><><><><><><><><>
 # <><><><><><><><><><><><><><><><><><><><>
 
@@ -13,14 +15,14 @@ setwd(inputdir)
 
 monthlyfiles <- dir()[grep("RData", dir())]
 
-for(i in monthlyfiles){ # i = "MD__2017-03.RData"
+for(i in monthlyfiles){ # i = "MD__2017-07.RData"
   
   starttime <- Sys.time()
   
   load(i)
   
   # Make sure any unnecessary columns are trimmed out.
-  # Some had unusused row.names column in here as well as unused pubMillis_date
+  # Some had unusused row.names column in here as well as unused pubMillis_date: !!!! check to see what these actually are. Want to keep initial time, last pull time, and duration.
   dropcols <- match(c("V1","X", "X.1", "X.2", "X.3", "pubMillis_date", "date", "filename", "country"), names(d))
   d1 <- d[,is.na(match(1:ncol(d), dropcols))]
 
@@ -32,7 +34,7 @@ for(i in monthlyfiles){ # i = "MD__2017-03.RData"
   # dx <- d1[d1$time > starttime & d1$time < stoptime,]
 
   # Now: find week of year from POSIX datetim
-  d1$week <- format(d1$time[1:10], "%W")
+  d1$week <- format(d1$time, "%W")
   
   # Find unique weeks within this month. Note that weeks spanning months will require rbinding after the fact.
   weeks <- formatC(sort(unique(d1$week)), width = 2, flag = 0) # ensure two-digit week with leading 0 for first 9 weeks of year
