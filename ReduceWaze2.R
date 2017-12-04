@@ -27,6 +27,7 @@ while (j <= length(wazefiles)){
   
     
   #aggregate by uuid and the highest reliability. Now using dplyr 
+  # also get number of unique reliability scores, 
   d <- as.tibble(bydate)
   ll <- d %>%
          group_by(uuid) %>%
