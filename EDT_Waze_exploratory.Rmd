@@ -46,7 +46,7 @@ knitr::opts_knit$set(root.dir = wazedir)
 ```{r dataimport}
 # Initial run: Start with the projected EDT and Waze data that Lia has prepared. It appears this is just the one week of August data for MD; use aa pilot, expand to other periods after. Clean these data and save as .RData. If already done, load the processed data.
 
-if(length(grep('EDT_Waze.RData', dir())) < 1){
+if(length(grep('EDT_Waze.RData', dir("R/"))) < 1){
   waz.shp <- readOGR(dsn = ".", "Waze_sample_projected")
   edt.shp <- readOGR(dsn = ".", "EDT_sample_projected")
   
@@ -63,8 +63,8 @@ if(length(grep('EDT_Waze.RData', dir())) < 1){
   md_counties <- counties[counties$STATEFP == 24,]
 
   # Save imported waze and EDT files as .RData for faster import after the first time
-  save(file = "EDT_Waze.RData", list = c("waz.shp", "edt.shp", "md_counties"))
-} else { load('EDT_Waze.RData') }
+  save(file = "R/EDT_Waze.RData", list = c("waz.shp", "edt.shp", "md_counties"))
+} else { load('R/EDT_Waze.RData') }
 
 
 ```
