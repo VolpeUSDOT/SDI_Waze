@@ -1,5 +1,5 @@
 ---
-title: "EDT + Waze Joining: August Example"
+title: "EDT + Waze Joining"
 output:
   html_notebook:
     df_print: paged
@@ -7,9 +7,9 @@ output:
     df_print: paged
 ---
 
-Initial work in mapping EDT and Waze incident data, using week of August 1 as example
+Initial work in mapping EDT and Waze incident data
 
-Started 2017-11-28
+Started 2017-12-07
 
 Ideas:
 
@@ -19,25 +19,15 @@ Ideas:
 - Spatial overlay of events - similar to Lia's slider idea, make a figure which builds up hotspots of Waze and EDT by day
 - Spatiotemporal join - Paul's 2x2 for time (early, laggy) and space (near, far) matching of EDT and Waze, by type. In the future, using data snapped to HPMS, use roadway classification as well, or could use day of week.
 
-Summarizing the overlay. How many:
-- Waze events match EDT events within the specified buffers? (M)
-- Waze events within the state do not match EDT events? (W)
-- EDT events within the state do not match Waze events? (E)
-
-FOr each of these three categories, what are the proportions for:
-- Different roadway types
-- Rural/urban areas
-- Types of events (severe/fatal in EDT, accident vs non-accient for Waze)
-
-This document usese the August data as an example, since these day have been worked with before and use the same coordinate system and projection.
-
 ```{r setup, message = F, warning = F}
 # Read in libraries and set working directory
 knitr::opts_chunk$set(echo = T, warning=F, message=F)
 options(width = 2400, stringsAsFactors = F)
 
+library(ggplot2)
 library(tidyverse)
 library(maps) # for mapping base layers
+library(reshape)
 library(DT) # for datatable
 # devtools::install_github("ropensci/plotly") # for latest version
 library(plotly) # do after ggplot2
@@ -48,12 +38,17 @@ library(rgdal) # for readOGR(), needed for reading in ArcM shapefiles
 library(rgeos) # for gIntersection, to clip two shapefiles
 library(raster)
 
-wazedir <- "W:/SDI Pilot Projects/Waze/Working Documents"
+wazedir <- "W:/SDI Pilot Projects/Waze/"
 knitr::opts_knit$set(root.dir = wazedir) 
 ```
 
 ```{r dataimport}
-# Initial run: Start with the projected EDT and Waze data that Lia has prepared. It appears this is just the one week of August data for MD; use as a pilot, expand to other periods after (month of April). Clean these data and save as .RData. If already done, load the processed data.
+
+# Start with total EDT and total Waze data for April
+
+# EDT: See CrashFact in W:\SDI Pilot Projects\Volpe\2017_11_03\waze\input\edt\2016_01_to_2017_09_MD_and_IN
+
+
 
 if(length(grep('EDT_Waze.RData', dir("R/"))) < 1){
   waz.shp <- readOGR(dsn = ".", "Waze_sample_projected")
@@ -75,6 +70,7 @@ if(length(grep('EDT_Waze.RData', dir("R/"))) < 1){
   save(file = "R/EDT_Waze.RData", list = c("waz.shp", "edt.shp", "md_counties"))
 } else { load('R/EDT_Waze.RData') }
 
+load("W:/SDI Pilot Projects/Waze/MASTER Data Files/Waze Aggregated/month_MD/MD__2017-04.RData")
 
 ```
 
@@ -100,10 +96,10 @@ md_base <- ggplot(md_counties) + geom_map(data = md_counties, map = md_counties,
 ```{r plotlymap}
 counties <- map_data("county", "maryland")
 
-waz.shp$tooltiptext <- with(waz.shp@data, paste(city, alert_type, time, sep = "\n"))
+waz.shp$tooltiptext <- with(waz.shp@data, paste(city, alert_type, time, sep = "/n"))
 waz.shp$tooltiptext <- sub("NA", "", waz.shp$tooltiptext)
 
-edt.shp$tooltiptext <- with(edt.shp@data, paste(County, HighestInj, time, sep = "\n"))
+edt.shp$tooltiptext <- with(edt.shp@data, paste(County, HighestInj, time, sep = "/n"))
 edt.shp$tooltiptext <- sub("NA", "", edt.shp$tooltiptext)
 
 
