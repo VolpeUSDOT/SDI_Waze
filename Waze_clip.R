@@ -13,6 +13,8 @@ library(rgdal) # for readOGR(), needed for reading in ArcM shapefiles
 library(rgeos) # for gIntersection, to clip two shapefiles
 library(raster)
 
+# Version 1: from .csv aggregations made by Lia ----
+
 wazemonthdir <- "W:/SDI Pilot Projects/Waze/MASTER Data Files/Waze Aggregated/By month"
 wazedir <- "W:/SDI Pilot Projects/Waze/Working Documents"
 outputdir <- "W:/SDI Pilot Projects/Waze/MASTER Data Files/Waze Aggregated/By month_MD_only"
@@ -33,7 +35,7 @@ monthfiles[c(2, 3, 4, 6, 7, 8)] # started w July, doing manually because connect
 
 
 # <><><><><><><><><><><><><><><><><><><><>
-# Start loop ----
+# Start loop
 for(i in monthfiles[c(2, 3, 4, 6, 7, 8)]){ # change back to all files when done with manual steps
   
   starttime <- Sys.time()
@@ -44,7 +46,7 @@ for(i in monthfiles[c(2, 3, 4, 6, 7, 8)]){ # change back to all files when done 
   orig.file.size <- file.info(file.path(wazemonthdir, i))$size/1000000
   orig.nrow <- nrow(d)
 # <><><><><><><><><><><><><><><><><><><><>
-# Convert data into comparable classes ----
+# Convert data into comparable classes
 # Make the waze data into a SpatialPointsDataFrame for comparison with the state polygon.
   
   # Discard unneeded columns. Discarding two date colums bc have pubMillis, will make a POSIX datetime column from this. For now, also dropping 'filename', revisit this.
@@ -60,8 +62,7 @@ for(i in monthfiles[c(2, 3, 4, 6, 7, 8)]){ # change back to all files when done 
   
   d <- SpatialPointsDataFrame(d[c("lon","lat")], d)
   
-  # Overlay points in polygons ----
-  
+  # Overlay points in polygons
   # Use over() from sp to join these to the census polygon. Points in Polygons, pip
   
   proj4string(d) <- proj4string(md_counties) # !!! Assumes Waze lat long are in NAD83 datum; check this.
@@ -75,7 +76,7 @@ for(i in monthfiles[c(2, 3, 4, 6, 7, 8)]){ # change back to all files when done 
   d <- SpatialPointsDataFrame(dx[c("lon","lat")], dx)
 
 # <><><><><><><><><><><><><><><><><><><><>
-# Export ----
+# Export
 # Save as .csv, .RData, and ShapeFile
   irda <- sub("csv", "RData", i)
   ishp <- sub("csv", "", i)
@@ -95,3 +96,224 @@ for(i in monthfiles[c(2, 3, 4, 6, 7, 8)]){ # change back to all files when done 
       orig.nrow - new.nrow, "rows of out-of-state data removed \n\n", rep("<>",20), "\n")
   
 }
+
+
+## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ##
+# Version 2: From .RData aggregated Month file ----
+## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ##
+
+wazemonthdir <- "W:/SDI Pilot Projects/Waze/MASTER Data Files/Waze Aggregated/month_MD"
+wazedir <- "W:/SDI Pilot Projects/Waze/Working Documents"
+outputdir <- "W:/SDI Pilot Projects/Waze/MASTER Data Files/Waze Aggregated/month_MD_clipped"
+
+setwd(wazedir)
+
+# Read in county data from Census
+counties <- readOGR("Census Files", layer = "cb_2015_us_county_500k")
+md_counties <- counties[counties$STATEFP == 24,]
+
+monthfiles <- dir(wazemonthdir)[grep("RData", dir(wazemonthdir))]
+
+# <><><><><><><><><><><><><><><><><><><><>
+# Start loop
+for(i in monthfiles){ # i = "MD__2017-04.RData"
+  
+  starttime <- Sys.time()
+  
+  system.time(load(file.path(wazemonthdir, i))) # 3-4 min for July, up to 4x slower on VPN. 
+  # 25s to load 50 MB RData file on Volpe network; 8x slower on VPN
+  
+  d <- mb # was abbreviated 'monthbind', use 'd' as before
+  
+  # original file size in MB
+  orig.file.size <- file.info(file.path(wazemonthdir, i))$size/1000000
+  orig.nrow <- nrow(d)
+  # <><><><><><><><><><><><><><><><><><><><>
+  # Convert data into comparable classes
+  # Make the waze data into a SpatialPointsDataFrame for comparison with the state polygon.
+  
+  # Discard unneeded columns. Discarding two date colums bc have pubMillis, will make a POSIX datetime column from this. For now, also dropping 'filename', revisit this.
+  dropcols <- match(c("V1","X", "X.1", "X.2", "X.3", "pubMillis_date", "date", "filename"), names(d))
+  d <- d[,is.na(match(1:ncol(d), dropcols))]
+  
+  d <- SpatialPointsDataFrame(d[c("lon","lat")], d)
+  
+  # Overlay points in polygons
+  
+  # Use over() from sp to join these to the census polygon. Points in Polygons, pip
+  
+  proj4string(d) <- proj4string(md_counties) # !!! Assumes Waze lat long are in NAD83 datum; check this.
+  
+  md_pip <- over(d, md_counties[,"NAME"]) # Match a county name to each row in d. If NA, it is not in Maryland.
+  
+  d$county <- as.character(md_pip$NAME)
+  
+  dx <- d@data[!is.na(d$county),] # Drop rows with no matching county name
+  
+  d <- SpatialPointsDataFrame(dx[c("lon","lat")], dx)
+  
+  # <><><><><><><><><><><><><><><><><><><><>
+  # Export
+  # Save as .csv, .RData, and ShapeFile
+  irda <- i
+  ishp <- sub("\\.RData", "", i)
+  icsv <- sub("RData", "csv", i)
+  
+  save(list = "d", file = file.path(outputdir, irda) )
+  
+  write.csv(d@data, file = file.path(outputdir, i), row.names = F)
+  
+  #  writeOGR(obj=d, dsn=file.path(outputdir, ishp), driver="ESRI Shapefile")
+  timediff <- round(Sys.time()-starttime, 2)
+  cat(i, "complete \n", timediff, attr(timediff, "units"), "elapsed \n\n")
+  
+  new.file.size <- file.info(file.path(outputdir, i))$size/1000000
+  new.nrow <- nrow(d@data)
+  
+  cat(".csv reduced from", orig.file.size, "to", new.file.size, "\n\n",
+      orig.nrow - new.nrow, "rows of out-of-state data removed \n\n", rep("<>",20), "\n")
+  
+}
+
+
+
+## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ##
+# Version 3: From .RData aggregated Month file, clipping to 5 mi box ----
+## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ##
+
+wazemonthdir <- "W:/SDI Pilot Projects/Waze/MASTER Data Files/Waze Aggregated/month_MD"
+outputdir <- "W:/SDI Pilot Projects/Waze/MASTER Data Files/Waze Aggregated/month_MD_clipped"
+
+setwd("//vntscex.local/DFS/Projects/PROJ-OR02A2/SDI")
+
+# Read in 5 mile clipping area polygon. This is a kmz file manually created in Google Earth
+
+fivemi <- readOGR("spatial_layers/5miClip.kml", "5miClip")
+
+monthfiles <- dir(wazemonthdir)[grep("RData", dir(wazemonthdir))]
+
+# <><><><><><><><><><><><><><><><><><><><>
+# Start 
+#for(i in monthfiles){ # 
+i = "MD__2017-04.RData"
+  
+  starttime <- Sys.time()
+  
+  system.time(load(file.path(wazemonthdir, i))) # 3-4 min for July, up to 4x slower on VPN. 
+  # 25s to load 50 MB RData file on Volpe network; 8x slower on VPN
+  
+  d <- mb # was abbreviated 'monthbind', use 'd' as before
+  
+  # original file size in MB
+  orig.file.size <- file.info(file.path(wazemonthdir, i))$size/1000000
+  orig.nrow <- nrow(d)
+  # <><><><><><><><><><><><><><><><><><><><>
+  # Convert data into comparable classes
+  # Make the waze data into a SpatialPointsDataFrame for comparison with the state polygon.
+  
+  # Discard unneeded columns. Discarding two date colums bc have pubMillis, will make a POSIX datetime column from this. For now, also dropping 'filename', revisit this.
+  dropcols <- match(c("V1","X", "X.1", "X.2", "X.3", "pubMillis_date", "date", "filename"), names(d))
+  d <- d[,is.na(match(1:ncol(d), dropcols))]
+  
+  d <- SpatialPointsDataFrame(d[c("lon","lat")], d)
+  
+  # Overlay points in polygons
+  
+  # Use over() from sp to join these to the census polygon. Points in Polygons, pip
+  
+  proj4string(fivemi) <- proj4string(d) 
+  
+  md_pip <- over(d, fivemi) # Match to our bounding box
+  
+  d$fivemi <- as.character(md_pip$Name)
+  
+  dx <- d@data[!is.na(d$fivemi),] # Drop rows not inside the box
+  
+  d <- SpatialPointsDataFrame(dx[c("lon","lat")], dx)
+  
+  # <><><><><><><><><><><><><><><><><><><><>
+  # Export
+  # Save as .csv and .RData
+  irda <- paste("FiveMiSubset", i, sep = "_")
+  icsv <- sub("RData", "csv", irda)
+  
+  save(list = "d", file = file.path(outputdir, irda) )
+  
+  write.csv(d@data, file = file.path(outputdir, icsv), row.names = F )
+# Clip EDT to April, same box
+
+edtdir = "//vntscex.local/DFS/Projects/PROJ-OR02A2/SDI/edt_data/2016_01_to_2017_09_MD_and_IN"
+  
+  i = "1_CrashFact_edited.txt"
+  starttime <- Sys.time()
+  
+  system.time(e <- read.csv(file.path(edtdir, i), sep = "\t")) 
+  
+  d <- e # was abbreviated 'monthbind', use 'd' as before
+  
+  # original file size in MB
+  orig.file.size <- file.info(file.path(edtdir, i))$size/1000000
+  orig.nrow <- nrow(d)
+  # <><><><><><><><><><><><><><><><><><><><>
+  # Convert data into comparable classes
+  # Make the EDT data into a SpatialPointsDataFrame for comparison with the polygon.
+  
+  # Discard unneeded columns. 
+  dropcols <- match(c("GPSLong_OG"), names(d))
+  d <- d[,is.na(match(1:ncol(d), dropcols))]
+  
+  # Discard rows with no lat long
+  d <- d[!is.na(d$GPSLat),]
+  
+  # Keep only Maryland, only 2017
+  d <- d[d$CrashState == "Maryland" & d$StudyYear == "2017",]
+  
+  # Format datetime. No crashdate_local, make it here
+  d$CrashDate_Local <- with(d,
+                          strptime(
+                            paste(substr(CrashDate, 1, 10),
+                                  HourofDay, MinuteofDay), format = "%Y-%m-%d %H %M", tz = "America/New_York")
+                            )
+  
+  # Also all of April, unbounded by the box
+  aprilonly <- format(d$CrashDate_Local, "%m") == "04"
+  
+  
+  d <- SpatialPointsDataFrame(d[c("GPSLong_New","GPSLat")], d)
+  
+  edt.april <- d[aprilonly,] # write out edt.april below
+  
+  # Overlay points in polygons
+  proj4string(fivemi) <- proj4string(d) 
+  
+  md_pip <- over(d, fivemi) # Match to our bounding box
+  
+  d$fivemi <- as.character(md_pip$Name)
+  
+  dx <- d@data[!is.na(d$fivemi),] # Drop rows not inside the box
+  
+  d <- SpatialPointsDataFrame(dx[c("GPSLong_New","GPSLat")], dx)
+  
+  # <><><><><><><><><><><><><><><><><><><><>
+  # Export
+  # Save as .csv and .RData
+  i <- sub("txt", "RData", i)
+  irda <- paste("FiveMiSubset", "2017-04", i, sep = "_")
+  icsv <- sub("RData", "csv", irda)
+  
+  edt.5mi <- d
+  
+#  save(list = "edt.5mi", file = file.path(outputdir, irda) )
+  
+  write.csv(edt.5mi@data, file = file.path(outputdir, icsv), row.names = F)
+  
+  april.irda <- paste("2017-04", i, sep = "_")
+  april.icsv <- sub("RData", "csv", april.irda)
+  
+  # edt.april 
+#  save(list = "edt.april", file = file.path(outputdir, april.irda) )
+  
+  write.csv(edt.5mi, file = file.path(outputdir, icsv), row.names = F)
+  
+  write.csv(edt.april, file = file.path(outputdir, april.icsv), row.names = F)
+  
