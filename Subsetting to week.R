@@ -15,9 +15,9 @@ setwd(inputdir)
 
 monthlyfiles <- dir()[grep("RData", dir())]
 
+starttime <- Sys.time()
+
 for(i in monthlyfiles){ # i = "MD__2017-07.RData"
-  
-  starttime <- Sys.time()
   
   load(i)
   
