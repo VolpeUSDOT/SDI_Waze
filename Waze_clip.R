@@ -180,7 +180,7 @@ for(i in monthfiles){ # i = "MD__2017-04.RData"
   
   save(list = "d", file = file.path(outputdir, irda) )
   
-  write.csv(d@data, file = file.path(outputdir, i), row.names = F)
+  write.csv(d@data, file = file.path(outputdir, icsv), row.names = F)
   
   #  writeOGR(obj=d, dsn=file.path(outputdir, ishp), driver="ESRI Shapefile")
   timediff <- round(Sys.time()-starttime, 2)
@@ -325,7 +325,7 @@ edtdir = "//vntscex.local/DFS/Projects/PROJ-OR02A2/SDI/edt_data/2016_01_to_2017_
   
   edt.5mi <- d
   
-#  save(list = "edt.5mi", file = file.path(outputdir, irda) )
+  save(list = "edt.5mi", file = file.path(outputdir, irda) )
   
   write.csv(edt.5mi@data, file = file.path(outputdir, icsv), row.names = F)
   
@@ -333,10 +333,8 @@ edtdir = "//vntscex.local/DFS/Projects/PROJ-OR02A2/SDI/edt_data/2016_01_to_2017_
   april.icsv <- sub("RData", "csv", april.irda)
   
   # edt.april 
-#  save(list = "edt.april", file = file.path(outputdir, april.irda) )
-  
-  write.csv(edt.5mi, file = file.path(outputdir, icsv), row.names = F)
-  
+  save(list = "edt.april", file = file.path(outputdir, april.irda) )
+
   write.csv(edt.april, file = file.path(outputdir, april.icsv), row.names = F)
   
 } # end version if statement
