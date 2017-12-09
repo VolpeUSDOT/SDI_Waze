@@ -33,6 +33,7 @@ proj4string(d) <- proj4string(edt) <- c("+proj=longlat +datum=NAD83 +no_defs +el
 
 link.all <- makelink(edt, d)
 
+write.csv(link.all, "EDT_Waze_link_April_MD.csv", row.names = F)
 
 # Next up: making summary tables from the link table
 
