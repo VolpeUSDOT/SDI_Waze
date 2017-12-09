@@ -13,7 +13,11 @@ library(rgdal) # for readOGR(), needed for reading in ArcM shapefiles
 library(rgeos) # for gIntersection, to clip two shapefiles
 library(raster)
 
+VERSION = 2 # Choose which type of aggregation and clipping to do. 1 was for original aggregated files from Lia; 2 is from .RData files; 3 is for both EDT and Waze, clipping to a 5 x 5 mi square
+
 # Version 1: from .csv aggregations made by Lia ----
+
+if(VERSION == 1){
 
 wazemonthdir <- "W:/SDI Pilot Projects/Waze/MASTER Data Files/Waze Aggregated/By month"
 wazedir <- "W:/SDI Pilot Projects/Waze/Working Documents"
@@ -97,10 +101,15 @@ for(i in monthfiles[c(2, 3, 4, 6, 7, 8)]){ # change back to all files when done 
   
 }
 
+} # end version if statement
 
 ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ##
 # Version 2: From .RData aggregated Month file ----
 ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ##
+
+if(VERSION == 2){
+
+BUFFER = TRUE # Set to false to use original md_counties shapefile, true for 0.5 mi buffered version
 
 wazemonthdir <- "W:/SDI Pilot Projects/Waze/MASTER Data Files/Waze Aggregated/month_MD"
 wazedir <- "W:/SDI Pilot Projects/Waze/Working Documents"
@@ -109,8 +118,13 @@ outputdir <- "W:/SDI Pilot Projects/Waze/MASTER Data Files/Waze Aggregated/month
 setwd(wazedir)
 
 # Read in county data from Census
-counties <- readOGR("Census Files", layer = "cb_2015_us_county_500k")
-md_counties <- counties[counties$STATEFP == 24,]
+if(BUFFER){
+    md_counties <- readOGR("Census Files", layer = "MD_buffered")  
+    
+    } else {
+    counties <- readOGR("Census Files", layer = "cb_2015_us_county_500k")
+    md_counties <- counties[counties$STATEFP == 24,]
+    }
 
 monthfiles <- dir(wazemonthdir)[grep("RData", dir(wazemonthdir))]
 
@@ -121,7 +135,7 @@ for(i in monthfiles){ # i = "MD__2017-04.RData"
   starttime <- Sys.time()
   
   system.time(load(file.path(wazemonthdir, i))) # 3-4 min for July, up to 4x slower on VPN. 
-  # 25s to load 50 MB RData file on Volpe network; 8x slower on VPN
+  # 25s to load 50 MB RData file on Volpe network; 5-8x slower on VPN
   
   d <- mb # was abbreviated 'monthbind', use 'd' as before
   
@@ -144,17 +158,22 @@ for(i in monthfiles){ # i = "MD__2017-04.RData"
   
   proj4string(d) <- proj4string(md_counties) # !!! Assumes Waze lat long are in NAD83 datum; check this.
   
-  md_pip <- over(d, md_counties[,"NAME"]) # Match a county name to each row in d. If NA, it is not in Maryland.
+  matchcol = ifelse(BUFFER, "MD", "NAME")
   
-  d$county <- as.character(md_pip$NAME)
+  md_pip <- over(d, md_counties[,matchcol]) # Match a county name to each row in d. If NA, it is not in Maryland.
   
-  dx <- d@data[!is.na(d$county),] # Drop rows with no matching county name
+  d@data <- data.frame(d@data, matchcol = as.character(md_pip[,matchcol]))
+  names(d@data)[length(d@data)] = matchcol
+  
+  dx <- d@data[!is.na(d@data[,matchcol]),] # Drop rows with no matching county name
   
   d <- SpatialPointsDataFrame(dx[c("lon","lat")], dx)
   
   # <><><><><><><><><><><><><><><><><><><><>
   # Export
   # Save as .csv, .RData, and ShapeFile
+  
+  if(BUFFER) i <- sub("MD", "MD_buffered", i)
   irda <- i
   ishp <- sub("\\.RData", "", i)
   icsv <- sub("RData", "csv", i)
@@ -176,10 +195,13 @@ for(i in monthfiles){ # i = "MD__2017-04.RData"
 }
 
 
+} # end version if statement
 
 ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ##
 # Version 3: From .RData aggregated Month file, clipping to 5 mi box ----
 ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ##
+
+if(VERSION == 3){
 
 wazemonthdir <- "W:/SDI Pilot Projects/Waze/MASTER Data Files/Waze Aggregated/month_MD"
 outputdir <- "W:/SDI Pilot Projects/Waze/MASTER Data Files/Waze Aggregated/month_MD_clipped"
@@ -317,3 +339,4 @@ edtdir = "//vntscex.local/DFS/Projects/PROJ-OR02A2/SDI/edt_data/2016_01_to_2017_
   
   write.csv(edt.april, file = file.path(outputdir, april.icsv), row.names = F)
   
+} # end version if statement
