@@ -18,7 +18,8 @@ makelink <- function(edtfile, wazefile){
     d.sp <- wazefile[dist.i.5,]
     
     # Temporally matching
-    d.t <- d.sp[d.sp$time > ei$CrashDate_Local-60*60 & d.sp$time <= ei$CrashDate_Local+60*60,] 
+    # Match between the first reported time and last pull time of the Waze event
+    d.t <- d.sp[d.sp$time > ei$CrashDate_Local-60*60 & d.sp$last.pull.time <= ei$CrashDate_Local+60*60,] 
     
     id.edt <- rep(as.character(ei$ID), nrow(d.t))
     uuid.waze <- as.character(d.t$uuid)
