@@ -7,16 +7,23 @@ library(tidyverse)
 library(maps)
 
 # Code location
-codeloc <- "~/Documents/git/SDI_Waze"
+mappeddriveloc <- "W:"
+
+codeloc <- "~/git/SDI_Waze"
+wazedir <- file.path(mappeddriveloc, "SDI Pilot Projects/Waze/MASTER Data Files/Waze Aggregated/month_MD_clipped")
 
 # load data - will load all files in month_MD_clipped directory on shared drive
-source(file.path(codeloc, 'wazeloader.R'))
+# source(file.path(codeloc, 'wazeloader.R'))
+
+setwd(wazedir)
+load("MD_buffered__2017-04.RData")
+load("2017-04_1_CrashFact_edited.RData")
 
 # read functions
 source(file.path(codeloc, 'wazefunctions.R'))
 
 # Set projections
-d <- SpatialPointsDataFrame(mb[c("lon", "lat")], mb)  # from monthbind of Waze data, make sure it is a SPDF
+# d <- SpatialPointsDataFrame(d[c("lon", "lat")], d)  # from monthbind of Waze data, make sure it is a SPDF
 edt <- edt.april
 
 proj4string(d) <- proj4string(edt) <- c("+proj=longlat +datum=NAD83 +no_defs +ellps=GRS80 +towgs84=0,0,0")
@@ -26,12 +33,13 @@ proj4string(d) <- proj4string(edt) <- c("+proj=longlat +datum=NAD83 +no_defs +el
 # Location in Waze is in lon and lat, time is in time.
 
 # use spDists from sp package to get distances from each EDT event to each Waze event. Could pre-filter Waze events by lat long; a degree latitude or longitude is ~ 69 mi for Maryland. If it is too slow, try this.
-
 # Produce a link table which has a two columns: EDT events and the Waze events which match them; repeat EDT event in the column for all matching Waze events.
 
-# link.test <- makelink(edt[1:250,], d[1:5000,])
 
+# <><><><><><><><><><><><><><><><><><><><><><><><>
 link.all <- makelink(edt, d)
+# <><><><><><><><><><><><><><><><><><><><><><><><>
+
 
 write.csv(link.all, "EDT_Waze_link_April_MD.csv", row.names = F)
 

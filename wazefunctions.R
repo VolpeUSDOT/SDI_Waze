@@ -9,7 +9,7 @@ makelink <- function(edtfile, wazefile){
   linktable <- vector()
   starttime <- Sys.time()
   
-  for(i in 1:nrow(edtfile)){ # i = 1
+  for(i in 1:nrow(edtfile)){ # i=which(edt$ID == "2023680")
     ei = edtfile[i,]
     dist.i <- spDists(ei, wazefile, longlat = T)*0.6213712 # spDists gives units in km, convert to miles
     dist.i.5 <- which(dist.i <= 0.5)
@@ -18,8 +18,8 @@ makelink <- function(edtfile, wazefile){
     d.sp <- wazefile[dist.i.5,]
     
     # Temporally matching
-    # Match between the first reported time and last pull time of the Waze event
-    d.t <- d.sp[d.sp$time > ei$CrashDate_Local-60*60 & d.sp$last.pull.time <= ei$CrashDate_Local+60*60,] 
+    # Match between the first reported time and last pull time of the Waze event. Last pull time is after the earliest time of EDT, and first reported time is earlier than the latest time of EDT
+    d.t <- d.sp[d.sp$last.pull.time >= ei$CrashDate_Local-60*60 & d.sp$time <= ei$CrashDate_Local+60*60,] 
     
     id.edt <- rep(as.character(ei$ID), nrow(d.t))
     uuid.waze <- as.character(d.t$uuid)
