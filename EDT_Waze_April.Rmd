@@ -37,40 +37,115 @@ library(mapproj) # for coord_map()
 library(rgdal) # for readOGR(), needed for reading in ArcM shapefiles
 library(rgeos) # for gIntersection, to clip two shapefiles
 library(raster)
+library(knitr)
+library(kableExtra)
 
 wazedir <- "W:/SDI Pilot Projects/Waze/"
+volpewazedir <- "//vntscex.local/DFS/Projects/PROJ-OR02A2/SDI/"
+
 knitr::opts_knit$set(root.dir = wazedir) 
 ```
 
 ```{r dataimport}
 
-# Start with total EDT and total Waze data for April
+# EDT: See CrashFact in W:\SDI Pilot Projects\Volpe\2017_11_03\waze\input\edt\2016_01_to_2017_09_MD_and_IN.
+# This has been reduced to just Maryland data from April 2017.
+load("MASTER Data Files/Waze Aggregated/month_MD_clipped/2017-04_1_CrashFact_edited.RData")
 
-# EDT: See CrashFact in W:\SDI Pilot Projects\Volpe\2017_11_03\waze\input\edt\2016_01_to_2017_09_MD_and_IN
+# Waze: Comes from aggregated monthly Waze events, clipped to a 0.5 mile buffer around MD, for April 2017
+load("MASTER Data Files/Waze Aggregated/month_MD_clipped/MD_buffered__2017-04.RData")
+
+# Read in link files: three versions, one from R script using time point, one from Python script
+link1 <- read.csv("MASTER Data Files/Waze Aggregated/month_MD_clipped/EDT_Waze_link_April_MD-timepoint.csv")
+link2 <- read.csv(file.path(volpewazedir, "output_mmg/link_table_edt_waze.txt"), sep = "\t")
+link <- read.csv("MASTER Data Files/Waze Aggregated/month_MD_clipped/EDT_Waze_link_April_MD.csv")
+
+# compare pairs
+link1.p <- paste(link1[,1], link1[,2])
+link2.p <- paste(link2[,1], link2[,2])
+link3.p <- paste(link[,1], link[,2])
+
+link1.p <- sort(link1.p)
+link2.p <- sort(link2.p)
+link3.p <- sort(link3.p)
+
+identical(length(link1.p), length(link2.p)) # identical!!
+length(link3.p) - length(link1.p) # additional linked records
+summary(link1.p == link2.p) # identical!
+
+# # Read in county data from Census
+# counties <- readOGR("Working Documents/Census Files", layer = "cb_2015_us_county_500k")
+# md_counties <- counties[counties$STATEFP == 24,]
+
+```
 
 
+```{r linksummary, echo = F}
 
-if(length(grep('EDT_Waze.RData', dir("R/"))) < 1){
-  waz.shp <- readOGR(dsn = ".", "Waze_sample_projected")
-  edt.shp <- readOGR(dsn = ".", "EDT_sample_projected")
-  
-  # Fix time values: convert pub_millis to usable POSIX date class
-  waz.shp$time <- as.POSIXct(waz.shp$pub_millis/1000, origin = "1970-01-01", tz="America/New_York")
-  # Convert crashdate and time in EDT to POSIX
-  edt.time <- paste(as.character(edt.shp$CrashDate), " ",
-                    edt.shp$HourofDay, ":",
-                    formatC(as.numeric(as.character(edt.shp$MinuteofDa)), width = 2, flag = "0"), sep = "")
-  edt.shp$time <- strptime(edt.time, format = "%Y/%m/%d %H:%M", tz="America/New_York")
+###Some code for subsetting EDT and Waze data based on link table
 
-  # Read in county data from Census
-  counties <- readOGR("CensusCounty/.")
-  md_counties <- counties[counties$STATEFP == 24,]
+# Make sure EDT data is just for April
+edt.april <- edt.april[edt.april$CrashDate_Local < "2017-05-01 00:00:00 EDT" & edt.april$CrashDate_Local > "2017-04-01 00:00:00 EDT",] 
 
-  # Save imported waze and EDT files as .RData for faster import after the first time
-  save(file = "R/EDT_Waze.RData", list = c("waz.shp", "edt.shp", "md_counties"))
-} else { load('R/EDT_Waze.RData') }
+#Add "M" code to the table to show matches if we merge in full datasets
+match <- rep("M", nrow(link))
+link <- mutate(link, match)
+# glimpse(link)
+# 
+# #Subset of Waze data that matches EDT
+# Waze.Match <- d[match(link$uuid.waze, d$uuid),]
+# 
+# stopifnot(identical(as.character(Waze.Match$uuid), link$uuid.waze) == TRUE)
+# 
+# # This merge doesn't work: non-unique matches detected. We want to keep non-unique matches
+# WazeLinked <- merge(Waze.Match, link, by.x = "uuid", by.y = "uuid.waze", all = T)
+# 
+# #Subset of Waze data that does not match (check to be sure is same as total length April Waze - number of unique match Waze)
+# length(unique(link.5mi$uuid.waze))
+# nrow(d)
+# Waze.NoMatch <- subset(d, !(uuid %in% link.5mi$uuid.waze))
+# nrow(Waze.NoMatch) #431/9921 or only 4.3% of Waze events match an EDT crash in space and time
+# 
+# #check total
+# nrow(Waze.NoMatch)+length(unique(link.5mi$uuid.waze)) # Matches total number 
+# 
+# # EDT files with matching Waze events:
+# length(unique(link.5mi$id.edt))
+# # out of
+# nrow(edt.april) #70/96 in April match a Waze event (72.9%)
+# 
+# # and with this distribution of Waze matches
+# hist(tapply(link.5mi$uuid.waze, link.5mi$id.edt, length))
 
-load("W:/SDI Pilot Projects/Waze/MASTER Data Files/Waze Aggregated/month_MD/MD__2017-04.RData")
+### 
+Total.EDT.events <- length(unique(edt.april$ID))
+EDT.events.with.Waze <- length(unique(link$id.edt))
+EDT.events.without.Waze <- Total.EDT.events - EDT.events.with.Waze
+Pct.EDT.match <- round(100*EDT.events.with.Waze/Total.EDT.events,2)
+
+Total.Waze.events <- length(unique(d$uuid))
+Waze.events.with.EDT <- length(unique(link$uuid.waze))
+Waze.events.without.EDT <- Total.Waze.events - Waze.events.with.EDT
+Pct.Waze.match <- round(100*Waze.events.with.EDT/Total.Waze.events,2)
+
+```
+
+```{r matchtable}
+
+
+mm <- matrix(c(EDT.events.with.Waze, EDT.events.without.Waze, Total.EDT.events, Pct.EDT.match,
+         Waze.events.with.EDT, Waze.events.without.EDT,Total.Waze.events, Pct.Waze.match), byrow=T,
+       nrow = 2, ncol = 4)
+
+row.names(mm) <- c("EDT", "Waze")
+colnames(mm) <- c("Matching", "Non-Matching", "Total", "Percent Matching")
+
+kable(mm) %>% kable_styling(bootstrap_options = c("striped", "hover"))
+
+
+# by type
+
+
 
 ```
 
@@ -93,7 +168,7 @@ md_base <- ggplot(md_counties) + geom_map(data = md_counties, map = md_counties,
   coord_map(projection="albers", lat = 39, lat1 = 45)
 ```
 
-```{r plotlymap}
+```{r plotlymap, eval=F}
 counties <- map_data("county", "maryland")
 
 waz.shp$tooltiptext <- with(waz.shp@data, paste(city, alert_type, time, sep = "/n"))
@@ -132,25 +207,23 @@ ggplotly(map.p, tooltip = "text", width = 1000)
 
 ```
 
-### Interactive table of Waze events by day 
+### Table of Waze events by day 
 
-```{r freqevents}
-# make a table of frequency of alert_type by day
-freq.tab <- aggregate(uuid ~ format(time, "%d") + alert_type,
-          FUN = length,
-          data = waz.shp@data)
+```{r freqevents, fig.width=12}
+# make a table of frequency of type by time of day
+d$timeofday <- as.numeric(paste(as.numeric(format(d$time, "%H")), round(100*as.numeric(format(d$time, "%M"))/60, 0), sep = "."))
 
-datatable(freq.tab,
-          filter = 'top',
-          colnames = c("Day" = 1, "Alert Type" = 2, "Count"= 3),
-          rownames = F,
-          options = list(dom = "ftip"))
+gp <- ggplot(d@data, aes(timeofday, color = type)) + 
+  geom_freqpoly(bins = 50)
+
+ggplotly(gp)
+
 ```
 
 
 ### Spatiotemporal join
 
-```{r stjoin, warning = F, eval = T} 
+```{r stjoin, warning = F, eval = F} 
 
 # for each EDT event, find the number and distance for nearest neighbors in space and time from Waze data
 ex <- edt.shp@data
