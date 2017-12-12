@@ -59,22 +59,23 @@ load("MASTER Data Files/Waze Aggregated/month_MD_clipped/2017-04_1_CrashFact_edi
 load("MASTER Data Files/Waze Aggregated/month_MD_clipped/MD_buffered__2017-04.RData")
 
 # Read in link files: three versions, one from R script using time point, one from Python script
-link1 <- read.csv("MASTER Data Files/Waze Aggregated/month_MD_clipped/EDT_Waze_link_April_MD-timepoint.csv")
+#link1 <- read.csv("MASTER Data Files/Waze Aggregated/month_MD_clipped/EDT_Waze_link_April_MD-timepoint.csv")
 link2 <- read.csv(file.path(volpewazedir, "output_mmg/link_table_edt_waze.txt"), sep = "\t")
 link <- read.csv("MASTER Data Files/Waze Aggregated/month_MD_clipped/EDT_Waze_link_April_MD.csv")
 
+# EDT_Waze_link_April_MD-timepoint.csv file deleted (used single timepoint instead of window)
 # compare pairs
-link1.p <- paste(link1[,1], link1[,2])
+#link1.p <- paste(link1[,1], link1[,2])
 link2.p <- paste(link2[,1], link2[,2])
 link3.p <- paste(link[,1], link[,2])
 
-link1.p <- sort(link1.p)
+#link1.p <- sort(link1.p)
 link2.p <- sort(link2.p)
 link3.p <- sort(link3.p)
 
-identical(length(link1.p), length(link2.p)) # identical!!
-length(link3.p) - length(link1.p) # additional linked records
-summary(link1.p == link2.p) # identical!
+#identical(length(link1.p), length(link2.p)) # identical!!
+#length(link3.p) - length(link1.p) # additional linked records
+#summary(link1.p == link2.p) # identical!
 
 # # Read in county data from Census
 # counties <- readOGR("Working Documents/Census Files", layer = "cb_2015_us_county_500k")
