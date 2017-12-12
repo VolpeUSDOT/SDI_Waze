@@ -1,13 +1,11 @@
 ---
-title: "EDT + Waze Joining"
+title: "EDT + Waze April 2017"
 output:
-  html_notebook:
-    df_print: paged
   html_document:
     df_print: paged
 ---
 
-Initial work in mapping EDT and Waze incident data
+## Working with linked EDT and Waze incident data for April 2017
 
 Started 2017-12-07
 
@@ -21,14 +19,13 @@ Ideas:
 
 ```{r setup, message = F, warning = F}
 # Read in libraries and set working directory
-knitr::opts_chunk$set(echo = T, warning=F, message=F)
+knitr::opts_chunk$set(echo = F, warning=F, message=F)
 options(width = 2400, stringsAsFactors = F)
 
-library(ggplot2)
 library(tidyverse)
 library(maps) # for mapping base layers
 library(reshape)
-library(DT) # for datatable
+library(DT) # for interatctive datatable
 # devtools::install_github("ropensci/plotly") # for latest version
 library(plotly) # do after ggplot2
 library(sp)
@@ -36,50 +33,54 @@ library(maptools) # readShapePoly() and others
 library(mapproj) # for coord_map()
 library(rgdal) # for readOGR(), needed for reading in ArcM shapefiles
 library(rgeos) # for gIntersection, to clip two shapefiles
-library(raster)
 library(knitr)
-library(kableExtra)
+library(kableExtra) # formatting tables 
 
 #Set file locations
-mappeddrive = "S:" # change this to match the mapped network drive on your machine (Z: in original)
-#wazedir <- "W:/SDI Pilot Projects/Waze/"
+
+if(length(grep("flynn", getwd())) > 0) {mappeddrive = "W:"} # change this to match the mapped network drive on your machine (Z: in original)
+if(length(grep("sudderth", getwd())) > 0) {mappeddrive = "S:"} 
+
 wazedir <- (file.path(mappeddrive,"SDI Pilot Projects/Waze"))
 volpewazedir <- "//vntscex.local/DFS/Projects/PROJ-OR02A2/SDI/"
-
-knitr::opts_knit$set(root.dir = wazedir) 
+ 
+knitr::opts_knit$set(root.dir = wazedir)  # setwd(wazedir) # to develop code in working R session
 ```
 
 ```{r dataimport}
 
 # EDT: See CrashFact in W:\SDI Pilot Projects\Volpe\2017_11_03\waze\input\edt\2016_01_to_2017_09_MD_and_IN.
 # This has been reduced to just Maryland data from April 2017.
-load("MASTER Data Files/Waze Aggregated/month_MD_clipped/2017-04_1_CrashFact_edited.RData")
+load(file.path(wazedir, "MASTER Data Files/Waze Aggregated/month_MD_clipped/2017-04_1_CrashFact_edited.RData"))
 
 # Waze: Comes from aggregated monthly Waze events, clipped to a 0.5 mile buffer around MD, for April 2017
-load("MASTER Data Files/Waze Aggregated/month_MD_clipped/MD_buffered__2017-04.RData")
+load(file.path(wazedir, "MASTER Data Files/Waze Aggregated/month_MD_clipped/MD_buffered__2017-04.RData"))
 
-# Read in link files: three versions, one from R script using time point, one from Python script
-#link1 <- read.csv("MASTER Data Files/Waze Aggregated/month_MD_clipped/EDT_Waze_link_April_MD-timepoint.csv")
+# Read in link files. Three versions: from R script using time point, from Python script, and from R, using wider time window for Waze events. 
+link1 <- read.csv(file.path(wazedir, "MASTER Data Files/Waze Aggregated/month_MD_clipped/EDT_Waze_link_April_MD-timepoint.csv"))
 link2 <- read.csv(file.path(volpewazedir, "output_mmg/link_table_edt_waze.txt"), sep = "\t")
-link <- read.csv("MASTER Data Files/Waze Aggregated/month_MD_clipped/EDT_Waze_link_April_MD.csv")
+link <- read.csv(file.path(wazedir, "MASTER Data Files/Waze Aggregated/month_MD_clipped/EDT_Waze_link_April_MD.csv"))
 
-# EDT_Waze_link_April_MD-timepoint.csv file deleted (used single timepoint instead of window)
+# EDT_Waze_link_April_MD-timepoint.csv file (used single timepoint instead of window)
 # compare pairs
-#link1.p <- paste(link1[,1], link1[,2])
+link1.p <- paste(link1[,1], link1[,2])
 link2.p <- paste(link2[,1], link2[,2])
 link3.p <- paste(link[,1], link[,2])
 
-#link1.p <- sort(link1.p)
+link1.p <- sort(link1.p)
 link2.p <- sort(link2.p)
 link3.p <- sort(link3.p)
 
-#identical(length(link1.p), length(link2.p)) # identical!!
-#length(link3.p) - length(link1.p) # additional linked records
-#summary(link1.p == link2.p) # identical!
+identical(length(link1.p), length(link2.p)) # identical!!
+length(link3.p) - length(link1.p) # additional linked records
+summary(link1.p == link2.p) # identical!
 
-# # Read in county data from Census
-# counties <- readOGR("Working Documents/Census Files", layer = "cb_2015_us_county_500k")
-# md_counties <- counties[counties$STATEFP == 24,]
+# Read in county data from Census
+counties <- readOGR(file.path(wazedir, "Working Documents/Census Files"), layer = "cb_2015_us_county_500k")
+md_counties <- counties[counties$STATEFP == 24,]
+
+# Read in urban/rural layer from Census
+ua <- readOGR(file.path(wazedir, "Working Documents/Census Files"), layer = "cb_2016_us_ua10_500k")
 
 ```
 
@@ -107,9 +108,10 @@ names(edt.df)
 #Subset of Waze data that matches EDT
 #Waze.Match <- Waze.df[match(link$uuid.waze, d$uuid),]
 #Waze.Match@data
+# stopifnot(identical(as.character(Waze.Match$uuid), link$uuid.waze) == TRUE)
 
 #Join Waze data to link table (full join)
-link.waze <- full_join(link,waze.df,by=c("uuid.waze"="uuid")) #442,500
+link.waze <- full_join(link, waze.df, by=c("uuid.waze"="uuid")) #442,500
 
 #Add W code to match column to indicate only Waze data
 link.waze$match <- ifelse(is.na(link.waze$match), 'W', link.waze$match)
@@ -117,7 +119,7 @@ link.waze$match <- ifelse(is.na(link.waze$match), 'W', link.waze$match)
 #Join EDT data to Waze-link table (full join)
 #Note:error stating "Column `CrashDate_Local` POSIXlt not supported" returned for all columns 
 #Removed the column for now  
-link.waze.edt <- full_join(link.waze,edt.df[,1:53],by=c("id.edt"="ID")) #446,461 x 74
+link.waze.edt <- full_join(link.waze, edt.df[,1:53], by = c("id.edt"="ID")) #446,461 x 74
 #Check size - total should equal number non-matched EDT + number non-matched Waze + nrow(link table);
 # 3961+413294+29206 = 446,461 (it matches!)
 
@@ -130,8 +132,15 @@ write.csv(link.waze.edt, file="merged.waze.edt.April_MD.csv")
 
 #Save the merged Rdata file as an Rdata file
 saveRDS(link.waze.edt, file = "merged.waze.edt.April_MD.rds")
+```
 
-# stopifnot(identical(as.character(Waze.Match$uuid), link$uuid.waze) == TRUE)
+```{r uaoverlay}
+# Get urban areas for these events
+
+```
+
+
+```{r matchtable}
 
 ## Calculations for EDT/Waze match table
 Total.EDT.events <- length(unique(edt.april$ID))
@@ -144,10 +153,6 @@ Waze.events.with.EDT <- length(unique(link$uuid.waze))
 Waze.events.without.EDT <- Total.Waze.events - Waze.events.with.EDT
 Pct.Waze.match <- round(100*Waze.events.with.EDT/Total.Waze.events,2)
 
-```
-
-```{r matchtable}
-
 
 mm <- matrix(c(EDT.events.with.Waze, EDT.events.without.Waze, Total.EDT.events, Pct.EDT.match,
          Waze.events.with.EDT, Waze.events.without.EDT,Total.Waze.events, Pct.Waze.match), byrow=T,
@@ -156,7 +161,7 @@ mm <- matrix(c(EDT.events.with.Waze, EDT.events.without.Waze, Total.EDT.events, 
 row.names(mm) <- c("EDT", "Waze")
 colnames(mm) <- c("Matching", "Non-Matching", "Total", "Percent Matching")
 
-kable(mm) %>% kable_styling(bootstrap_options = c("striped", "hover"))
+kable(mm) %>% kable_styling(bootstrap_options = c("hover"))
 
 
 # by type
