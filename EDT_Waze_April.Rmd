@@ -111,11 +111,16 @@ names(edt.df)
 #Join Waze data to link table (full join)
 link.waze <- full_join(link,waze.df,by=c("uuid.waze"="uuid")) #442,500
 
+#Add W code to match column to indicate only Waze data
+link.waze$match <- ifelse(is.na(link.waze$match), 'W', link.waze$match)
+
 #Join EDT data to Waze-link table (full join)
 #Note:error stating "Column `CrashDate_Local` POSIXlt not supported" returned for all columns 
 #Removed the column for now  
 link.waze.edt <- full_join(link.waze,edt.df[,1:53],by=c("id.edt"="ID")) #446,461 x 74
 #Check size - total should equal number non-matched EDT + number non-matched Waze + nrow(link table) = 446,461 (matches!)
+#Add E code to match column to indicate only EDT data
+link.waze.edt$match <- ifelse(is.na(link.waze.edt$match), 'E', link.waze.edt$match)
 
 #save the merged file as a csv file
 #write.csv(link.waze.edt, file="link.waze.edt.April2017.csv")
