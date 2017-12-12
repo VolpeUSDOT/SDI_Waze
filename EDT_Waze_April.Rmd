@@ -40,7 +40,10 @@ library(raster)
 library(knitr)
 library(kableExtra)
 
-wazedir <- "W:/SDI Pilot Projects/Waze/"
+#Set file locations
+mappeddrive = "S:" # change this to match the mapped network drive on your machine (Z: in original)
+#wazedir <- "W:/SDI Pilot Projects/Waze/"
+wazedir <- (file.path(mappeddrive,"SDI Pilot Projects/Waze"))
 volpewazedir <- "//vntscex.local/DFS/Projects/PROJ-OR02A2/SDI/"
 
 knitr::opts_knit$set(root.dir = wazedir) 
