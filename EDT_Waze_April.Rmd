@@ -118,19 +118,22 @@ link.waze$match <- ifelse(is.na(link.waze$match), 'W', link.waze$match)
 #Note:error stating "Column `CrashDate_Local` POSIXlt not supported" returned for all columns 
 #Removed the column for now  
 link.waze.edt <- full_join(link.waze,edt.df[,1:53],by=c("id.edt"="ID")) #446,461 x 74
-#Check size - total should equal number non-matched EDT + number non-matched Waze + nrow(link table) = 446,461 (matches!)
+#Check size - total should equal number non-matched EDT + number non-matched Waze + nrow(link table);
+# 3961+413294+29206 = 446,461 (it matches!)
+
 #Add E code to match column to indicate only EDT data
 link.waze.edt$match <- ifelse(is.na(link.waze.edt$match), 'E', link.waze.edt$match)
+table(link.waze.edt$match)
 
 #save the merged file as a csv file
-#write.csv(link.waze.edt, file="link.waze.edt.April2017.csv")
+write.csv(link.waze.edt, file="link.waze.edt.April2017.csv")
 
-# Save the merged Rdata file as an Rdata file
-#saveRDS(link.waze.edt, file = "link.waze.edt.April2017.rds")
+#Save the merged Rdata file as an Rdata file
+saveRDS(link.waze.edt, file = "link.waze.edt.April2017.rds")
 
 # stopifnot(identical(as.character(Waze.Match$uuid), link$uuid.waze) == TRUE)
 
-## 
+## Calculations for EDT/Waze match table
 Total.EDT.events <- length(unique(edt.april$ID))
 EDT.events.with.Waze <- length(unique(link$id.edt))
 EDT.events.without.Waze <- Total.EDT.events - EDT.events.with.Waze
