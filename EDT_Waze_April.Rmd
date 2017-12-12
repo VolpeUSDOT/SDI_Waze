@@ -93,35 +93,39 @@ edt.april <- edt.april[edt.april$CrashDate_Local < "2017-05-01 00:00:00 EDT" & e
 
 #Add "M" code to the table to show matches if we merge in full datasets
 match <- rep("M", nrow(link))
-link <- mutate(link, match)
-# glimpse(link)
-# 
-# #Subset of Waze data that matches EDT
-# Waze.Match <- d[match(link$uuid.waze, d$uuid),]
-# 
-# stopifnot(identical(as.character(Waze.Match$uuid), link$uuid.waze) == TRUE)
-# 
-# # This merge doesn't work: non-unique matches detected. We want to keep non-unique matches
-# WazeLinked <- merge(Waze.Match, link, by.x = "uuid", by.y = "uuid.waze", all = T)
-# 
-# #Subset of Waze data that does not match (check to be sure is same as total length April Waze - number of unique match Waze)
-# length(unique(link.5mi$uuid.waze))
-# nrow(d)
-# Waze.NoMatch <- subset(d, !(uuid %in% link.5mi$uuid.waze))
-# nrow(Waze.NoMatch) #431/9921 or only 4.3% of Waze events match an EDT crash in space and time
-# 
-# #check total
-# nrow(Waze.NoMatch)+length(unique(link.5mi$uuid.waze)) # Matches total number 
-# 
-# # EDT files with matching Waze events:
-# length(unique(link.5mi$id.edt))
-# # out of
-# nrow(edt.april) #70/96 in April match a Waze event (72.9%)
-# 
-# # and with this distribution of Waze matches
-# hist(tapply(link.5mi$uuid.waze, link.5mi$id.edt, length))
+link <- mutate(link, match) #29,206
+glimpse(link)
+ 
+#Save Waze data as dataframe
+waze.df <- d@data #439,562 x 20
+names(waze.df)
 
-### 
+#Save EDT data as dataframe
+edt.df <- edt.april@data #9,271 x 54
+names(edt.df)
+
+#Subset of Waze data that matches EDT
+#Waze.Match <- Waze.df[match(link$uuid.waze, d$uuid),]
+#Waze.Match@data
+
+#Join Waze data to link table (full join)
+link.waze <- full_join(link,waze.df,by=c("uuid.waze"="uuid")) #442,500
+
+#Join EDT data to Waze-link table (full join)
+#Note:error stating "Column `CrashDate_Local` POSIXlt not supported" returned for all columns 
+#Removed the column for now  
+link.waze.edt <- full_join(link.waze,edt.df[,1:53],by=c("id.edt"="ID")) #446,461 x 74
+#Check size - total should equal number non-matched EDT + number non-matched Waze + nrow(link table) = 446,461 (matches!)
+
+#save the merged file as a csv file
+#write.csv(link.waze.edt, file="link.waze.edt.April2017.csv")
+
+# Save the merged Rdata file as an Rdata file
+#saveRDS(link.waze.edt, file = "link.waze.edt.April2017.rds")
+
+# stopifnot(identical(as.character(Waze.Match$uuid), link$uuid.waze) == TRUE)
+
+## 
 Total.EDT.events <- length(unique(edt.april$ID))
 EDT.events.with.Waze <- length(unique(link$id.edt))
 EDT.events.without.Waze <- Total.EDT.events - EDT.events.with.Waze
