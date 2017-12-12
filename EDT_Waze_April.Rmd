@@ -126,10 +126,10 @@ link.waze.edt$match <- ifelse(is.na(link.waze.edt$match), 'E', link.waze.edt$mat
 table(link.waze.edt$match)
 
 #save the merged file as a csv file
-write.csv(link.waze.edt, file="link.waze.edt.April2017.csv")
+write.csv(link.waze.edt, file="merged.waze.edt.April_MD.csv")
 
 #Save the merged Rdata file as an Rdata file
-saveRDS(link.waze.edt, file = "link.waze.edt.April2017.rds")
+saveRDS(link.waze.edt, file = "merged.waze.edt.April_MD.rds")
 
 # stopifnot(identical(as.character(Waze.Match$uuid), link$uuid.waze) == TRUE)
 
