@@ -52,8 +52,8 @@ movefiles <- function(filelist, temp = outdir, wazedir){
       temp <- gsub("C:/U", "C://U", temp)
       
       # Encase the destination path in quotes, because of spaces in path name
-      system(paste0("move ", file.path(temp, i), " '", file.path(wazedir, i), "'"))
-    
+      system(paste0("mv ", file.path(temp, i), ' \"', file.path(wazedir, i), '\"'))
+  
       }
     }
 
@@ -64,8 +64,8 @@ movefiles <- function(filelist, temp = outdir, wazedir){
 # read file names
 wazefiles <- dir()[grep("csv", dir())]
 
-# For now: April only
-wazefiles = wazefiles[substr(wazefiles, 10, 11) == "04"]
+# Initially did April only, now do all others.
+wazefiles = wazefiles[substr(wazefiles, 10, 11) != "04"]
 
 # create a temporary directory on the C: drive of the local machine to save files
 outdir <- tempdir()
@@ -147,6 +147,7 @@ filelist <- dir(outdir)[grep("RData$", dir(outdir))]
 
 movefiles(filelist, outdir, wazedir)
 
+# Compiling daily files takes ~ 2-4 min per day; this is 7-14 h of run time for the 7 months of data.
 
 # <><><><><><><><><><><><><><><><><><><><><><><><>
 # Compiling Monthly ----
