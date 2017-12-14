@@ -40,7 +40,6 @@ proj4string(d) <- proj4string(edt) <- c("+proj=longlat +datum=NAD83 +no_defs +el
 link.all <- makelink(edt, d)
 # <><><><><><><><><><><><><><><><><><><><><><><><>
 
-
 write.csv(link.all, "EDT_Waze_link_April_MD.csv", row.names = F)
 
 # Next up: making summary tables from the link table
@@ -52,50 +51,29 @@ nrow(edt)
 # and with this distribution of Waze matches
 hist(tapply(fivemi.link$uuid.waze, fivemi.link$id.edt, length))
 
-# Erika code:
 
-###Some code for subsetting EDT and Waze data based on link table
-#Subset EDT data to April
-edt.april <- edt[edt$CrashDate_Local < "2017-05-01 00:00:00 EDT" & edt$CrashDate_Local > "2017-04-01 00:00:00 EDT",] 
-edtfile <- edt.april
-edt.april$CrashDate_Local
 
-#Use link function to match April EDT and April Waze
-link.5mi <- makelink(edt.april, d)
-write.csv(link.5mi, "EDT_Waze_link_April_MD_5mi.csv", row.names = F)
+# linking Waze accidents to all Waze events, for April
+proj4string(d) <- c("+proj=longlat +datum=NAD83 +no_defs +ellps=GRS80 +towgs84=0,0,0")
 
-#Add "M" code to the table to show matches if we merge in full datasets
-match <- rep("M",nrow(link.5mi))
-link.5mi <- mutate(link.5mi, match)
-glimpse(link.5mi)
-
-#Subset of Waze data that matches EDT
-Waze.Match <- subset(d, (uuid %in% link.5mi$uuid.waze))
-length(unique(Waze.Match$uuid)) #431
-
-##This merge doesn't work: non-unique matches detected. We want to keep non-unique matches
-WazeLinked <- merge(Waze.Match, link.5mi, by.x = "uuid", by.y = "uuid.waze")
-
-#Subset of Waze data that does not match (check to be sure is same as total length April Waze - number of unique match Waze)
-length(unique(link.5mi$uuid.waze))
-nrow(d)
-Waze.NoMatch <- subset(d, !(uuid %in% link.5mi$uuid.waze))
-nrow(Waze.NoMatch) #431/9921 or only 4.3% of Waze events match an EDT crash in space and time
-
-#check total
-nrow(Waze.NoMatch)+length(unique(link.5mi$uuid.waze)) #Matches total number 
-
-# EDT files with matching Waze events:
-length(unique(link.5mi$id.edt))
-# out of
-nrow(edt.april) #70/96 in April match a Waze event (72.9%)
-
-# and with this distribution of Waze matches
-hist(tapply(link.5mi$uuid.waze, link.5mi$id.edt, length))
+wazeacc <- d[d$type == "ACCIDENT",]
 
 
 
 
+# <><><><><><><><><><><><><><><><><><><><><><><><>
+link.waze.waze <- makelink(wazeacc, d,
+                           acctimevar = "time",
+                           inctimevar1 = "time",
+                           inctimevar2 = "last.pull.time",
+                           accidvar = "uuid",
+                           incidvar = "uuid")
+# <><><><><><><><><><><><><><><><><><><><><><><><>
+
+write.csv(link.waze.waze, "Waze_Waze_link_April_MD.csv", row.names = F)
+
+
+# old ----
 
 # map("state", "maryland")
 # points(i, pch = 21, cex = 2)
@@ -126,3 +104,49 @@ hist(tapply(link.5mi$uuid.waze, link.5mi$id.edt, length))
 #       cat(i, "complete \n", timediff, attr(timediff, "units"), "elapsed \n", rep("<>",20), "\n")
 #       }
 # }
+
+
+# Old Erika code -- all moved to UrbanArea_overlay.R, just keeping here for reference
+# 
+# ###Some code for subsetting EDT and Waze data based on link table
+# #Subset EDT data to April
+# edt.april <- edt[edt$CrashDate_Local < "2017-05-01 00:00:00 EDT" & edt$CrashDate_Local > "2017-04-01 00:00:00 EDT",] 
+# edtfile <- edt.april
+# edt.april$CrashDate_Local
+# 
+# #Use link function to match April EDT and April Waze
+# link.5mi <- makelink(edt.april, d)
+# write.csv(link.5mi, "EDT_Waze_link_April_MD_5mi.csv", row.names = F)
+# 
+# #Add "M" code to the table to show matches if we merge in full datasets
+# match <- rep("M",nrow(link.5mi))
+# link.5mi <- mutate(link.5mi, match)
+# glimpse(link.5mi)
+# 
+# #Subset of Waze data that matches EDT
+# Waze.Match <- subset(d, (uuid %in% link.5mi$uuid.waze))
+# length(unique(Waze.Match$uuid)) #431
+# 
+# ##This merge doesn't work: non-unique matches detected. We want to keep non-unique matches
+# WazeLinked <- merge(Waze.Match, link.5mi, by.x = "uuid", by.y = "uuid.waze")
+# 
+# 
+# 
+# 
+# #Subset of Waze data that does not match (check to be sure is same as total length April Waze - number of unique match Waze)
+# length(unique(link.5mi$uuid.waze))
+# nrow(d)
+# Waze.NoMatch <- subset(d, !(uuid %in% link.5mi$uuid.waze))
+# nrow(Waze.NoMatch) #431/9921 or only 4.3% of Waze events match an EDT crash in space and time
+# 
+# #check total
+# nrow(Waze.NoMatch)+length(unique(link.5mi$uuid.waze)) #Matches total number 
+# 
+# # EDT files with matching Waze events:
+# length(unique(link.5mi$id.edt))
+# # out of
+# nrow(edt.april) #70/96 in April match a Waze event (72.9%)
+# 
+# # and with this distribution of Waze matches
+# hist(tapply(link.5mi$uuid.waze, link.5mi$id.edt, length))
+# 

@@ -107,7 +107,7 @@ while (j <= length(wazefiles)){
     # Using ModeString function here in case there are multiple uuid at the maximum date (should not be)
     ll2 <-  d %>% 
         group_by(uuid) %>%
-        filter(date == max(date)) %>%
+        filter(date == max(date, na.rm = T)) %>%
         summarize(
           city = ModeString(city),
           last.reportRating = median(reportRating),
@@ -172,7 +172,6 @@ months = unique(substr(wazefiles, 10, 11))
 
 starttime <- Sys.time()
 
-
 # Read in each day, rbind together, 
 # get dates in correct format, output to csv and RData
 
@@ -212,7 +211,7 @@ for(i in months){ # i = "04"
   # Using ModeString function here in case there are multiple uuid at the maximum date (should not be)
   ll2 <-  d %>% 
     group_by(uuid) %>%
-    filter(date == max(pubMillis)) %>%
+    filter(as.numeric(date) == max(as.numeric(date), na.rm=T)) %>%
     summarize(
       city = ModeString(city),
       last.reportRating = median(last.reportRating),
@@ -220,7 +219,7 @@ for(i in months){ # i = "04"
       last.reliability = median(last.reliability),
       type = ModeString(type),
       roadType = ModeString(as.character(roadType)),
-      magvar = max(magvar),
+      magvar = max(magvar, na.rm=T),
       subtype = ModeString(subtype),
       street = ModeString(street)
     )
