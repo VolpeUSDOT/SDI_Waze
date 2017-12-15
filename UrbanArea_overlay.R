@@ -25,7 +25,7 @@ setwd(wazedir)
 # From: https://www.census.gov/geo/maps-data/data/cbf/cbf_ua.html
 # https://www2.census.gov/geo/pdfs/maps-data/data/tiger/tgrshprd13/TGRSHPrd13_TechDoc_A.pdf
 
-ua <- readOGR(file.path(wazedir, "Working Documents/Census Files"), layer = "cb_2016_us_ua10_500k")
+ua <- readOGR(file.path(wazedir, "Working Documents/Census Files/Urban_Areas"), layer = "cb_2016_us_ua10_500k")
 
 # EDT: See CrashFact in W:\SDI Pilot Projects\Volpe\2017_11_03\waze\input\edt\2016_01_to_2017_09_MD_and_IN.
 # This has been reduced to just Maryland data from April 2017.
@@ -38,6 +38,9 @@ load(file.path(wazedir, "MASTER Data Files/Waze Aggregated/month_MD_clipped/MD_b
 link1 <- read.csv(file.path(wazedir, "MASTER Data Files/Waze Aggregated/month_MD_clipped/EDT_Waze_link_April_MD-timepoint.csv"))
 link2 <- read.csv(file.path(volpewazedir, "output_mmg/link_table_edt_waze.txt"), sep = "\t")
 link <- read.csv(file.path(wazedir, "MASTER Data Files/Waze Aggregated/month_MD_clipped/EDT_Waze_link_April_MD.csv"))
+
+linkww <- read.csv(file.path(wazedir, "MASTER Data Files/Waze Aggregated/month_MD_clipped/Waze_Waze_link_April_MD.csv"))
+linkee <- read.csv(file.path(wazedir, "MASTER Data Files/Waze Aggregated/month_MD_clipped/EDT_EDT_link_April_MD.csv"))
 
 # EDT_Waze_link_April_MD-timepoint.csv file (used single timepoint instead of window)
 # compare pairs
@@ -63,6 +66,16 @@ match <- rep("M", nrow(link))
 link <- mutate(link, match) #29,206
 glimpse(link)
 
+# Waze-waze:  Add "M" code to the table to show matches if we merge in full datasets
+match <- rep("M", nrow(linkww))
+linkww <- mutate(linkww, match) #29,206
+glimpse(linkww)
+
+# EDT-EDT:
+match <- rep("M", nrow(linkee))
+linkee <- mutate(linkee, match) #29,206
+glimpse(linkee)
+
 # <><><><><><><><><><><><><><><><><><><><>
 # Start ua overlay
 
@@ -86,7 +99,7 @@ names(edt.april@data)[(length(edt.april@data)-1):length(edt.april@data)] <- c("E
  
 
 # <><><><><><><><><><><><><><><><><><><><>
-# Merge and save 
+# Merge and save EDT-Waze
 # <><><><><><><><><><><><><><><><><><><><>
 
 # Save Waze data as dataframe
@@ -115,14 +128,36 @@ link.waze.edt <- full_join(link.waze, edt.df, by = c("id.edt"="ID")) #446,461 x 
 link.waze.edt$match <- ifelse(is.na(link.waze.edt$match), 'E', link.waze.edt$match)
 table(link.waze.edt$match)
 
+# Convert CrashDate_Local back to POSIX
 
-# Count of urbanrural
-UA <- !is.na(link.waze.edt$EDT_UA_Name) | !is.na(link.waze.edt$Waze_UA_Name)
-
-table(link.waze.edt$match, UA)
+link.waze.edt$CrashDate_Local <- strptime(link.waze.edt$CrashDate_Local, "%Y-%m-%d %H:%M:%S", tz = "America/New_York")
 
 #save the merged file as a csv file
 write.csv(link.waze.edt, file=file.path(outputdir, "merged.waze.edt.April_MD.csv"), row.names = F)
 
 #Save the merged Rdata file as an Rdata file
 saveRDS(link.waze.edt, file = file.path(outputdir, "merged.waze.edt.April_MD.rds"))
+
+# <><><><><><><><><><><><>
+# Waze-Waze
+# <><><><><><><><><><><><>
+
+# Join Waze incident data to link table (full join)
+link.waze <- full_join(linkww, waze.df, by=c("id.accident"="uuid")) 
+
+# Add Wa code to match column to indicate only Waze accident only data
+link.waze$match <- ifelse(is.na(link.waze$match), 'Wa', link.waze$match)
+
+# Join Waze accident data to Waze-link table (full join). X variables for Waze accidents, Y variables for Waze incidents
+link.waze.waze <- full_join(linkww, waze.df, by = c("id.incidents"="uuid")) 
+
+#Add Wu code to match column to indicate only Waze incident only data
+link.waze.waze$match <- ifelse(is.na(link.waze.waze$match), 'Wi', link.waze.waze$match)
+table(link.waze.waze$match)
+
+
+#save the merged file as a csv file
+write.csv(link.waze.waze, file=file.path(outputdir, "merged.waze.waze.April_MD.csv"), row.names = F)
+
+#Save the merged Rdata file as an Rdata file
+saveRDS(link.waze.waze, file = file.path(outputdir, "merged.waze.waze.April_MD.rds"))
