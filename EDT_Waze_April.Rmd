@@ -152,11 +152,14 @@ kable(mm, format.args = list(big.mark = ",")) %>% kable_styling(bootstrap_option
 
 
 ```{r wwmatchtable}
+# remove identical
+linkww.same <- linkww[,1] == linkww[,2]
+linkww <- linkww[!linkww.same,]
 
-## Calculations for EDT/Waze match table
+## Calculations for Waze/Waze match table
 Total.Waze.Incidents <- length(unique(d$uuid))
 Accidents.with.all.Waze <- length(unique(linkww$id.accident))
-Accidents.not.matching <- Total.Waze.Incidents - Accidents.with.all.Waze
+Incidents.not.matching <- Total.Waze.Incidents - Accidents.with.all.Waze
 Pct.match <- round(100*Accidents.with.all.Waze/Total.Waze.Incidents,2)
 
 Incidents.with.Accidents <- length(unique(linkww$id.incidents))
@@ -212,3 +215,24 @@ datatable(mm, filter = 'top') %>%
   formatCurrency(c('Urban', 'Rural'), currency = "", digits = 0) %>%
   formatPercentage('Percent Urban', digits = 1)
 ```
+
+
+## Summary of EDT-EDT linkages
+
+
+```{r eematchtable}
+# remove identical
+linkee.same <- linkee[,1] == linkee[,2]
+
+linkee <- linkee[!linkee.same,]
+
+## Calculations for EDT/EDT
+EDT.acc.with.match <- length(unique(linkee[,1]))
+Matching.EDT.acc <- length(unique(linkee[,2]))
+
+
+
+# kable(mm, format.args = list(big.mark = ",")) %>% kable_styling(bootstrap_options = c("striped"))
+```
+
+
