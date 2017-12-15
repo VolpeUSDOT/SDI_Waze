@@ -73,6 +73,20 @@ link.waze.waze <- makelink(wazeacc, d,
 write.csv(link.waze.waze, "Waze_Waze_link_April_MD.csv", row.names = F)
 
 
+
+
+# <><><><><><><><><><><><><><><><><><><><><><><><>
+link.edt.edt <- makelink(edt, edt,
+                           acctimevar = "CrashDate_Local",
+                           inctimevar1 = "CrashDate_Local",
+                           inctimevar2 = "CrashDate_Local",
+                           accidvar = "ID",
+                           incidvar = "ID")
+# <><><><><><><><><><><><><><><><><><><><><><><><>
+
+write.csv(link.edt.edt, "EDT_EDT_link_April_MD.csv", row.names = F)
+
+
 # old ----
 
 # map("state", "maryland")
