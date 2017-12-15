@@ -17,7 +17,7 @@ Ideas:
 - Spatial overlay of events - similar to Lia's slider idea, make a figure which builds up hotspots of Waze and EDT by day
 - Spatiotemporal join - Paul's 2x2 for time (early, laggy) and space (near, far) matching of EDT and Waze, by type. In the future, using data snapped to HPMS, use roadway classification as well, or could use day of week.
 
-```{r setup, message = F, warning = F}
+```{r setup, message = F, warning = F, echo = F}
 # Read in libraries and set working directory
 knitr::opts_chunk$set(echo = F, warning=F, message=F)
 options(width = 2400, stringsAsFactors = F)
@@ -43,24 +43,33 @@ if(length(grep("sudderth", getwd())) > 0) {mappeddrive = "S:"}
 
 wazedir <- (file.path(mappeddrive,"SDI Pilot Projects/Waze"))
 volpewazedir <- "//vntscex.local/DFS/Projects/PROJ-OR02A2/SDI/"
+
+wazedir <- c("/Users/danflynn/Documents/Volpe Remote/tempdir/")
  
 knitr::opts_knit$set(root.dir = wazedir)  # setwd(wazedir) # to develop code in working R session
 ```
 
 ```{r dataimport}
 # Read in merged Waze and EDT data 
-ew <- readRDS(file.path(wazemonthdir, "merged.waze.edt.April_MD.rds"))
+ew <- readRDS(file.path(wazedir, "merged.waze.edt.April_MD.rds"))
+ww <- readRDS(file.path(wazedir, "merged.waze.waze.April_MD.rds"))
+
+
+load(file.path(wazedir, "2017-04_1_CrashFact_edited.RData"))
+# Waze: Comes from aggregated monthly Waze events, clipped to a 0.5 mile buffer around MD, for April 2017
+load(file.path(wazedir, "MD_buffered__2017-04.RData"))
+
+link <- read.csv(file.path(wazedir, "EDT_Waze_link_April_MD.csv"))
+linkww <- read.csv(file.path(wazedir, "Waze_Waze_link_April_MD.csv"))
+
 
 # Read in county data from Census
-counties <- readOGR(file.path(wazedir, "Working Documents/Census Files"), layer = "cb_2015_us_county_500k")
-md_counties <- counties[counties$STATEFP == 24,]
+# counties <- readOGR(file.path(wazedir, "Working Documents/Census Files/Counties", layer = "."))
+# md_counties <- counties[counties$STATEFP == 24,]
 
 ```
 
-
-```{r linksummary, echo = F}
-
-```
+## Summary of EDT-Waze linkages
 
 
 ```{r matchtable}
@@ -84,133 +93,122 @@ mm <- matrix(c(EDT.events.with.Waze, EDT.events.without.Waze, Total.EDT.events, 
 row.names(mm) <- c("EDT", "Waze")
 colnames(mm) <- c("Matching", "Non-Matching", "Total", "Percent Matching")
 
-kable(mm) %>% kable_styling(bootstrap_options = c("hover"))
+kable(mm, format.args = list(big.mark = ",")) %>% kable_styling(bootstrap_options = c("striped"))
+```
 
+### EDT-Waze linkages by Urban/Rural
 
-# by type
+```{r matchbyurbanrural}
+# Count of urbanrural
 
+ew$UA <- !is.na(ew$EDT_UA_Name) | !is.na(ew$Waze_UA_Name)
+
+mm <- aggregate(UA ~ match, 
+                FUN = function(x) cbind(length(x), length(x[!x])),
+                data = ew)
+
+mm <- data.frame(mm[,1], as.data.frame(mm[,2]))
+
+mm[,1] <- c("EDT only", "EDT-Waze Match", "Waze only")
+
+mm$Pct.Urban <- round(100*mm[,2]/rowSums(mm[2:3]), 2)
+
+colnames(mm) <- c("Match Type", "Urban", "Rural", "Percent Urban")
+
+kable(mm, format.args = list(big.mark = ",")) %>% kable_styling(bootstrap_options = c("striped")) 
 
 
 ```
 
-### Initial mapping work
+### EDT-Waze linkages by Urban/Rural and Waze Event Type
 
-```{r fort.map, eval=FALSE, include=FALSE}
-# Currently not run -- this is the start of making a fortified dataframe for ggplot mapping, to turn into a plotly map.
-# Get points in polygons: events in each county
-proj4string(edt.shp) <- proj4string(waz.shp) <- proj4string(md_counties)
-
-md_pip <- over(waz.shp, md_counties[,"NAME"])
-
-waz.shp$NAME <- md_pip
-
-md_base <- ggplot(md_counties) + geom_map(data = md_counties, map = md_counties,
-                                            aes(x = long, y = lat, group = group, map_id = id),
-                                            color = "black", fill = NA) +
-  ylab(label="") + xlab(label="") +
-  theme_minimal() +
-  coord_map(projection="albers", lat = 39, lat1 = 45)
-```
-
-```{r plotlymap, eval=F}
-counties <- map_data("county", "maryland")
-
-waz.shp$tooltiptext <- with(waz.shp@data, paste(city, alert_type, time, sep = "/n"))
-waz.shp$tooltiptext <- sub("NA", "", waz.shp$tooltiptext)
-
-edt.shp$tooltiptext <- with(edt.shp@data, paste(County, HighestInj, time, sep = "/n"))
-edt.shp$tooltiptext <- sub("NA", "", edt.shp$tooltiptext)
+```{r matchbyurbanruraltype}
+mm <- aggregate(UA ~ match + type, 
+                FUN = function(x) cbind(length(x), length(x[!x])),
+                data = ew)
 
 
-map.p <- ggplot() +
-  ggtitle("2017-08-01 Spatial Overlay") +
-  geom_polygon(data = counties, aes(x = long, y = lat, group = group), 
-               color = "white", fill = "grey80") + theme_void() +
-coord_fixed(1.3) +
+mm <- data.frame(mm[,1:2], as.data.frame(mm[,3]))
 
-  geom_point(data = waz.shp[format(waz.shp$time, "%d") == "01",]@data, # 2017-08-01 first
-             aes(
-               x = longitude, 
-               y = latitude, 
-               color = alert_type,
-                text = tooltiptext),
-             shape = 16) +
+mm$Pct.Urban <- mm[,3]/rowSums(mm[3:4])
 
-  geom_point(data = edt.shp[format(edt.shp$time, "%d") == "01",]@data, # 2017-08-01 first
-             aes(
-               x = GPSLong_Ne, 
-               y = GPSLat, 
-               text = tooltiptext,
-               color = 'EDT'),
-             shape = 16) +
-  scale_color_brewer(palette = "Set1",
-                        name = "Waze Alert Type and EDT Crash")
+mm[,1] <- rep(c("EDT-Waze Match", "Waze only"), length(unique(mm[,2])))
 
-  
-ggplotly(map.p, tooltip = "text", width = 1000)
+mm$Pct.Urban <- round(100*mm$Pct.Urban, 2)
+
+
+colnames(mm) <- c("Match Type", "Waze Type", "Urban", "Rural", "Percent Urban")
+
+# datatable(mm, filter = 'top') %>% 
+#   formatCurrency(c('Urban', 'Rural'), currency = "", digits = 0) %>%
+#   formatPercentage('Percent Urban', digits = 1)
+
+kable(mm, format.args = list(big.mark = ",")) %>% kable_styling(bootstrap_options = c("striped")) 
+
 
 ```
 
-### Table of Waze events by day 
+## Summary of Waze-Waze linkages
 
-```{r freqevents, fig.width=12}
-# make a table of frequency of type by time of day
-d$timeofday <- as.numeric(paste(as.numeric(format(d$time, "%H")), round(100*as.numeric(format(d$time, "%M"))/60, 0), sep = "."))
 
-gp <- ggplot(d@data, aes(timeofday, color = type)) + 
-  geom_freqpoly(bins = 50)
+```{r wwmatchtable}
 
-ggplotly(gp)
+## Calculations for EDT/Waze match table
+Total.Waze.Incidents <- length(unique(d$uuid))
+Accidents.with.all.Waze <- length(unique(linkww$id.accident))
+Accidents.not.matching <- Total.Waze.Incidents - Accidents.with.all.Waze
+Pct.match <- round(100*Accidents.not.matching/Total.Waze.Incidents,2)
+
+Incidents.with.Accidents <- length(unique(linkww$id.incidents))
+Pct.Waze.match.by.incident <- round(100*Incidents.with.Accidents/Total.Waze.Incidents,2)
+
+mm <- matrix(c(Accidents.with.all.Waze, Total.Waze.Incidents, Pct.match,
+         Incidents.with.Accidents, Total.Waze.Incidents, Pct.Waze.match.by.incident), byrow=T,
+       nrow = 2, ncol = 3)
+
+row.names(mm) <- c("Waze Accidents", "Waze Incidents")
+colnames(mm) <- c("Matching", "Total", "Percent Matching")
+
+kable(mm, format.args = list(big.mark = ",")) %>% kable_styling(bootstrap_options = c("striped"))
+```
+
+```{r wwmatchbyurbanrural, eval=F}
+# Count of urbanrural
+
+link.waze.waze$UA <- !is.na(ww$Waze_UA_Name) | !is.na(ww$Waze_UA_Name.y)
+
+mm <- aggregate(UA ~ match, 
+                FUN = function(x) cbind(length(x), length(x[!x])),
+                data = link.waze.waze)
+
+mm <- data.frame(mm[,1], as.data.frame(mm[,2]))
+
+mm[,1] <- c("Waze-Waze Match", "Waze incident only")
+
+mm$Pct.Urban <- round(100*mm[,2]/rowSums(mm[2:3]), 2)
+
+colnames(mm) <- c("Match Type", "Urban", "Rural", "Percent Urban")
+
+kable(mm, format.args = list(big.mark = ",")) %>% kable_styling(bootstrap_options = c("striped")) 
+
 
 ```
 
+```{r wwmatchbyurbanruraltype, eval=F}
+mm <- aggregate(UA ~ match + type, 
+                FUN = function(x) cbind(length(x), length(x[!x])),
+                data = link.waze.waze)
 
-### Spatiotemporal join
 
-```{r stjoin, warning = F, eval = F} 
+mm <- data.frame(mm[,1:2], as.data.frame(mm[,3]))
 
-# for each EDT event, find the number and distance for nearest neighbors in space and time from Waze data
-ex <- edt.shp@data
+mm$Pct.Urban <- mm[,3]/rowSums(mm[3:4])
 
-distbreaks <- c(0, 0.1, 0.5, 1, 5, 10, 15, 25, 50, 100, 300, 1000)
-distcounts <- vector()
+mm[,1] <- rep(c("EDT-Waze Match", "Waze only"), length(unique(mm[,2])))
 
-for(i in 1:nrow(ex)){
+colnames(mm) <- c("Match Type", "Waze Type", "Urban", "Rural", "Percent Urban")
 
-  daterangemin <- ex[i, 'time'] - 2*60*60
-  daterangemax <- ex[i, 'time'] + 2*60*60
-    
-  # find waze events within 3 hrs of this crash
-  
-  wx <- waz.shp[waz.shp$time > daterangemin & waz.shp$time < daterangemax,]
-  
-  if(nrow(wx) ==0) {
-    b <- rep(0, length(distbreaks))
-  } else {
-  w_sp <- SpatialPoints(coords = data.frame(wx$longitude, wx$latitude))
-  e_sp <- SpatialPoints(coords = data.frame(ex[i,'GPSLong_Ne'], ex[i,'GPSLat']))
-  
-  t1 <- spDists(w_sp, e_sp, longlat = T) # distance in km to each edt event
-  
-  # Sum of events with 0.1 to 100 mi in various chunks
-  b <- hist(t1, breaks = distbreaks, plot = F)$counts
-  }
-
-  distcounts <- rbind(distcounts, b)
-  
-  # Sum of events within 1 to 120 minutes
-  
-  }
-
-colnames(distcounts) = distbreaks[2:length(distbreaks)]
-rownames(distcounts) = ex$ID
-
-dm <- melt(distcounts)
-colnames(dm) <- c("ID", "Bin", "Count")
-dm$Bin <- as.factor(dm$Bin)
-
-gp <- ggplot(dm) + geom_histogram(aes(x = Count), bins = 50) + facet_wrap(~Bin) + ylab("Frequency") + xlab("Count of Waze Events")
-
-ggplotly(gp, width = 1000, tooltip = c("count"))
-
+datatable(mm, filter = 'top') %>% 
+  formatCurrency(c('Urban', 'Rural'), currency = "", digits = 0) %>%
+  formatPercentage('Percent Urban', digits = 1)
 ```
