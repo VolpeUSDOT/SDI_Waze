@@ -1,5 +1,12 @@
 # Time-space match points
-# Test of matching EDT and Waze events, first using 5 mi square data from Maryland, April 2017.
+# Matching EDT and Waze events.
+
+# Goal: for a given EDT event, find the matching Waze events within 60 min on either side, within a 0.5 mi radius.
+# Location in EDT is in GPSLong_New and GPS_Lat, time is in CrashDate_Local.
+# Location in Waze is in lon and lat, time is in time.
+
+# use spDists from sp package to get distances from each EDT event to each Waze event. 
+# Produce a link table which has a two columns: EDT events and the Waze events which match them; repeat EDT event in the column for all matching Waze events.
 
 # Setup ----
 library(sp)
@@ -11,36 +18,64 @@ mappeddriveloc <- "W:"
 
 codeloc <- "~/git/SDI_Waze"
 wazedir <- file.path(mappeddriveloc, "SDI Pilot Projects/Waze/MASTER Data Files/Waze Aggregated/month_MD_clipped")
+edtdir <- file.path(mappeddriveloc, "SDI Pilot Projects/Waze/MASTER Data Files/EDT_month")
+
 
 # load data - will load all files in month_MD_clipped directory on shared drive
 # source(file.path(codeloc, 'wazeloader.R'))
 
 setwd(wazedir)
-load("MD_buffered__2017-04.RData")
-load("2017-04_1_CrashFact_edited.RData")
 
 # read functions
 source(file.path(codeloc, 'wazefunctions.R'))
 
-# Set projections
-# d <- SpatialPointsDataFrame(d[c("lon", "lat")], d)  # from monthbind of Waze data, make sure it is a SPDF
-edt <- edt.april
+# Start loop over months ----
+wazemonthfiles <- dir(wazedir)[grep("MD_buffered__2017", dir(wazedir))]
+wazemonthfiles <- wazemonthfiles[grep("RData$", wazemonthfiles)]
+                               
+edtmonths <- unique(substr(dir(edtdir), 6, 7))
+wazemonths <- unique(substr(wazemonthfiles, 19, 20))
 
-proj4string(d) <- proj4string(edt) <- c("+proj=longlat +datum=NAD83 +no_defs +ellps=GRS80 +towgs84=0,0,0")
+months_shared <- edtmonths[edtmonths %in% wazemonths]
+# make sure months are actually shared 
+stopifnot(all(months_shared == wazemonths[wazemonths %in% edtmonths]))
 
-# Goal: for a given EDT event, find the matching Waze events within 60 min on either side, within a 0.5 mi radius.
-# Location in EDT is in GPSLong_New and GPS_Lat, time is in CrashDate_Local.
-# Location in Waze is in lon and lat, time is in time.
+outputdir_temp <- tempdir()
+outputdir_final <- file.path(wazedir, "MASTER Data Files/EDT_month")
 
-# use spDists from sp package to get distances from each EDT event to each Waze event. Could pre-filter Waze events by lat long; a degree latitude or longitude is ~ 69 mi for Maryland. If it is too slow, try this.
-# Produce a link table which has a two columns: EDT events and the Waze events which match them; repeat EDT event in the column for all matching Waze events.
+starttime_total <- Sys.time()
+
+for(i in months_shared){
+  starttime_month <- Sys.time()
+  
+  load(file.path(wazedir, paste0("MD_buffered__2017-", i, ".RData")))
+  load(file.path(edtdir, paste0("2017-", i, "_1_CrashFact_edited.RData")))
+
+  # Set projections
+  # d <- SpatialPointsDataFrame(d[c("lon", "lat")], d)  # from monthbind of Waze data, make sure it is a SPDF
+  edt <- get(paste("edt", i, sep = "_"))
+  
+  proj4string(d) <- proj4string(edt) <- c("+proj=longlat +datum=NAD83 +no_defs +ellps=GRS80 +towgs84=0,0,0")
+  
+  # <><><><><><><><><><><><><><><><><><><><><><><><>
+  link.all <- makelink(edt, d)
+  # <><><><><><><><><><><><><><><><><><><><><><><><>
+  
+  
+  write.csv(link.all, file.path(outputdir_temp, paste0("EDT_Waze_link_2017-", i, "_MD.csv")), row.names = F)
+  
+  timediff <- round(Sys.time()-starttime_month, 2)
+  cat(i, "complete \n", timediff, attr(timediff, "units"), "elapsed \n\n")
+
+  timediff.total <- round(Sys.time()-starttime_total, 2)
+  cat(timediff.total, attr(timediff.total, "units"), "elapsed in total \n", rep("<>", 20), "\n")
+  
+}
+
+filelist <- dir(outputdir_temp)[grep("[RData$|csv$]", dir(outputdir_temp))]
+movefiles(filelist, outputdir_temp, outputdir_final)
 
 
-# <><><><><><><><><><><><><><><><><><><><><><><><>
-link.all <- makelink(edt, d)
-# <><><><><><><><><><><><><><><><><><><><><><><><>
-
-write.csv(link.all, "EDT_Waze_link_April_MD.csv", row.names = F)
 
 # Next up: making summary tables from the link table
 
