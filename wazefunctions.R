@@ -47,3 +47,52 @@ makelink <- function(accfile = edt.april, incfile = waze.april,
 }
 
 
+
+# moving files from a temporary directory on local machine to shared drive. 
+# Files are removed from the local machine by this process.
+movefiles <- function(filelist, temp = outdir, wazedir){
+  for(i in filelist){
+    # Fix path separators for Windows / R 
+    temp <- gsub("\\\\", "/", temp)
+    temp <- gsub("C:/U", "C://U", temp)
+    
+    # Encase the destination path in quotes, because of spaces in path name
+    system(paste0("mv ", file.path(temp, i), ' \"', file.path(wazedir, i), '\"'))
+    
+  }
+}
+
+
+# Helper functions ----
+
+# Function to return the most frequent value for character vectors.
+# Breaks ties by taking the first value
+ModeString <- function(x) {
+  ux <- unique(x)
+  
+  # One unique value: return that value
+  if(length(ux)==1) { 
+    return(ux)
+  } else {
+    
+    # Multiple values, no duplicates: return first one
+    if(!anyDuplicated(x)) {
+      return(ux[1])
+    } else {
+      
+      # Multiple values, one category more frequent: return first most frequent
+      tbl <-   tabulate(match(x, ux))
+      return(ux[tbl==max(tbl)][1])
+    }
+  }
+}
+
+# Function for extracting time from file names
+gettime <- function(x, tz = "America/New_York"){
+  d <- substr(x, 5, 14)
+  t <- substr(x, 16, 23)
+  dt <- strptime(paste(d, t), "%Y-%m-%d %H-%M-%S", tz = tz)
+}
+
+
+

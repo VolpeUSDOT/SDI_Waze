@@ -44,8 +44,6 @@ if(length(grep("sudderth", getwd())) > 0) {mappeddrive = "S:"}
 wazedir <- (file.path(mappeddrive,"SDI Pilot Projects/Waze"))
 volpewazedir <- "//vntscex.local/DFS/Projects/PROJ-OR02A2/SDI/"
 
-wazedir <- c("/Users/danflynn/Documents/Volpe Remote/tempdir/")
- 
 knitr::opts_knit$set(root.dir = wazedir)  # setwd(wazedir) # to develop code in working R session
 ```
 

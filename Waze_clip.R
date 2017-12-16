@@ -15,21 +15,9 @@ library(raster)
 
 VERSION = 2 # Choose which type of aggregation and clipping to do. 1 was for original aggregated files from Lia; 2 is from .RData files; 3 is for both EDT and Waze, clipping to a 5 x 5 mi square
 
-
-# moving files from a temporary directory on local machine to shared drive. 
-# Files are removed from the local machine by this process.
-movefiles <- function(filelist, temp = outdir, wazedir){
-  for(i in filelist){
-    # Fix path separators for Windows / R 
-    temp <- gsub("\\\\", "/", temp)
-    temp <- gsub("C:/U", "C://U", temp)
-    
-    # Encase the destination path in quotes, because of spaces in path name
-    system(paste0("mv ", file.path(temp, i), ' \"', file.path(wazedir, i), '\"'))
-    
-  }
-}
-
+# read functions
+codeloc <- "~/git/SDI_Waze"
+source(file.path(codeloc, 'wazefunctions.R'))
 
 
 # Version 1: from .csv aggregations made by Lia ----
