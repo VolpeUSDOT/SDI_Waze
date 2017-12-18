@@ -105,7 +105,9 @@ link.waze.waze <- makelink(wazeacc, d,
                            incidvar = "uuid")
 # <><><><><><><><><><><><><><><><><><><><><><><><>
 
-write.csv(link.waze.waze, "Waze_Waze_link_April_MD.csv", row.names = F)
+link.waze.waze2 <-  link.waze.waze[as.character(link.waze.waze[,1]) != as.character(link.waze.waze[,2]),]
+
+write.csv(link.waze.waze2, "Waze_Waze_link_April_MD.csv", row.names = F)
 
 
 
@@ -119,7 +121,11 @@ link.edt.edt <- makelink(edt, edt,
                            incidvar = "ID")
 # <><><><><><><><><><><><><><><><><><><><><><><><>
 
-write.csv(link.edt.edt, "EDT_EDT_link_April_MD.csv", row.names = F)
+# remove self-matches
+
+link.edt.edt2 <-  link.edt.edt[link.edt.edt[,1] != link.edt.edt[,2],]
+
+write.csv(link.edt.edt2, "EDT_EDT_link_April_MD.csv", row.names = F)
 
 
 # old ----

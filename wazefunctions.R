@@ -37,7 +37,7 @@ makelink <- function(accfile = edt.april, incfile = waze.april,
     
     linktable <- rbind(linktable, data.frame(id.accident, id.incidents))
     
-    if(i %% 100 == 0) {
+    if(i %% 1000 == 0) {
       timediff <- round(Sys.time()-starttime, 2)
       cat(i, "complete \n", timediff, attr(timediff, "units"), "elapsed \n", rep("<>",20), "\n")
     }

@@ -41,7 +41,7 @@ library(kableExtra) # formatting tables
 if(length(grep("flynn", getwd())) > 0) {mappeddrive = "W:"} # change this to match the mapped network drive on your machine (Z: in original)
 if(length(grep("sudderth", getwd())) > 0) {mappeddrive = "S:"} 
 
-wazedir <- (file.path(mappeddrive,"SDI Pilot Projects/Waze"))
+wazedir <- (file.path(mappeddrive,"SDI Pilot Projects/Waze/MASTER Data Files/Waze Aggregated/month_MD_clipped"))
 volpewazedir <- "//vntscex.local/DFS/Projects/PROJ-OR02A2/SDI/"
 
 knitr::opts_knit$set(root.dir = wazedir)  # setwd(wazedir) # to develop code in working R session
@@ -50,7 +50,7 @@ knitr::opts_knit$set(root.dir = wazedir)  # setwd(wazedir) # to develop code in 
 ```{r dataimport}
 # Read in merged Waze and EDT data 
 ew <- readRDS(file.path(wazedir, "merged.waze.edt.April_MD.rds"))
-ww <- readRDS(file.path(wazedir, "merged.waze.waze.April_MD.rds"))
+# ww <- readRDS(file.path(wazedir, "merged.waze.waze.April_MD.rds"))
 
 
 load(file.path(wazedir, "2017-04_1_CrashFact_edited.RData"))
@@ -149,7 +149,7 @@ kable(mm, format.args = list(big.mark = ",")) %>% kable_styling(bootstrap_option
 ## Summary of Waze-Waze linkages
 
 
-```{r wwmatchtable}
+```{r wwmatchtable, eval = T}
 # remove identical
 linkww.same <- linkww[,1] == linkww[,2]
 linkww <- linkww[!linkww.same,]
@@ -218,7 +218,7 @@ datatable(mm, filter = 'top') %>%
 ## Summary of EDT-EDT linkages
 
 
-```{r eematchtable}
+```{r eematchtable, eval = F}
 # remove identical
 linkee.same <- linkee[,1] == linkee[,2]
 
