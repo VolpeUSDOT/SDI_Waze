@@ -60,6 +60,8 @@ load(file.path(wazedir, "MD_buffered__2017-04.RData"))
 link <- read.csv(file.path(wazedir, "EDT_Waze_link_April_MD.csv"))
 linkww <- read.csv(file.path(wazedir, "Waze_Waze_link_April_MD.csv"))
 
+# compare with Python script output
+link.p <- read.csv("//vntscex.local/DFS/Projects/PROJ-OR02A2/SDI/output_mmg/link_table_edt_waze.txt", sep="\t")
 
 # Read in county data from Census
 # counties <- readOGR(file.path(wazedir, "Working Documents/Census Files/Counties", layer = "."))
