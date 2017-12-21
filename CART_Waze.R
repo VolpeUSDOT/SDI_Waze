@@ -185,15 +185,15 @@ wazeformula <- reformulate(termlabels = fitvars.w[2:length(fitvars.w)], response
 pdf("Regression_Tree_Plots.pdf",
     width = 18, height = 10)
 
-# ct = ctree(edtformula, 
-#            data = fitdat,
-#            controls = ctree_control(maxdepth = 3))
+ct = ctree(edtformula,
+           data = fitdat,
+           controls = ctree_control(maxdepth = 3))
 
 plot(ct, main="EDT Event Matching")
 
-# ct.w = ctree(wazeformula, 
-#            data = fitdat.w,
-#            controls = ctree_control(maxdepth = 3))
+ct.w = ctree(wazeformula,
+           data = fitdat.w,
+           controls = ctree_control(maxdepth = 10))
 
 plot(ct.w, main="Waze Event Matching")
 
