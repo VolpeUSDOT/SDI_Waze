@@ -4,7 +4,7 @@
 # Started by Stephen Brumbaugh @sbrumb
 
 library(extrafont)
-extrafont::loadfonts(device="win") # needed on Windows machines
+# extrafont::loadfonts(device="win") # needed on Windows machines
 # extrafont::font_import() # will import all fonts, takes time
 
 library(tidyverse)
