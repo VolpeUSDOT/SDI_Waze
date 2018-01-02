@@ -165,8 +165,7 @@ fitvars.w <- c("WazeMatch", "median.reliability", "nrecord", "type", "Road", "UA
 pdf(file.path(wazefigdir, "Pairwise_comparison_Waze_vars.pdf"), width = 15, height = 15); ggpairs(d@data[fitvars.w]); dev.off()
 
 
-# <><><><><><><><><><><><><><><><><><><><>
-# Start CART ----
+# Prepare data and formulas
 
 fitdat <- edt.april@data
 fitvars <- c("EDTMatch", "DayOfWeek", "HourofDay", "Light", "Atmospheric", "Damage", "TotalFatalCount", "UA")
@@ -179,6 +178,9 @@ fitvars.w <- c("WazeMatch", "median.reliability", "nrecord", "type","subType", "
 fitdat.w <- fitdat.w[complete.cases(fitdat.w[,fitvars.w]),]
 wazeformula <- reformulate(termlabels = fitvars.w[2:length(fitvars.w)], response = 'WazeMatch')
 
+
+# <><><><><><><><><><><><><><><><><><><><>
+# Start CART ----
 
 # ctree approach from party
 
@@ -216,6 +218,51 @@ table(predict(ct), fitdat$EDTMatch)
 # Estimated class probabilities
 tr.pred = predict(ct, newdata=fitdat, type="prob")
 hist(unlist(tr.pred))
+
+
+
+# <><><><><><><><><><><><><><><><><><><><><><><><><><><>
+# Conditional random forest from ctree ----
+# Will allow ordered variables for crash severity
+# CPU intensive, but not RAM intensive. doMC should help.
+
+starttime <- Sys.time()
+
+# Default 500 trees
+
+cf = cforest(edtformula,
+           data = fitdat,
+           controls = cforest_unbiased())
+
+cat(Sys.time() - starttime, " elapsed for EDT")
+
+
+pt <- prettytree(cf@ensemble[[1]], names(cf@data@get("input"))) 
+nt <- new("BinaryTree") 
+nt@tree <- pt 
+nt@data <- cf@data 
+nt@responses <- cf@responses 
+
+plot(nt, type="simple")
+
+# predictions
+cf.pred <- predict(cf, OOB = T)
+
+table(fitdat$EDTMatch, cf.pred)
+
+
+
+starttime <- Sys.time()
+
+cf.w = cforest(wazeformula,
+             data = fitdat.w,
+             controls = cforest_unbiased())
+
+cat(Sys.time() - starttime, " elapsed for EDT")
+
+
+plot(cf.w, main="Waze Event Matching")
+
 
 # <><><><><><><><><><><><><><><><><><><><><><><><><><><>
 
