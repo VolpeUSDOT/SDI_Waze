@@ -23,9 +23,13 @@ if(length(grep("sudderth", getwd())) > 0) {mappeddrive = "S:"}
 
 wazedir <- (file.path(mappeddrive,"SDI Pilot Projects/Waze/MASTER Data Files/Waze Aggregated/month_MD_clipped"))
 wazefigdir <- file.path(mappeddrive, "SDI Pilot Projects/Waze/Figures")
+codeloc <- "~/git/SDI_Waze"
 
 
 setwd(wazedir)
+
+# read functions
+source(file.path(codeloc, 'wazefunctions.R'))
 
 # <><><><><><><><><><><><><><><><><><><><>
 # Data prep ----
@@ -127,7 +131,7 @@ edt.april@data$Damage = as.factor(Damage)
 fitvars <- c("EDTMatch", "DayOfWeek", "HourofDay", "Light", "Atmospheric", "Damage", "TotalFatalCount", "UA")
 
 # Examine variables: EDT
-pdf(file.path(wazefigdir, "Pairwise_comparison_EDT_vars.pdf"), width = 15, height = 15); ggpairs(edt.april@data[fitvars]); dev.off()
+# pdf(file.path(wazefigdir, "Pairwise_comparison_EDT_vars.pdf"), width = 15, height = 15); ggpairs(edt.april@data[fitvars]); dev.off()
 
 
 # <><><><><><><><><><><><><><><><><><><><><>
@@ -162,7 +166,7 @@ levels(d@data$UA) = c("Rural", "Urban")
 fitvars.w <- c("WazeMatch", "median.reliability", "nrecord", "type", "Road", "UA", "DayofWeek", "HourofDay")
 
 # Examine variables: EDT
-pdf(file.path(wazefigdir, "Pairwise_comparison_Waze_vars.pdf"), width = 15, height = 15); ggpairs(d@data[fitvars.w]); dev.off()
+# pdf(file.path(wazefigdir, "Pairwise_comparison_Waze_vars.pdf"), width = 15, height = 15); ggpairs(d@data[fitvars.w]); dev.off()
 
 
 # Prepare data and formulas
@@ -251,14 +255,36 @@ cf.pred <- predict(cf, OOB = T)
 table(fitdat$EDTMatch, cf.pred)
 
 
+# Waze forest
 
 starttime <- Sys.time()
 
 cf.w = cforest(wazeformula,
              data = fitdat.w,
-             controls = cforest_unbiased())
+             controls = cforest_control(ntree = 50,
+                                        trace = TRUE))
 
-cat(Sys.time() - starttime, " elapsed for EDT")
+cat(Sys.time() - starttime, " elapsed for Waze")
+
+
+# Save forest output ----
+outputdir_temp <- tempdir()
+outputdir_final <- wazedir
+
+save(list = c('cf.w', 'cf', 'cf.pred'), 
+     file = file.path(outputdir_temp, 
+                      paste0("Random_Forest_output_", Sys.Date(), ".RData")
+                      )
+    )
+      
+filelist <- dir(outputdir_temp)[grep("[RData$|csv$]", dir(outputdir_temp))]
+movefiles(filelist, outputdir_temp, outputdir_final)
+
+
+# predictions
+cf.w.pred <- predict(cf.w, OOB = T)
+
+table(fitdat.w$WazeMatch, cf.w.pred)
 
 
 plot(cf.w, main="Waze Event Matching")
