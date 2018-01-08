@@ -1,6 +1,6 @@
-# CART start for Waze
+# CART and Random Forest work for Waze
 
-# Goals: produce example (at first) classification and regression trees for features of a. Waze events which predict matching with EDT events and b. EDT events which predict matching with Waze events.
+# Goals: produce classification and regression trees for features of a. Waze events which predict matching with EDT events and b. EDT events which predict matching with Waze events. Then extend this to random forests, with diagnostics including k-fold cross-validation and confusion matrices.
 
 # <><><><><><><><><><><><><><><><><><><><>
 # Setup ----
@@ -10,84 +10,84 @@ library(randomForest)
 # library(reprtree) # library(devtools); install_github('araastat/reprtree')
 library(maptree) # for better graphing
 library(party)
+library(partykit)
 library(rgdal) # for readOGR(), needed for reading in ArcM shapefiles
 library(CORElearn)
 library(ggRandomForests)
 library(GGally) # for ggpairs
 
-# install.packages(c("rpart", "maptree", "party", "CORElearn", "ggRandomForests"), dep = T)
+# Run this if you don't have these packages:
+# install.packages(c("rpart", "randomForest", "maptree", "party", "partykit", "CORElearn", "ggRandomForests", "GGally", "rgdal"), dep = T)
 
-
+setwd("~/")
 if(length(grep("flynn", getwd())) > 0) {mappeddrive = "W:"} # change this to match the mapped network drive on your machine (Z: in original)
 if(length(grep("sudderth", getwd())) > 0) {mappeddrive = "S:"} 
 
 wazedir <- (file.path(mappeddrive,"SDI Pilot Projects/Waze/MASTER Data Files/Waze Aggregated/month_MD_clipped"))
 wazefigdir <- file.path(mappeddrive, "SDI Pilot Projects/Waze/Figures")
-codeloc <- "~/git/SDI_Waze"
-
+codeloc <- "~/git/SDI_Waze" # Update as needed for the git repository on your local machine.
 
 setwd(wazedir)
 
-# read functions
-source(file.path(codeloc, 'wazefunctions.R'))
+# read utility functions, inclulding movefiles
+source(file.path(codeloc, 'utility/wazefunctions.R'))
 
 # <><><><><><><><><><><><><><><><><><><><>
 # Data prep ----
 
-PREPNEW = F
+PREPNEW = F # Use this to skip the data prep steps, reading directly from prepared data
 
 if(!PREPNEW) load("CART_data_April.RData")
 
 if(PREPNEW) {
-# Read in merged Waze and EDT data 
-ew <- readRDS(file.path(wazedir, "merged.waze.edt.April_MD.rds"))
-
-# Read in full Waze and full EDT data
-load(file.path(wazedir, "2017-04_1_CrashFact_edited.RData"))
-# Waze: Comes from aggregated monthly Waze events, clipped to a 0.5 mile buffer around MD, for April 2017
-load(file.path(wazedir, "MD_buffered__2017-04.RData"))
-
-# Link file
-link <- read.csv(file.path(wazedir, "EDT_Waze_link_April_MD.csv"))
-
-# Apply matching variable to full data sets
-
-d$WazeMatch <- !is.na(match(d$uuid, unique(link[,2])))
-
-edt.april$EDTMatch <- !is.na(match(edt.april$ID, unique(link[,1])))
-
-# Get Urban Areas from UrbanArea_overlay file 
-ua <- readOGR(file.path(mappeddrive, "SDI Pilot Projects/Waze/Working Documents/Census Files"), layer = "cb_2016_us_ua10_500k")
-
-proj4string(d) <- proj4string(edt.april) <- proj4string(ua) 
-
-waze_ua_pip <- over(d, ua[,c("NAME10","UATYP10")]) # Match a urban area name and type to each row in d. 
-edt_ua_pip <- over(edt.april, ua[,c("NAME10","UATYP10")]) # Match a urban area name and type to each row in edt.april. 
-
-d@data <- data.frame(d@data, waze_ua_pip)
-names(d@data)[(length(d@data)-1):length(d@data)] <- c("Waze_UA_Name", "Waze_UA_Type")
-
-edt.april@data <- data.frame(edt.april@data, edt_ua_pip)
-names(edt.april@data)[(length(edt.april@data)-1):length(edt.april@data)] <- c("EDT_UA_Name", "EDT_UA_Type")
-
-edt.april$UA <- !is.na(edt.april$EDT_UA_Name)
-d$UA <- !is.na(d$Waze_UA_Name)
-
-edt.april$EDTMatch <- as.factor(edt.april$EDTMatch)
-edt.april$UA <- as.factor(edt.april$UA)
-
-d$WazeMatch <- as.factor(d$WazeMatch)
-d$UA <- as.factor(d$UA)
-d$DayofWeek <- as.factor(format(d$time, "%a"))
-d$roadType <- as.factor(d$roadType)
-
-d$HourofDay <- as.numeric(format(d$time, "%H"))
-
-# Save prepped data for faster loading from scratch
-save(file = "CART_data_April.RData",
-     list = c("edt.april","d","ew","link","wazedir"))
+  # Read in merged Waze and EDT data 
+  ew <- readRDS(file.path(wazedir, "merged.waze.edt.April_MD.rds"))
+  
+  # Read in full Waze and full EDT data
+  load(file.path(wazedir, "2017-04_1_CrashFact_edited.RData"))
+  # Waze: Comes from aggregated monthly Waze events, clipped to a 0.5 mile buffer around MD, for April 2017
+  load(file.path(wazedir, "MD_buffered__2017-04.RData"))
+  
+  # Link file
+  link <- read.csv(file.path(wazedir, "EDT_Waze_link_April_MD.csv"))
+  
+  # Apply matching variable to full data sets
+  
+  d$WazeMatch <- !is.na(match(d$uuid, unique(link[,2])))
+  
+  edt.april$EDTMatch <- !is.na(match(edt.april$ID, unique(link[,1])))
+  
+  # Get Urban Areas from UrbanArea_overlay file 
+  ua <- readOGR(file.path(mappeddrive, "SDI Pilot Projects/Waze/Working Documents/Census Files"), layer = "cb_2016_us_ua10_500k")
+  
+  proj4string(d) <- proj4string(edt.april) <- proj4string(ua) 
+  
+  waze_ua_pip <- over(d, ua[,c("NAME10","UATYP10")]) # Match a urban area name and type to each row in d. 
+  edt_ua_pip <- over(edt.april, ua[,c("NAME10","UATYP10")]) # Match a urban area name and type to each row in edt.april. 
+  
+  d@data <- data.frame(d@data, waze_ua_pip)
+  names(d@data)[(length(d@data)-1):length(d@data)] <- c("Waze_UA_Name", "Waze_UA_Type")
+  
+  edt.april@data <- data.frame(edt.april@data, edt_ua_pip)
+  names(edt.april@data)[(length(edt.april@data)-1):length(edt.april@data)] <- c("EDT_UA_Name", "EDT_UA_Type")
+  
+  edt.april$UA <- !is.na(edt.april$EDT_UA_Name)
+  d$UA <- !is.na(d$Waze_UA_Name)
+  
+  edt.april$EDTMatch <- as.factor(edt.april$EDTMatch)
+  edt.april$UA <- as.factor(edt.april$UA)
+  
+  d$WazeMatch <- as.factor(d$WazeMatch)
+  d$UA <- as.factor(d$UA)
+  d$DayofWeek <- as.factor(format(d$time, "%a"))
+  d$roadType <- as.factor(d$roadType)
+  
+  d$HourofDay <- as.numeric(format(d$time, "%H"))
+  
+  # Save prepped data for faster loading from scratch
+  save(file = "CART_data_April.RData",
+       list = c("edt.april","d","ew","link","wazedir"))
 }
-
 
 
 # <><><><><><><><><><><><><><><><><><><><><>
@@ -182,38 +182,46 @@ fitvars.w <- c("WazeMatch", "median.reliability", "nrecord", "type","subType", "
 fitdat.w <- fitdat.w[complete.cases(fitdat.w[,fitvars.w]),]
 wazeformula <- reformulate(termlabels = fitvars.w[2:length(fitvars.w)], response = 'WazeMatch')
 
+# Subset Waze for random forest ----
+# If only Waze accidents, only 15,000 records with complete cases
+# Only Waze accidents + jams + road closed, 196,707 records with complete cases
+
+fitdat.w <- d@data[d@data$type != "WEATHERHAZARD",]
+fitvars.w <- c("WazeMatch", "median.reliability", "nrecord","subType", "Road", "UA", "DayofWeek", "HourofDay")
+fitdat.w <- fitdat.w[complete.cases(fitdat.w[,fitvars.w]),]
+wazeformula <- reformulate(termlabels = fitvars.w[2:length(fitvars.w)], response = 'WazeMatch')
 
 # <><><><><><><><><><><><><><><><><><><><>
 # Start CART ----
 
-# ctree approach from party
+# ctree approach from party. Specify this package with party::, otherwise the slightly different version from partykit is used.
 
-pdf("Regression_Tree_Plots.pdf",
+pdf(file.path(wazefigdir, "Regression_Tree_Plots.pdf"),
     width = 18, height = 10)
 
-ct = ctree(edtformula,
+ct = party::ctree(edtformula,
            data = fitdat,
-           controls = ctree_control(maxdepth = 3))
+           controls = party::ctree_control(maxdepth = 3))
 
 plot(ct, main="EDT Event Matching")
 
-ct.w = ctree(wazeformula,
+ct.w = party::ctree(wazeformula,
            data = fitdat.w,
-           controls = ctree_control(maxdepth = 10))
+           controls = party::ctree_control(maxdepth = 10))
 
 plot(ct.w, main="Waze Event Matching")
 
 
 dev.off()
-system("open Regression_Tree_Plots.pdf")
+system(paste("open ", shQuote(file.path(wazefigdir, "Regression_Tree_Plots.pdf"))))
 
 
-jpeg("EDT_Regression_Tree_Plot.jpeg",
+jpeg(file.path(wazefigdir, "EDT_Regression_Tree_Plot.jpeg"),
      width = 3600, height = 1800, quality = 100,
      pointsize = 8.5,
      res = 300)
 plot(ct, main="EDT Event Matching")
-dev.off(); system("open EDT_Regression_Tree_Plot.jpeg")
+dev.off(); system(paste("open ", shQuote(file.path(wazefigdir, "EDT_Regression_Tree_Plot.jpeg"))))
 
 
 # Table of prediction errors
@@ -224,21 +232,22 @@ tr.pred = predict(ct, newdata=fitdat, type="prob")
 hist(unlist(tr.pred))
 
 
-
 # <><><><><><><><><><><><><><><><><><><><><><><><><><><>
 # Conditional random forest from ctree ----
-# Will allow ordered variables for crash severity
+# Will allow ordered variables for crash severity. 
 # CPU intensive, but not RAM intensive. doMC should help.
 
 starttime <- Sys.time()
 
 # Default 500 trees
 
-cf = cforest(edtformula,
+cf = party::cforest(edtformula,
            data = fitdat,
-           controls = cforest_unbiased())
+           controls = party::cforest_unbiased(), 
+           trace = TRUE)
 
-cat(Sys.time() - starttime, " elapsed for EDT")
+timediff <- Sys.time() - starttime
+cat(round(timediff, 2), attr(timediff, "units"), " elapsed for EDT")
 
 
 pt <- prettytree(cf@ensemble[[1]], names(cf@data@get("input"))) 
@@ -247,25 +256,37 @@ nt@tree <- pt
 nt@data <- cf@data 
 nt@responses <- cf@responses 
 
-plot(nt, type="simple")
+# plot(nt) # needs work
 
 # predictions
 cf.pred <- predict(cf, OOB = T)
 
-table(fitdat$EDTMatch, cf.pred)
+(predtab <- table(fitdat$EDTMatch, cf.pred))
 
+bin.mod.diagnostics(predtab) # from wazefunctions.R
 
-# Waze forest
+# Waze forest ----
+showobjsize() # from wazefunctions.R
+
+rm(list = ls()[is.na(match(ls(), 
+                           c("fitdat.w", "fitdat", "wazeformula", "edtformula", "cf", "cf.pred",
+                             "wazedir", "wazefigdir", "codeloc")))])
+gc() # Strong remval of anything except for these objects; use with caution. gc() clears unused memory.
+
+source(file.path(codeloc, 'utility/wazefunctions.R')) # read functions back in
 
 starttime <- Sys.time()
 
-cf.w = cforest(wazeformula,
+cf.w = partykit::cforest(wazeformula,
              data = fitdat.w,
-             controls = cforest_control(ntree = 50,
-                                        trace = TRUE))
+#             control = partykit::ctree_control(),
+             trace = T,
+             ntree = 250)
 
 cat(Sys.time() - starttime, " elapsed for Waze")
+# ~ 5 min for accident type only using party
 
+format(object.size(cf.w), units = "Mb")
 
 # Save forest output ----
 outputdir_temp <- tempdir()
@@ -284,8 +305,25 @@ movefiles(filelist, outputdir_temp, outputdir_final)
 # predictions
 cf.w.pred <- predict(cf.w, OOB = T)
 
-table(fitdat.w$WazeMatch, cf.w.pred)
+wt <- table(fitdat.w$WazeMatch, cf.w.pred)
 
+knitr::kable(wt)
+
+bin.mod.diagnostics(wt) 
+
+# With party:
+#       cf.w.pred
+#       FALSE TRUE
+# FALSE  8170 1008
+# TRUE   4358 1603
+
+# With partykit: same overall misclassification rate, but more predicted positives overall
+# |      | FALSE| TRUE|
+#   |:-----|-----:|----:|
+#   |FALSE |  7876| 1302|
+#   |TRUE  |  4075| 1886|
+
+plot(WazeMatch)
 
 plot(cf.w, main="Waze Event Matching")
 
@@ -293,6 +331,12 @@ plot(cf.w, main="Waze Event Matching")
 # <><><><><><><><><><><><><><><><><><><><><><><><><><><>
 
 # Other approaches ----
+
+# RWeka 
+# Relies on Java library of machine learning tools. Architechture of R and Java have to match; both should be 64-bit. If necessary, uninstall old Java and install correct version (https://java.com/en/download/manual.jsp)
+
+library(RWeka)
+
 
 # Rpart 
 fit.e.1 <- rpart(edtformula,
