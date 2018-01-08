@@ -62,9 +62,6 @@ movefiles <- function(filelist, temp = outdir, wazedir){
   }
 }
 
-
-# Helper functions ----
-
 # Function to return the most frequent value for character vectors.
 # Breaks ties by taking the first value
 ModeString <- function(x) {
@@ -94,5 +91,30 @@ gettime <- function(x, tz = "America/New_York"){
   dt <- strptime(paste(d, t), "%Y-%m-%d %H-%M-%S", tz = tz)
 }
 
+# Function to show obejcts in the memory, orderd by size. Useful for cleaning up the workspace to free up RAM
+showobjsize <- function(units = "Mb", limit = 100) {
+  sizes <- vector()
+  for (thing in ls(envir = .GlobalEnv)) { 
+    sz <- format(object.size(get(thing)), 
+           units = units,
+           digits = 2)
+    sizes <- rbind(sizes, data.frame(obj = thing, 
+                                     size = as.numeric(unlist(lapply(strsplit(sz, " "), function(x) x[[1]][1])))
+                                     ))
+  }
+  printlim <- ifelse(nrow(sizes) >= limit, limit, nrow(sizes))
+  message("Object size in ", units)
+  print(sizes[order(sizes$size, decreasing = T)[1:printlim],])
+}
 
+# Print diagnotstics from a confusion matrix
+# given a 2x2 table where rows are observed negative and postive, and columns are predicted negative and positive
+bin.mod.diagnostics <- function(predtab){
 
+  accuracy = (predtab[1,1] + predtab[2,2] )/ sum(predtab) # true positives and true negatives divided by all observations
+  precision = (predtab[2,2] )/ sum(predtab[,2]) # true positives divided by all predicted positives
+  recall = (predtab[2,2] )/ sum(predtab[2,]) # true positives divided by all observed positives
+  false.positive.rate = (predtab[2,1] )/ sum(predtab[1,]) # false positives divided by all observed negatives
+
+  t(data.frame(accuracy, precision, recall, false.positive.rate))  
+}
