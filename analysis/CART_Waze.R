@@ -292,18 +292,9 @@ format(object.size(cf.w), units = "Mb")
 outputdir_temp <- tempdir()
 outputdir_final <- wazedir
 
-save(list = c('cf.w', 'cf', 'cf.pred'), 
-     file = file.path(outputdir_temp, 
-                      paste0("Random_Forest_output_", Sys.Date(), ".RData")
-                      )
-    )
-      
-filelist <- dir(outputdir_temp)[grep("[RData$|csv$]", dir(outputdir_temp))]
-movefiles(filelist, outputdir_temp, outputdir_final)
-
 
 # predictions
-cf.w.pred <- predict(cf.w, OOB = T)
+cf.w.pred <- predict(cf.w, OOB = T) # 144 Gb vector needed for predictions, fails if using all but weather hazards.
 
 wt <- table(fitdat.w$WazeMatch, cf.w.pred)
 
@@ -323,9 +314,20 @@ bin.mod.diagnostics(wt)
 #   |FALSE |  7876| 1302|
 #   |TRUE  |  4075| 1886|
 
-plot(WazeMatch)
+save(list = c('cf.w', 'cf', 'cf.pred', 'cf.w.pred'), 
+     file = file.path(outputdir_temp, 
+                      paste0("Random_Forest_output_", Sys.Date(), ".RData")
+     )
+)
 
-plot(cf.w, main="Waze Event Matching")
+filelist <- dir(outputdir_temp)[grep("RData$", dir(outputdir_temp))]
+movefiles(filelist, outputdir_temp, outputdir_final)
+
+
+
+# plot(WazeMatch)
+# 
+# plot(cf.w, main="Waze Event Matching")
 
 
 # <><><><><><><><><><><><><><><><><><><><><><><><><><><>
