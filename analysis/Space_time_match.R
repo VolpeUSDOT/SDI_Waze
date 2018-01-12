@@ -27,7 +27,7 @@ edtdir <- file.path(mappeddriveloc, "SDI Pilot Projects/Waze/MASTER Data Files/E
 setwd(wazedir)
 
 # read functions
-source(file.path(codeloc, 'wazefunctions.R'))
+source(file.path(codeloc, 'utility/wazefunctions.R'))
 
 # Start loop over months ----
 wazemonthfiles <- dir(wazedir)[grep("MD_buffered__2017", dir(wazedir))]
