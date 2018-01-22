@@ -21,11 +21,12 @@ library(GGally) # for ggpairs
 
 setwd("~/")
 if(length(grep("flynn", getwd())) > 0) {mappeddrive = "W:"} # change this to match the mapped network drive on your machine (Z: in original)
-if(length(grep("sudderth", getwd())) > 0) {mappeddrive = "S:"} 
+if(length(grep("sudderth", getwd())) > 0) {mappeddrive = "S:"} #this line does not work for me
+mappeddrive = "S:" #for sudderth mapped drive, I have to click on the drive location in windows explorer to "connect" to the S drive before the data files will load
 
 wazedir <- (file.path(mappeddrive,"SDI Pilot Projects/Waze/MASTER Data Files/Waze Aggregated/month_MD_clipped"))
 wazefigdir <- file.path(mappeddrive, "SDI Pilot Projects/Waze/Figures")
-codeloc <- "~/git/SDI_Waze" # Update as needed for the git repository on your local machine.
+codeloc <- "~/GitHub/SDI_Waze" # Update as needed for the git repository on your local machine. (git for flynn, GitHub for sudderth)
 
 setwd(wazedir)
 
@@ -243,14 +244,14 @@ starttime <- Sys.time()
 
 cf = party::cforest(edtformula,
            data = fitdat,
-           controls = party::cforest_unbiased(), 
-           trace = TRUE)
+           controls = party::cforest_unbiased())#, 
+#           trace = TRUE) #Error with this argument
 
 timediff <- Sys.time() - starttime
 cat(round(timediff, 2), attr(timediff, "units"), " elapsed for EDT")
 
 
-pt <- prettytree(cf@ensemble[[1]], names(cf@data@get("input"))) 
+pt <- prettytree(cf@ensemble[[1]], names(cf@data@get("input")))
 nt <- new("BinaryTree") 
 nt@tree <- pt 
 nt@data <- cf@data 
@@ -421,7 +422,6 @@ reprtree:::plot.getTree(fit.rf.w, depth = 4)
 # faster moving estimates of crash estiamtes that is reliable in space and time. Share reg tree approach on matched events. 
 # overall approach
 # visual of the analysis steps. 
-# make this by noon Monday, for dry run on Monday afternoon.
 
 # EDT vars to use: extent of damage, highest injury level, light condition, time.., manner of collision, n vehicles involved, roadway traffic identifier (maybe), road intersection (maybe), atmospheric
 
