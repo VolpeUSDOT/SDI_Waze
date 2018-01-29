@@ -187,7 +187,7 @@ wazeformula <- reformulate(termlabels = fitvars.w[2:length(fitvars.w)], response
 # If only Waze accidents, only 15,000 records with complete cases
 # Only Waze accidents + jams + road closed, 196,707 records with complete cases
 
-fitdat.w <- d@data[d@data$type != "WEATHERHAZARD",]
+fitdat.w <- d@data[d@data$type == "ACCIDENT",]
 fitvars.w <- c("WazeMatch", "median.reliability", "nrecord","subType", "Road", "UA", "DayofWeek", "HourofDay")
 fitdat.w <- fitdat.w[complete.cases(fitdat.w[,fitvars.w]),]
 wazeformula <- reformulate(termlabels = fitvars.w[2:length(fitvars.w)], response = 'WazeMatch')
