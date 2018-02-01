@@ -24,14 +24,11 @@ source(file.path(codeloc, 'utility/wazefunctions.R'))
 
 #Subset to Waze accidents
 names(link.waze.edt)
+dim(link.waze.edt)
 table(link.waze.edt$type)
 table(link.waze.edt$type, link.waze.edt$match, useNA = "ifany")
 
 #How many EDT reports match non-accident Waze events?
-link.waze.edt %>%
-  group_by(CrashCaseID, type) %>%
-  summarize(count=n())
-
 MatchTypeTable <- link.waze.edt %>%
   group_by(CrashCaseID) %>%
   summarize(
@@ -40,8 +37,21 @@ MatchTypeTable <- link.waze.edt %>%
     nWazeRC=table(type)[3],
     nWazeWH=table(type)[4])
 
+dim(MatchTypeTable) #9272
 
-# Add indicator variables to merged edt-waze file
+#Number of EDT reports with at least one Jam report and no accident reports
+EDT_JamNoAcc <- filter(MatchTypeTable, nWazeJAM>1 & nWazeAcc<1)
+nrow(EDT_JamNoAcc) #618
+
+#Number of EDT reports with at least one RC report and no accident reports
+EDT_RCNoAcc <- filter(MatchTypeTable, nWazeRC>1 & nWazeAcc<1)
+nrow(EDT_RCNoAcc) #191
+
+#Number of EDT reports with at least one WH report and no accident reports
+EDT_WHNoAcc <- filter(MatchTypeTable, nWazeWH>1 & nWazeAcc<1)
+nrow(EDT_WHNoAcc)
+
+# Add indicator variables to merged edt-waze file (IN PROGRESS)
 wazeAcc.edt <- filter(link.waze.edt, type=="ACCIDENT")
 
 
