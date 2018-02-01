@@ -1,6 +1,6 @@
 # Random Forest work for Waze
 
-# Goals: produce rnadom forest analysis for features of a. Waze accidents that predict matching with EDT reports 
+# Goals: produce random forest analysis for features of Waze accidents and other event types that predict matching with EDT reports 
 
 # <><><><><><><><><><><><><><><><><><><><>
 # Setup ----
@@ -51,6 +51,7 @@ if(PREPNEW) {
   
   # Link file
   link <- read.csv(file.path(wazedir, "EDT_Waze_link_April_MD.csv"))
+  
   
   # Apply matching variable to full data sets
   
