@@ -14,9 +14,13 @@ library(tidyverse)
 library(maps)
 
 # Code location
-mappeddriveloc <- "W:"
+mappeddriveloc <- "W:" #Flynn
+mappeddriveloc <- "S:" #Sudderth
 
-codeloc <- "~/git/SDI_Waze"
+
+codeloc <- "~/git/SDI_Waze" #Flynn
+codeloc <- "~/GitHub/SDI_Waze" #Sudderth
+
 wazedir <- file.path(mappeddriveloc, "SDI Pilot Projects/Waze/MASTER Data Files/Waze Aggregated/month_MD_clipped")
 edtdir <- file.path(mappeddriveloc, "SDI Pilot Projects/Waze/MASTER Data Files/EDT_month")
 
