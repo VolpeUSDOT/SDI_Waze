@@ -13,11 +13,17 @@ library(rgdal) # for readOGR(), needed for reading in ArcM shapefiles
 library(rgeos) # for gIntersection, to clip two shapefiles
 library(raster)
 
-
+#Flynn drive
 wazemonthdir <- "W:/SDI Pilot Projects/Waze/MASTER Data Files/Waze Aggregated/month_MD_clipped"
 wazedir <- "W:/SDI Pilot Projects/Waze/"
 volpewazedir <- "//vntscex.local/DFS/Projects/PROJ-OR02A2/SDI/"
 outputdir <- "W:/SDI Pilot Projects/Waze/MASTER Data Files/Waze Aggregated/month_MD_clipped"
+
+#Sudderth drive
+wazemonthdir <- "S:/SDI Pilot Projects/Waze/MASTER Data Files/Waze Aggregated/month_MD_clipped"
+wazedir <- "S:/SDI Pilot Projects/Waze/"
+volpewazedir <- "//vntscex.local/DFS/Projects/PROJ-OR02A2/SDI/"
+outputdir <- "S:/SDI Pilot Projects/Waze/MASTER Data Files/Waze Aggregated/month_MD_clipped"
 
 setwd(wazedir)
 
