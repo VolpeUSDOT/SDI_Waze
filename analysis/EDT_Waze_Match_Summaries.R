@@ -51,7 +51,10 @@ nrow(EDT_RCNoAcc) #191
 EDT_WHNoAcc <- filter(MatchTypeTable, nWazeWH>1 & nWazeAcc<1)
 nrow(EDT_WHNoAcc)
 
+# <><><><><><><><><><><><>
 # Add indicator variables to merged edt-waze file (IN PROGRESS)
+# <><><><><><><><><><><><>
+
 wazeAcc.edt <- filter(link.waze.edt, type=="ACCIDENT")
 
 
