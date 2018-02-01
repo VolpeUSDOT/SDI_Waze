@@ -4,22 +4,8 @@
 # <><><><><><><><><><><><><><><><><><><><>
 # Setup ----
 
-library(rpart)
-library(randomForest)
-# library(reprtree) # library(devtools); install_github('araastat/reprtree')
-library(maptree) # for better graphing
-library(party)
-library(partykit)
-library(rgdal) # for readOGR(), needed for reading in ArcM shapefiles
 library(dplyr)
 library(tidyr)
-
-#library(CORElearn)
-#library(ggRandomForests)
-#library(GGally) # for ggpairs
-
-# Run this if you don't have these packages:
-# install.packages(c("rpart", "randomForest", "maptree", "party", "partykit", "rgdal"), dep = T)
 
 setwd("~/")
 if(length(grep("flynn", getwd())) > 0) {mappeddrive = "W:"} # change this to match the mapped network drive on your machine (Z: in original)
