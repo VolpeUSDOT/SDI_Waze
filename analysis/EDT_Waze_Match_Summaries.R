@@ -26,6 +26,8 @@ source(file.path(codeloc, 'utility/wazefunctions.R'))
 names(link.waze.edt)
 dim(link.waze.edt)
 table(link.waze.edt$type)
+table(link.waze.edt$subtype)
+table(link.waze.edt$subtype, link.waze.edt$type,useNA = "ifany")
 table(link.waze.edt$type, link.waze.edt$match, useNA = "ifany")
 
 #How many EDT reports match non-accident Waze events?
@@ -56,6 +58,26 @@ nrow(EDT_WHNoAcc)
 # <><><><><><><><><><><><>
 
 wazeAcc.edt <- filter(link.waze.edt, type=="ACCIDENT")
+
+# Make sure EDT data is just for April
+edt.april <- edt.april[edt.april$CrashDate_Local < "2017-05-01 00:00:00 EDT" & edt.april$CrashDate_Local > "2017-04-01 00:00:00 EDT",] 
+
+# Add "M" code to the table to show matches if we merge in full datasets
+match <- rep("M", nrow(link))
+link <- mutate(link, match) #29,206
+glimpse(link)
+
+# Waze-waze:  Add "M" code to the table to show matches if we merge in full datasets
+match <- rep("M", nrow(linkww))
+linkww <- mutate(linkww, match) #29,206
+glimpse(linkww)
+
+# EDT-EDT:
+match <- rep("M", nrow(linkee))
+linkee <- mutate(linkee, match) #29,206
+glimpse(linkee)
+
+
 
 
 
