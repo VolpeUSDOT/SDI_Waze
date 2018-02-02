@@ -38,11 +38,6 @@ source(file.path(codeloc, 'utility/wazefunctions.R'))
 # linking all Waze events to all other Waze events, for April
 proj4string(d) <- c("+proj=longlat +datum=NAD83 +no_defs +ellps=GRS80 +towgs84=0,0,0")
 
-wazeacc <- d[d$type == "ACCIDENT",]
-
-
-
-
 # <><><><><><><><><><><><><><><><><><><><><><><><>
 link.waze.waze <- makelink(d, d,
                            acctimevar = "time",
