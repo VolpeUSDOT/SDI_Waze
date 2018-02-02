@@ -33,7 +33,7 @@ setwd(wazedir)
 # read functions
 source(file.path(codeloc, 'utility/wazefunctions.R'))
 
-#TODO: add code to load April Waze data (don't want to load all)
+#TODO: add code to load April Waze data ( below - using saved data now)
 
 # linking all Waze events to all other Waze events, for April
 proj4string(d) <- c("+proj=longlat +datum=NAD83 +no_defs +ellps=GRS80 +towgs84=0,0,0")
