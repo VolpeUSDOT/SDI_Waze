@@ -89,7 +89,7 @@ Annotated bibliography of tools and approaches used in existing analyses of road
 **@Saha:2015 Prioritizing Highway Safety Manual's crash prediction variables using boosted regression trees**
 
 - Decision tree (BRT, similar to random forests, based on CART) approach used to evaluate the impact of individual roadway characteristics on crash predictions. The goal here was to rank roadway characteristics, to prioritize which variables should be the focus of data collection, when resources are limited for roadway monitoring. Roadway characteristics are the input for the Highway Safety Manual (HSM) empirical Bayes approach to estimating crash frequency with negative binomial regression. 
-- Five years of data (2008-2012) in Florida used. Boosted regression tree (BRT) are similar to random forests, in using an ensemble of decision trees, and can be useful when most individual decision trees produce weak statistical predictions. Implemneted in *gbm* package in R.
+- Five years of data (2008-2012) in Florida used. Boosted regression tree (BRT) are similar to random forests, in using an ensemble of decision trees, and can be useful when most individual decision trees produce weak statistical predictions. Implemented in *gbm* package in R.
 
 **@Saleem:2016 An Exploratory Computational Piecewise Approach to Characterizing and Analyzing Traffic Accident Data**
 
@@ -105,7 +105,7 @@ Annotated bibliography of tools and approaches used in existing analyses of road
 
 **@Sun:2016 Developing Crash Models with Supporting Vector Machine for Urban Transportation Planning**
 
-- Support vector machines (SVM) unsupervised learning approach to discover patterns in crash frequency. Data from Louisiana urban roadways in 2011-2013, with crash frequency, roadway geomtry, and AADT as main inputs. Little detail on model specification or application provide, largely a demonstration that SVM can be used.
+- Support vector machines (SVM) unsupervised learning approach to discover patterns in crash frequency. Data from Louisiana urban roadways in 2011-2013, with crash frequency, roadway geometry, and AADT as main inputs. Little detail on model specification or application provide, largely a demonstration that SVM can be used.
 
 **@Vasudevan:2016 Predicting Traffic Flow Regimes From Simulated Connected Vehicle Messages Using Data Analytics and Machine Learning**
 
