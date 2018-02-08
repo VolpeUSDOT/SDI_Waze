@@ -109,6 +109,9 @@ Annotated bibliography of tools and approaches used in existing analyses of road
 
 **@Vasudevan:2016 Predicting Traffic Flow Regimes From Simulated Connected Vehicle Messages Using Data Analytics and Machine Learning**
 
+- Simulated data from a highway corridor in Seattle, to model traffic flow regimes under different conditions for connected vehicles. Three machine learning approaches were taken for traffic flow estimation: logistic regression, individal decision trees (CART), and random forests. Moldes were run in a Microsoft Azure cloud computing environment, using Apache Spark machine learning libraries.  
+- Focus is on connected vehicle configuration, operational conditions, market penetration, and estiamting traffic flow rather than estimating crash counts. Useful detail on feature extraction, relying on principal component analysis (PCA) in R.
+
 **@Wang:2016 Exploration of Advances in Statistical Methodologies for Crash Count and Severity Prediction Models**
 
 **@Wei:2017 Analyzing Traffic Crash Severity in Work Zones under Different Light Conditions**
@@ -124,6 +127,8 @@ Annotated bibliography of tools and approaches used in existing analyses of road
 - Data collected automatically from new vehicles used as input for a decision tree analysis of road condition.  Data collection relies on GPS, Wi-Fi, and sensors of vertical acceleration and pitch rate to detect features such as potholes. 
 
 **@Vasudevan:2016 Predicting Traffic Flow Regimes From Simulated Connected Vehicle Messages Using Data Analytics and Machine Learning**
+ 
+-  
  
 ## Spatial regression for road safety <a name = "spatial"></a>
 
