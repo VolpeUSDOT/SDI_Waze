@@ -1,5 +1,6 @@
 # Test of SDC Redshift connection, following John Alesse's notes for pulling data from Redshift
-
+# additional detail from https://aws.amazon.com/blogs/big-data/connecting-r-with-amazon-redshift/
+# https://daniel-workspace.securedatacommons.com:8888
 # install.packages("RJDBC", dep = T)
 library(RJDBC)
 
@@ -11,8 +12,12 @@ if(length(dir("~/.redshiftTools"))==0){
 }
 
 driver <- JDBC(driverClass = "com.amazon.redshift.jdbc42.Driver", 
-               classPath = "~/.redshiftTools/RedshiftJDBC42-1.2.10.1009.jar", 
+               classPath = "~/.redshiftTools/RedshiftJDBC42-1.2.10.1009.jar",
                identifier.quote="`")
+
+# .jclassLoader()$setDebug(1L) # Set this to get more details if recieving 'class not found' error. Same error on ec2 instance inside SDC.
+# possible solutions: https://stackoverflow.com/questions/30738974/rjava-load-error-in-rstudio-r-after-upgrading-to-osx-yosemite
+# issue with Java class path? Iss
 
 # Specify username and password manually, once:
 if(Sys.getenv("sdc_waze_username")==""){

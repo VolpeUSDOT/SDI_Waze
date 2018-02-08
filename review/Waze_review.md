@@ -86,9 +86,14 @@ Annotated bibliography of tools and approaches used in existing analyses of road
 - Data aggregation and preparation discussed. Includes a useful literature review.
 - Similar in some respects to goals of SDI Waze project, but using different data sets and with a different geographic and temporal scope.
 
-**@Saha:2015 Prioritizing Highway Safety Manual’s crash prediction variables using boosted regression trees**
+**@Saha:2015 Prioritizing Highway Safety Manual's crash prediction variables using boosted regression trees**
+
+- Decision tree (BRT, similar to random forests, based on CART) approach used to evaluate the impact of individual roadway characteristics on crash predictions. The goal here was to rank roadway characteristics, to prioritize which variables should be the focus of data collection, when resources are limited for roadway monitoring. Roadway characteristics are the input for the Highway Safety Manual (HSM) empirical Bayes approach to estimating crash frequency with negative binomial regression. 
+- Five years of data (2008-2012) in Florida used. Boosted regression tree (BRT) are similar to random forests, in using an ensemble of decision trees, and can be useful when most individual decision trees produce weak statistical predictions. Implemneted in *gbm* package in R.
 
 **@Saleem:2016 An Exploratory Computational Piecewise Approach to Characterizing and Analyzing Traffic Accident Data**
+
+- Six years of data (2008-2013) in North Dakota from state sources. Large number of crash-level data used. "Data analysis" is only fitting polynomial functions to the bivariate patterns, no statistical inference.
 
 **@Shawky:2016 Risk Factors Analysis for Drivers with Multiple Crashes**
 
@@ -96,7 +101,11 @@ Annotated bibliography of tools and approaches used in existing analyses of road
 
 **@Srinivasan:2015 Crash Prediction Method for Freeway Facilities with High Occupancy Vehicle (HOV) and High Occupancy Toll (HOT) Lanes**
 
+- Segment-based crash frequency modeling, separate models for fatal/injury crashes and all crashes. Negative binomial regression approach, with AADT as exposure variable, segment length and number of lanes as additional important variables. Data from three states, CA, WA, and FL, from the Highway Safety Information System (HSIS). Models were run in SPSS, and spreadsheet tool developed using the fitted coefficients. 
+
 **@Sun:2016 Developing Crash Models with Supporting Vector Machine for Urban Transportation Planning**
+
+- Support vector machines (SVM) unsupervised learning approach to discover patterns in crash frequency. Data from Louisiana urban roadways in 2011-2013, with crash frequency, roadway geomtry, and AADT as main inputs. Little detail on model specification or application provide, largely a demonstration that SVM can be used.
 
 **@Vasudevan:2016 Predicting Traffic Flow Regimes From Simulated Connected Vehicle Messages Using Data Analytics and Machine Learning**
 
