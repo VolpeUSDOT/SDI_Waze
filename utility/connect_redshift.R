@@ -13,6 +13,8 @@ if(length(dir("~/.redshiftTools"))==0){
     download.file('https://s3.amazonaws.com/redshift-downloads/drivers/RedshiftJDBC42-1.2.10.1009.jar', '~/.redshiftTools/RedshiftJDBC42-1.2.10.1009.jar', mode = "wb")
 }
 
+# Try from commandline directly: wget 
+
 driver <- JDBC(driverClass = "com.amazon.redshift.jdbc42.Driver", 
                classPath = "~/.redshiftTools/RedshiftJDBC42-1.2.10.1009.jar",
                identifier.quote="`")
