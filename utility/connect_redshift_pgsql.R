@@ -11,7 +11,7 @@ if(Sys.getenv("sdc_waze_username")==""){
 }
 
 
-redshift_host <- Sys.getenv("prod-dot-sdc-redshift-cluster.cctxatvt4w6t.us-east-1.redshift.amazonaws.com")
+redshift_host <- "prod-dot-sdc-redshift-cluster.cctxatvt4w6t.us-east-1.redshift.amazonaws.com"
 redshift_port <- "5439"
 redshift_user <- Sys.getenv("sdc_waze_username")
 redshift_password <- Sys.getenv("sdc_waze_password")
