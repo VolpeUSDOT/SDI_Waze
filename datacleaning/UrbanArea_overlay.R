@@ -20,10 +20,10 @@ volpewazedir <- "//vntscex.local/DFS/Projects/PROJ-OR02A2/SDI/"
 outputdir <- "W:/SDI Pilot Projects/Waze/MASTER Data Files/Waze Aggregated/month_MD_clipped"
 
 #Sudderth drive
-wazemonthdir <- "S:/SDI Pilot Projects/Waze/MASTER Data Files/Waze Aggregated/month_MD_clipped"
-wazedir <- "S:/SDI Pilot Projects/Waze/"
-volpewazedir <- "//vntscex.local/DFS/Projects/PROJ-OR02A2/SDI/"
-outputdir <- "S:/SDI Pilot Projects/Waze/MASTER Data Files/Waze Aggregated/month_MD_clipped"
+# wazemonthdir <- "S:/SDI Pilot Projects/Waze/MASTER Data Files/Waze Aggregated/month_MD_clipped"
+# wazedir <- "S:/SDI Pilot Projects/Waze/"
+# volpewazedir <- "//vntscex.local/DFS/Projects/PROJ-OR02A2/SDI/"
+# outputdir <- "S:/SDI Pilot Projects/Waze/MASTER Data Files/Waze Aggregated/month_MD_clipped"
 
 setwd(wazedir)
 
@@ -31,7 +31,14 @@ setwd(wazedir)
 # From: https://www.census.gov/geo/maps-data/data/cbf/cbf_ua.html
 # https://www2.census.gov/geo/pdfs/maps-data/data/tiger/tgrshprd13/TGRSHPrd13_TechDoc_A.pdf
 
-ua <- readOGR(file.path(wazedir, "Working Documents/Census Files/Urban_Areas"), layer = "cb_2016_us_ua10_500k")
+ua <- readOGR(file.path(wazedir, "Working Documents/Census Files"), layer = "cb_2016_us_ua10_500k")
+
+# Read in hexagon shapefile. This is a rectangular surface of 1 sq mi area hexagons, 
+hex <- readOGR(file.path(volpewazedir, "spatial_layers/MD_hexagons_shapefiles"), layer = "MD_hexagons_1mi")
+
+# read in county shapefile
+
+co <- readOGR(file.path(wazedir, "Working Documents/Census Files"), layer = "cb_2015_us_county_500k")
 
 # EDT: See CrashFact in W:\SDI Pilot Projects\Volpe\2017_11_03\waze\input\edt\2016_01_to_2017_09_MD_and_IN.
 # This has been reduced to just Maryland data from April 2017.
@@ -102,7 +109,24 @@ names(edt.april@data)[(length(edt.april@data)-1):length(edt.april@data)] <- c("E
 # # lat/longs should be extremely close. Use EDT as the 'center' for each given row.
 # with(ew[complete.cases(ew[,c('lat','GPSLat')]),], cor(lat, GPSLat))
 # with(ew[complete.cases(ew[,c('lon','GPSLong_New')]),], cor(lon, GPSLong_New))
- 
+
+# <><><><><><><><><><><><><><><><><><><><>
+# Start Hexagon overlay
+
+# match coordinate reference system of hexagons to Urban Areas and counties
+proj4string(hex)
+proj4string(co)
+
+# maryland FIPS = 24
+md.co <- co[co$STATEFP == 24,]
+
+hex2 <- spTransform(hex, proj4string(md.co))
+
+# try the other way
+
+
+
+
 
 # <><><><><><><><><><><><><><><><><><><><>
 # Merge and save EDT-Waze

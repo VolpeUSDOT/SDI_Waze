@@ -26,13 +26,13 @@ conn <- dbConnect(
   password=redshift_password,
   dbname=redshift_db)
 
-tryCatch({
-  example_query <- "SELECT * FROM my_table LIMIT 5"
-  results <- dbGetQuery(conn, example_query)
-  print(results)
-}, finally = {
-  dbDisconnect(conn)
-})
-
-
+# tryCatch({
+#   example_query <- "SELECT * FROM my_table LIMIT 5"
+#   results <- dbGetQuery(conn, example_query)
+#   print(results)
+# }, finally = {
+#   dbDisconnect(conn)
+# })
+# 
+# 
 
