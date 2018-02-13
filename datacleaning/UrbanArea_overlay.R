@@ -14,6 +14,7 @@ library(rgeos) # for gIntersection, to clip two shapefiles
 library(raster)
 
 #Flynn drive
+codedir <- "~/git/SDI_Waze" 
 wazemonthdir <- "W:/SDI Pilot Projects/Waze/MASTER Data Files/Waze Aggregated/month_MD_clipped"
 wazedir <- "W:/SDI Pilot Projects/Waze/"
 volpewazedir <- "//vntscex.local/DFS/Projects/PROJ-OR02A2/SDI/"
@@ -24,6 +25,8 @@ outputdir <- "W:/SDI Pilot Projects/Waze/MASTER Data Files/Waze Aggregated/month
 # wazedir <- "S:/SDI Pilot Projects/Waze/"
 # volpewazedir <- "//vntscex.local/DFS/Projects/PROJ-OR02A2/SDI/"
 # outputdir <- "S:/SDI Pilot Projects/Waze/MASTER Data Files/Waze Aggregated/month_MD_clipped"
+
+source(file.path(codedir, "utility/wazefunctions.R")) # for movefiles
 
 setwd(wazedir)
 
@@ -111,7 +114,7 @@ names(edt.april@data)[(length(edt.april@data)-1):length(edt.april@data)] <- c("E
 # with(ew[complete.cases(ew[,c('lon','GPSLong_New')]),], cor(lon, GPSLong_New))
 
 # <><><><><><><><><><><><><><><><><><><><>
-# Start Hexagon overlay
+# Hexagon overlay
 
 # match coordinate reference system of hexagons to Urban Areas and counties
 proj4string(hex)
@@ -122,37 +125,47 @@ md.co <- co[co$STATEFP == 24,]
 
 hex2 <- spTransform(hex, proj4string(md.co))
 
-# try the other way
+# grid column names
+gridcols <- names(hex2)[grep("^GRID", names(hex2))]
 
+waze_hex_pip <- over(d, hex2[,gridcols]) # Match hexagon names to each row in d. 
+edt_hex_pip <- over(edt.april, hex2[,gridcols]) # Match hexagon names to each row in edt.april. 
 
+# add these columns to the data frame
+d@data <- data.frame(d@data, waze_hex_pip)
 
-
+edt.april@data <- data.frame(edt.april@data, edt_hex_pip)
 
 # <><><><><><><><><><><><><><><><><><><><>
 # Merge and save EDT-Waze
 # <><><><><><><><><><><><><><><><><><><><>
 
 # Save Waze data as dataframe
-waze.df <- d@data #439,562 x 22
+waze.df <- d@data #439,562 x 32
 names(waze.df)
 
 # Save EDT data as dataframe
-edt.df <- edt.april@data #9,271 x 56
+edt.df <- edt.april@data #9,271 x 63
 names(edt.df)
 
+# before carrying out the join, rename the EDT grid cell columns 
+names(edt.df)[grep("^GRID", names(edt.df))] <- paste(names(edt.df)[grep("^GRID", names(edt.df))], "edt", sep = ".")
+
 # Join Waze data to link table (full join)
-link.waze <- full_join(link, waze.df, by=c("uuid.waze"="uuid")) #442,500
+link.waze <- full_join(link, waze.df, by=c("uuid.waze"="uuid")) #442,500 x 34
 
 # Add W code to match column to indicate only Waze data
 link.waze$match <- ifelse(is.na(link.waze$match), 'W', link.waze$match)
 
 # Join EDT data to Waze-link table (full join)
-# Note:error stating "Column `CrashDate_Local` POSIXlt not supported" returned for all columns 
+
+# *** Potential improvement for data storage: at this step, make a selection of only those columns which will be useful from EDT (do not include all 0 columns or columns not useful for the model) ***
+
 edt.df$CrashDate_Local <- as.character(edt.df$CrashDate_Local) # will need to convert back to POSIX
-link.waze.edt <- full_join(link.waze, edt.df, by = c("id.edt"="ID")) #446,461 x 74
+link.waze.edt <- full_join(link.waze, edt.df, by = c("id.edt"="ID")) #446,498 x 96
 
 # Check size - total should equal number non-matched EDT + number non-matched Waze + nrow(link table);
-# 3961+413294+29206 = 446,461 (it matches!)
+# 3998 + 413294 + 29206 = 446,498 (it matches!)
 
 #Add E code to match column to indicate only EDT data
 link.waze.edt$match <- ifelse(is.na(link.waze.edt$match), 'E', link.waze.edt$match)
@@ -162,11 +175,34 @@ table(link.waze.edt$match)
 
 link.waze.edt$CrashDate_Local <- strptime(link.waze.edt$CrashDate_Local, "%Y-%m-%d %H:%M:%S", tz = "America/New_York")
 
+# Save files first to a local temporaroy directory, then move to the shared drive and delete local copies when complete.
+temp.outputdir = tempdir() 
+
 #save the merged file as a csv file
-write.csv(link.waze.edt, file=file.path(outputdir, "merged.waze.edt.April_MD.csv"), row.names = F)
+write.csv(link.waze.edt, file=file.path(temp.outputdir, "merged.waze.edt.April_MD.csv"), row.names = F)
 
 #Save the merged Rdata file as an Rdata file
-saveRDS(link.waze.edt, file = file.path(outputdir, "merged.waze.edt.April_MD.rds"))
+saveRDS(link.waze.edt, file = file.path(temp.outputdir, "merged.waze.edt.April_MD.rds"))
+
+save(list=c("link.waze.edt", "edt.df"), file = file.path(temp.outputdir, "merged.waze.edt.April_MD.RData"))
+
+movefiles(dir(temp.outputdir)[grep("merged", dir(temp.outputdir))], temp.outputdir, outputdir)
+
+# hexagons matching a Waze event
+
+any.waze.hex <- as.character(unique(unlist(d@data[gridcols])))
+# remove NA 
+any.waze.hex <- any.waze.hex[-which(is.na(any.waze.hex))]
+
+
+hex.md <- hex2[match(any.waze.hex, hex2$GRID_ID),]
+
+# all hexagons
+plot(hex2)
+plot(hex.md, col = "blue", add = T)
+
+save(list = c('hex.md', 'hex2'), file = file.path(volpewazedir, "spatial_layers/MD_hex.RData"))
+
 
 # <><><><><><><><><><><><>
 # Waze-Waze
