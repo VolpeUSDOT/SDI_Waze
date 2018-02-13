@@ -3,7 +3,6 @@
 # Setup ----
 library(sp)
 library(maps) # for mapping base layers
-#library(maptools) # readShapePoly() and others
 library(mapproj) # for coord_map()
 library(rgdal) # for readOGR(), needed for reading in ArcM shapefiles
 
@@ -34,6 +33,9 @@ md.co <- co[co$STATEFP == 24,]
 
 hex2 <- spTransform(hex, proj4string(md.co))
 
+# overlay hexagons and county map
+plot(md.co)
+plot(hex2, add = T)
 
 # try the other way
 
