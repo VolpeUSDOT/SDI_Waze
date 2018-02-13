@@ -51,8 +51,17 @@ edt.df$CrashDate_Local <- as.POSIXct(edt.df$CrashDate_Local, "%Y-%m-%d %H:%M:%S"
 # For each neighbor cell, count the number of Waze events of each type and subtype. End result is a data frame with (number of types) x 6 + (number of substypes) x 6 columns, associated with each Waze event.
 neighbor.counts.waze <- vector()
 
-
-
+for(i in 1:nrow(link.waze.edt)){
+  # i = 1
+  wx <- link.waze.edt[i,]
+  
+  link.waze.edt %>%
+    filter(GRID_ID == as.character(wx$GRID_ID_N)) %>%
+    group_by(day = format(time, "%j"), hour = format(time, "%H"), type, subtype) %>%
+    summarise(
+      nrecord=n()
+    )
+  }
 
 
 # making gridded data frame of Waze data, by grid cell ID, day of year, and hour of day.
@@ -66,15 +75,16 @@ grd.w <- link.waze.edt %>%
     # pubMillis = min(pubMillis),
     # first.file = sort(filename, decreasing = F)[1],
     # last.file = sort(filename, decreasing = T)[1],
-    nrecord = n()
+    nrecord = n(),
+    nmatch = table(match)[2] # creating a table every time... slow-ish
   )
 
 # Gridded data frame of EDT data
 grd.e <- edt.df %>%
   group_by(GRID_ID.edt, day = format(CrashDate_Local, "%j"), hour = format(CrashDate_Local, "%H")) %>%
   summarise(
-    nrecord = n(),
-    n.N = sum(GRID_ID_N.edt)
+    nrecord = n()#,
+   # n.N = sum(GRID_ID_N.edt)
   )
 
 
