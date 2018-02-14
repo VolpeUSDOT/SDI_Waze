@@ -1,9 +1,11 @@
 # Time-space match points
 # Matching Waze events to other Waze events (needed to make indicator variables showing matches to toher Waze events).
 
-# Goal: for a given EDT event, find the matching Waze events within 60 min on either side, within a 0.5 mi radius.
+
+# Original Goal: for a given EDT event, find the matching Waze events within 60 min on either side, within a 0.5 mi radius.
 # Location in EDT is in GPSLong_New and GPS_Lat, time is in CrashDate_Local.
 # Location in Waze is in lon and lat, time is in time.
+# Now applying to all Waze events to Waze accidents, and updating to run on ATA server
 
 # use spDists from sp package to get distances from each EDT event to each Waze event. 
 # Produce a link table which has a two columns: EDT events and the Waze events which match them; repeat EDT event in the column for all matching Waze events.
@@ -11,31 +13,22 @@
 # Setup ----
 library(sp)
 library(tidyverse)
-library(maps)
 
-# Code location
-mappeddriveloc <- "W:" #Flynn
-mappeddriveloc <- "S:" #Sudderth
+codeloc <- "~/SDI_Waze" #ATA
 
-
-codeloc <- "~/git/SDI_Waze" #Flynn
-codeloc <- "~/GitHub/SDI_Waze" #Sudderth
-
-wazedir <- file.path(mappeddriveloc, "SDI Pilot Projects/Waze/MASTER Data Files/Waze Aggregated/month_MD_clipped")
-edtdir <- file.path(mappeddriveloc, "SDI Pilot Projects/Waze/MASTER Data Files/EDT_month")
-
-
-# load data - will load all files in month_MD_clipped directory on shared drive
-# source(file.path(codeloc, 'wazeloader.R'))
-
-setwd(wazedir)
+setwd("~/")
 
 # read functions
 source(file.path(codeloc, 'utility/wazefunctions.R'))
 
-#TODO: add code to load April Waze data ( below - using saved data now)
+# Ensure AWS credentials are set up. If this fails, set up AWS Access Keys in the AWS Console on a web browser, then save the plain text file of the key and secret in a secure location.
+# in the Jupyter terminal, use `aws configure` and enter those values by pasting into the console. 
+aws.signature::use_credentials()
 
-# linking all Waze events to all other Waze events, for April
+# load data from S3 bucket
+s3load("working/merged.waze.edt.April_MD.RData", bucket = "ata-waze")
+
+# linking all Waze events to all other Waze events, for April. Set the projection to match that of the census data we use as the default
 proj4string(d) <- c("+proj=longlat +datum=NAD83 +no_defs +ellps=GRS80 +towgs84=0,0,0")
 
 # <><><><><><><><><><><><><><><><><><><><><><><><>
@@ -54,3 +47,5 @@ link.waze.wazeAll <-  link.waze.wazeAll[link.waze.wazeAll[,1] != link.waze.wazeA
 
 write.csv(link.waze.wazeAll, "Waze_WazeAll_link_April_MD.csv", row.names = F)
 
+s3save(link.waze.wazeAll, "Waze_WazeAll_link_April_MD.RData", bucket = "ata-waze")
+s3save(link.waze.wazeAll, "Waze_WazeAll_link_April_MD.RData", bucket = "ata-sdi-out")
