@@ -9,10 +9,12 @@
 
 # use spDists from sp package to get distances from each EDT event to each Waze event. 
 # Produce a link table which has a two columns: EDT events and the Waze events which match them; repeat EDT event in the column for all matching Waze events.
+# ** ATA note: needed to install.packages('sp', type = 'source') to resolve "error sp_dists not available for .C()". Then quit and re-start R after re-installing sp from source.
 
 # Setup ----
 library(sp)
 library(tidyverse)
+library(aws.s3)
 
 codeloc <- "~/SDI_Waze" #ATA
 
@@ -26,7 +28,7 @@ source(file.path(codeloc, 'utility/wazefunctions.R'))
 aws.signature::use_credentials()
 
 # load data from S3 bucket
-s3load("working/merged.waze.edt.April_MD.RData", bucket = "ata-waze")
+s3load("working/MD_buffered__2017-04.RData", bucket = "ata-waze")
 
 # linking all Waze events to all other Waze events, for April. Set the projection to match that of the census data we use as the default
 proj4string(d) <- c("+proj=longlat +datum=NAD83 +no_defs +ellps=GRS80 +towgs84=0,0,0")
