@@ -49,6 +49,7 @@ edt.df$CrashDate_Local <- as.POSIXct(edt.df$CrashDate_Local, "%Y-%m-%d %H:%M:%S"
 
 # 'Manual' way to make the counts in neighboring cells with a loop and matching
 # For each neighbor cell, count the number of Waze events of each type and subtype. End result is a data frame with (number of types) x 6 + (number of substypes) x 6 columns, associated with each Waze event.
+
 neighbor.counts.waze <- vector()
 
 for(i in 1:nrow(link.waze.edt)){
