@@ -62,7 +62,11 @@ for(i in 1:nrow(link.waze.edt)){
     summarise(
       nrecord=n()
     )
+  
   }
+
+# Do this by hour now. Then consider aggregation in 3hr blocks, with lag/lead 1hr (maybe) for every Waze events 
+# Additiona data: weather, roadway
 
 
 # making gridded data frame of Waze data, by grid cell ID, day of year, and hour of day.
