@@ -16,7 +16,7 @@ library(sp)
 library(tidyverse)
 library(aws.s3)
 
-LOCALTEST = T # F to run on ATA server, T to test on local machine
+LOCALTEST = F # F to run on ATA server, T to test on local machine
 
 if(LOCALTEST){ 
   codeloc = "~/git/SDI_Waze/" 
@@ -61,7 +61,7 @@ link.waze.wazeAll <-  link.waze.waze[as.character(link.waze.waze[,1]) != as.char
 # remove self-matches
 link.waze.wazeAll <-  link.waze.wazeAll[link.waze.wazeAll[,1] != link.waze.wazeAll[,2],]
 
-write.csv(link.waze.wazeAll, "Waze_WazeAll_link_April_MD.csv", row.names = F)
+write.csv(link.waze.wazeAll, file = "Waze_WazeAll_link_April_MD.csv", row.names = F)
 
-s3save(link.waze.wazeAll, "Waze_WazeAll_link_April_MD.RData", bucket = "ata-waze")
-s3save(link.waze.wazeAll, "Waze_WazeAll_link_April_MD.RData", bucket = "ata-sdi-out")
+s3save(link.waze.wazeAll, object = "Waze_WazeAll_link_April_MD.RData", bucket = "ata-waze")
+s3save(link.waze.wazeAll, object = "Waze_WazeAll_link_April_MD.RData", bucket = "ata-sdi-out")
