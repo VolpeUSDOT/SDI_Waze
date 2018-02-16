@@ -10,14 +10,24 @@ makelink <- function(accfile = edt.april, incfile = waze.april,
                      inctimevar1 = "time",
                      inctimevar2 = "last.pull.time",
                      accidvar = "ID",
-                     incidvar = "uuid"){
+                     incidvar = "uuid"
+                     ){
+  library(foreach) 
+  library(doParallel) # includes iterators and parallel
+  
+  cl <- makeCluster(parallel::detectCores()) # make a cluster of all available cores
+  registerDoParallel(cl)
   
   linktable <- vector()
-  starttime <- Sys.time()
   
-  for(i in 1:nrow(accfile)){ # i=which(edt$ID == "2023680")
+  starttime <- Sys.time()
+  writeLines("", paste0("waze_waze_log_", Sys.Date(), ".txt")) # to store messages
+  
+  # Start of %dopar% loop
+  linktable <- foreach(i=1:nrow(accfile), .combine = rbind, .packages = "sp") %dopar% {
+    
     ei = accfile[i,]
-
+    
     dist.i <- spDists(ei, incfile, longlat = T)*0.6213712 # spDists gives units in km, convert to miles
     dist.i.5 <- which(dist.i <= 0.5)
     
@@ -29,23 +39,69 @@ makelink <- function(accfile = edt.april, incfile = waze.april,
     if(class(ei)=="SpatialPointsDataFrame") { ei <- as.data.frame(ei) }
     if(class(d.sp)=="SpatialPointsDataFrame") { d.sp <- as.data.frame(d.sp) }
     
-    
     d.t <- d.sp[d.sp[,inctimevar2] >= ei[,acctimevar]-60*60 & d.sp[,inctimevar1] <= ei[,acctimevar]+60*60,] 
     
     id.accident <- rep(as.character(ei[,accidvar]), nrow(d.t))
     id.incidents <- as.character(d.t[,incidvar])
     
-    linktable <- rbind(linktable, data.frame(id.accident, id.incidents))
-    
-    if(i %% 1000 == 0) {
+    if(i %% 100 == 0) {
       timediff <- round(Sys.time()-starttime, 2)
-      cat(i, "complete \n", timediff, attr(timediff, "units"), "elapsed \n", rep("<>",20), "\n")
-    }
-  } # end loop
+      cat(i, "complete \n", timediff, attr(timediff, "units"), "elapsed \n",
+      "approx", round(as.numeric(timediff)/i * (nrow(accfile)-i), 2), attr(timediff, "units"), "remaining \n",
+        rep("<>",20), "\n\n",
+       file = paste0("waze_waze_log_", Sys.Date(), ".txt"), append = T) }
+
+    data.frame(id.accident, id.incidents) # rbind this output
+  } # end %dopar% loop
+  
+  stopCluster(cl) # stop the cluster.
   
   linktable
-}
+  }
+  
 
+makelink.nonpar <- function(accfile = edt.april, incfile = waze.april,
+                       acctimevar = "CrashDate_Local",
+                       inctimevar1 = "time",
+                       inctimevar2 = "last.pull.time",
+                       accidvar = "ID",
+                       incidvar = "uuid"
+                       ){
+    
+    linktable <- vector()
+  
+    # keeping non-parallized version here for reference
+    for(i in 1:nrow(accfile)){ # i=which(edt$ID == "2023680")
+      ei = accfile[i,]
+      
+      dist.i <- spDists(ei, incfile, longlat = T)*0.6213712 # spDists gives units in km, convert to miles
+      dist.i.5 <- which(dist.i <= 0.5)
+      
+      # Spatially matching
+      d.sp <- incfile[dist.i.5,]
+      
+      # Temporally matching
+      # Match between the first reported time and last pull time of the Waze event. Last pull time is after the earliest time of EDT, and first reported time is earlier than the latest time of EDT
+      if(class(ei)=="SpatialPointsDataFrame") { ei <- as.data.frame(ei) }
+      if(class(d.sp)=="SpatialPointsDataFrame") { d.sp <- as.data.frame(d.sp) }
+      
+      
+      d.t <- d.sp[d.sp[,inctimevar2] >= ei[,acctimevar]-60*60 & d.sp[,inctimevar1] <= ei[,acctimevar]+60*60,] 
+      
+      id.accident <- rep(as.character(ei[,accidvar]), nrow(d.t))
+      id.incidents <- as.character(d.t[,incidvar])
+      
+      linktable <- rbind(linktable, data.frame(id.accident, id.incidents))
+      
+      if(i %% 1000 == 0) {
+        timediff <- round(Sys.time()-starttime, 2)
+        cat(i, "complete \n", timediff, attr(timediff, "units"), "elapsed \n", rep("<>",20), "\n")
+      }
+    } # end loop
+    
+    
+    linktable
+  }
 
 
 # moving files from a temporary directory on local machine to shared drive. 
