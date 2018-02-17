@@ -44,7 +44,7 @@ makelink <- function(accfile = edt.april, incfile = waze.april,
     id.accident <- rep(as.character(ei[,accidvar]), nrow(d.t))
     id.incidents <- as.character(d.t[,incidvar])
     
-    if(i %% 100 == 0) {
+    if(i %% 5000 == 0) {
       timediff <- round(Sys.time()-starttime, 2)
       cat(i, "complete \n", timediff, attr(timediff, "units"), "elapsed \n",
       "approx", round(as.numeric(timediff)/i * (nrow(accfile)-i), 2), attr(timediff, "units"), "remaining \n",
