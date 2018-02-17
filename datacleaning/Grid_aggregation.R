@@ -19,10 +19,11 @@ volpewazedir <- "//vntscex.local/DFS/Projects/PROJ-OR02A2/SDI/"
 outputdir <- "W:/SDI Pilot Projects/Waze/MASTER Data Files/Waze Aggregated/month_MD_clipped"
 
 #Sudderth drive
-# wazemonthdir <- "S:/SDI Pilot Projects/Waze/MASTER Data Files/Waze Aggregated/month_MD_clipped"
-# wazedir <- "S:/SDI Pilot Projects/Waze/"
-# volpewazedir <- "//vntscex.local/DFS/Projects/PROJ-OR02A2/SDI/"
-# outputdir <- "S:/SDI Pilot Projects/Waze/MASTER Data Files/Waze Aggregated/month_MD_clipped"
+codedir <- "~/GitHub/SDI_Waze"  #CONNECT TO VPN FIRST
+wazemonthdir <- "S:/SDI Pilot Projects/Waze/MASTER Data Files/Waze Aggregated/month_MD_clipped"
+wazedir <- "S:/SDI Pilot Projects/Waze/"
+volpewazedir <- "//vntscex.local/DFS/Projects/PROJ-OR02A2/SDI/"
+outputdir <- "S:/SDI Pilot Projects/Waze/MASTER Data Files/Waze Aggregated/month_MD_clipped"
 
 source(file.path(codedir, "utility/wazefunctions.R")) # for movefiles() function
 
@@ -47,13 +48,34 @@ edt.df$CrashDate_Local <- as.POSIXct(edt.df$CrashDate_Local, "%Y-%m-%d %H:%M:%S"
 # The same, but for each of the neighboring grid cells (N, NE, SE, S, SW, NW). 
 # counts for roadType, 11 columns: length(unique(link.waze.edt$roadType[!is.na(link.waze.edt$roadType)]))
 
+# EAS test - aggregate all to grid cell, then add data for neighboring grid cells using mutate
+# 27,878 grid cells
+names(link.waze.edt)
+
+waze.edt.hex <- 
+link.waze.edt %>%
+  group_by(GRID_ID, type, day = format(time, "%j"), hour = format(time, "%H")) %>%
+  summarize(
+    nRows = n(), #includes duplicates that match more than one EDT report
+    uniqWazeEvents= n_distinct(uuid.waze),
+    uniqEDT = n_distinct(CrashCaseID),#Non-matching EDT crashes do not have the same GridID?
+    nMatch = length(which(match=="M")),
+    nEDT = length(which(match=="E"))) %>% 
+  spread(type, uniqWazeEvents) %>%
+  add_tally()
+
+#TODO - Get EDT gridID to match Waze (remove .edt from IDs? Can we have same column name? Merge earlier in process?)
+
+
+## Not used right now)
 # 'Manual' way to make the counts in neighboring cells with a loop and matching
-# For each neighbor cell, count the number of Waze events of each type and subtype. End result is a data frame with (number of types) x 6 + (number of substypes) x 6 columns, associated with each Waze event.
+# For each neighbor cell, count the number of Waze events of each type and subtype. 
+#End result is a data frame with (number of types) x 6 + (number of substypes) x 6 columns, associated with each Waze event.
 
 neighbor.counts.waze <- vector()
 
 for(i in 1:nrow(link.waze.edt)){
-  # i = 1
+  i = 1
   wx <- link.waze.edt[i,]
   
   link.waze.edt %>%
