@@ -1,12 +1,13 @@
 ---
-title: Annotated Bibliography for SDI Waze Pilot Project
-author: Dan Flynn | Volpe Center
-date: February 2018
+title: "Annotated Bibliography for SDI Waze Pilot Project"
+author: "Dan Flynn | Volpe Center"
+date: "February 2018"
 output:
   pdf_document: default
+  word_document: default
   html_document: default
-bibliography: Waze_review.bib
 csl: nature.csl
+bibliography: Waze_review.bib
 ---
 
 
@@ -65,9 +66,13 @@ Annotated bibliography of tools and approaches used in existing analyses of road
 
 **@Lord:2005 Poisson, Poisson-gamma and zero-inflated regression models of motor vehicle crashes: balancing statistical fit and theory**
 
+- Review of three common models for modelling crash count data: Poisson, Zero-inflated Poisson, and Zero-inflated negative binomial (also called Poisson-gamma) models. They point out that models which can account for zero-inflation, which can arise because of overly narrow time and space scale selection and rarity of crashes, often provide the best statistical fit, but may not characterize the underlying crash process completely. 
+- Provides detailed review of statistical theory behind these crash count models, and lay out how a zero-inflated model makes a simplifying assumption that a roadway can exist in either a 0-crash, 'perfectly safe' condition, or a non-zero crash, 'imperfectly safe' condition. They argue that having a too-small spatial or temporal scale can lead to over-estimation of the 'perfectly safe' condition.
+
 **@Lord:2010 The statistical analysis of crash-frequency data: a review and assessment of methodological alternatives**
 
-- Excellent review of models used for crash frequency data. Discusses the commonly-used zero inflated negative binomial, as well as Poisson regression more generally. Refers to common approaches for dealing with temporal and spatial correlation. GEE, GAM, and random effects (hierarchical) models also discussed.  
+- Excellent review of models used for crash frequency data. Discusses the commonly-used zero inflated negative binomial, as well as Poisson regression more generally. Discusses challenges with modeling crash frequency data, including overdispersion (variance exceeding the mean), correct choice of time window, and temporal and spatial correlation. 
+- Refers to common approaches for dealing with temporal and spatial correlation. GEE, GAM, and random effects (hierarchical) models also discussed.  
 - Machine learning models are briefly discussed, including neural networks and support vector machine models.
 
 **@Morgan:2013 Performance Measures for Prioritizing Highway Safety Improvements Based on Predicted Crash Frequency and Severity**
@@ -107,18 +112,23 @@ Annotated bibliography of tools and approaches used in existing analyses of road
 
 - Support vector machines (SVM) unsupervised learning approach to discover patterns in crash frequency. Data from Louisiana urban roadways in 2011-2013, with crash frequency, roadway geometry, and AADT as main inputs. Little detail on model specification or application provide, largely a demonstration that SVM can be used.
 
-**@Vasudevan:2016 Predicting Traffic Flow Regimes From Simulated Connected Vehicle Messages Using Data Analytics and Machine Learning**
-
-- Simulated data from a highway corridor in Seattle, to model traffic flow regimes under different conditions for connected vehicles. Three machine learning approaches were taken for traffic flow estimation: logistic regression, individal decision trees (CART), and random forests. Moldes were run in a Microsoft Azure cloud computing environment, using Apache Spark machine learning libraries.  
-- Focus is on connected vehicle configuration, operational conditions, market penetration, and estiamting traffic flow rather than estimating crash counts. Useful detail on feature extraction, relying on principal component analysis (PCA) in R.
 
 **@Wang:2016 Exploration of Advances in Statistical Methodologies for Crash Count and Severity Prediction Models**
 
+- PhD thesis from University of Connecticut, focusing on the simultaneous estimation of injury severity and vehicle damage using regression models. Simultaneous estimation is done by "copula based models"", and finds high correlation between injury and vehicle damage. Spatial analysis of road intersections and segments using socio-economic variables. Thirdly, carried analysis of crash type and crash severity on rural two-lane highways, using a multivariate Poisson lognormal model.
+- Crash type and severity were better predicted by the multivariate Poisson lognormal than by negative binomial or univariate Poisson lognormal models. 
+
 **@Wei:2017 Analyzing Traffic Crash Severity in Work Zones under Different Light Conditions**
+
+- Focus on work zones in Tennessee, 2003-2015, to assess factors determining crash severity (not count). Use Classification and Regression Trees (CART) to show importance of light conditions in crash severity, as well as roadway geometry factors, driver factors, and environmental factors (e.g., Weather, clear or not clear).
+- Highest proportion of injury crashes for head-on collisions, along roadways, with greater than two lanes. Create three decision trees, one for each of the light conditions, and compare results. For instance, traffic control devices were effective in reducing crash severity in daylight and dark-lighted, but not dark-not-lighted conditions.
 
 **@Xie:2007 Predicting motor vehicle collisions using Bayesian neural network models: An empirical analysis**
 
-**@Xu:2014 Modeling crash and fatality counts along mainlines and frontage roads across Texas: The roles of design, the built environment, and weather**
+- Analysis of rural roads in Texas, comparing two types of neural network machine learning models, and a negative binomial regression model. Suggest that the Bayesian neural network is a useful approach for estimating crash counts in rural highways.
+- Reviews the limitations of regression model approaches: need for clearly defined function relating crash frequencies and explanatory variables. Neural networks do not require *a priori* specification of a functional form relating these variables. Such models have however been criticized for over-fitting data and resulting in models without interpretable coefficients for explanatory variables. The Bayesian approach to a neural network can alleviate the former concern.
+- Using a training/testing framework, neural networks outperformed negative binomial regressions for crash counts, with predictors of segment length, vehicles per day, shoulder width, and lane width.   
+
 
 ## Crowdsourced data analysis approaches <a name = "crowd"></a>
 
@@ -126,9 +136,12 @@ Annotated bibliography of tools and approaches used in existing analyses of road
 
 - Data collected automatically from new vehicles used as input for a decision tree analysis of road condition.  Data collection relies on GPS, Wi-Fi, and sensors of vertical acceleration and pitch rate to detect features such as potholes. 
 
+
 **@Vasudevan:2016 Predicting Traffic Flow Regimes From Simulated Connected Vehicle Messages Using Data Analytics and Machine Learning**
- 
--  
+
+- Simulated data from a highway corridor in Seattle, to model traffic flow regimes under different conditions for connected vehicles. Three machine learning approaches were taken for traffic flow estimation: logistic regression, individual decision trees (CART), and random forests. Models were run in a Microsoft Azure cloud computing environment, using Apache Spark machine learning libraries.  
+- Focus is on connected vehicle configuration, operational conditions, market penetration, and estimating traffic flow rather than estimating crash counts. Useful detail on feature extraction, relying on principal component analysis (PCA) in R. 
+
  
 ## Spatial regression for road safety <a name = "spatial"></a>
 
@@ -142,6 +155,16 @@ Annotated bibliography of tools and approaches used in existing analyses of road
 - Road segment based analysis for traffic crashes in Seoul, Korea, in 2010, using geographically weighted regression to account for spatial autocorrelation. Discuss conditional autoregressive (CAR) model, but end up using geographically weighted regression. Use Moran's I to assess strength of spatial autocorrelation. Use AIC to evaluate competing models. 
 
 **@Schultz:2015 Use of Roadway Attributes in Hot Spot Identification and Analysis**
+
+- Analysis of Utah "hot spots" for crashes, adding detailed roadway attribute layers such as vertical sag and grade to traditional variables such as lane width, number of lanes, shoulder width, and horizontal curvature. Use a hierarchical Bayesian Poisson mixture model. 
+- Use Bayesian horseshoe method for variable selection. This approach can take in a large number of possible variables, and assign a coefficient of zero to those which are unimportant. Lasso and ridge regression techniques serve a similar purpose in logistic regression models. Once variables were selected, a Bayesian Poisson regression was done on segments, using non-informative priors. 
+- Areas where many segments have observed crashes much greater than predicted crashes are considered hot spots. A number of specific hot spots are examined in detail.
+
+**@Xu:2014 Modeling crash and fatality counts along mainlines and frontage roads across Texas: The roles of design, the built environment, and weather**
+
+- Analysis of Texas highways, using spatial data on traffic, demography, land use,   population and job density, rainfall, income, and education. Compare zero-inflated negative binomial, zero-inflated Poisson, and negative binomial models, finding the first preferred.
+- Fully-spatial analysis (e.g., conditional autoregressive analysis) can be intractable for very large data sets, so segment-based analysis is typically used.
+- Use 50-year average rainfall as the weather variable. Separate analysis for mainlanes and frontage roads. Population density and job densities found to be the strongest predictors of crash counts, along with urbanization. Age and income have negative effects; average rainfall slightly positive.  
 
 **@Zeng:2014 Bayesian spatial joint modeling of traffic crashes on an urban road network**
 

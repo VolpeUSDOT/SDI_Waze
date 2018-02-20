@@ -37,7 +37,7 @@ setwd(wazedir)
 ua <- readOGR(file.path(wazedir, "Working Documents/Census Files"), layer = "cb_2016_us_ua10_500k")
 
 # Read in hexagon shapefile. This is a rectangular surface of 1 sq mi area hexagons, 
-hex <- readOGR(file.path(volpewazedir, "spatial_layers/MD_hexagons_shapefiles"), layer = "MD_hexagons_1mi")
+hex <- readOGR(file.path(volpewazedir, "spatial_layers/MD_hexagons_shapefiles"), layer = "MD_hexagons_1mi_newExtent")
 
 # read in county shapefile
 
