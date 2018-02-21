@@ -10,6 +10,8 @@ library(sp)
 library(maps) # for mapping base layers
 library(mapproj) # for coord_map()
 library(rgdal) # for readOGR(), needed for reading in ArcM shapefiles
+library(lubridate)
+library(utils)
 
 #Flynn drive
 codedir <- "~/git/SDI_Waze" 
@@ -52,22 +54,68 @@ edt.df$CrashDate_Local <- as.POSIXct(edt.df$CrashDate_Local, "%Y-%m-%d %H:%M:%S"
 # 27,878 grid cells
 names(link.waze.edt)
 
+#summarize counts of Waze events in each hexagon and EDT matches to the Waze events (could be in neighboring hexagon)
+#TODO: Expand Waze events over time windows (time to last.pull.time) - right now, they only show up in the start time windows(?) - only matters for persistent Waze events.
+
 waze.edt.hex <- 
 link.waze.edt %>%
-  group_by(GRID_ID, type, day = format(time, "%j"), hour = format(time, "%H")) %>%
+  group_by(GRID_ID, day = format(time, "%j"), hour = format(time, "%H")) %>%
   summarize(
-    nRows = n(), #includes duplicates that match more than one EDT report
+    DayOfWeek = weekdays(time)[1], #Better way to select one value?
+    nRows = n(), #includes duplicates that match more than one EDT report (don't use in model)
     uniqWazeEvents= n_distinct(uuid.waze),
-    uniqEDT = n_distinct(CrashCaseID),#Non-matching EDT crashes do not have the same GridID?
-    nMatch = length(which(match=="M")),
-    nEDT = length(which(match=="E"))) %>% 
+    nMatchEDT_buffer = n_distinct(CrashCaseID[which(match=="M")]),
+    nMatchWaze_buffer = n_distinct(uuid.waze[which(match=="M")]),
+    nNoMatchWaze_buffer = n_distinct(uuid.waze[which(match=="W")]),
+    nWazeAccident = n_distinct(uuid.waze[which(subtype=="ACCIDENT")]),
+    nWazeJam = n_distinct(uuid.waze[which(subtype=="JAM")]),
+    nWazeRoadCloased = n_distinct(uuid.waze[which(subtype=="ROAD_CLOSED")]),
+    nWazeWeatherOrHazard = n_distinct(uuid.waze[which(subtype=="WEATHERHAZARD")]),
+    nWazeAccidentMajor = n_distinct(uuid.waze[which(subtype=="ACCIDENT_MAJOR")]),
+    nWazeAccidentMinor = n_distinct(uuid.waze[which(subtype=="ACCIDENT_MINOR")]),
+    nWazeHazardCarStoppedRoad = n_distinct(uuid.waze[which(subtype=="HAZARD_ON_ROAD_CAR_STOPPED")]),
+    nWazeHazardCarStoppedShould = n_distinct(uuid.waze[which(subtype=="HAZARD_ON_SHOULDER_CAR_STOPPED")]),
+    nWazeHazardConstruction = n_distinct(uuid.waze[which(subtype=="HAZARD_ON_ROAD_CONSTRUCTION")]),
+    nWazeHazardObjectOnRoad = n_distinct(uuid.waze[which(subtype=="HAZARD_ON_ROAD_OBJECT")]),
+    nWazeJamModerate = n_distinct(uuid.waze[which(subtype=="JAM_MODERATE_TRAFFIC")]),
+    nWazeJamHeavy = n_distinct(uuid.waze[which(subtype=="JAM_HEAVY_TRAFFIC")]),
+    nWazeJamStandStill = n_distinct(uuid.waze[which(subtype=="JAM_STAND_STILL_TRAFFIC")]),
+    nWazeWeatherFlood = n_distinct(uuid.waze[which(subtype=="HAZARD_WEATHER_FLOOD")]),
+    nWazeWeatherFog = n_distinct(uuid.waze[which(subtype=="HAZARD_WEATHER_FOG")])) 
+
+#??Is there a faster way than "which" to get these values?
+
+save(list="waze.edt.hex", file = "WazeEdtHex_Beta.RData")
+
+#TODO: Complete similar process for EDT M and EDT only reports, then merge     
+
+##########################################################################################################
+#Functions to play with for continued aggregations
   spread(type, uniqWazeEvents) %>%
   add_tally()
 
-#TODO - Get EDT gridID to match Waze (remove .edt from IDs? Can we have same column name? Merge earlier in process?)
+
+#Vector of Grid IDs in month of data (all grid IDs with Waze or EDT data)
+GridIDall <- c(unique(as.character(link.waze.edt$GRID_ID)), unique(as.character(link.waze.edt$GRID_ID.edt)))
+Aprilday <- seq(ymd('2017-04-01'),ymd('2017-04-30'), by = '1 day')
+day <- format(Aprilday, "%j")
+hour <- seq(1,24,1)
+GridIDTime <- expand.grid(hour,day,GridIDall)
 
 
-## Not used right now)
+
+link.waze.edt <- mutate(link.waze.edt, GridIDall = ifelse(is.na(GRID_ID), as.character(GRID_ID.edt), as.character(GRID_ID)))
+
+summary(!is.na(link.waze.edt$GRID_ID.edt))
+help = mutate(help, newvar = ifelse(is.na(var1), as.character(var2), as.character(var1)))
+
+unite_(mtcars, "vs_am", c("vs","am"))
+mtcars %>%
+  unite(vs_am, vs, am) %>%
+  separate(vs_am, c("vs", "am"))
+
+
+## Not used right now
 # 'Manual' way to make the counts in neighboring cells with a loop and matching
 # For each neighbor cell, count the number of Waze events of each type and subtype. 
 #End result is a data frame with (number of types) x 6 + (number of substypes) x 6 columns, associated with each Waze event.
