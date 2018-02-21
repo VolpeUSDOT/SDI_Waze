@@ -25,7 +25,7 @@ codedir <- "~/GitHub/SDI_Waze"  #CONNECT TO VPN FIRST
 wazemonthdir <- "S:/SDI Pilot Projects/Waze/MASTER Data Files/Waze Aggregated/month_MD_clipped"
 wazedir <- "S:/SDI Pilot Projects/Waze/"
 volpewazedir <- "//vntscex.local/DFS/Projects/PROJ-OR02A2/SDI/"
-outputdir <- "S:/SDI Pilot Projects/Waze/MASTER Data Files/Waze Aggregated/month_MD_clipped"
+outputdir <- "S:/SDI Pilot Projects/Waze/MASTER Data Files/Waze Aggregated/HexagonWazeEDT"
 
 source(file.path(codedir, "utility/wazefunctions.R")) # for movefiles() function
 
@@ -65,6 +65,36 @@ link.waze.edt %>%
     #DayOfWeek = weekdays(time)[1], #Better way to select one value?
     nRows = n(), #includes duplicates that match more than one EDT report (don't use in model)
     uniqWazeEvents= n_distinct(uuid.waze),
+    nMatchEDT_buffer = n_distinct(CrashCaseID[match=="M"]),
+    nMatchWaze_buffer = n_distinct(uuid.waze[match=="M"]),
+    nNoMatchWaze_buffer = n_distinct(uuid.waze[match=="W"]),
+    nWazeAccident = n_distinct(uuid.waze[subtype=="ACCIDENT"]),
+    nWazeJam = n_distinct(uuid.waze[subtype=="JAM"]),
+    nWazeRoadCloased = n_distinct(uuid.waze[subtype=="ROAD_CLOSED"]),
+    nWazeWeatherOrHazard = n_distinct(uuid.waze[subtype=="WEATHERHAZARD"]),
+    nWazeAccidentMajor = n_distinct(uuid.waze[subtype=="ACCIDENT_MAJOR"]),
+    nWazeAccidentMinor = n_distinct(uuid.waze[subtype=="ACCIDENT_MINOR"]),
+    nWazeHazardCarStoppedRoad = n_distinct(uuid.waze[subtype=="HAZARD_ON_ROAD_CAR_STOPPED"]),
+    nWazeHazardCarStoppedShould = n_distinct(uuid.waze[subtype=="HAZARD_ON_SHOULDER_CAR_STOPPED"]),
+    nWazeHazardConstruction = n_distinct(uuid.waze[subtype=="HAZARD_ON_ROAD_CONSTRUCTION"]),
+    nWazeHazardObjectOnRoad = n_distinct(uuid.waze[subtype=="HAZARD_ON_ROAD_OBJECT"]),
+    nWazeJamModerate = n_distinct(uuid.waze[subtype=="JAM_MODERATE_TRAFFIC"]),
+    nWazeJamHeavy = n_distinct(uuid.waze[subtype=="JAM_HEAVY_TRAFFIC"]),
+    nWazeJamStandStill = n_distinct(uuid.waze[subtype=="JAM_STAND_STILL_TRAFFIC"]),
+    nWazeWeatherFlood = n_distinct(uuid.waze[subtype=="HAZARD_WEATHER_FLOOD"]),
+    nWazeWeatherFog = n_distinct(uuid.waze[subtype=="HAZARD_WEATHER_FOG"])) 
+
+EndTime <- Sys.time()-StartTime
+
+
+StartTime <- Sys.time()
+waze.edt.hex <- 
+  link.waze.edt %>%
+  group_by(GRID_ID, day = format(time, "%j"), hour = format(time, "%H")) %>%
+  summarize(
+    DayOfWeek = weekdays(time)[1], #Better way to select one value?
+    nRows = n(), #includes duplicates that match more than one EDT report (don't use in model)
+    uniqWazeEvents= n_distinct(uuid.waze),
     nMatchEDT_buffer = n_distinct(CrashCaseID[which(match=="M")]),
     nMatchWaze_buffer = n_distinct(uuid.waze[which(match=="M")]),
     nNoMatchWaze_buffer = n_distinct(uuid.waze[which(match=="W")]),
@@ -86,9 +116,7 @@ link.waze.edt %>%
 
 EndTime <- Sys.time()-StartTime
 
-#??Is there a faster way than "which" to get these values?
-
-save(list="waze.edt.hex", file = "WazeEdtHex_Beta.RData")
+save(list="waze.edt.hex", file = "Aggregated WazeEDT Data\WazeEdtHex_Beta.RData")
 
 #TODO: Complete similar process for EDT M and EDT only reports, then merge     
 
