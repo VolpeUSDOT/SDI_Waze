@@ -54,6 +54,16 @@ edt.df$CrashDate_Local <- as.POSIXct(edt.df$CrashDate_Local, "%Y-%m-%d %H:%M:%S"
 # 27,878 grid cells
 names(link.waze.edt)
 
+#Add time variables
+link.waze.edt <- link.waze.edt %>%
+  mutate(Waze.start.day = format(time, "%j"), 
+         Waze.end.day = format(last.pull.time, "%j"),
+         Waze.start.hour = format(time, "%H"), 
+         Waze.end.hour = format(last.pull.time, "%H"),
+         Waze.start.DofW = format(time, "%A"), 
+         Waze.end.DofW = format(last.pull.time, "%A"))
+         
+
 #summarize counts of Waze events in each hexagon and EDT matches to the Waze events (could be in neighboring hexagon)
 #TODO: Expand Waze events over time windows (time to last.pull.time) - right now, they only show up in the start time windows(?) - only matters for persistent Waze events.
 
@@ -104,8 +114,9 @@ waze.edt.hex <- full_join(waze.hex, edt.hex, by = c("GRID_ID", "day", "hour")) %
   mutate_all(funs(replace(., is.na(.), 0)))
 #Replace NA with zero (for the grid counts here, 0 means there were no reported Waze events or EDT crashes in the grid cell at that hour)
 
-save(list="waze.edt.hex", file = paste(outputdir,"/WazeEdtHex_Beta.RData",sep=""))
 
+
+save(list="waze.edt.hex", file = paste(outputdir,"/WazeEdtHex_Beta.RData",sep=""))
 
 
 ##########################################################################################################
@@ -121,8 +132,17 @@ df %>%
 GridIDall <- c(unique(as.character(link.waze.edt$GRID_ID)), unique(as.character(link.waze.edt$GRID_ID.edt)))
 Aprilday <- seq(ymd('2017-04-01'),ymd('2017-04-30'), by = '1 day')
 day <- format(Aprilday, "%j")
-hour <- seq(1,24,1)
-GridIDTime <- expand.grid(hour,day,GridIDall)
+GridIDTime <- expand.grid(day,GridIDall)
+names(GridIDTime) <- c("Day","GridIDall")
+
+
+# Temporally matching
+# Match between the first reported time and last pull time of the Waze event. Last pull time is after the earliest time of EDT, and first reported time is earlier than the latest time of EDT
+d.t <- d.sp[d.sp[,inctimevar2] >= ei[,acctimevar]-60*60 & d.sp[,inctimevar1] <= ei[,acctimevar]+60*60,] 
+
+id.accident <- rep(as.character(ei[,accidvar]), nrow(d.t))
+id.incidents <- as.character(d.t[,incidvar])
+
 
 
 
