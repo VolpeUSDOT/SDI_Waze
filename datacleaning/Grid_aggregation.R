@@ -57,11 +57,12 @@ names(link.waze.edt)
 #summarize counts of Waze events in each hexagon and EDT matches to the Waze events (could be in neighboring hexagon)
 #TODO: Expand Waze events over time windows (time to last.pull.time) - right now, they only show up in the start time windows(?) - only matters for persistent Waze events.
 
+StartTime <- Sys.time()
 waze.edt.hex <- 
 link.waze.edt %>%
   group_by(GRID_ID, day = format(time, "%j"), hour = format(time, "%H")) %>%
   summarize(
-    DayOfWeek = weekdays(time)[1], #Better way to select one value?
+    #DayOfWeek = weekdays(time)[1], #Better way to select one value?
     nRows = n(), #includes duplicates that match more than one EDT report (don't use in model)
     uniqWazeEvents= n_distinct(uuid.waze),
     nMatchEDT_buffer = n_distinct(CrashCaseID[which(match=="M")]),
@@ -82,6 +83,8 @@ link.waze.edt %>%
     nWazeJamStandStill = n_distinct(uuid.waze[which(subtype=="JAM_STAND_STILL_TRAFFIC")]),
     nWazeWeatherFlood = n_distinct(uuid.waze[which(subtype=="HAZARD_WEATHER_FLOOD")]),
     nWazeWeatherFog = n_distinct(uuid.waze[which(subtype=="HAZARD_WEATHER_FOG")])) 
+
+EndTime <- Sys.time()-StartTime
 
 #??Is there a faster way than "which" to get these values?
 
