@@ -12,15 +12,16 @@
 	Volume = {50},
 	Year = {2013}}
 
-@article{Gkritza:2013,
-	Author = {Gkritza, Konstantina and Souleyrette, Reginald R and Baird, Michael J and Danielson, Brent J},
-	Journal = {Journal of transportation engineering},
-	Number = {2},
-	Pages = {04013002},
-	Publisher = {American Society of Civil Engineers},
-	Title = {Empirical Bayes approach for estimating urban deer-vehicle crashes using police and maintenance records},
-	Volume = {140},
-	Year = {2013}}
+@Article{Gkritza:2013,
+  author    = {Gkritza, Konstantina and Souleyrette, Reginald R and Baird, Michael J and Danielson, Brent J},
+  title     = {Empirical Bayes approach for estimating urban deer-vehicle crashes using police and maintenance records},
+  journal   = {Journal of Transportation Engineering},
+  year      = {2013},
+  volume    = {140},
+  number    = {2},
+  pages     = {04013002},
+  publisher = {American Society of Civil Engineers},
+}
 
 @phdthesis{Lin:2015,
 	Author = {Lin, Lei},
@@ -28,15 +29,16 @@
 	Title = {Data science application in intelligent transportation systems: An integrative approach for border delay prediction and traffic accident analysis},
 	Year = {2015}}
 
-@article{Lord:2004,
-	Author = {Lord, Dominique and Persaud, Bhagwant N},
-	Journal = {Accident analysis \& prevention},
-	Number = {4},
-	Pages = {609--620},
-	Publisher = {Elsevier},
-	Title = {Estimating the safety performance of urban road transportation networks},
-	Volume = {36},
-	Year = {2004}}
+@Article{Lord:2004,
+  author    = {Lord, Dominique and Persaud, Bhagwant N},
+  title     = {Estimating the safety performance of urban road transportation networks},
+  journal   = {Accident Analysis \& Prevention},
+  year      = {2004},
+  volume    = {36},
+  number    = {4},
+  pages     = {609--620},
+  publisher = {Elsevier},
+}
 
 @article{Lord:2010,
 	Author = {Lord, Dominique and Mannering, Fred},
@@ -188,14 +190,16 @@
 	Title = {Performance Measures for Prioritizing Highway Safety Improvements Based on Predicted Crash Frequency and Severity},
 	Year = {2013}}
 
-@inproceedings{Bahouth:2012,
-	Author = {Bahouth, George and Digges, Kennerly and Schulman, Carl},
-	Booktitle = {Annals of Advances in Automotive Medicine/Annual Scientific Conference},
-	Organization = {Association for the Advancement of Automotive Medicine},
-	Pages = {223},
-	Title = {Influence of injury risk thresholds on the performance of an algorithm to predict crashes with serious injuries},
-	Volume = {56},
-	Year = {2012}}
+@Article{Bahouth:2012,
+  author       = {Bahouth, George and Digges, Kennerly and Schulman, Carl},
+  title        = {Influence of injury risk thresholds on the performance of an algorithm to predict crashes with serious injuries},
+  journal      = {Annals of Advances in Automotive Medicine},
+  year         = {2012},
+  volume       = {56},
+  pages        = {223},
+  booktitle    = {Annals of Advances in Automotive Medicine/Annual Scientific Conference},
+  organization = {Association for the Advancement of Automotive Medicine},
+}
 
 @article{Pal:2016,
 	Author = {Pal, Chinmoy and Okabe, Tomosaburo and Kulothungan, Vimalathithan and Sangolla, Narahari and Manoharan, Jeyabharath and Stewart, Wang and Combest, John},
@@ -239,14 +243,16 @@
 	Title = {Development of a Prediction Model for Crash Occurrence by Analyzing Traffic Crash and Citation Data},
 	Year = {2017}}
 
-@inproceedings{Xu:2014,
-	Author = {Xu, Jian and Kockelman, Kara M and Wang, Yiyi},
-	Booktitle = {Presented at the 93rd Annual Meeting of the Transportation Research},
-	Number = {23},
-	Pages = {24},
-	Title = {MODELING CRASH AND FATALITY COUNTS ALONG MAINLANES AND 1 FRONTAGE ROADS ACROSS TEXAS: 2 THE ROLES OF DESIGN, THE BUILT ENVIRONMENT, AND WEATHER 3},
-	Volume = {22},
-	Year = {2014}}
+@Article{Xu:2014,
+  author    = {Xu, Jian and Kockelman, Kara M and Wang, Yiyi},
+  title     = {Modeling Crash and Fatality Counts Along Mainlanes and Frontage Roads Across Texas: The Roles of Design, the Built Environment, and Weather},
+  journal   = {93rd Annual Meeting of the Transportation Research},
+  year      = {2014},
+  volume    = {22},
+  number    = {23},
+  pages     = {24},
+  booktitle = {Presented at the 93rd Annual Meeting of the Transportation Research},
+}
 
 @inproceedings{Sun:2016,
 	Author = {Sun, Xiaoduan and Das, Subasish and Broussard, Nicholas},
