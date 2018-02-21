@@ -58,20 +58,20 @@ names(link.waze.edt)
 #TODO: Expand Waze events over time windows (time to last.pull.time) - right now, they only show up in the start time windows(?) - only matters for persistent Waze events.
 
 StartTime <- Sys.time()
-waze.edt.hex <- 
-link.waze.edt %>%
+
+waze.hex <- filter(link.waze.edt, !is.na(GRID_ID)) %>%
   group_by(GRID_ID, day = format(time, "%j"), hour = format(time, "%H")) %>%
   summarize(
-    #DayOfWeek = weekdays(time)[1], #Better way to select one value?
-    nRows = n(), #includes duplicates that match more than one EDT report (don't use in model)
+    DayOfWeek = weekdays(time)[1], #Better way to select one value?
+    nWazeRowsInMatch = n(), #includes duplicates that match more than one EDT report (don't use in model)
     uniqWazeEvents= n_distinct(uuid.waze),
     nMatchEDT_buffer = n_distinct(CrashCaseID[match=="M"]),
     nMatchWaze_buffer = n_distinct(uuid.waze[match=="M"]),
     nNoMatchWaze_buffer = n_distinct(uuid.waze[match=="W"]),
-    nWazeAccident = n_distinct(uuid.waze[subtype=="ACCIDENT"]),
-    nWazeJam = n_distinct(uuid.waze[subtype=="JAM"]),
-    nWazeRoadCloased = n_distinct(uuid.waze[subtype=="ROAD_CLOSED"]),
-    nWazeWeatherOrHazard = n_distinct(uuid.waze[subtype=="WEATHERHAZARD"]),
+    nWazeAccident = n_distinct(uuid.waze[type=="ACCIDENT"]),
+    nWazeJam = n_distinct(uuid.waze[type=="JAM"]),
+    nWazeRoadCloased = n_distinct(uuid.waze[type=="ROAD_CLOSED"]),
+    nWazeWeatherOrHazard = n_distinct(uuid.waze[type=="WEATHERHAZARD"]),
     nWazeAccidentMajor = n_distinct(uuid.waze[subtype=="ACCIDENT_MAJOR"]),
     nWazeAccidentMinor = n_distinct(uuid.waze[subtype=="ACCIDENT_MINOR"]),
     nWazeHazardCarStoppedRoad = n_distinct(uuid.waze[subtype=="HAZARD_ON_ROAD_CAR_STOPPED"]),
@@ -87,44 +87,35 @@ link.waze.edt %>%
 EndTime <- Sys.time()-StartTime
 
 
-StartTime <- Sys.time()
-waze.edt.hex <- 
-  link.waze.edt %>%
-  group_by(GRID_ID, day = format(time, "%j"), hour = format(time, "%H")) %>%
+#Compute grid counts for EDT data
+names(edt.df)
+edt.hex <- 
+  edt.df %>%
+  group_by(GRID_ID.edt, day = format(CrashDate_Local, "%j"), hour = format(CrashDate_Local, "%H")) %>%
   summarize(
-    DayOfWeek = weekdays(time)[1], #Better way to select one value?
-    nRows = n(), #includes duplicates that match more than one EDT report (don't use in model)
-    uniqWazeEvents= n_distinct(uuid.waze),
-    nMatchEDT_buffer = n_distinct(CrashCaseID[which(match=="M")]),
-    nMatchWaze_buffer = n_distinct(uuid.waze[which(match=="M")]),
-    nNoMatchWaze_buffer = n_distinct(uuid.waze[which(match=="W")]),
-    nWazeAccident = n_distinct(uuid.waze[which(subtype=="ACCIDENT")]),
-    nWazeJam = n_distinct(uuid.waze[which(subtype=="JAM")]),
-    nWazeRoadCloased = n_distinct(uuid.waze[which(subtype=="ROAD_CLOSED")]),
-    nWazeWeatherOrHazard = n_distinct(uuid.waze[which(subtype=="WEATHERHAZARD")]),
-    nWazeAccidentMajor = n_distinct(uuid.waze[which(subtype=="ACCIDENT_MAJOR")]),
-    nWazeAccidentMinor = n_distinct(uuid.waze[which(subtype=="ACCIDENT_MINOR")]),
-    nWazeHazardCarStoppedRoad = n_distinct(uuid.waze[which(subtype=="HAZARD_ON_ROAD_CAR_STOPPED")]),
-    nWazeHazardCarStoppedShould = n_distinct(uuid.waze[which(subtype=="HAZARD_ON_SHOULDER_CAR_STOPPED")]),
-    nWazeHazardConstruction = n_distinct(uuid.waze[which(subtype=="HAZARD_ON_ROAD_CONSTRUCTION")]),
-    nWazeHazardObjectOnRoad = n_distinct(uuid.waze[which(subtype=="HAZARD_ON_ROAD_OBJECT")]),
-    nWazeJamModerate = n_distinct(uuid.waze[which(subtype=="JAM_MODERATE_TRAFFIC")]),
-    nWazeJamHeavy = n_distinct(uuid.waze[which(subtype=="JAM_HEAVY_TRAFFIC")]),
-    nWazeJamStandStill = n_distinct(uuid.waze[which(subtype=="JAM_STAND_STILL_TRAFFIC")]),
-    nWazeWeatherFlood = n_distinct(uuid.waze[which(subtype=="HAZARD_WEATHER_FLOOD")]),
-    nWazeWeatherFog = n_distinct(uuid.waze[which(subtype=="HAZARD_WEATHER_FOG")])) 
+    uniqEDTreports= n_distinct(CrashCaseID)) 
 
-EndTime <- Sys.time()-StartTime
+#Merge EDT counts to waze counts by hexagons
+names(waze.hex)
+names(edt.hex)
+colnames(edt.hex)[1] <- "GRID_ID"
 
-save(list="waze.edt.hex", file = "Aggregated WazeEDT Data\WazeEdtHex_Beta.RData")
+waze.edt.hex <- full_join(waze.hex, edt.hex, by = c("GRID_ID", "day", "hour")) %>%
+  mutate_all(funs(replace(., is.na(.), 0)))
+#Replace NA with zero (for the grid counts here, 0 means there were no reported Waze events or EDT crashes in the grid cell at that hour)
 
-#TODO: Complete similar process for EDT M and EDT only reports, then merge     
+save(list="waze.edt.hex", file = paste(outputdir,"/WazeEdtHex_Beta.RData",sep=""))
+
+
 
 ##########################################################################################################
 #Functions to play with for continued aggregations
   spread(type, uniqWazeEvents) %>%
   add_tally()
 
+df %>% 
+  count(a, b) %>%
+  slice(which.max(n))
 
 #Vector of Grid IDs in month of data (all grid IDs with Waze or EDT data)
 GridIDall <- c(unique(as.character(link.waze.edt$GRID_ID)), unique(as.character(link.waze.edt$GRID_ID.edt)))
