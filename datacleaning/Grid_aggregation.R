@@ -55,14 +55,18 @@ edt.df$CrashDate_Local <- as.POSIXct(edt.df$CrashDate_Local, "%Y-%m-%d %H:%M:%S"
 names(link.waze.edt)
 
 #Add time variables
+StartTime <- Sys.time()
 link.waze.edt <- link.waze.edt %>%
-  mutate(Waze.start.day = format(time, "%j"), 
-         Waze.end.day = format(last.pull.time, "%j"),
-         Waze.start.hour = format(time, "%H"), 
-         Waze.end.hour = format(last.pull.time, "%H"),
+  mutate(Waze.start.year = format(time, "%Y"), 
+         Waze.start.day = format(time, "%j"), 
          Waze.start.DofW = format(time, "%A"), 
+         Waze.start.hour = format(time, "%H"), 
+         Waze.end.year = format(last.pull.time, "%Y"),
+         Waze.end.day = format(last.pull.time, "%j"),
+         Waze.end.hour = format(last.pull.time, "%H"),
          Waze.end.DofW = format(last.pull.time, "%A"))
-         
+EndTime <- Sys.time()-StartTime
+EndTime
 
 #summarize counts of Waze events in each hexagon and EDT matches to the Waze events (could be in neighboring hexagon)
 #TODO: Expand Waze events over time windows (time to last.pull.time) - right now, they only show up in the start time windows(?) - only matters for persistent Waze events.
