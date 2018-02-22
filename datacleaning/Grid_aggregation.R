@@ -78,7 +78,7 @@ names(GridIDTime) <- c("Day","TimeOfDay","GridIDall")
 ## TO BE CONTINUED...need to expand Waze events to duplicate rows over time window, 
 #or figure out how to count events using the time windows prior to the summarize function by GridID
 GridIDTime.Waze <- GridIDTime %>%
- #mutate() #Try to add counts based on time windows
+ #mutate() #Try to add counts of different events based on time windows
 
 
 #summarize counts of Waze events in each hexagon and EDT matches to the Waze events (could be in neighboring hexagon)
