@@ -54,6 +54,26 @@ edt.df$CrashDate_Local <- as.POSIXct(edt.df$CrashDate_Local, "%Y-%m-%d %H:%M:%S"
 # 27,878 grid cells
 names(link.waze.edt)
 
+#Vector of Grid IDs in month of data (all grid IDs with Waze or EDT data)
+GridIDall <- c(unique(as.character(link.waze.edt$GRID_ID)), unique(as.character(link.waze.edt$GRID_ID.edt)))
+Aprilday <- seq(ymd('2017-04-01'),ymd('2017-04-30'), by = '1 day')
+Day <- format(Aprilday, "%j")
+TimeOfDay <- c("NightAM_24to4","MorningEarly_4to8","Morning_8to12","Afternoon_12to16","Evening_16to20","NightPM_20to24")
+GridIDTime <- expand.grid(Day,TimeOfDay,GridIDall)
+names(GridIDTime) <- c("Day","TimeOfDay","GridIDall")
+
+#Match Waze event UUID by time to 
+
+
+# Temporally matching
+# Match between the first reported time and last pull time of the Waze event. Last pull time is after the earliest time of EDT, and first reported time is earlier than the latest time of EDT
+d.t <- d.sp[d.sp[,inctimevar2] >= ei[,acctimevar]-60*60 & d.sp[,inctimevar1] <= ei[,acctimevar]+60*60,] 
+
+id.accident <- rep(as.character(ei[,accidvar]), nrow(d.t))
+id.incidents <- as.character(d.t[,incidvar])
+
+##############
+
 #Add time variables
 StartTime <- Sys.time()
 link.waze.edt <- link.waze.edt %>%
@@ -64,9 +84,11 @@ link.waze.edt <- link.waze.edt %>%
          Waze.end.year = format(last.pull.time, "%Y"),
          Waze.end.day = format(last.pull.time, "%j"),
          Waze.end.hour = format(last.pull.time, "%H"),
-         Waze.end.DofW = format(last.pull.time, "%A"))
+         Waze.end.DofW = format(last.pull.time, "%A"),
+         Waze.Duration.Minutes = round((last.pull.time-time)/60,0))
 EndTime <- Sys.time()-StartTime
 EndTime
+
 
 #summarize counts of Waze events in each hexagon and EDT matches to the Waze events (could be in neighboring hexagon)
 #TODO: Expand Waze events over time windows (time to last.pull.time) - right now, they only show up in the start time windows(?) - only matters for persistent Waze events.
@@ -96,7 +118,15 @@ waze.hex <- filter(link.waze.edt, !is.na(GRID_ID)) %>%
     nWazeJamHeavy = n_distinct(uuid.waze[subtype=="JAM_HEAVY_TRAFFIC"]),
     nWazeJamStandStill = n_distinct(uuid.waze[subtype=="JAM_STAND_STILL_TRAFFIC"]),
     nWazeWeatherFlood = n_distinct(uuid.waze[subtype=="HAZARD_WEATHER_FLOOD"]),
-    nWazeWeatherFog = n_distinct(uuid.waze[subtype=="HAZARD_WEATHER_FOG"])) 
+    nWazeWeatherFog = n_distinct(uuid.waze[subtype=="HAZARD_WEATHER_FOG"]),
+    nWazeRT3 = n_distinct(uuid.waze[roadType=="3"]),
+    nWazeRT4 = n_distinct(uuid.waze[roadType=="4"]),
+    nWazeRT6 = n_distinct(uuid.waze[roadType=="6"]),
+    nWazeRT7 = n_distinct(uuid.waze[roadType=="7"]),
+    nWazeRT2 = n_distinct(uuid.waze[roadType=="2"]),
+    nWazeRT0 = n_distinct(uuid.waze[roadType=="0"]),
+    nWazeRT1 = n_distinct(uuid.waze[roadType=="1"]),
+    nWazeRT20 = n_distinct(uuid.waze[roadType=="20"])) 
 
 EndTime <- Sys.time()-StartTime
 
@@ -135,9 +165,12 @@ df %>%
 #Vector of Grid IDs in month of data (all grid IDs with Waze or EDT data)
 GridIDall <- c(unique(as.character(link.waze.edt$GRID_ID)), unique(as.character(link.waze.edt$GRID_ID.edt)))
 Aprilday <- seq(ymd('2017-04-01'),ymd('2017-04-30'), by = '1 day')
-day <- format(Aprilday, "%j")
-GridIDTime <- expand.grid(day,GridIDall)
-names(GridIDTime) <- c("Day","GridIDall")
+Day <- format(Aprilday, "%j")
+TimeOfDay <- c("NightAM_24to4","MorningEarly_4to8","Morning_8to12","Afternoon_12to16","Evening_16to20","NightPM_20to24")
+GridIDTime <- expand.grid(Day,TimeOfDay,GridIDall)
+names(GridIDTime) <- c("Day","TimeOfDay","GridIDall")
+
+#Match Waze event UUID by time to 
 
 
 # Temporally matching
@@ -213,7 +246,7 @@ grd.e <- edt.df %>%
 # how often is the EDT event not in the central grid cell?
 summary(link.waze.edt$GRID_ID == link.waze.edt$GRID_ID.edt)
 
-# some Waze events have NA for grid cell ID, which should not be the case
+# some Waze events had NA for grid cell ID in the first iteration (fixed now)
 map('state','maryland')
 points(link.waze.edt[is.na(link.waze.edt$GRID_ID),c("lon","lat")]) 
 
