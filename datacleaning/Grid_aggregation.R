@@ -70,15 +70,65 @@ EndTime
 GridIDall <- c(unique(as.character(link.waze.edt$GRID_ID)), unique(as.character(link.waze.edt$GRID_ID.edt)))
 Aprilday <- seq(ymd('2017-04-01'),ymd('2017-04-30'), by = '1 day')
 Day <- format(Aprilday, "%j")
-TimeOfDay <- c("NightAM_24to4","MorningEarly_4to8","Morning_8to12","Afternoon_12to16","Evening_16to20","NightPM_20to24")
-GridIDTime <- expand.grid(Day,TimeOfDay,GridIDall)
-names(GridIDTime) <- c("Day","TimeOfDay","GridIDall")
+Day.num <- as.numeric(Day)
+Hour <- c(1:24)
+GridIDTime <- expand.grid(Day.num,Hour,GridIDall)
+names(GridIDTime) <- c("Day","Hour","GridIDall")
+
+GridIDTime <- GridIDTime%>%
+  mutate(TimeID=(as.numeric(Day)*Hour))
+  
+
 
 # Waze event counts by GridID, day of year, and time of day   
 ## TO BE CONTINUED...need to expand Waze events to duplicate rows over time window, 
 #or figure out how to count events using the time windows prior to the summarize function by GridID
 GridIDTime.Waze <- GridIDTime %>%
  #mutate() #Try to add counts of different events based on time windows
+
+# Temporally matching
+# Match between the first reported time and last pull time of the Waze event. Last pull time is after the earliest time of EDT, and first reported time is earlier than the latest time of EDT
+
+t.min=min(GridIDTime$TimeID)
+t.max=min(GridIDTime$TimeID)
+
+
+
+for(i in t.min:t.max){
+  GridIDTime.ti = GridIDTime[TimeID=i,]
+  
+  dist.i <- spDists(ei, incfile, longlat = T)*0.6213712 # spDists gives units in km, convert to miles
+  dist.i.5 <- which(dist.i <= 0.5)
+  
+  # Spatially matching
+  d.sp <- incfile[dist.i.5,]
+  
+  # Temporally matching
+  # Match between the first reported time and last pull time of the Waze event. Last pull time is after the earliest time of EDT, and first reported time is earlier than the latest time of EDT
+  if(class(ei)=="SpatialPointsDataFrame") { ei <- as.data.frame(ei) }
+  if(class(d.sp)=="SpatialPointsDataFrame") { d.sp <- as.data.frame(d.sp) }
+  
+  
+  d.t <- d.sp[d.sp[,inctimevar2] >= ei[,acctimevar]-60*60 & d.sp[,inctimevar1] <= ei[,acctimevar]+60*60,] 
+  
+  id.accident <- rep(as.character(ei[,accidvar]), nrow(d.t))
+  id.incidents <- as.character(d.t[,incidvar])
+  
+  linktable <- rbind(linktable, data.frame(id.accident, id.incidents))
+  
+  if(i %% 1000 == 0) {
+    timediff <- round(Sys.time()-starttime, 2)
+    cat(i, "complete \n", timediff, attr(timediff, "units"), "elapsed \n", rep("<>",20), "\n")
+  }
+} # end loop
+
+
+
+
+
+
+
+TimeOfDay <- c("NightAM_24to4","MorningEarly_4to8","Morning_8to12","Afternoon_12to16","Evening_16to20","NightPM_20to24")
 
 
 #summarize counts of Waze events in each hexagon and EDT matches to the Waze events (could be in neighboring hexagon)
@@ -94,12 +144,20 @@ waze.hex <- filter(link.waze.edt, !is.na(GRID_ID)) %>%
     nWazeRowsInMatch = n(), #includes duplicates that match more than one EDT report (don't use in model)
     uniqWazeEvents= n_distinct(uuid.waze),
     nMatchEDT_buffer = n_distinct(CrashCaseID[match=="M"]),
+  
+    nMatchEDT_buffer_Acc = n_distinct(CrashCaseID[match=="M" & type=="ACCIDENT"]),
+    nMatchEDT_buffer_Jam = n_distinct(CrashCaseID[match=="M" & type=="JAM"]),
+    nMatchEDT_buffer_RoadClosed = n_distinct(CrashCaseID[match=="M" & type=="ROAD_CLOSED"]),
+    nMatchEDT_buffer_WorH = n_distinct(CrashCaseID[match=="M"& type=="WEATHERHAZARD"]),
+    
     nMatchWaze_buffer = n_distinct(uuid.waze[match=="M"]),
     nNoMatchWaze_buffer = n_distinct(uuid.waze[match=="W"]),
+    
     nWazeAccident = n_distinct(uuid.waze[type=="ACCIDENT"]),
     nWazeJam = n_distinct(uuid.waze[type=="JAM"]),
     nWazeRoadCloased = n_distinct(uuid.waze[type=="ROAD_CLOSED"]),
     nWazeWeatherOrHazard = n_distinct(uuid.waze[type=="WEATHERHAZARD"]),
+    
     nWazeAccidentMajor = n_distinct(uuid.waze[subtype=="ACCIDENT_MAJOR"]),
     nWazeAccidentMinor = n_distinct(uuid.waze[subtype=="ACCIDENT_MINOR"]),
     nWazeHazardCarStoppedRoad = n_distinct(uuid.waze[subtype=="HAZARD_ON_ROAD_CAR_STOPPED"]),
@@ -111,6 +169,7 @@ waze.hex <- filter(link.waze.edt, !is.na(GRID_ID)) %>%
     nWazeJamStandStill = n_distinct(uuid.waze[subtype=="JAM_STAND_STILL_TRAFFIC"]),
     nWazeWeatherFlood = n_distinct(uuid.waze[subtype=="HAZARD_WEATHER_FLOOD"]),
     nWazeWeatherFog = n_distinct(uuid.waze[subtype=="HAZARD_WEATHER_FOG"]),
+    
     nWazeRT3 = n_distinct(uuid.waze[roadType=="3"]),
     nWazeRT4 = n_distinct(uuid.waze[roadType=="4"]),
     nWazeRT6 = n_distinct(uuid.waze[roadType=="6"]),
@@ -176,15 +235,6 @@ df %>% complete(group, nesting(item_id, item_name), fill = list(value1 = 0))
 t <- link.waze.edt[1000:1010,]; t
 names(t)
 tt <- t %>% complete(uuid.waze, nesting(Waze.start.day, Waze.end.day,Waze.start.hour,Waze.end.hour), fill=list())
-
-
-#Vector of Grid IDs in month of data (all grid IDs with Waze or EDT data)
-GridIDall <- c(unique(as.character(link.waze.edt$GRID_ID)), unique(as.character(link.waze.edt$GRID_ID.edt)))
-Aprilday <- seq(ymd('2017-04-01'),ymd('2017-04-30'), by = '1 day')
-Day <- format(Aprilday, "%j")
-TimeOfDay <- c("NightAM_24to4","MorningEarly_4to8","Morning_8to12","Afternoon_12to16","Evening_16to20","NightPM_20to24")
-GridIDTime <- expand.grid(Day,TimeOfDay,GridIDall)
-names(GridIDTime) <- c("Day","TimeOfDay","GridIDall")
 
 
 # Temporally matching
