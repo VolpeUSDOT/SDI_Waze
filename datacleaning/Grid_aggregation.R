@@ -151,8 +151,11 @@ wazeTime.edt.hex <- full_join(waze.hex, edt.hex, by = c("GRID_ID", "day", "hour"
   mutate_all(funs(replace(., is.na(.), 0)))
 #Replace NA with zero (for the grid counts here, 0 means there were no reported Waze events or EDT crashes in the grid cell at that hour)
 
-save(list="waze.edt.hex", file = paste(outputdir,"/WazeEdtHex_Beta.RData",sep=""))
-save(list="wazeTime.edt.hex", file = paste(outputdir,"/WazeTimeEdtHex.RData",sep=""))
+names(waze.edt.hex)
+
+save(list="waze.edt.hex", file = paste(outputdir,"/WazeEdtHex_April.RData",sep=""))
+save(list="wazeTime.edt.hex", file = paste(outputdir,"/WazeTimeEdtHex_April.RData",sep=""))
+write.csv(wazeTime.edt.hex, file = paste(outputdir,"/WazeTimeEdtHex_April.csv",sep=""))
 
 
 ##########################################################################################################
