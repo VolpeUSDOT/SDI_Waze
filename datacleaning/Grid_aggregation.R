@@ -62,7 +62,6 @@ names(GridIDTime) <- c("GridDayHour","GRID_ID")
 
 # Temporally matching
 # Match between the first reported time and last pull time of the Waze event. 
-# Last pull time is after the earliest time of EDT, and first reported time is earlier than the latest time of EDT
 
 StartTime <- Sys.time()
 t.min=min(GridIDTime$GridDayHour)
@@ -70,14 +69,11 @@ t.max=max(GridIDTime$GridDayHour)
 i=t.min
 
 Waze.hex.time <- vector()
-while(i+3600 < t.max){
+while(i+3600 <= t.max){
   ti.GridIDTime = filter(GridIDTime,GridDayHour==i)
   ti.link.waze.edt = filter(link.waze.edt, time >= i & time <= i+3600| last.pull.time >=i & last.pull.time <=i+3600)
 
-  names(ti.GridIDTime)
-  names(ti.link.waze.edt)
-  
-  ti.Waze.hex <- inner_join(ti.GridIDTime, ti.link.waze.edt)  
+  ti.Waze.hex <- inner_join(ti.GridIDTime, ti.link.waze.edt) #Use left_join to get zeros if no match  
   
   Waze.hex.time <- rbind(Waze.hex.time, ti.Waze.hex)
   i=i+3600
@@ -89,7 +85,6 @@ EndTime
 
 
 #summarize counts of Waze events in each hexagon and EDT matches to the Waze events (could be in neighboring hexagon)
-#TODO: Expand Waze events over time windows (time to last.pull.time) - right now, they only show up in the start time windows(?) - only matters for persistent Waze events.
 
 names(Waze.hex.time)
 StartTime <- Sys.time()
@@ -156,7 +151,8 @@ wazeTime.edt.hex <- full_join(waze.hex, edt.hex, by = c("GRID_ID", "day", "hour"
   mutate_all(funs(replace(., is.na(.), 0)))
 #Replace NA with zero (for the grid counts here, 0 means there were no reported Waze events or EDT crashes in the grid cell at that hour)
 
-save(list="wazeTime.edt.hex", file = paste(outputdir,"/WazeEdtHex_Beta.RData",sep=""))
+save(list="waze.edt.hex", file = paste(outputdir,"/WazeEdtHex_Beta.RData",sep=""))
+save(list="wazeTime.edt.hex", file = paste(outputdir,"/WazeTimeEdtHex.RData",sep=""))
 
 
 ##########################################################################################################
