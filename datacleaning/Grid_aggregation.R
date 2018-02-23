@@ -51,22 +51,6 @@ edt.df$CrashDate_Local <- as.POSIXct(edt.df$CrashDate_Local, "%Y-%m-%d %H:%M:%S"
 # counts for roadType, 11 columns: length(unique(link.waze.edt$roadType[!is.na(link.waze.edt$roadType)]))
 
 ##############
-#Add time variables
-StartTime <- Sys.time()
-link.waze.edt <- link.waze.edt %>%
-  mutate(Waze.start.year = format(time, "%Y"), 
-         Waze.start.day = format(time, "%j"), 
-         Waze.start.DofW = format(time, "%A"), 
-         Waze.start.hour = format(time, "%H"), 
-         Waze.end.year = format(last.pull.time, "%Y"),
-         Waze.end.day = format(last.pull.time, "%j"),
-         Waze.end.hour = format(last.pull.time, "%H"),
-         Waze.end.DofW = format(last.pull.time, "%A"),
-         Waze.Duration.Minutes = round((last.pull.time-time)/60,0))%>%
-  mutate(Waze.start.TimeID=as.numeric(Waze.start.day)*as.numeric(Waze.start.hour), Waze.end.TimeID=as.numeric(Waze.end.day)*as.numeric(Waze.end.hour))
-#Note: this does not work for the zeros!
-EndTime <- Sys.time()-StartTime
-EndTime
 
 #Dataframe of Grid IDs by day of year and time of day in month of April data (all grid IDs with Waze or EDT data)
 GridIDall <- c(unique(as.character(link.waze.edt$GRID_ID)), unique(as.character(link.waze.edt$GRID_ID.edt)))
@@ -76,22 +60,16 @@ GridIDTime <- expand.grid(Aprilhour,GridIDall)
 names(GridIDTime) <- c("GridDayHour","GRID_ID")
 
 
-
-# Waze event counts by GridID, day of year, and time of day   
-## TO BE CONTINUED...need to expand Waze events to duplicate rows over time window, 
-#or figure out how to count events using the time windows prior to the summarize function by GridID
-
 # Temporally matching
-# Match between the first reported time and last pull time of the Waze event. Last pull time is after the earliest time of EDT, and first reported time is earlier than the latest time of EDT
-
-t.min=min(GridIDTime$GridDayHour)
-t.max=max(GridIDTime$GridDayHour)
-
+# Match between the first reported time and last pull time of the Waze event. 
+# Last pull time is after the earliest time of EDT, and first reported time is earlier than the latest time of EDT
 
 StartTime <- Sys.time()
+t.min=min(GridIDTime$GridDayHour)
+t.max=max(GridIDTime$GridDayHour)
+i=t.min
 
 Waze.hex.time <- vector()
-i=t.min
 while(i+3600 < t.max){
   ti.GridIDTime = filter(GridIDTime,GridDayHour==i)
   ti.link.waze.edt = filter(link.waze.edt, time >= i & time <= i+3600| last.pull.time >=i & last.pull.time <=i+3600)
@@ -116,7 +94,7 @@ EndTime
 names(link.waze.edt)
 StartTime <- Sys.time()
 
-waze.hex <- filter(link.waze.edt, !is.na(GRID_ID)) %>%
+waze.hex <- filter(Waze.hex.time, !is.na(GRID_ID)) %>%
   group_by(GRID_ID, day = format(time, "%j"), hour = format(time, "%H")) %>%
   summarize(
     DayOfWeek = weekdays(time)[1], #Better way to select one value?
@@ -182,6 +160,25 @@ save(list="waze.edt.hex", file = paste(outputdir,"/WazeEdtHex_Beta.RData",sep=""
 
 
 ##########################################################################################################
+#Not sure we need this now...
+#Add time variables
+StartTime <- Sys.time()
+link.waze.edt <- link.waze.edt %>%
+  mutate(Waze.start.year = format(time, "%Y"), 
+         Waze.start.day = format(time, "%j"), 
+         Waze.start.DofW = format(time, "%A"), 
+         Waze.start.hour = format(time, "%H"), 
+         Waze.end.year = format(last.pull.time, "%Y"),
+         Waze.end.day = format(last.pull.time, "%j"),
+         Waze.end.hour = format(last.pull.time, "%H"),
+         Waze.end.DofW = format(last.pull.time, "%A"),
+         Waze.Duration.Minutes = round((last.pull.time-time)/60,0))%>%
+  mutate(Waze.start.TimeID=as.numeric(Waze.start.day)*as.numeric(Waze.start.hour), Waze.end.TimeID=as.numeric(Waze.end.day)*as.numeric(Waze.end.hour))
+#Note: this does not work for the zeros!
+EndTime <- Sys.time()-StartTime
+EndTime
+
+
 #Functions to play with for continued aggregations
   spread(type, uniqWazeEvents) %>%
   add_tally()
