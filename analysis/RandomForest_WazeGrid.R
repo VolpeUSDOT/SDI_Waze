@@ -35,18 +35,20 @@ source(file.path(codeloc, 'utility/wazefunctions.R'))
 
 load("WazeEdtHex_Beta.RData")
 
+waze.edt.hex <- wazeTime.edt.hex
+
 waze.edt.hex$DayOfWeek <- as.factor(waze.edt.hex$DayOfWeek)
 waze.edt.hex$hour <- as.numeric(waze.edt.hex$hour)
 
 
-# Response variable: use continuous? Only 1,000 out of 238,000 cells have > 1 EDT event matching. Consider converting to binary. Of the >1 cell, 886 are 2 events, 122 3 events, tiny number have greater.
+# Response variable: use continuous? Only 1,600 out of 310,000 cells have > 1 EDT event matching. Consider converting to binary. Of the >1 cell, 886 are 2 events, 122 3 events, tiny number have greater. 15,000 have 1.
 summary(waze.edt.hex$nMatchEDT_buffer)
 summary(waze.edt.hex$nMatchEDT_buffer > 1)
 table(waze.edt.hex$nMatchEDT_buffer[waze.edt.hex$nMatchEDT_buffer > 1])
 
 # Going to binary:
 waze.edt.hex$MatchEDT_buffer <- waze.edt.hex$nMatchEDT_buffer
-waze.edt.hex$MatchEDT_buffer[waze.edt.hex$MatchEDT_buffer > 0 ] = 1 
+waze.edt.hex$MatchEDT_buffer[waze.edt.hex$MatchEDT_buffer > 0] = 1 
 waze.edt.hex$MatchEDT_buffer <- as.factor(waze.edt.hex$MatchEDT_buffer)
 
 # Analysis ----
@@ -153,6 +155,10 @@ bin.mod.diagnostics(predtab)
 
 stopCluster(cl) # stop the cluster when done
 
+
+# If only Waze accident report
+# 1. Predict to nMatchEDT_buffer_acc
+# 2. Subset to only nWazeAccident > 1 ? look at this. 
 
 # <><><><><><><><><><><><><><><><><><><><><><><><><><><>
 # Conditional random forest from ctree ----
