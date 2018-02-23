@@ -164,13 +164,17 @@ showobjsize <- function(units = "Mb", limit = 100) {
 }
 
 # Print diagnotstics from a confusion matrix
-# given a 2x2 table where rows are observed negative and postive, and columns are predicted negative and positive
+# given a 2x2 table where columns are observed negative and postive, and rows are predicted negative and positive:
+# |: ---------------------------- Observed ------:|
+# |: ----------------------:|:Negative:|:Positive:|
+# |: Predicted  :|:Negative:|   A      |    B     |
+# |:            :|:Positive:|   C      |    D     |
 bin.mod.diagnostics <- function(predtab){
 
   accuracy = (predtab[1,1] + predtab[2,2] )/ sum(predtab) # true positives and true negatives divided by all observations
-  precision = (predtab[2,2] )/ sum(predtab[,2]) # true positives divided by all predicted positives
-  recall = (predtab[2,2] )/ sum(predtab[2,]) # true positives divided by all observed positives
-  false.positive.rate = (predtab[2,1] )/ sum(predtab[1,]) # false positives divided by all observed negatives
+  precision = (predtab[2,2] )/ sum(predtab[2,]) # true positives divided by all predicted positives
+  recall = (predtab[2,2] )/ sum(predtab[,2]) # true positives divided by all observed positives
+  false.positive.rate = (predtab[2,1] )/ sum(predtab[,1]) # false positives divided by all observed negatives
 
-  t(data.frame(accuracy, precision, recall, false.positive.rate))  
+  round(t(data.frame(accuracy, precision, recall, false.positive.rate)), 4)  
 }
