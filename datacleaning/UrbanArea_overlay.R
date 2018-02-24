@@ -78,8 +78,8 @@ for(i in shared.avail.months){
   # i = shared.avail.months[1]
   
   load(file.path(wazedir, paste0("MASTER Data Files/EDT_month/2017-", i, "_1_CrashFact_edited.RData")))
-  # find the edt file for this month and assign to temporary working file name
-  edt.working <- get(ls()[grep("edt_", ls())])
+  # find the edt file for this month and assign to temporary working file name. Remove the month-named data frame
+  edt.working <- get(ls()[grep("edt_", ls())]); rm(list=ls()[grep("edt_", ls())])
   
   # Waze: Comes from aggregated monthly Waze events, clipped to a 0.5 mile buffer around MD, for April 2017. All the waze files share the same object name, d
   load(file.path(wazedir, paste0("MASTER Data Files/Waze Aggregated/month_MD_clipped/MD_buffered__2017-", i, ".RData")))
