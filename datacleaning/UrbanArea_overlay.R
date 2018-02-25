@@ -1,17 +1,15 @@
-# Assigns urban area classifications to Waze and EDT events
+# Assigns urban area classifications and hexagonal grid IDs to Waze and EDT events
 # Merges the two files into a matched data frame and saves
+# Loops over all months of available data were both EDT and Waze files exist
 
 # <><><><><><><><><><><><><><><><><><><><>
 # Setup ----
 library(tidyverse)
 library(sp)
 library(maps) # for mapping base layers
-library(reshape)
 library(maptools) # readShapePoly() and others
 library(mapproj) # for coord_map()
 library(rgdal) # for readOGR(), needed for reading in ArcM shapefiles
-library(rgeos) # for gIntersection, to clip two shapefiles
-library(raster)
 
 #Flynn drive
 codedir <- "~/git/SDI_Waze" 
@@ -69,19 +67,19 @@ shared.avail.months = c(avail.edt.months, avail.waze.months)[duplicated(c(avail.
 
 # Start loop over months ----
 
-# Save files first to a local temporary directory, then move to the shared drive and delete local copies when complete.
+# Save files first to a local temporary directory, then move to the shared drive and delete local copies when complete, using movefiles() from utility/wazefunctions.R.
 temp.outputdir = tempdir() 
 
 
 for(i in shared.avail.months){
   
-  # i = shared.avail.months[1]
+  # i = shared.avail.months[1] # test
   
   load(file.path(wazedir, paste0("MASTER Data Files/EDT_month/2017-", i, "_1_CrashFact_edited.RData")))
   # find the edt file for this month and assign to temporary working file name. Remove the month-named data frame
   edt.working <- get(ls()[grep("edt_", ls())]); rm(list=ls()[grep("edt_", ls())])
   
-  # Waze: Comes from aggregated monthly Waze events, clipped to a 0.5 mile buffer around MD, for April 2017. All the waze files share the same object name, d
+  # Waze: Comes from aggregated monthly Waze events, clipped to a 0.5 mile buffer around MD, for each month 2017. All the waze files share the same object name, d
   load(file.path(wazedir, paste0("MASTER Data Files/Waze Aggregated/month_MD_clipped/MD_buffered__2017-", i, ".RData")))
 
   link <- read.csv(file.path(wazedir, paste0("MASTER Data Files/Waze Aggregated/month_MD_clipped/EDT_Waze_link_2017-", i, "_MD.csv")))
@@ -173,7 +171,7 @@ for(i in shared.avail.months){
   
 } # End month loop ----
 
-# move files out of temporary output directory to shared drive
+# move files out of temporary output directory to shared drive. This function will move only files with the pattern 'merged' in the file name, from the tempdir to the outputdir. Files are deleted after copying. Temporary directories are additionaly deleted automatically on restart.
 movefiles(dir(temp.outputdir)[grep("merged", dir(temp.outputdir))], temp.outputdir, outputdir)
 
 # Scratch from previous work
