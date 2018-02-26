@@ -26,16 +26,21 @@ library(doParallel) # includes iterators and parallel
 
 
 # Run this if you don't have these packages:
-# install.packages(c("rpart", "randomForest", "maptree", "party", "partykit", "rgdal"), dep = T)
+# install.packages(c("rpart", "randomForest", "maptree", "party", "partykit", "rgdal", "foreach", "doParallel"), dep = T)
 
 setwd("~/")
+
+#Flynn drive
 if(length(grep("flynn", getwd())) > 0) {mappeddrive = "W:"} 
-if(length(grep("EASdocs", getwd())) > 0) {mappeddrive = "S:"} 
-# mappeddrive = "S:" #for sudderth mapped drive, I have to click on the drive location in windows explorer to "connect" to the S drive before the data files will load
+codeloc <- "~/git/SDI_Waze" # Update as needed for the git repository on your local machine. (git for flynn, GitHub for sudderth)
+
+#Sudderth drive
+#if(length(grep("EASdocs", getwd())) > 0) {mappeddrive = "S:"} 
+mappeddrive = "S:" #for sudderth mapped drive, I have to click on the drive location in windows explorer to "connect" to the S drive before the data files will load
+codeloc <- "~/GitHub/SDI_Waze" # Update as needed for the git repository on your local machine. (git for flynn, GitHub for sudderth)
 
 wazedir <- (file.path(mappeddrive,"SDI Pilot Projects/Waze/MASTER Data Files/Waze Aggregated/HexagonWazeEDT"))
 wazefigdir <- file.path(mappeddrive, "SDI Pilot Projects/Waze/Figures")
-codeloc <- "~/git/SDI_Waze" # Update as needed for the git repository on your local machine. (git for flynn, GitHub for sudderth)
 
 setwd(wazedir)
 
