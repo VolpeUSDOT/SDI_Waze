@@ -52,10 +52,16 @@ source(file.path(codeloc, 'utility/wazefunctions.R'))
 load("WazeTimeEdtHex_04.RData")
 wazeTime.edt.hex$DayOfWeek <- as.factor(wazeTime.edt.hex$DayOfWeek)
 wazeTime.edt.hex$hour <- as.numeric(wazeTime.edt.hex$hour)
-# Going to binary:
+
+# Going to binary for all Waze buffer match:
 wazeTime.edt.hex$MatchEDT_buffer <- wazeTime.edt.hex$nMatchEDT_buffer
 wazeTime.edt.hex$MatchEDT_buffer[wazeTime.edt.hex$MatchEDT_buffer > 0] = 1 
 wazeTime.edt.hex$MatchEDT_buffer <- as.factor(wazeTime.edt.hex$MatchEDT_buffer)
+
+# Going to binary for all Waze Accident buffer match:
+wazeTime.edt.hex$MatchEDT_buffer_Acc <- wazeTime.edt.hex$nMatchEDT_buffer_Acc
+wazeTime.edt.hex$MatchEDT_buffer_Acc[wazeTime.edt.hex$nMatchEDT_buffer_Acc > 0] = 1 
+wazeTime.edt.hex$MatchEDT_buffer_Acc <- as.factor(wazeTime.edt.hex$nMatchEDT_buffer_Acc)
 
 w.04 <- wazeTime.edt.hex; rm(wazeTime.edt.hex) 
 
@@ -65,6 +71,9 @@ wazeTime.edt.hex$hour <- as.numeric(wazeTime.edt.hex$hour)
 wazeTime.edt.hex$MatchEDT_buffer <- wazeTime.edt.hex$nMatchEDT_buffer
 wazeTime.edt.hex$MatchEDT_buffer[wazeTime.edt.hex$MatchEDT_buffer > 0] = 1 
 wazeTime.edt.hex$MatchEDT_buffer <- as.factor(wazeTime.edt.hex$MatchEDT_buffer)
+wazeTime.edt.hex$MatchEDT_buffer_Acc <- wazeTime.edt.hex$nMatchEDT_buffer_Acc
+wazeTime.edt.hex$MatchEDT_buffer_Acc[wazeTime.edt.hex$nMatchEDT_buffer_Acc > 0] = 1 
+wazeTime.edt.hex$MatchEDT_buffer_Acc <- as.factor(wazeTime.edt.hex$nMatchEDT_buffer_Acc)
 
 w.05 <- wazeTime.edt.hex; rm(wazeTime.edt.hex) 
 
@@ -74,6 +83,9 @@ wazeTime.edt.hex$hour <- as.numeric(wazeTime.edt.hex$hour)
 wazeTime.edt.hex$MatchEDT_buffer <- wazeTime.edt.hex$nMatchEDT_buffer
 wazeTime.edt.hex$MatchEDT_buffer[wazeTime.edt.hex$MatchEDT_buffer > 0] = 1 
 wazeTime.edt.hex$MatchEDT_buffer <- as.factor(wazeTime.edt.hex$MatchEDT_buffer)
+wazeTime.edt.hex$MatchEDT_buffer_Acc <- wazeTime.edt.hex$nMatchEDT_buffer_Acc
+wazeTime.edt.hex$MatchEDT_buffer_Acc[wazeTime.edt.hex$nMatchEDT_buffer_Acc > 0] = 1 
+wazeTime.edt.hex$MatchEDT_buffer_Acc <- as.factor(wazeTime.edt.hex$nMatchEDT_buffer_Acc)
 
 w.06 <- wazeTime.edt.hex; rm(wazeTime.edt.hex) 
 
