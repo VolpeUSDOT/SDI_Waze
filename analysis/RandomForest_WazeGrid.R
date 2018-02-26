@@ -98,12 +98,19 @@ w.06 <- wazeTime.edt.hex; rm(wazeTime.edt.hex)
 # Analysis ----
 
 # Variables to test. Use Waze only predictors, and omit grid ID and day as predictors as well
-
+#All Waze matches
 fitvars <- names(w.04)[is.na(match(names(w.04),
                                              c("GRID_ID", "day", # place variables to omit as predictors in this vector 
                                                "nMatchWaze_buffer", "nNoMatchWaze_buffer",
                                                grep("EDT", names(w.04), value = T)
                                                )))]
+
+#Waze accident matches (Use this or All Waze above)
+fitAccvars <- names(w.04)[is.na(match(names(w.04),
+                                   c("GRID_ID", "day", # place variables to omit as predictors in this vector 
+                                     "nNoMatchWaze_buffer", "nMatchEDT_buffer_Acc",
+                                     grep("EDT", names(w.04), value = T)
+                                   )))]
 
 # Unnecessary now: all rows are complete cases
 # fitdat.04 <- w.04[complete.cases(w.04[,fitvars]),]
@@ -114,6 +121,10 @@ wazeformula <- reformulate(termlabels = fitvars[is.na(match(fitvars,
                                                               "MatchEDT_buffer"))], 
                            response = "MatchEDT_buffer")
 
+
+wazeAccformula <- reformulate(termlabels = fitAccvars[is.na(match(fitvars,
+                                                            "MatchEDT_buffer_Acc"))], 
+                           response = "MatchEDT_buffer_Acc")
 
 # <><><><><><><><><><><><><><><><><><><><><><><><><><><>
 # Random forest parallel ----
@@ -136,7 +147,7 @@ testrows <- (1:nrow(w.04))[!1:nrow(w.04) %in% trainrows]
 system.time(rf.04 <- foreach(ntree = c(ntree.use/avail.cores, avail.cores),
                 .combine = combine,
                 .packages = "randomForest") %dopar%
-          randomForest(wazeformula,
+          randomForest(wazeAccformula,  #wazeformula
                data = w.04[trainrows,],
                ntree = ntree,
                nodesize = 5,
@@ -147,14 +158,14 @@ system.time(rf.04 <- foreach(ntree = c(ntree.use/avail.cores, avail.cores),
 system.time(rf.04.pred <- predict(rf.04, w.04[testrows, fitvars]))
 
 Nobs <- data.frame(t(c(nrow(w.04),
-               summary(w.04$MatchEDT_buffer),
-               length(w.04$nWazeAccident[w.04$nWazeAccident>0])
+               summary(w.04$MatchEDT_buffer_Acc), 
+               length(w.04$nWazeAccident[w.04$nWazeAccident>0]) 
                )))
 
 colnames(Nobs) = c("N", "No EDT", "EDT present", "Waze accident present")
 format(Nobs, big.mark = ",")
 
-(predtab <- table(w.04$MatchEDT_buffer[testrows], rf.04.pred))
+(predtab <- table(w.04$MatchEDT_buffer_Acc[testrows], rf.04.pred)) #MatchEDT_buffer 
 bin.mod.diagnostics(predtab)
 
 # save output predictions
