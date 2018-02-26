@@ -142,9 +142,9 @@ bin.mod.diagnostics(predtab)
 
 # save output predictions
 
-out.04 <- data.frame(w.04$GRID_ID[testrows], w.04$MatchEDT_buffer[testrows], rf.04.pred)
-
-names(out.04) <- c("GRID_ID", "Obs", "Pred")
+out.04 <- data.frame(w.04[testrows, c("GRID_ID", "day", "hour", "MatchEDT_buffer")], rf.04.pred)
+out.04$day <- as.numeric(out.04$day)
+names(out.04)[4:5] <- c("Obs", "Pred")
 
 out.04 = data.frame(out.04,
                     TN = out.04$Obs == 0 &  out.04$Pred == 0,
@@ -199,9 +199,10 @@ bin.mod.diagnostics(predtab)
 
 # save output predictions
 
-out.0405 <- data.frame(w.0405$GRID_ID[testrows], w.0405$MatchEDT_buffer[testrows], rf.0405.pred)
+out.0405 <- data.frame(w.0405[testrows, c("GRID_ID", "day", "hour", "MatchEDT_buffer")], rf.0405.pred)
+out.0405$day <- as.numeric(out.0405$day)
 
-names(out.0405) <- c("GRID_ID", "Obs", "Pred")
+names(out.0405)[4:5] <- c("Obs", "Pred")
 
 out.0405 = data.frame(out.0405,
                     TN = out.0405$Obs == 0 &  out.0405$Pred == 0,
@@ -254,9 +255,9 @@ bin.mod.diagnostics(predtab)
 
 # save output predictions
 
-out.06 <- data.frame(w.06$GRID_ID, w.06$MatchEDT_buffer, rf.0405.06.pred)
+out.06 <- data.frame(w.06[c("GRID_ID","day","hour", "MatchEDT_buffer")], rf.0405.06.pred)
 
-names(out.06) <- c("GRID_ID", "Obs", "Pred")
+names(out.06)[4:5] <- c("Obs", "Pred")
 
 out.06 = data.frame(out.06,
                       TN = out.06$Obs == 0 &  out.06$Pred == 0,
@@ -274,9 +275,6 @@ save(list = c("rf.0405.all",
      file = "RandomForest_Output_0405_06.RData")
 
 varImpPlot(rf.0405.all) # variable importance plot
-
-
-
 
 
 
