@@ -166,6 +166,9 @@ for(j in avail.months){ # j = "05"
     mutate_all(funs(replace(., is.na(.), 0)))
   #Replace NA with zero (for the grid counts here, 0 means there were no reported Waze events or EDT crashes in the grid cell at that hour)
   
+  hextimeChar <- paste(wazeTime.edt.hex$day,wazeTime.edt.hex$hour,sep=":")
+  wazeTime.edt.hex$hextime <- strptime(hextimeChar, "%j:%H", tz=)
+  
  # names(waze.edt.hex)
   
 #  save(list="waze.edt.hex", file = paste(temp.outputdir, "/WazeEdtHex_", j,".RData",sep=""))
@@ -176,6 +179,7 @@ for(j in avail.months){ # j = "05"
 
 movefiles(dir(temp.outputdir)[grep("Hex", dir(temp.outputdir))], temp.outputdir, outputdir)
 
+##########################################################################################################
 ##########################################################################################################
 #Not sure we need this now...
 #Add time variables
