@@ -147,7 +147,7 @@ testrows <- (1:nrow(w.04))[!1:nrow(w.04) %in% trainrows]
 system.time(rf.04 <- foreach(ntree = c(ntree.use/avail.cores, avail.cores),
                 .combine = combine,
                 .packages = "randomForest") %dopar%
-          randomForest(wazeAccformula,  #wazeformula
+          randomForest(wazeformula,
                data = w.04[trainrows,],
                ntree = ntree,
                nodesize = 5,
@@ -158,14 +158,14 @@ system.time(rf.04 <- foreach(ntree = c(ntree.use/avail.cores, avail.cores),
 system.time(rf.04.pred <- predict(rf.04, w.04[testrows, fitvars]))
 
 Nobs <- data.frame(t(c(nrow(w.04),
-               summary(w.04$MatchEDT_buffer_Acc), #MatchEDT_buffer
+               summary(w.04$MatchEDT_buffer),
                length(w.04$nWazeAccident[w.04$nWazeAccident>0]) 
                )))
 
 colnames(Nobs) = c("N", "No EDT", "EDT present", "Waze accident present")
 format(Nobs, big.mark = ",")
 
-(predtab <- table(w.04$MatchEDT_buffer_Acc[testrows], rf.04.pred)) #MatchEDT_buffer 
+(predtab <- table(w.04$MatchEDT_buffer[testrows], rf.04.pred)) 
 bin.mod.diagnostics(predtab)
 
 # save output predictions
@@ -309,6 +309,65 @@ varImpPlot(rf.0405.all) # variable importance plot
 
 
 stopCluster(cl) # stop the cluster when done
+
+
+# Model 4 (Waze accident only EDT match response variable): April, 70/30 ----
+# approx 2.5 min to run on 218k rows of training data with 4 cores
+
+trainrows <- sort(sample(1:nrow(w.04), size = nrow(w.04)*.7, replace = F))
+testrows <- (1:nrow(w.04))[!1:nrow(w.04) %in% trainrows]
+
+# length(testrows) + length(trainrows) == nrow(w.04)
+
+system.time(rf.04.AccMatch <- foreach(ntree = c(ntree.use/avail.cores, avail.cores),
+                             .combine = combine,
+                             .packages = "randomForest") %dopar%
+              randomForest(wazeAccformula,
+                           data = w.04[trainrows,],
+                           ntree = ntree,
+                           nodesize = 5,
+                           mtry = 9)
+)
+
+
+system.time(rf.04.AccMatch.pred <- predict(rf.04.AccMatch, w.04[testrows, fitvars]))
+
+Nobs <- data.frame(t(c(nrow(w.04),
+                       summary(w.04$MatchEDT_buffer_Acc),
+                       length(w.04$nWazeAccident[w.04$nWazeAccident>0]) 
+)))
+
+colnames(Nobs) = c("N", "No EDT", "EDT present", "Waze accident present")
+format(Nobs, big.mark = ",")
+
+(predtab <- table(w.04$MatchEDT_buffer_Acc[testrows], rf.04.AccMatch)) 
+bin.mod.diagnostics(predtab)
+
+# save output predictions
+
+out.04.AccMatch <- data.frame(w.04[testrows, c("GRID_ID", "day", "hour", "MatchEDT_buffer_Acc")], rf.04.AccMatch.pred)
+out.04.AccMatch$day <- as.numeric(out.04.AccMatch$day)
+names(out.04.AccMatch)[4:5] <- c("Obs", "Pred")
+
+out.04.AccMatch = data.frame(out.04.AccMatch,
+                    TN = out.04.AccMatch$Obs == 0 &  out.04.AccMatch$Pred == 0,
+                    FP = out.04.AccMatch$Obs == 0 &  out.04.AccMatch$Pred == 1,
+                    FN = out.04.AccMatch$Obs == 1 &  out.04.AccMatch$Pred == 0,
+                    TP = out.04.AccMatch$Obs == 1 &  out.04.AccMatch$Pred == 1)
+write.csv(out.04.AccMatch,
+          file = "RandomForest_pred_04_AccMatch.csv",
+          row.names = F)
+
+varImpPlot(rf.04) # variable imporatance: mean decrease in Gini impurity for this predictor across all trees.  
+
+save(list = c("rf.04.AccMatch",
+              "rf.04.AccMatch.pred",
+              "testrows",
+              "trainrows",
+              "w.04",
+              "out.04.AccMatch"),
+     file = "RandomForest_Output_04_AccMatch.RData")
+
 
 # Scratch ----
 
