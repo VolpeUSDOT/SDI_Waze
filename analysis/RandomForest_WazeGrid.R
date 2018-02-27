@@ -354,7 +354,7 @@ write.csv(out.04.AccMatch,
           file = "RandomForest_pred_04_AccMatch.csv",
           row.names = F)
 
-varImpPlot(rf.04) # variable imporatance: mean decrease in Gini impurity for this predictor across all trees.  
+varImpPlot(rf.04.AccMatch) # variable imporatance: mean decrease in Gini impurity for this predictor across all trees.  
 
 save(list = c("rf.04.AccMatch",
               "rf.04.AccMatch.pred",
@@ -363,6 +363,8 @@ save(list = c("rf.04.AccMatch",
               "w.04",
               "out.04.AccMatch"),
      file = "RandomForest_Output_04_AccMatch.RData")
+
+
 
 
 # Scratch ----
