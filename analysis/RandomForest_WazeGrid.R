@@ -60,8 +60,8 @@ wazeTime.edt.hex$MatchEDT_buffer <- as.factor(wazeTime.edt.hex$MatchEDT_buffer)
 
 # Going to binary for all Waze Accident buffer match:
 wazeTime.edt.hex$MatchEDT_buffer_Acc <- wazeTime.edt.hex$nMatchEDT_buffer_Acc
-wazeTime.edt.hex$MatchEDT_buffer_Acc[wazeTime.edt.hex$nMatchEDT_buffer_Acc > 0] = 1 
-wazeTime.edt.hex$MatchEDT_buffer_Acc <- as.factor(wazeTime.edt.hex$nMatchEDT_buffer_Acc)
+wazeTime.edt.hex$MatchEDT_buffer_Acc[wazeTime.edt.hex$MatchEDT_buffer_Acc > 0] = 1 
+wazeTime.edt.hex$MatchEDT_buffer_Acc <- as.factor(wazeTime.edt.hex$MatchEDT_buffer_Acc)
 
 w.04 <- wazeTime.edt.hex; rm(wazeTime.edt.hex) 
 
@@ -72,8 +72,8 @@ wazeTime.edt.hex$MatchEDT_buffer <- wazeTime.edt.hex$nMatchEDT_buffer
 wazeTime.edt.hex$MatchEDT_buffer[wazeTime.edt.hex$MatchEDT_buffer > 0] = 1 
 wazeTime.edt.hex$MatchEDT_buffer <- as.factor(wazeTime.edt.hex$MatchEDT_buffer)
 wazeTime.edt.hex$MatchEDT_buffer_Acc <- wazeTime.edt.hex$nMatchEDT_buffer_Acc
-wazeTime.edt.hex$MatchEDT_buffer_Acc[wazeTime.edt.hex$nMatchEDT_buffer_Acc > 0] = 1 
-wazeTime.edt.hex$MatchEDT_buffer_Acc <- as.factor(wazeTime.edt.hex$nMatchEDT_buffer_Acc)
+wazeTime.edt.hex$MatchEDT_buffer_Acc[wazeTime.edt.hex$MatchEDT_buffer_Acc > 0] = 1 
+wazeTime.edt.hex$MatchEDT_buffer_Acc <- as.factor(wazeTime.edt.hex$MatchEDT_buffer_Acc)
 
 w.05 <- wazeTime.edt.hex; rm(wazeTime.edt.hex) 
 
@@ -84,8 +84,8 @@ wazeTime.edt.hex$MatchEDT_buffer <- wazeTime.edt.hex$nMatchEDT_buffer
 wazeTime.edt.hex$MatchEDT_buffer[wazeTime.edt.hex$MatchEDT_buffer > 0] = 1 
 wazeTime.edt.hex$MatchEDT_buffer <- as.factor(wazeTime.edt.hex$MatchEDT_buffer)
 wazeTime.edt.hex$MatchEDT_buffer_Acc <- wazeTime.edt.hex$nMatchEDT_buffer_Acc
-wazeTime.edt.hex$MatchEDT_buffer_Acc[wazeTime.edt.hex$nMatchEDT_buffer_Acc > 0] = 1 
-wazeTime.edt.hex$MatchEDT_buffer_Acc <- as.factor(wazeTime.edt.hex$nMatchEDT_buffer_Acc)
+wazeTime.edt.hex$MatchEDT_buffer_Acc[wazeTime.edt.hex$MatchEDT_buffer_Acc > 0] = 1 
+wazeTime.edt.hex$MatchEDT_buffer_Acc <- as.factor(wazeTime.edt.hex$MatchEDT_buffer_Acc)
 
 w.06 <- wazeTime.edt.hex; rm(wazeTime.edt.hex) 
 
@@ -118,6 +118,8 @@ wazeformula <- reformulate(termlabels = fitvars[is.na(match(fitvars,
 wazeAccformula <- reformulate(termlabels = fitvars[is.na(match(fitvars,
                                                             "MatchEDT_buffer_Acc"))], 
                            response = "MatchEDT_buffer_Acc")
+
+table(w.04$nMatchEDT_buffer_Acc)
 
 # <><><><><><><><><><><><><><><><><><><><><><><><><><><>
 # Random forest parallel ----
@@ -334,6 +336,8 @@ colnames(Nobs) = c("N", "No EDT", "EDT present", "Waze accident present")
 format(Nobs, big.mark = ",")
 
 (predtab <- table(w.04$MatchEDT_buffer_Acc[testrows], rf.04.AccMatch)) 
+##!!Error in table(w.04$MatchEDT_buffer_Acc[testrows], rf.04.AccMatch): all arguments must have the same length
+
 bin.mod.diagnostics(predtab)
 
 # save output predictions
