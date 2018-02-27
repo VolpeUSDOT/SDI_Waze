@@ -122,7 +122,7 @@ for(j in avail.months){ # j = "05"
       
       nWazeAccident = n_distinct(uuid.waze[type=="ACCIDENT"]),
       nWazeJam = n_distinct(uuid.waze[type=="JAM"]),
-      nWazeRoadCloased = n_distinct(uuid.waze[type=="ROAD_CLOSED"]),
+      nWazeRoadClosed = n_distinct(uuid.waze[type=="ROAD_CLOSED"]),
       nWazeWeatherOrHazard = n_distinct(uuid.waze[type=="WEATHERHAZARD"]),
       
       nWazeAccidentMajor = n_distinct(uuid.waze[subtype=="ACCIDENT_MAJOR"]),
@@ -181,24 +181,6 @@ movefiles(dir(temp.outputdir)[grep("Hex", dir(temp.outputdir))], temp.outputdir,
 
 ##########################################################################################################
 ##########################################################################################################
-#Not sure we need this now...
-#Add time variables
-StartTime <- Sys.time()
-link.waze.edt <- link.waze.edt %>%
-  mutate(Waze.start.year = format(time, "%Y"), 
-         Waze.start.day = format(time, "%j"), 
-         Waze.start.DofW = format(time, "%A"), 
-         Waze.start.hour = format(time, "%H"), 
-         Waze.end.year = format(last.pull.time, "%Y"),
-         Waze.end.day = format(last.pull.time, "%j"),
-         Waze.end.hour = format(last.pull.time, "%H"),
-         Waze.end.DofW = format(last.pull.time, "%A"),
-         Waze.Duration.Minutes = round((last.pull.time-time)/60,0))%>%
-  mutate(Waze.start.TimeID=as.numeric(Waze.start.day)*as.numeric(Waze.start.hour), Waze.end.TimeID=as.numeric(Waze.end.day)*as.numeric(Waze.end.hour))
-#Note: this does not work for the zeros!
-EndTime <- Sys.time()-StartTime
-EndTime
-
 
 #Functions to play with for continued aggregations
   spread(type, uniqWazeEvents) %>%
@@ -207,10 +189,6 @@ EndTime
 df %>% 
   count(a, b) %>%
   slice(which.max(n))
-
-df %>%
-  group_by(hour) %>%
-  filter(!hour%%2 & row_number() <3)
 
 ##Sample function to split columns into new rows
 cols <- df %>% 
@@ -233,75 +211,14 @@ t <- link.waze.edt[1000:1010,]; t
 names(t)
 tt <- t %>% complete(uuid.waze, nesting(Waze.start.day, Waze.end.day,Waze.start.hour,Waze.end.hour), fill=list())
 
-
-# Temporally matching
-# Match between the first reported time and last pull time of the Waze event. Last pull time is after the earliest time of EDT, and first reported time is earlier than the latest time of EDT
-d.t <- d.sp[d.sp[,inctimevar2] >= ei[,acctimevar]-60*60 & d.sp[,inctimevar1] <= ei[,acctimevar]+60*60,] 
-
-id.accident <- rep(as.character(ei[,accidvar]), nrow(d.t))
-id.incidents <- as.character(d.t[,incidvar])
-
-
-
-
-link.waze.edt <- mutate(link.waze.edt, GridIDall = ifelse(is.na(GRID_ID), as.character(GRID_ID.edt), as.character(GRID_ID)))
-
 summary(!is.na(link.waze.edt$GRID_ID.edt))
+
 help = mutate(help, newvar = ifelse(is.na(var1), as.character(var2), as.character(var1)))
 
 unite_(mtcars, "vs_am", c("vs","am"))
 mtcars %>%
   unite(vs_am, vs, am) %>%
   separate(vs_am, c("vs", "am"))
-
-
-## Not used right now
-# 'Manual' way to make the counts in neighboring cells with a loop and matching
-# For each neighbor cell, count the number of Waze events of each type and subtype. 
-#End result is a data frame with (number of types) x 6 + (number of substypes) x 6 columns, associated with each Waze event.
-
-neighbor.counts.waze <- vector()
-
-for(i in 1:nrow(link.waze.edt)){
-  i = 1
-  wx <- link.waze.edt[i,]
-  
-  link.waze.edt %>%
-    filter(GRID_ID == as.character(wx$GRID_ID_N)) %>%
-    group_by(day = format(time, "%j"), hour = format(time, "%H"), type, subtype) %>%
-    summarise(
-      nrecord=n()
-    )
-  
-  }
-
-# Do this by hour now. Then consider aggregation in 3hr blocks, with lag/lead 1hr (maybe) for every Waze events 
-# Additiona data: weather, roadway
-
-
-# making gridded data frame of Waze data, by grid cell ID, day of year, and hour of day.
-grd.w <- link.waze.edt %>%
-  group_by(GRID_ID, day = format(time, "%j"), hour = format(time, "%H")) %>%
-  summarise(
-    
-    # median.reportRating = median(reportRating),
-    # median.confidence = median(confidence),
-    # median.reliability = median(reliability),
-    # pubMillis = min(pubMillis),
-    # first.file = sort(filename, decreasing = F)[1],
-    # last.file = sort(filename, decreasing = T)[1],
-    nrecord = n(),
-    nmatch = table(match)[2] # creating a table every time... slow-ish
-  )
-
-# Gridded data frame of EDT data
-grd.e <- edt.df %>%
-  group_by(GRID_ID.edt, day = format(CrashDate_Local, "%j"), hour = format(CrashDate_Local, "%H")) %>%
-  summarise(
-    nrecord = n()#,
-   # n.N = sum(GRID_ID_N.edt)
-  )
-
 
 # Extra explortaion:
 # how often is the EDT event not in the central grid cell?
@@ -314,4 +231,3 @@ points(link.waze.edt[is.na(link.waze.edt$GRID_ID),c("lon","lat")])
 # EDT events with NA for grid cell ID:
 dim(link.waze.edt[is.na(link.waze.edt$GRID_ID.edt) & !is.na(link.waze.edt$CrashCaseID),])
 points(link.waze.edt[is.na(link.waze.edt$GRID_ID.edt) & !is.na(link.waze.edt$CrashCaseID),c("GPSLong_New","GPSLat")]) # also in NW corner of the state, these should go away with new grid cells from Michelle
-
