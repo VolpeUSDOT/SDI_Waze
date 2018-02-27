@@ -364,7 +364,127 @@ save(list = c("rf.04.AccMatch",
               "out.04.AccMatch"),
      file = "RandomForest_Output_04_AccMatch.RData")
 
+varImpPlot(rf.04.AccMatch) # variable importance plot
 
+
+##
+
+# Model 5 (Waze accident only EDT match response variable): April + May, 70/30 ----
+# ~ 7 min to run on 460k rows training data with 4 cores
+
+w.0405 <- rbind(w.04, w.05)
+
+trainrows <- sort(sample(1:nrow(w.0405), size = nrow(w.0405)*.7, replace = F))
+testrows <- (1:nrow(w.0405))[!1:nrow(w.0405) %in% trainrows]
+
+system.time(rf.AccMatch.0405 <- foreach(ntree = c(ntree.use/avail.cores, avail.cores),
+                               .combine = combine,
+                               .packages = "randomForest") %dopar%
+              randomForest(wazeAccformula,
+                           data = w.0405[trainrows,],
+                           ntree = ntree,
+                           nodesize = 5,
+                           mtry = 9)
+)
+
+
+system.time(rf.AccMatch.0405.pred <- predict(rf.AccMatch.0405, w.0405[testrows, fitvars]))
+
+Nobs <- data.frame(t(c(nrow(w.0405),
+                       summary(w.0405$MatchEDT_buffer_Acc),
+                       length(w.0405$nWazeAccident[w.0405$nWazeAccident>0])
+)))
+
+colnames(Nobs) = c("N", "No EDT", "EDT present", "Waze accident present")
+format(Nobs, big.mark = ",")
+
+(predtab <- table(w.0405$MatchEDT_buffer_Acc[testrows], rf.AccMatch.0405.pred))
+bin.mod.diagnostics(predtab)
+
+# save output predictions
+
+out.0405.AccMatch <- data.frame(w.0405[testrows, c("GRID_ID", "day", "hour", "MatchEDT_buffer_Acc")], rf.AccMatch.0405.pred)
+out.0405.AccMatch$day <- as.numeric(out.0405.AccMatch$day)
+
+names(out.0405.AccMatch)[4:5] <- c("Obs", "Pred")
+
+out.0405.AccMatch = data.frame(out.0405.AccMatch,
+                      TN = out.0405.AccMatch$Obs == 0 &  out.0405.AccMatch$Pred == 0,
+                      FP = out.0405.AccMatch$Obs == 0 &  out.0405.AccMatch$Pred == 1,
+                      FN = out.0405.AccMatch$Obs == 1 &  out.0405.AccMatch$Pred == 0,
+                      TP = out.0405.AccMatch$Obs == 1 &  out.0405.AccMatch$Pred == 1)
+write.csv(out.0405.AccMatch,
+          file = "RandomForest_pred_0405_AccMatch.csv",
+          row.names = F)
+
+save(list = c("rf.AccMatch.0405",
+              "rf.AccMatch.0405.pred",
+              "testrows",
+              "trainrows",
+              "w.0405",
+              "out.0405.AccMatch"),
+     file = "RandomForest_Output_0405_AccMatch.RData")
+
+varImpPlot(rf.AccMatch.0405) # variable importance plot
+
+# Model 6 (Waze accident only EDT match response variable): April + May, predict June
+# ~ X min to run on 657k rows training data on 4 cores
+
+system.time(rf.AccMatch.0405.all <- foreach(ntree = c(ntree.use/avail.cores, avail.cores),
+                                   .combine = combine,
+                                   .packages = "randomForest") %dopar%
+              randomForest(wazeAccformula,
+                           data = w.0405,
+                           ntree = ntree,
+                           nodesize = 5,
+                           mtry = 9)
+)
+
+
+system.time(rf.AccMatch.0405.06.pred <- predict(rf.AccMatch.0405.all, w.06[, fitvars]))
+
+w.040506 <- rbind(w.0405, w.06)
+
+Nobs <- data.frame(t(c(nrow(w.040506),
+                       summary(w.040506$MatchEDT_buffer),
+                       length(w.040506$nWazeAccident[w.040506$nWazeAccident>0])
+)))
+
+colnames(Nobs) = c("N", "No EDT", "EDT present", "Waze accident present")
+format(Nobs, big.mark = ",")
+
+(predtab <- table(w.06$MatchEDT_buffer, rf.AccMatch.0405.06.pred))
+bin.mod.diagnostics(predtab)
+
+
+# save output predictions
+
+out.06.AccMatch <- data.frame(w.06[c("GRID_ID","day","hour", "MatchEDT_buffer")], rf.AccMatch.0405.06.pred)
+
+names(out.06.AccMatch)[4:5] <- c("Obs", "Pred")
+
+out.06.AccMatch = data.frame(out.06.AccMatch,
+                    TN = out.06.AccMatch$Obs == 0 &  out.06.AccMatch$Pred == 0,
+                    FP = out.06.AccMatch$Obs == 0 &  out.06.AccMatch$Pred == 1,
+                    FN = out.06.AccMatch$Obs == 1 &  out.06.AccMatch$Pred == 0,
+                    TP = out.06.AccMatch$Obs == 1 &  out.06.AccMatch$Pred == 1)
+write.csv(out.06.AccMatch,
+          file = "RandomForest_pred_0405_06_AccMatch.csv",
+          row.names = F)
+
+save(list = c("rf.AccMatch.0405.all",
+              "rf.AccMatch.0405.06.pred",
+              "w.06",
+              "out.06.AccMatch"),
+     file = "RandomForest_Output_0405_06_AccMatch.RData")
+
+varImpPlot(rf.AccMatch.0405.all) # variable importance plot
+
+
+
+
+
+stopCluster(cl) # stop the cluster when done
 
 
 # Scratch ----
