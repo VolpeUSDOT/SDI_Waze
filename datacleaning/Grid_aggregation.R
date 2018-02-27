@@ -122,7 +122,7 @@ for(j in avail.months){ # j = "05"
       
       nWazeAccident = n_distinct(uuid.waze[type=="ACCIDENT"]),
       nWazeJam = n_distinct(uuid.waze[type=="JAM"]),
-      nWazeRoadCloased = n_distinct(uuid.waze[type=="ROAD_CLOSED"]),
+      nWazeRoadClosed = n_distinct(uuid.waze[type=="ROAD_CLOSED"]),
       nWazeWeatherOrHazard = n_distinct(uuid.waze[type=="WEATHERHAZARD"]),
       
       nWazeAccidentMajor = n_distinct(uuid.waze[subtype=="ACCIDENT_MAJOR"]),
