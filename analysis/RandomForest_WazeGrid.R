@@ -119,7 +119,7 @@ wazeAccformula <- reformulate(termlabels = fitvars[is.na(match(fitvars,
                                                             "MatchEDT_buffer_Acc"))], 
                            response = "MatchEDT_buffer_Acc")
 
-table(w.04$nMatchEDT_buffer_Acc)
+table(w.04$MatchEDT_buffer_Acc)
 
 # <><><><><><><><><><><><><><><><><><><><><><><><><><><>
 # Random forest parallel ----
@@ -335,8 +335,7 @@ Nobs <- data.frame(t(c(nrow(w.04),
 colnames(Nobs) = c("N", "No EDT", "EDT present", "Waze accident present")
 format(Nobs, big.mark = ",")
 
-(predtab <- table(w.04$MatchEDT_buffer_Acc[testrows], rf.04.AccMatch)) 
-##!!Error in table(w.04$MatchEDT_buffer_Acc[testrows], rf.04.AccMatch): all arguments must have the same length
+(predtab <- table(w.04$MatchEDT_buffer_Acc[testrows], rf.04.AccMatch.pred)) 
 
 bin.mod.diagnostics(predtab)
 
