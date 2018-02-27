@@ -108,7 +108,7 @@ fitvars <- names(w.04)[is.na(match(names(w.04),
 #Waze accident matches (Use this or All Waze above)
 fitAccvars <- names(w.04)[is.na(match(names(w.04),
                                    c("GRID_ID", "day", # place variables to omit as predictors in this vector 
-                                     "nNoMatchWaze_buffer", "nMatchEDT_buffer_Acc",
+                                     "nNoMatchWaze_buffer", "nMatchEDT_buffer_Acc", "nMatchWaze_buffer", "DayOfWeek",
                                      grep("EDT", names(w.04), value = T)
                                    )))]
 
@@ -122,7 +122,7 @@ wazeformula <- reformulate(termlabels = fitvars[is.na(match(fitvars,
                            response = "MatchEDT_buffer")
 
 
-wazeAccformula <- reformulate(termlabels = fitAccvars[is.na(match(fitvars,
+wazeAccformula <- reformulate(termlabels = fitAccvars[is.na(match(fitAccvars,
                                                             "MatchEDT_buffer_Acc"))], 
                            response = "MatchEDT_buffer_Acc")
 
@@ -158,7 +158,7 @@ system.time(rf.04 <- foreach(ntree = c(ntree.use/avail.cores, avail.cores),
 system.time(rf.04.pred <- predict(rf.04, w.04[testrows, fitvars]))
 
 Nobs <- data.frame(t(c(nrow(w.04),
-               summary(w.04$MatchEDT_buffer_Acc), 
+               summary(w.04$MatchEDT_buffer_Acc), #MatchEDT_buffer
                length(w.04$nWazeAccident[w.04$nWazeAccident>0]) 
                )))
 
