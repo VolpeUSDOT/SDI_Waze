@@ -324,7 +324,7 @@ wazeformula <- reformulate(termlabels = fitvars[is.na(match(fitvars,
                                                             "MatchEDT_buffer_Acc"))], 
                            response = "MatchEDT_buffer_Acc")
 
-# Model 1-Acc: April, 70/30 ----
+# Model 4-Acc: April, 70/30 ----
 
 w.04.acc <- w.04[w.04$nWazeAccident > 0,]# ; nrow(w.04.acc) / nrow(w.04) # 5.5% of all data
 
@@ -378,7 +378,7 @@ save(list = c("rf.04.acc",
 
 varImpPlot(rf.04.acc) # variable importance plot
 
-# Model 2-Acc: April+May, 70/30 ----
+# Model 5-Acc: April+May, 70/30 ----
 
 w.05.acc <- w.05[w.05$nWazeAccident > 0,]
 w.0405.acc <- rbind(w.04.acc, w.05.acc)
@@ -433,7 +433,7 @@ save(list = c("rf.0405.acc",
 
 varImpPlot(rf.0405.acc) # variable importance plot
 
-# Model 3-Acc: April+May, predict June ----
+# Model 6-Acc: April+May, predict June ----
 
 w.06.acc <- w.06[w.06$nWazeAccident > 0,]
 
