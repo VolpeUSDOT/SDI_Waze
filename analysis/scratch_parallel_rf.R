@@ -2,6 +2,7 @@
 # To compare possible implementations on ATA server. Ordered in priority of testing
 
 # Test data: run first section of RandomForest_WazeGrid.R, up to section header "# Random forest sequential ----"
+# Test push from SDC
 
 
 # <<>><<>><<>><<>><<>><<>><<>><<>><<>><<>><<>><<>><<>><<>>
