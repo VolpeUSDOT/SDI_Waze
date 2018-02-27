@@ -33,7 +33,8 @@ if(length(grep("flynn", getwd())) > 0) {mappeddrive = "W:"}
 if(length(grep("EASdocs", getwd())) > 0) {mappeddrive = "S:"} 
 # mappeddrive = "S:" #for sudderth mapped drive, I have to click on the drive location in windows explorer to "connect" to the S drive before the data files will load
 
-wazedir <- (file.path(mappeddrive,"SDI Pilot Projects/Waze/MASTER Data Files/Waze Aggregated/HexagonWazeEDT"))
+#wazedir <- (file.path(mappeddrive,"SDI Pilot Projects/Waze/MASTER Data Files/Waze Aggregated/HexagonWazeEDT"))
+wazedir <- "~/Temp Working Docs/SDI_temp" # Dan local
 wazefigdir <- file.path(mappeddrive, "SDI Pilot Projects/Waze/Figures")
 codeloc <- "~/git/SDI_Waze" # Update as needed for the git repository on your local machine. (git for flynn, GitHub for sudderth)
 
@@ -52,6 +53,10 @@ wazeTime.edt.hex$MatchEDT_buffer <- wazeTime.edt.hex$nMatchEDT_buffer
 wazeTime.edt.hex$MatchEDT_buffer[wazeTime.edt.hex$MatchEDT_buffer > 0] = 1 
 wazeTime.edt.hex$MatchEDT_buffer <- as.factor(wazeTime.edt.hex$MatchEDT_buffer)
 
+wazeTime.edt.hex$MatchEDT_buffer_Acc <- wazeTime.edt.hex$nMatchEDT_buffer_Acc
+wazeTime.edt.hex$MatchEDT_buffer_Acc[wazeTime.edt.hex$MatchEDT_buffer_Acc > 0] = 1 
+wazeTime.edt.hex$MatchEDT_buffer_Acc <- as.factor(wazeTime.edt.hex$MatchEDT_buffer_Acc)
+
 w.04 <- wazeTime.edt.hex; rm(wazeTime.edt.hex) 
 
 load("WazeTimeEdtHex_05.RData")
@@ -60,6 +65,10 @@ wazeTime.edt.hex$hour <- as.numeric(wazeTime.edt.hex$hour)
 wazeTime.edt.hex$MatchEDT_buffer <- wazeTime.edt.hex$nMatchEDT_buffer
 wazeTime.edt.hex$MatchEDT_buffer[wazeTime.edt.hex$MatchEDT_buffer > 0] = 1 
 wazeTime.edt.hex$MatchEDT_buffer <- as.factor(wazeTime.edt.hex$MatchEDT_buffer)
+
+wazeTime.edt.hex$MatchEDT_buffer_Acc <- wazeTime.edt.hex$nMatchEDT_buffer_Acc
+wazeTime.edt.hex$MatchEDT_buffer_Acc[wazeTime.edt.hex$MatchEDT_buffer_Acc > 0] = 1 
+wazeTime.edt.hex$MatchEDT_buffer_Acc <- as.factor(wazeTime.edt.hex$MatchEDT_buffer_Acc)
 
 w.05 <- wazeTime.edt.hex; rm(wazeTime.edt.hex) 
 
@@ -70,8 +79,11 @@ wazeTime.edt.hex$MatchEDT_buffer <- wazeTime.edt.hex$nMatchEDT_buffer
 wazeTime.edt.hex$MatchEDT_buffer[wazeTime.edt.hex$MatchEDT_buffer > 0] = 1 
 wazeTime.edt.hex$MatchEDT_buffer <- as.factor(wazeTime.edt.hex$MatchEDT_buffer)
 
-w.06 <- wazeTime.edt.hex; rm(wazeTime.edt.hex) 
+wazeTime.edt.hex$MatchEDT_buffer_Acc <- wazeTime.edt.hex$nMatchEDT_buffer_Acc
+wazeTime.edt.hex$MatchEDT_buffer_Acc[wazeTime.edt.hex$MatchEDT_buffer_Acc > 0] = 1 
+wazeTime.edt.hex$MatchEDT_buffer_Acc <- as.factor(wazeTime.edt.hex$MatchEDT_buffer_Acc)
 
+w.06 <- wazeTime.edt.hex; rm(wazeTime.edt.hex) 
 
 # Exploration of response variable: For April, only 1,600 out of 310,000 cells have > 1 EDT event matching. Consider converting to binary. Of the >1 cell, 886 are 2 events, 122 3 events, tiny number have greater. 15,000 have 1.
 # summary(w.05$nMatchEDT_buffer > 1)
@@ -93,9 +105,11 @@ fitvars <- names(w.04)[is.na(match(names(w.04),
 # fitdat.05 <- w.05[complete.cases(w.05[,fitvars]),]
 # fitdat.06 <- w.06[complete.cases(w.06[,fitvars]),]
 
+# Change response to nMatch for regression; output will be continuous, much more RAM intensive.
+
 wazeformula <- reformulate(termlabels = fitvars[is.na(match(fitvars,
-                                                              "MatchEDT_buffer"))], 
-                           response = "MatchEDT_buffer")
+                                                              "nMatchEDT_buffer"))], 
+                           response = "nMatchEDT_buffer")
 
 
 # <><><><><><><><><><><><><><><><><><><><><><><><><><><>
@@ -105,7 +119,7 @@ registerDoParallel(cl)
 
 # On small job, user time faster but system time greater. On a large job, almost exactly ncore X faster
 (avail.cores <- parallel::detectCores()) # 4 on local
-ntree.use = avail.cores * 100 
+ntree.use = avail.cores * 100
 
 
 # Model 1: April, 70/30 ----
@@ -121,9 +135,7 @@ system.time(rf.04 <- foreach(ntree = c(ntree.use/avail.cores, avail.cores),
                 .packages = "randomForest") %dopar%
           randomForest(wazeformula,
                data = w.04[trainrows,],
-               ntree = ntree,
-               nodesize = 5,
-               mtry = 9)
+               ntree = ntree)
   )
 
 
@@ -223,7 +235,7 @@ save(list = c("rf.0405",
 
 varImpPlot(rf.0405) # variable importance plot
 
-# Model 3: April + May, predict June
+# Model 3: April + May, predict June ----
 # ~ X min to run on 657k rows training data on 4 cores
 
 system.time(rf.0405.all <- foreach(ntree = c(ntree.use/avail.cores, avail.cores),
@@ -278,9 +290,192 @@ varImpPlot(rf.0405.all) # variable importance plot
 
 
 
+stopCluster(cl) # stop the cluster when done
+
+
+# For Waze accidents only ----
+# To do: make all of this a function for faster iteration
+
+cl <- makeCluster(parallel::detectCores()) # make a cluster of all available cores
+registerDoParallel(cl)
+
+(avail.cores <- parallel::detectCores()) # 4 on local
+ntree.use = avail.cores * 200 # can do more trees, much smaller data set  
+
+wazeformula <- reformulate(termlabels = fitvars[is.na(match(fitvars,
+                                                            "MatchEDT_buffer_Acc"))], 
+                           response = "MatchEDT_buffer_Acc")
+
+# Model 1-Acc: April, 70/30 ----
+
+w.04.acc <- w.04[w.04$nWazeAccident > 0,]# ; nrow(w.04.acc) / nrow(w.04) # 5.5% of all data
+
+trainrows <- sort(sample(1:nrow(w.04.acc), size = nrow(w.04.acc)*.7, replace = F))
+testrows <- (1:nrow(w.04.acc))[!1:nrow(w.04.acc) %in% trainrows]
+
+rf.04.acc <- foreach(ntree = c(ntree.use/avail.cores, avail.cores),
+                               .combine = combine,
+                               .packages = "randomForest") %dopar%
+              randomForest(wazeformula,
+                           data = w.04.acc[trainrows,],
+                           ntree = ntree)
+
+
+rf.04.acc.pred <- predict(rf.04.acc, w.04.acc[testrows, fitvars])
+
+Nobs <- data.frame(t(c(nrow(w.04.acc),
+                       summary(w.04.acc$MatchEDT_buffer_Acc),
+                       length(w.04.acc$nWazeAccident[w.04.acc$nWazeAccident>0])
+)))
+
+colnames(Nobs) = c("N", "No EDT", "EDT present", "Waze accident present")
+format(Nobs, big.mark = ",")
+
+(predtab <- table(w.04.acc$MatchEDT_buffer_Acc[testrows], rf.04.acc.pred))
+bin.mod.diagnostics(predtab)
+
+# save output predictions
+
+out.04.acc <- data.frame(w.04.acc[testrows, c("GRID_ID", "day", "hour", "MatchEDT_buffer_Acc")], rf.04.acc.pred)
+out.04.acc$day <- as.numeric(out.04.acc$day)
+
+names(out.04.acc)[4:5] <- c("Obs", "Pred")
+
+out.04.acc = data.frame(out.04.acc,
+                      TN = out.04.acc$Obs == 0 &  out.04.acc$Pred == 0,
+                      FP = out.04.acc$Obs == 0 &  out.04.acc$Pred == 1,
+                      FN = out.04.acc$Obs == 1 &  out.04.acc$Pred == 0,
+                      TP = out.04.acc$Obs == 1 &  out.04.acc$Pred == 1)
+write.csv(out.04.acc,
+          file = "RandomForest_pred_04.acc.csv",
+          row.names = F)
+
+save(list = c("rf.04.acc",
+              "rf.04.acc.pred",
+              "testrows",
+              "trainrows",
+              "w.04.acc",
+              "out.04.acc"),
+     file = "RandomForest_Output_04.acc.RData")
+
+varImpPlot(rf.04.acc) # variable importance plot
+
+# Model 2-Acc: April+May, 70/30 ----
+
+w.05.acc <- w.05[w.05$nWazeAccident > 0,]
+w.0405.acc <- rbind(w.04.acc, w.05.acc)
+
+trainrows <- sort(sample(1:nrow(w.0405.acc), size = nrow(w.0405.acc)*.7, replace = F))
+testrows <- (1:nrow(w.0405.acc))[!1:nrow(w.0405.acc) %in% trainrows]
+
+rf.0405.acc <- foreach(ntree = c(ntree.use/avail.cores, avail.cores),
+                     .combine = combine,
+                     .packages = "randomForest") %dopar%
+  randomForest(wazeformula,
+               data = w.0405.acc[trainrows,],
+               ntree = ntree)
+
+
+rf.0405.acc.pred <- predict(rf.0405.acc, w.0405.acc[testrows, fitvars])
+
+Nobs <- data.frame(t(c(nrow(w.0405.acc),
+                       summary(w.0405.acc$MatchEDT_buffer_Acc),
+                       length(w.0405.acc$nWazeAccident[w.0405.acc$nWazeAccident>0])
+)))
+
+colnames(Nobs) = c("N", "No EDT", "EDT present", "Waze accident present")
+format(Nobs, big.mark = ",")
+
+(predtab <- table(w.0405.acc$MatchEDT_buffer_Acc[testrows], rf.0405.acc.pred))
+bin.mod.diagnostics(predtab)
+
+# save output predictions
+
+out.0405.acc <- data.frame(w.0405.acc[testrows, c("GRID_ID", "day", "hour", "MatchEDT_buffer")], rf.0405.acc.pred)
+out.0405.acc$day <- as.numeric(out.0405.acc$day)
+
+names(out.0405.acc)[4:5] <- c("Obs", "Pred")
+
+out.0405.acc = data.frame(out.0405.acc,
+                        TN = out.0405.acc$Obs == 0 &  out.0405.acc$Pred == 0,
+                        FP = out.0405.acc$Obs == 0 &  out.0405.acc$Pred == 1,
+                        FN = out.0405.acc$Obs == 1 &  out.0405.acc$Pred == 0,
+                        TP = out.0405.acc$Obs == 1 &  out.0405.acc$Pred == 1)
+write.csv(out.0405.acc,
+          file = "RandomForest_pred_0405.acc.csv",
+          row.names = F)
+
+save(list = c("rf.0405.acc",
+              "rf.0405.acc.pred",
+              "testrows",
+              "trainrows",
+              "w.0405.acc",
+              "out.0405.acc"),
+     file = "RandomForest_Output_0405.acc.RData")
+
+varImpPlot(rf.0405.acc) # variable importance plot
+
+# Model 3-Acc: April+May, predict June ----
+
+w.06.acc <- w.06[w.06$nWazeAccident > 0,]
+
+system.time(rf.0405.acc.all <- foreach(ntree = c(ntree.use/avail.cores, avail.cores),
+                                   .combine = combine,
+                                   .packages = "randomForest") %dopar%
+              randomForest(wazeformula,
+                           data = w.0405.acc,
+                           ntree = ntree,
+                           nodesize = 5,
+                           mtry = 9)
+)
+
+
+system.time(rf.0405.06.acc.pred <- predict(rf.0405.acc.all, w.06.acc[, fitvars]))
+
+w.040506.acc <- rbind(w.0405.acc, w.06.acc)
+
+Nobs <- data.frame(t(c(nrow(w.040506.acc),
+                       summary(w.040506.acc$MatchEDT_buffer_Acc),
+                       length(w.040506.acc$nWazeAccident[w.040506.acc$nWazeAccident>0])
+)))
+
+colnames(Nobs) = c("N", "No EDT", "EDT present", "Waze accident present")
+format(Nobs, big.mark = ",")
+
+(predtab <- table(w.06.acc$MatchEDT_buffer, rf.0405.06.acc.pred))
+bin.mod.diagnostics(predtab)
+
+
+# save output predictions
+
+out.06.acc <- data.frame(w.06.acc[c("GRID_ID","day","hour", "MatchEDT_buffer")], rf.0405.06.acc.pred)
+
+names(out.06.acc)[4:5] <- c("Obs", "Pred")
+
+out.06.acc = data.frame(out.06.acc,
+                    TN = out.06.acc$Obs == 0 &  out.06.acc$Pred == 0,
+                    FP = out.06.acc$Obs == 0 &  out.06.acc$Pred == 1,
+                    FN = out.06.acc$Obs == 1 &  out.06.acc$Pred == 0,
+                    TP = out.06.acc$Obs == 1 &  out.06.acc$Pred == 1)
+write.csv(out.06.acc,
+          file = "RandomForest_pred_0405_06_acc.csv",
+          row.names = F)
+
+save(list = c("rf.0405.acc.all",
+              "rf.0405.06.acc.pred",
+              "w.06.acc",
+              "out.06.acc"),
+     file = "RandomForest_Output_0405_06_Acc.RData")
+
+varImpPlot(rf.0405.acc.all) # variable importance plot
+
+
+
 
 
 stopCluster(cl) # stop the cluster when done
+
+
 
 # Scratch ----
 
