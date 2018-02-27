@@ -105,13 +105,6 @@ fitvars <- names(w.04)[is.na(match(names(w.04),
                                                grep("EDT", names(w.04), value = T)
                                                )))]
 
-#Waze accident matches (Use this or All Waze above)
-fitAccvars <- names(w.04)[is.na(match(names(w.04),
-                                   c("GRID_ID", "day", # place variables to omit as predictors in this vector 
-                                     "nNoMatchWaze_buffer", "nMatchEDT_buffer_Acc", "nMatchWaze_buffer", "DayOfWeek",
-                                     grep("EDT", names(w.04), value = T)
-                                   )))]
-
 # Unnecessary now: all rows are complete cases
 # fitdat.04 <- w.04[complete.cases(w.04[,fitvars]),]
 # fitdat.05 <- w.05[complete.cases(w.05[,fitvars]),]
@@ -122,7 +115,7 @@ wazeformula <- reformulate(termlabels = fitvars[is.na(match(fitvars,
                            response = "MatchEDT_buffer")
 
 
-wazeAccformula <- reformulate(termlabels = fitAccvars[is.na(match(fitAccvars,
+wazeAccformula <- reformulate(termlabels = fitvars[is.na(match(fitvars,
                                                             "MatchEDT_buffer_Acc"))], 
                            response = "MatchEDT_buffer_Acc")
 
