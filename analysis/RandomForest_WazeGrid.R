@@ -119,8 +119,6 @@ wazeAccformula <- reformulate(termlabels = fitvars[is.na(match(fitvars,
                                                             "MatchEDT_buffer_Acc"))], 
                            response = "MatchEDT_buffer_Acc")
 
-table(w.04$MatchEDT_buffer_Acc)
-
 # <><><><><><><><><><><><><><><><><><><><><><><><><><><>
 # Random forest parallel ----
 cl <- makeCluster(parallel::detectCores()) # make a cluster of all available cores
