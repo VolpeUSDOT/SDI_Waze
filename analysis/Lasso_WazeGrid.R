@@ -19,7 +19,8 @@
 library(speedglm)
 library(CORElearn)
 library(glmnet)
-library(biglasso)
+library(foreach) 
+
 
 setwd("~/")
 
@@ -150,6 +151,13 @@ plot(glmnet.fit, label = T, xvar = "dev")
 
 # Cross-validation. Try both 'class' for misclassification rate an 'auc' for area under ROC.
 # Use this step to identify optimal lambda . Time- and CPU intensive, ~ 10 min for w.04
+# To do: make parallel, as in this example, or by simply specifying parallel = T
+# model_fit <- foreach(ii = seq_len(ncol(target))) %dopar% {
+#   cv.glmnet(x, target[,ii], family = "binomial", alpha = 0,
+#             type.measure = "auc", grouped = FALSE, standardize = FALSE,
+#             parallel = TRUE)
+# }
+
 starttime <- Sys.time()
 cv.fit <- cv.glmnet(x = X,
                     y = Y,
@@ -228,12 +236,12 @@ glmnet.fit <- glmnet(x = X,
 
 timediff <- round(Sys.time()-starttime, 2)
 cat("complete \n", timediff, attr(timediff, "units"), "elapsed \n\n")
-# 1 min with sparse matrix
+# 2.3 min 
 
 plot(glmnet.fit, label = T, xvar = "dev")
 
 # Cross-validation. Try both 'class' for misclassification rate an 'auc' for area under ROC.
-# Use this step to identify optimal lambda . Time- and CPU intensive, ~ 10 min for w.0405
+# Use this step to identify optimal lambda . Time- and CPU intensive, ~ 23 min for w.0405
 starttime <- Sys.time()
 cv.fit <- cv.glmnet(x = X,
                     y = Y,
@@ -293,88 +301,77 @@ save(list = c("glmnet.fit",
 
 # Model 3: April + May, predict June ----
 
+X <- as.matrix(w.0405[fitvars])
 
-trainrows <- sort(sample(1:nrow(w.04), size = nrow(w.04)*.7, replace = F))
-testrows <- (1:nrow(w.04))[!1:nrow(w.04) %in% trainrows]
+X = as(X, "sparseMatrix") 
 
-X <- as.matrix(w.04[trainrows, fitvars])
-
-X = as(X, "sparseMatrix") # saves ~ 50% of the storage
-
-Y = as.matrix(w.04$MatchEDT_buffer[trainrows])
+Y = as.matrix(w.0405$MatchEDT_buffer)
 
 starttime <- Sys.time()
-glmnet.fit <- glmnet(x = X,
+glmnet.fit.06 <- glmnet(x = X,
                      y = Y,
                      family = "binomial")
 
 timediff <- round(Sys.time()-starttime, 2)
 cat("complete \n", timediff, attr(timediff, "units"), "elapsed \n\n")
-# 1 min with sparse matrix
+# X min 
 
+plot(glmnet.fit.06, label = T, xvar = "dev")
 
-plot(glmnet.fit, label = T, xvar = "dev")
-
-# Cross-validation. Try both 'class' for misclassification rate an 'auc' for area under ROC.
-# Use this step to identify optimal lambda . Time- and CPU intensive, ~ 10 min for w.04
+# Cross-validation. 
+# Time: 
 starttime <- Sys.time()
-cv.fit <- cv.glmnet(x = X,
+cv.fit.06 <- cv.glmnet(x = X,
                     y = Y,
                     family = "binomial",
-                    type.measure = "class")
+                    type.measure = "class",
+                    parallel = T)
 
 timediff <- round(Sys.time()-starttime, 2)
 cat("complete \n", timediff, attr(timediff, "units"), "elapsed \n\n")
-plot(cv.fit) # to see the misclassification error by lambda.
-cv.fit$lambda.min; cv.fit$lambda.1se # 0.0002393555
+plot(cv.fit.06) # to see the misclassification error by lambda.
+cv.fit.06$lambda.min; cv.fit.06$lambda.1se # 
 
-X.pred <- as(as.matrix(w.04[testrows, fitvars]), "sparseMatrix")
+X.pred <- as(as.matrix(w.06[fitvars]), "sparseMatrix")
 
-glmnet.04.pred <- predict(glmnet.fit, 
+glmnet.06.pred <- predict(glmnet.fit.06, 
                           newx = X.pred,
                           type = "class",
-                          s = cv.fit$lambda.1se)
+                          s = cv.fit.06$lambda.1se)
 
-Nobs <- data.frame(t(c(nrow(w.04),
-                       summary(w.04$MatchEDT_buffer),
-                       length(w.04$nWazeAccident[w.04$nWazeAccident>0]) 
-)))
 
-colnames(Nobs) = c("N", "No EDT", "EDT present", "Waze accident present")
-format(Nobs, big.mark = ",")
-
-(predtab <- table(w.04$MatchEDT_buffer[testrows], glmnet.04.pred)) 
+(predtab <- table(w.06$MatchEDT_buffer, glmnet.06.pred)) 
 bin.mod.diagnostics(predtab)
 
 # save output predictions
 
-out.04 <- data.frame(w.04[testrows, c("GRID_ID", "day", "hour", "MatchEDT_buffer")], glmnet.04.pred)
-out.04$day <- as.numeric(out.04$day)
-names(out.04)[4:5] <- c("Obs", "Pred")
+out.06 <- data.frame(w.06[c("GRID_ID", "day", "hour", "MatchEDT_buffer")], glmnet.06.pred)
+out.06$day <- as.numeric(out.06$day)
+names(out.06)[4:5] <- c("Obs", "Pred")
 
-out.04 = data.frame(out.04,
-                    TN = out.04$Obs == 0 &  out.04$Pred == 0,
-                    FP = out.04$Obs == 0 &  out.04$Pred == 1,
-                    FN = out.04$Obs == 1 &  out.04$Pred == 0,
-                    TP = out.04$Obs == 1 &  out.04$Pred == 1)
-write.csv(out.04,
-          file = "Lasso_pred_04.csv",
+out.06 = data.frame(out.06,
+                    TN = out.06$Obs == 0 &  out.06$Pred == 0,
+                    FP = out.06$Obs == 0 &  out.06$Pred == 1,
+                    FN = out.06$Obs == 1 &  out.06$Pred == 0,
+                    TP = out.06$Obs == 1 &  out.06$Pred == 1)
+write.csv(out.06,
+          file = "Lasso_pred_06.csv",
           row.names = F)
 
+coefs <- coef(glmnet.fit.06, s = cv.fit.06$lambda.1se)
+(OR <- data.frame(OR = exp(coefs[order(abs(coefs[,1]), decreasing = T),])) ) # Odds ratios of coefficients. 
 
-save(list = c("glmnet.fit",
-              "cv.fit",
+save(list = c("glmnet.fit.06",
+              "cv.fit.06",
+              "OR",
               "testrows",
               "trainrows",
-              "w.04",
-              "out.04"),
-     file = "Lasso_Output_04.RData")
+              "w.06",
+              "out.06"),
+     file = "Lasso_Output_06.RData")
 
-
-
-stopCluster(cl) # stop the cluster when done
 
 
 # For Waze accidents only ----
 
-# to do
+# to do... will need to resolve same issues as for RF work, namely do we subset for nWazeAccidents > 0 or just predict on MatchEDT_buffer_Acc.
