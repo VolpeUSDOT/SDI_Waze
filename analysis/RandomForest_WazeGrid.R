@@ -10,7 +10,7 @@
 
 # After this is complete, repeat these three with Waze accidents and nMatchEDT_acc as response only
 # If only Waze accident report
-# 1. Predict to nMatchEDT_buffer_acc
+# 1. Predict to nMatchEDT_buffer_Acc (binary version, MatchEDT_buffer_Acc)
 # 2. Subset to only nWazeAccident > 1 ? look at this. 
 
 # <><><><><><><><><><><><><><><><><><><><>
@@ -30,17 +30,17 @@ library(doParallel) # includes iterators and parallel
 
 setwd("~/")
 
-#Flynn drive
-if(length(grep("flynn", getwd())) > 0) {mappeddrive = "W:"} 
-codeloc <- "~/git/SDI_Waze" # Update as needed for the git repository on your local machine. (git for flynn, GitHub for sudderth)
-
 #Sudderth drive
 #if(length(grep("EASdocs", getwd())) > 0) {mappeddrive = "S:"} 
 mappeddrive = "S:" #for sudderth mapped drive, I have to click on the drive location in windows explorer to "connect" to the S drive before the data files will load
 codeloc <- "~/GitHub/SDI_Waze" # Update as needed for the git repository on your local machine. (git for flynn, GitHub for sudderth)
 
-#wazedir <- (file.path(mappeddrive,"SDI Pilot Projects/Waze/MASTER Data Files/Waze Aggregated/HexagonWazeEDT"))
-wazedir <- "~/Temp Working Docs/SDI_temp" # Dan local
+#Flynn drive
+if(length(grep("flynn", getwd())) > 0) {mappeddrive = "W:"} 
+codeloc <- "~/git/SDI_Waze" # Update as needed for the git repository on your local machine. (git for flynn, GitHub for sudderth)
+
+wazedir <- (file.path(mappeddrive,"SDI Pilot Projects/Waze/MASTER Data Files/Waze Aggregated/HexagonWazeEDT"))
+#wazedir <- "~/Temp Working Docs/SDI_temp" # Dan local
 wazefigdir <- file.path(mappeddrive, "SDI Pilot Projects/Waze/Figures")
 
 setwd(wazedir)
@@ -59,10 +59,8 @@ wazeTime.edt.hex$MatchEDT_buffer <- wazeTime.edt.hex$nMatchEDT_buffer
 wazeTime.edt.hex$MatchEDT_buffer[wazeTime.edt.hex$MatchEDT_buffer > 0] = 1 
 wazeTime.edt.hex$MatchEDT_buffer <- as.factor(wazeTime.edt.hex$MatchEDT_buffer)
 
-<<<<<<< HEAD
-=======
 # Going to binary for all Waze Accident buffer match:
->>>>>>> origin/master
+
 wazeTime.edt.hex$MatchEDT_buffer_Acc <- wazeTime.edt.hex$nMatchEDT_buffer_Acc
 wazeTime.edt.hex$MatchEDT_buffer_Acc[wazeTime.edt.hex$MatchEDT_buffer_Acc > 0] = 1 
 wazeTime.edt.hex$MatchEDT_buffer_Acc <- as.factor(wazeTime.edt.hex$MatchEDT_buffer_Acc)
@@ -124,8 +122,8 @@ fitvars <- names(w.04)[is.na(match(names(w.04),
 # Change response to nMatch for regression; output will be continuous, much more RAM intensive.
 
 wazeformula <- reformulate(termlabels = fitvars[is.na(match(fitvars,
-                                                              "nMatchEDT_buffer"))], 
-                           response = "nMatchEDT_buffer")
+                                                              "MatchEDT_buffer"))], 
+                           response = "MatchEDT_buffer")
 
 
 wazeAccformula <- reformulate(termlabels = fitvars[is.na(match(fitvars,
@@ -496,10 +494,7 @@ varImpPlot(rf.0405.acc.all) # variable importance plot
 stopCluster(cl) # stop the cluster when done
 
 
-<<<<<<< HEAD
-=======
 # Model 4 (Waze accident only EDT match response variable): April, 70/30 ----
-# approx 2.5 min to run on 218k rows of training data with 4 cores
 
 trainrows <- sort(sample(1:nrow(w.04), size = nrow(w.04)*.7, replace = F))
 testrows <- (1:nrow(w.04))[!1:nrow(w.04) %in% trainrows]
@@ -556,9 +551,7 @@ save(list = c("rf.04.AccMatch",
               "out.04.AccMatch"),
      file = "RandomForest_Output_04_AccMatch.RData")
 
-<<<<<<< HEAD
->>>>>>> origin/master
-=======
+
 varImpPlot(rf.04.AccMatch) # variable importance plot
 
 
@@ -676,119 +669,4 @@ save(list = c("rf.AccMatch.0405.all",
 varImpPlot(rf.AccMatch.0405.all) # variable importance plot
 
 
-
-
-
 stopCluster(cl) # stop the cluster when done
-
->>>>>>> origin/master
-
-# Scratch ----
-
-# Comparison of sequential and parallel: identical predictions and diagnostics. 
-# Accuracy: sum of true positives and true negatives, as a portion of total sample.
-# Precision: True positives as a portion of all predictions
-# Recall: true postives as a portion of all observed positives
-# False positive rate: False positives a portion of all observed negatives
-
-# rf.p.pred
-# Observed as columns, predicted as rows.
-#       0     1
-# 0 67740   375
-# 1  2846   694
-
-# accuracy            0.9550
-# precision           0.1960
-# recall              0.6492
-# false.positive.rate 0.0403
-
-
-
- 
-# # <><><><><><><><><><><><><><><><><><><><><><><><><><><>
-# # Random forest sequential ----
-# # CPU intensive, but not RAM intensive. doMC should help.
-# showobjsize() # from wazefunctions.R
-# 
-# 
-# 
-# system.time(rf.w <- randomForest(wazeformula,
-#                                  data = fitdat.w[trainrows,],
-#                                  ntree = ntree.use,
-#                                  nodesize = 5,
-#                                  mtry = 9)
-# )
-# 
-# # predict on test values
-# system.time(rf.w.pred <- predict(rf.w, fitdat.w[testrows, fitvars.w]))
-# 
-# (predtab <- table(fitdat.w$MatchEDT_buffer[testrows], rf.w.pred))
-# bin.mod.diagnostics(predtab)
-# 
-# # rf.w.pred
-# #       0     1
-# # 0 67746   369
-# # 1  2850   690
-# # accuracy            0.9551
-# # precision           0.1949
-# # recall              0.6516
-# # false.positive.rate 0.0404
-
-# <><><><><><><><><><><><><><><><><><><><><><><><><><><>
-# Conditional random forest from ctree ----
-
-# cf.w = partykit::cforest(wazeformula,
-#              data = fitdat.w[1:1000,],
-#              trace = T,
-#              ntree = 250)
-
-# cat(Sys.time() - starttime, " elapsed for Waze")
-# ~ 5 min for accident type only using party
-
-format(object.size(cf.w), units = "Mb")
-
-# Save forest output ----
-outputdir_temp <- tempdir()
-outputdir_final <- wazedir
-
-
-# predictions
-cf.w.pred <- predict(cf.w, OOB = T) # 144 Gb vector needed for predictions,
-
-
-wt <- table(as.factor(fitdat.w$nMatchEDT_buffer[1:1000]), cf.w.pred)
-
-knitr::kable(wt)
-
-bin.mod.diagnostics(wt) 
-
-# With party:
-#       cf.w.pred
-#       FALSE TRUE
-# FALSE  8170 1008
-# TRUE   4358 1603
-
-# With partykit: same overall misclassification rate, but more predicted positives overall
-# |      | FALSE| TRUE|
-#   |:-----|-----:|----:|
-#   |FALSE |  7876| 1302|
-#   |TRUE  |  4075| 1886|
-
-save(list = c('cf.w', 'cf', 'cf.pred', 'cf.w.pred'), 
-     file = file.path(outputdir_temp, 
-                      paste0("Random_Forest_output_", Sys.Date(), ".RData")
-     )
-)
-
-filelist <- dir(outputdir_temp)[grep("RData$", dir(outputdir_temp))]
-movefiles(filelist, outputdir_temp, outputdir_final)
-
-
-
-# Clear unused objects; only named objects retained
-rm(list = ls()[is.na(match(ls(), 
-                           c("fitdat.w", "fitdat", "wazeformula", "cf", "cf.pred",
-                             "wazedir", "wazefigdir", "codeloc")))])
-gc() # Strong remval of anything except for these objects; use with caution. gc() clears unused memory.
-
-source(file.path(codeloc, 'utility/wazefunctions.R')) # read functions back in
