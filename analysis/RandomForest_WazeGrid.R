@@ -615,7 +615,7 @@ save(list = c("rf.AccMatch.0405",
 
 varImpPlot(rf.AccMatch.0405) # variable importance plot
 
-# Model 6 (Waze accident only EDT match response variable): April + May, predict June
+# Model 6 (Waze accident only EDT match response variable): April + May, predict June ----
 # ~ X min to run on 657k rows training data on 4 cores
 
 system.time(rf.AccMatch.0405.all <- foreach(ntree = c(ntree.use/avail.cores, avail.cores),

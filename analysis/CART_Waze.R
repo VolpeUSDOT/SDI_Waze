@@ -20,13 +20,13 @@ library(GGally) # for ggpairs
 # install.packages(c("rpart", "randomForest", "maptree", "party", "partykit", "CORElearn", "ggRandomForests", "GGally", "rgdal"), dep = T)
 
 setwd("~/")
-if(length(grep("flynn", getwd())) > 0) {mappeddrive = "W:"} # change this to match the mapped network drive on your machine (Z: in original)
-if(length(grep("sudderth", getwd())) > 0) {mappeddrive = "S:"} #this line does not work for me
-mappeddrive = "S:" #for sudderth mapped drive, I have to click on the drive location in windows explorer to "connect" to the S drive before the data files will load
+if(length(grep("flynn", getwd())) > 0) {mappeddrive = "W:"; codeloc <- "~/git/SDI_Waze"} # Update as needed for the git repository on your local machine. (git for flynn, GitHub for sudderth)} # change this to match the mapped network drive on your machine (Z: in original)
+if(length(grep("sudderth", getwd())) > 0) {mappeddrive = "S:"; codeloc <- "~/GitHub/SDI_Waze" }# Update as needed for the git repository on your local machine. (git for flynn, GitHub for sudderth)} #this line does not work for me
+#mappeddrive = "S:" #for sudderth mapped drive, I have to click on the drive location in windows explorer to "connect" to the S drive before the data files will load
 
 wazedir <- (file.path(mappeddrive,"SDI Pilot Projects/Waze/MASTER Data Files/Waze Aggregated/month_MD_clipped"))
 wazefigdir <- file.path(mappeddrive, "SDI Pilot Projects/Waze/Figures")
-codeloc <- "~/GitHub/SDI_Waze" # Update as needed for the git repository on your local machine. (git for flynn, GitHub for sudderth)
+
 
 setwd(wazedir)
 
