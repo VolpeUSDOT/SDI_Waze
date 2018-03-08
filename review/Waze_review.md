@@ -66,8 +66,8 @@ Annotated bibliography of tools and approaches used in existing analyses of road
 
 **@Lord:2005 Poisson, Poisson-gamma and zero-inflated regression models of motor vehicle crashes: balancing statistical fit and theory**
 
-- Review of three common models for modelling crash count data: Poisson, Zero-inflated Poisson, and Zero-inflated negative binomial (also called Poisson-gamma) models. They point out that models which can account for zero-inflation, which can arise because of overly narrow time and space scale selection and rarity of crashes, often provide the best statistical fit, but may not characterize the underlying crash process completely. 
-- Provides detailed review of statistical theory behind these crash count models, and lay out how a zero-inflated model makes a simplifying assumption that a roadway can exist in either a 0-crash, 'perfectly safe' condition, or a non-zero crash, 'imperfectly safe' condition. They argue that having a too-small spatial or temporal scale can lead to over-estimation of the 'perfectly safe' condition.
+- Lord et al.[@Lord:2004; @Lord:2005] review of three common models for modelling crash count data: Poisson, Zero-inflated Poisson, and Zero-inflated negative binomial (also called Poisson-gamma) models. They point out that models which can account for zero-inflation, which can arise because of overly narrow time and space scale selection and rarity of crashes, often provide the best statistical fit, but may not characterize the underlying crash process completely. 
+- Provide detailed reviews of statistical theory behind these crash count models, and lay out how a zero-inflated model makes a simplifying assumption that a roadway can exist in either a 0-crash, 'perfectly safe' condition, or a non-zero crash, 'imperfectly safe' condition. They argue that having a too-small spatial or temporal scale can lead to over-estimation of the 'perfectly safe' condition.
 
 **@Lord:2010 The statistical analysis of crash-frequency data: a review and assessment of methodological alternatives**
 
