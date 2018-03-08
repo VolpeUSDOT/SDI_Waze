@@ -29,25 +29,6 @@ conn <- dbConnect(
   password=redshift_password,
   dbname=redshift_db)
 
-# tryCatch({
-#   example_query <- "SELECT * FROM my_table LIMIT 5"
-#   results <- dbGetQuery(conn, example_query)
-#   print(results)
-# }, finally = {
-#   dbDisconnect(conn)
-# })
-# 
-# 
-
-alert_query <- "SELECT * FROM alert LIMIT 5"
-results <- dbGetQuery(conn, alert_query)
-
-alert_query_MD <- "SELECT * FROM alert 
-                    WHERE state='MD'
-                    LIMIT 5"
-results <- dbGetQuery(conn, alert_query_MD)
-# add in time
-
 # time functions: strftime and to_timestamp
 # WHERE pub_millis BETWEEN to_date('01-APR-17','DD-MON-YY') AND to_date('03-APR-17','DD-MON-YY')
 
@@ -55,13 +36,39 @@ results <- dbGetQuery(conn, alert_query_MD)
 
 alert_query_MD <- "SELECT * FROM alert 
                     WHERE state='MD' 
-                    AND pub_utc_timestamp BETWEEN to_timestamp('2017-04-01 00:00:00','YYYY-MM-DD HH24:MI:SS') AND to_timestamp('2017-04-30 23:59:59','YYYY-MM-DD HH24:MI:SS')
-                      "
+                    AND pub_utc_timestamp BETWEEN to_timestamp('2017-04-01 00:00:00','YYYY-MM-DD HH24:MI:SS') 
+                                          AND     to_timestamp('2017-04-30 23:59:59','YYYY-MM-DD HH24:MI:SS')
+                      " # end query
+
 results <- dbGetQuery(conn, alert_query_MD)
+
+
+exit() # break the script when calling externally. Below section is scratch. 
 
 format(object.size(results), "Gb") # 1.3 Gb for April 2017 Md data,
 
 summary(duplicated(results$alert_uuid)) # Avg 8x duplicated uuids
 
 system('free -m') # 16 GB ram, 6 used 
+
+# is the pub_utc_timestamp direclty converted from pub_millis?
+
+timetest <- as.POSIXct(as.numeric(results$pub_millis)[1:500]/1000, origin = "1970-01-01", tz="America/New_York") # Time zone will need to be correctly configured for other States.
+
+data.frame(timetest, results[1:500, c("pub_millis", "pub_utc_timestamp")]) # Yes, timestamp is just the time represented in UTC, 4 hrs ahead of Eastern; we do not have 'first pull time' as in previous files. 
+
+lm(timetest ~ results[1:500, "pub_utc_timestamp"])
+
+
+# Test query, limit to 5 results. First all alerts, then specifying MD
+
+alert_query <- "SELECT * FROM alert LIMIT 5"
+results <- dbGetQuery(conn, alert_query)
+
+alert_query_MD <- "SELECT * FROM alert 
+                  WHERE state='MD'
+                  LIMIT 5"
+results <- dbGetQuery(conn, alert_query_MD)
+
+
 
