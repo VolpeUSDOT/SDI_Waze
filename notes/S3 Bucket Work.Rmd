@@ -1,0 +1,34 @@
+---
+title: "S3 Bucket integration"
+output: html_notebook
+---
+
+Notes on how to share files with other members of the SDI Waze team:
+
+- From RStudio session, save files to a tempory output location, like "tempout"
+- From Jupyter Notebook, run the script `sdc_s3_out.sh` while logged in as `ec2-user`. This is the only user with permissions to write out to the shared S3 buckets.
+  + Open a Juptyer Notebook session at https://<username>-workspace.securedatacommons.com:8888/
+  + New > Terminal or Running > select an already-running terminal
+  + Run the script as follows, with your username in the path:
+  
+```
+sudo /home/daniel/SDI_Waze/utility/sdc_s3_out.sh
+```
+
+If this fails, make sure permissions are set up correctly:
+
+```
+sudo chmod u+x /home/daniel/SDI_Waze/utility/sdc_s3_out.sh
+```
+
+Here is the script to write out some test files:
+
+```{r}
+output.loc <- "~/tempout"
+
+
+# assuming a data.frame 'results' exists
+write.csv(results[1:100,], file = file.path(output.loc, "TestResults.csv"), row.names = F)
+```
+
+
