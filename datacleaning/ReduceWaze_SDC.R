@@ -6,11 +6,13 @@
 library(tidyverse) # tidyverse install on SDC may require additional steps, see Package Installation Notes.Rmd 
 library(aws.s3)
 
-output.loc <- "prod-sdc-sdi-911061262852-us-east-1-bucket"
+# output.loc <- "prod-sdc-sdi-911061262852-us-east-1-bucket"
+# 
+# get_bucket(output.loc) # forbidden 403. 
 
-get_bucket(output.loc) # forbidden 403. Need to set up AWS credential from within this EC2 instance.
+output.loc <- "~/tempout"
 
-# read functions
+# read functionss
 codeloc <- "~/SDI_Waze"
 source(file.path(codeloc, 'utility/wazefunctions.R'))
 
