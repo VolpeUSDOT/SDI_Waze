@@ -3,7 +3,10 @@
 # additional detail from https://aws.amazon.com/blogs/big-data/connecting-r-with-amazon-redshift/
 # https://daniel-workspace.securedatacommons.com:8888
 # install.packages("RPostgreSQL", dep = T)
+TESTCONN = F # Set to T to test connection 
+
 library(RPostgreSQL)
+
 
 # Specify username and password manually, once:
 if(Sys.getenv("sdc_waze_username")==""){
@@ -29,10 +32,13 @@ conn <- dbConnect(
   password=redshift_password,
   dbname=redshift_db)
 
+if(TESTCONN){
+
 # time functions: strftime and to_timestamp
 # WHERE pub_millis BETWEEN to_date('01-APR-17','DD-MON-YY') AND to_date('03-APR-17','DD-MON-YY')
 
 # add to end to limit the nrows: LIMIT 50000
+
 
 alert_query_MD <- "SELECT * FROM alert 
                     WHERE state='MD' 
@@ -43,7 +49,6 @@ alert_query_MD <- "SELECT * FROM alert
 results <- dbGetQuery(conn, alert_query_MD)
 
 
-exit() # break the script when calling externally. Below section is scratch. 
 
 format(object.size(results), "Gb") # 1.3 Gb for April 2017 Md data,
 
@@ -71,4 +76,4 @@ alert_query_MD <- "SELECT * FROM alert
 results <- dbGetQuery(conn, alert_query_MD)
 
 
-
+}

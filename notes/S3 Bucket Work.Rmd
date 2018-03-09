@@ -5,7 +5,54 @@ output: html_notebook
 
 Notes on how to share files with other members of the SDI Waze team:
 
-- From RStudio session, save files to a tempory output location, like "tempout"
+### Writing to shared bucket
+
+The SDI Waze team shared S3 bucket is at this location:
+```
+s3://prod-sdc-sdi-911061262852-us-east-1-bucket
+```
+
+As a user in an RStudio session, this bucket may not be accessible using the aws.s3 package:
+```{r s3connect_test} 
+library(aws.s3)
+
+teambucket <- "s3://prod-sdc-sdi-911061262852-us-east-1-bucket"
+
+get_bucket(teambucket)
+get_location(teambucket)
+bucket_exists(teambucket)
+
+get_object()
+
+```
+
+The aws.s3 package in R looks for credentials in a `.aws` folder, which does not apply in this configuration (connection to S3 is based on SSH, per Santosh). So need to run the read/write scripts directly, either as shell scripts outside R or possibly passing AWS CLI commands via `system()` within R.
+
+
+Possible solutions: 
+
+From RStudio session, save files to a tempory output location, like "tempout"
+
+1. Within the RStudio session, run the script `sdc_s3_out.sh`
+
+```{r}
+output.loc <- "~/tempout"
+
+# assuming a data.frame 'results' exists, from connect_redshift_pgsql.R
+write.csv(results[1:100,], file = file.path(output.loc, "TestResults3.csv"), row.names = F)
+
+dir("~/tempout") # list output files
+
+system("~/SDI_Waze/utility/sdc_s3_out.sh")
+
+```
+
+
+
+
+
+
+2. As `ec2-user`, run the script `sdc_s3_out.sh`:
 - From Jupyter Notebook, run the script `sdc_s3_out.sh` while logged in as `ec2-user`. This is the only user with permissions to write out to the shared S3 buckets.
   + Open a Juptyer Notebook session at https://<username>-workspace.securedatacommons.com:8888/
   + New > Terminal or Running > select an already-running terminal
@@ -15,10 +62,10 @@ Notes on how to share files with other members of the SDI Waze team:
 sudo /home/daniel/SDI_Waze/utility/sdc_s3_out.sh
 ```
 
-If this fails, make sure permissions are set up correctly:
+If this fails, make sure permissions are set up correctly, so that this `.sh` script can be executed by ec2-user:
 
 ```
-sudo chmod u+x /home/daniel/SDI_Waze/utility/sdc_s3_out.sh
+sudo chmod +x /home/daniel/SDI_Waze/utility/sdc_s3_out.sh
 ```
 
 Here is the script to write out some test files:
@@ -28,7 +75,28 @@ output.loc <- "~/tempout"
 
 
 # assuming a data.frame 'results' exists
-write.csv(results[1:100,], file = file.path(output.loc, "TestResults.csv"), row.names = F)
+write.csv(results[1:100,], file = file.path(output.loc, "TestResults3.csv"), row.names = F)
 ```
 
+Then go to Juptyer Notebook terminal and run the script.
 
+
+## Reading from shared bucket
+
+From within RStudio session, get list of available objects and copy selected objects to this session.
+
+Use a directory "tempin" to hold files copied from the S3 bucket. This should not be a permanent storage location for working files, just temporary directory to hold files during this session. 
+
+
+```{r s3read}
+dir.create("~/tempin", showWarnings = F) # will create it if does not already exist, will skip if already exists
+
+list.cmd <- paste("aws s3 ls", teambucket)
+system(list.cmd)
+
+getobject.cmd <- paste("aws s3 cp", file.path(teambucket, "TestResults2.csv"), "~/tempin")
+
+system(getobject.cmd)
+```
+
+Possible enhancement: make functions in `/utility` to carry out these list/read/write commands.
