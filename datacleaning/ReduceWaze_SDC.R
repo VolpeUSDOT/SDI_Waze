@@ -121,7 +121,8 @@ for(i in 1:length(yearmonths)){ # i = 1
   cat(format(nrow(mb), big.mark = ","), "observations in aggregated data \n")
   
   timediff <- round(Sys.time()-starttime, 2)
-  cat(yearmonths[i], "complete \n", timediff, attr(timediff, "units"), "elapsed \n", rep("<>",20), "\n")
+  cat(#yearmonths[i], "complete \n", 
+    timediff, attr(timediff, "units"), "elapsed \n", rep("<>",20), "\n")
   
   } # end month loop
 
