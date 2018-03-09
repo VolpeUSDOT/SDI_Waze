@@ -174,31 +174,119 @@ $(document).ready(function () {
 
 <!-- rnb-text-begin -->
 <p>Notes on how to share files with other members of the SDI Waze team:</p>
+<div id="writing-to-shared-bucket" class="section level3">
+<h3>Writing to shared bucket</h3>
+<p>The SDI Waze team shared S3 bucket is at this location:</p>
+<pre><code>s3://prod-sdc-sdi-911061262852-us-east-1-bucket</code></pre>
+<p>As a user in an RStudio session, this bucket may not be accessible using the aws.s3 package:</p>
+<!-- rnb-text-end -->
+<!-- rnb-chunk-begin -->
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuYnVja2V0X2V4aXN0cyh0ZWFtYnVja2V0KVxuXG5gYGAifQ== -->
+<pre class="r"><code>bucket_exists(teambucket)
+</code></pre>
+<!-- rnb-source-end -->
+<!-- rnb-output-begin eyJkYXRhIjoiQ2xpZW50IGVycm9yOiAoNDA1KSBNZXRob2QgTm90IEFsbG93ZWRcbiJ9 -->
+<pre><code>Client error: (405) Method Not Allowed</code></pre>
+<!-- rnb-output-end -->
+<!-- rnb-output-begin eyJkYXRhIjoiWzFdIEZBTFNFXG5hdHRyKCxcIngtYW16LXJlcXVlc3QtaWRcIilcblsxXSBcIjNBQUVBRkY3RUZFQTg4NTFcIlxuYXR0cigsXCJ4LWFtei1pZC0yXCIpXG5bMV0gXCIyd2swejQ3TXBLRmV6SXNPMURPZFJNaHlDYmlFVmRzRnF5Q3ROS2RuZTBPM0tTRXdyZ3EyNFFaVmNycWJPOE9vbFU3eUN6QTdyU289XCJcbmF0dHIoLFwiYWxsb3dcIilcblsxXSBcIkdFVFwiXG5hdHRyKCxcImNvbnRlbnQtdHlwZVwiKVxuWzFdIFwiYXBwbGljYXRpb24veG1sXCJcbmF0dHIoLFwidHJhbnNmZXItZW5jb2RpbmdcIilcblsxXSBcImNodW5rZWRcIlxuYXR0cigsXCJkYXRlXCIpXG5bMV0gXCJGcmksIDA5IE1hciAyMDE4IDEzOjE2OjA4IEdNVFwiXG5hdHRyKCxcInNlcnZlclwiKVxuWzFdIFwiQW1hem9uUzNcIlxuIn0= -->
+<pre><code>[1] FALSE
+attr(,&quot;x-amz-request-id&quot;)
+[1] &quot;3AAEAFF7EFEA8851&quot;
+attr(,&quot;x-amz-id-2&quot;)
+[1] &quot;2wk0z47MpKFezIsO1DOdRMhyCbiEVdsFqyCtNKdne0O3KSEwrgq24QZVcrqbO8OolU7yCzA7rSo=&quot;
+attr(,&quot;allow&quot;)
+[1] &quot;GET&quot;
+attr(,&quot;content-type&quot;)
+[1] &quot;application/xml&quot;
+attr(,&quot;transfer-encoding&quot;)
+[1] &quot;chunked&quot;
+attr(,&quot;date&quot;)
+[1] &quot;Fri, 09 Mar 2018 13:16:08 GMT&quot;
+attr(,&quot;server&quot;)
+[1] &quot;AmazonS3&quot;</code></pre>
+<!-- rnb-output-end -->
+<!-- rnb-chunk-end -->
+<!-- rnb-text-begin -->
+<p>The aws.s3 package in R looks for credentials in a <code>.aws</code> folder, which does not apply in this configuration (connection to S3 is based on SSH, per Santosh). So need to run the read/write scripts directly, either as shell scripts outside R or possibly passing AWS CLI commands via <code>system()</code> within R.</p>
+<p>Possible solutions:</p>
+<p>From RStudio session, save files to a tempory output location, like “tempout”</p>
+<ol style="list-style-type: decimal">
+<li>Within the RStudio session, run the script <code>sdc_s3_out.sh</code></li>
+</ol>
+<!-- rnb-text-end -->
+<!-- rnb-chunk-begin -->
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuc3lzdGVtKFwifi9TRElfV2F6ZS91dGlsaXR5L3NkY19zM19vdXQuc2hcIilcblxuYGBgIn0= -->
+<pre class="r"><code>system(&quot;~/SDI_Waze/utility/sdc_s3_out.sh&quot;)
+</code></pre>
+<!-- rnb-source-end -->
+<!-- rnb-output-begin eyJkYXRhIjoiQ29tcGxldGVkIDIwLjYgS2lCLzQxLjEgS2lCICgyOTkuOCBLaUIvcykgd2l0aCAyIGZpbGUocykgcmVtYWluaW5nXG51cGxvYWQ6IC4uLy4uL3RlbXBvdXQvVGVzdFJlc3VsdHMzLmNzdiB0byBzMzovL3Byb2Qtc2RjLXNkaS05MTEwNjEyNjI4NTItdXMtZWFzdC0xLWJ1Y2tldC9UZXN0UmVzdWx0czMuY3N2XG5Db21wbGV0ZWQgMjAuNiBLaUIvNDEuMSBLaUIgKDI5OS44IEtpQi9zKSB3aXRoIDEgZmlsZShzKSByZW1haW5pbmdcbkNvbXBsZXRlZCA0MS4xIEtpQi80MS4xIEtpQiAoNDMzLjggS2lCL3MpIHdpdGggMSBmaWxlKHMpIHJlbWFpbmluZ1xudXBsb2FkOiAuLi8uLi90ZW1wb3V0L1Rlc3RSZXN1bHRzLmNzdiB0byBzMzovL3Byb2Qtc2RjLXNkaS05MTEwNjEyNjI4NTItdXMtZWFzdC0xLWJ1Y2tldC9UZXN0UmVzdWx0cy5jc3ZcbjEgc2Vjb25kKHMpIGVsYXBzZWRcbiAgICAgICAgICAgICAgICAgICAgICAgICAgIFBSRSBUZXN0X2Zyb21fRGFuL1xuMjAxOC0wMy0wOSAxMzozMTozOCAgICAgIDIxMDY1IFRlc3RSZXN1bHRzLmNzdlxuMjAxOC0wMy0wOCAyMTo1MDo0MCAgICAgMTg1ODA3IFRlc3RSZXN1bHRzMi5jc3ZcbjIwMTgtMDMtMDkgMTM6MzE6MzggICAgICAyMTA2NSBUZXN0UmVzdWx0czMuY3N2XG4yMDE4LTAyLTA3IDIyOjU4OjE1ICAgICAgIDM4ODcgbm9odXAub3V0XG5EZWxldGUgZmlsZXMgaW4gdGVtcG9yYXJ5IG91dHB1dCBkaXJlY3Rvcnk/XG4ifQ== -->
+<pre><code>Completed 20.6 KiB/41.1 KiB (299.8 KiB/s) with 2 file(s) remaining
+upload: ../../tempout/TestResults3.csv to s3://prod-sdc-sdi-911061262852-us-east-1-bucket/TestResults3.csv
+Completed 20.6 KiB/41.1 KiB (299.8 KiB/s) with 1 file(s) remaining
+Completed 41.1 KiB/41.1 KiB (433.8 KiB/s) with 1 file(s) remaining
+upload: ../../tempout/TestResults.csv to s3://prod-sdc-sdi-911061262852-us-east-1-bucket/TestResults.csv
+1 second(s) elapsed
+                           PRE Test_from_Dan/
+2018-03-09 13:31:38      21065 TestResults.csv
+2018-03-08 21:50:40     185807 TestResults2.csv
+2018-03-09 13:31:38      21065 TestResults3.csv
+2018-02-07 22:58:15       3887 nohup.out
+Delete files in temporary output directory?</code></pre>
+<!-- rnb-output-end -->
+<!-- rnb-output-begin eyJkYXRhIjoiMSkgWWVzXG4yKSBOb1xuIz8gXG4ifQ== -->
+<pre><code>1) Yes
+2) No
+#? </code></pre>
+<!-- rnb-output-end -->
+<!-- rnb-chunk-end -->
+<!-- rnb-text-begin -->
+<ol start="2" style="list-style-type: decimal">
+<li>As <code>ec2-user</code>, run the script <code>sdc_s3_out.sh</code>:</li>
+</ol>
 <ul>
-<li>From RStudio session, save files to a tempory output location, like “tempout”</li>
 <li>From Jupyter Notebook, run the script <code>sdc_s3_out.sh</code> while logged in as <code>ec2-user</code>. This is the only user with permissions to write out to the shared S3 buckets.</li>
 <li>Open a Juptyer Notebook session at <a href="https://" class="uri">https://</a><username>-workspace.securedatacommons.com:8888/</li>
 <li>New &gt; Terminal or Running &gt; select an already-running terminal</li>
 <li>Run the script as follows, with your username in the path:</li>
 </ul>
 <pre><code>sudo /home/daniel/SDI_Waze/utility/sdc_s3_out.sh</code></pre>
-<p>If this fails, make sure permissions are set up correctly:</p>
-<pre><code>sudo chmod u+x /home/daniel/SDI_Waze/utility/sdc_s3_out.sh</code></pre>
+<p>If this fails, make sure permissions are set up correctly, so that this <code>.sh</code> script can be executed by ec2-user:</p>
+<pre><code>sudo chmod +x /home/daniel/SDI_Waze/utility/sdc_s3_out.sh</code></pre>
 <p>Here is the script to write out some test files:</p>
 <!-- rnb-text-end -->
 <!-- rnb-chunk-begin -->
-<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxub3V0cHV0LmxvYyA8LSBcIn4vdGVtcG91dFwiXG5cblxuIyBhc3N1bWluZyBhIGRhdGEuZnJhbWUgJ3Jlc3VsdHMnIGV4aXN0c1xud3JpdGUuY3N2KHJlc3VsdHNbMToxMDAsXSwgZmlsZSA9IGZpbGUucGF0aChvdXRwdXQubG9jLCBcIlRlc3RSZXN1bHRzLmNzdlwiKSwgcm93Lm5hbWVzID0gRilcbmBgYCJ9 -->
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxub3V0cHV0LmxvYyA8LSBcIn4vdGVtcG91dFwiXG4jIGFzc3VtaW5nIGEgZGF0YS5mcmFtZSAncmVzdWx0cycgZXhpc3RzXG53cml0ZS5jc3YocmVzdWx0c1sxOjEwMCxdLCBmaWxlID0gZmlsZS5wYXRoKG91dHB1dC5sb2MsIFwiVGVzdFJlc3VsdHMuY3N2XCIpLCByb3cubmFtZXMgPSBGKVxuYGBgIn0= -->
 <pre class="r"><code>output.loc &lt;- &quot;~/tempout&quot;
-
-
 # assuming a data.frame 'results' exists
 write.csv(results[1:100,], file = file.path(output.loc, &quot;TestResults.csv&quot;), row.names = F)</code></pre>
 <!-- rnb-source-end -->
 <!-- rnb-chunk-end -->
 <!-- rnb-text-begin -->
+<p>Then go to Juptyer Notebook terminal and run the script.</p>
+</div>
+<div id="reading-from-shared-bucket" class="section level2">
+<h2>Reading from shared bucket</h2>
+<p>From within RStudio session, get list of available objects and copy selected objects to this session.</p>
+<p>Use a directory “tempin” to hold files copied from the S3 bucket. This should not be a permanent storage location for working files, just temporary directory to hold files during this session.</p>
 <!-- rnb-text-end -->
+<!-- rnb-chunk-begin -->
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuZGlyLmNyZWF0ZShcIn4vdGVtcGluXCIsIHNob3dXYXJuaW5ncyA9IEYpICMgd2lsbCBjcmVhdGUgaXQgaWYgZG9lcyBub3QgYWxyZWFkeSBleGlzdCwgd2lsbCBza2lwIGlmIGFscmVhZHkgZXhpc3RzXG5cbmxpc3QuY21kIDwtIHBhc3RlKFwiYXdzIHMzIGxzXCIsIHRlYW1idWNrZXQpXG5zeXN0ZW0obGlzdC5jbWQpXG5cbmdldG9iamVjdC5jbWQgPC0gcGFzdGUoXCJhd3MgczMgY3BcIiwgZmlsZS5wYXRoKHRlYW1idWNrZXQsIFwiVGVzdFJlc3VsdHMyLmNzdlwiKSwgXCJ+L3RlbXBpblwiKVxuXG5zeXN0ZW0oZ2V0b2JqZWN0LmNtZClcbmBgYCJ9 -->
+<pre class="r"><code>dir.create(&quot;~/tempin&quot;, showWarnings = F) # will create it if does not already exist, will skip if already exists
 
-<div id="rmd-source-code">LS0tCnRpdGxlOiAiUzMgQnVja2V0IGludGVncmF0aW9uIgpvdXRwdXQ6IGh0bWxfbm90ZWJvb2sKLS0tCgpOb3RlcyBvbiBob3cgdG8gc2hhcmUgZmlsZXMgd2l0aCBvdGhlciBtZW1iZXJzIG9mIHRoZSBTREkgV2F6ZSB0ZWFtOgoKLSBGcm9tIFJTdHVkaW8gc2Vzc2lvbiwgc2F2ZSBmaWxlcyB0byBhIHRlbXBvcnkgb3V0cHV0IGxvY2F0aW9uLCBsaWtlICJ0ZW1wb3V0IgotIEZyb20gSnVweXRlciBOb3RlYm9vaywgcnVuIHRoZSBzY3JpcHQgYHNkY19zM19vdXQuc2hgIHdoaWxlIGxvZ2dlZCBpbiBhcyBgZWMyLXVzZXJgLiBUaGlzIGlzIHRoZSBvbmx5IHVzZXIgd2l0aCBwZXJtaXNzaW9ucyB0byB3cml0ZSBvdXQgdG8gdGhlIHNoYXJlZCBTMyBidWNrZXRzLgogICsgT3BlbiBhIEp1cHR5ZXIgTm90ZWJvb2sgc2Vzc2lvbiBhdCBodHRwczovLzx1c2VybmFtZT4td29ya3NwYWNlLnNlY3VyZWRhdGFjb21tb25zLmNvbTo4ODg4LwogICsgTmV3ID4gVGVybWluYWwgb3IgUnVubmluZyA+IHNlbGVjdCBhbiBhbHJlYWR5LXJ1bm5pbmcgdGVybWluYWwKICArIFJ1biB0aGUgc2NyaXB0IGFzIGZvbGxvd3MsIHdpdGggeW91ciB1c2VybmFtZSBpbiB0aGUgcGF0aDoKICAKYGBgCnN1ZG8gL2hvbWUvZGFuaWVsL1NESV9XYXplL3V0aWxpdHkvc2RjX3MzX291dC5zaApgYGAKCklmIHRoaXMgZmFpbHMsIG1ha2Ugc3VyZSBwZXJtaXNzaW9ucyBhcmUgc2V0IHVwIGNvcnJlY3RseToKCmBgYApzdWRvIGNobW9kIHUreCAvaG9tZS9kYW5pZWwvU0RJX1dhemUvdXRpbGl0eS9zZGNfczNfb3V0LnNoCmBgYAoKSGVyZSBpcyB0aGUgc2NyaXB0IHRvIHdyaXRlIG91dCBzb21lIHRlc3QgZmlsZXM6CgpgYGB7cn0Kb3V0cHV0LmxvYyA8LSAifi90ZW1wb3V0IgoKCiMgYXNzdW1pbmcgYSBkYXRhLmZyYW1lICdyZXN1bHRzJyBleGlzdHMKd3JpdGUuY3N2KHJlc3VsdHNbMToxMDAsXSwgZmlsZSA9IGZpbGUucGF0aChvdXRwdXQubG9jLCAiVGVzdFJlc3VsdHMuY3N2IiksIHJvdy5uYW1lcyA9IEYpCmBgYAoKCg==</div>
+list.cmd &lt;- paste(&quot;aws s3 ls&quot;, teambucket)
+system(list.cmd)
+
+getobject.cmd &lt;- paste(&quot;aws s3 cp&quot;, file.path(teambucket, &quot;TestResults2.csv&quot;), &quot;~/tempin&quot;)
+
+system(getobject.cmd)</code></pre>
+<!-- rnb-source-end -->
+<!-- rnb-chunk-end -->
+<!-- rnb-text-begin -->
+<p>Possible enhancement: make functions in <code>/utility</code> to carry out these list/read/write commands.</p>
+<!-- rnb-text-end -->
+</div>
+
+<div id="rmd-source-code">LS0tCnRpdGxlOiAiUzMgQnVja2V0IGludGVncmF0aW9uIgpvdXRwdXQ6IGh0bWxfbm90ZWJvb2sKLS0tCgpOb3RlcyBvbiBob3cgdG8gc2hhcmUgZmlsZXMgd2l0aCBvdGhlciBtZW1iZXJzIG9mIHRoZSBTREkgV2F6ZSB0ZWFtOgoKIyMjIFdyaXRpbmcgdG8gc2hhcmVkIGJ1Y2tldAoKVGhlIFNESSBXYXplIHRlYW0gc2hhcmVkIFMzIGJ1Y2tldCBpcyBhdCB0aGlzIGxvY2F0aW9uOgpgYGAKczM6Ly9wcm9kLXNkYy1zZGktOTExMDYxMjYyODUyLXVzLWVhc3QtMS1idWNrZXQKYGBgCgpBcyBhIHVzZXIgaW4gYW4gUlN0dWRpbyBzZXNzaW9uLCB0aGlzIGJ1Y2tldCBtYXkgbm90IGJlIGFjY2Vzc2libGUgdXNpbmcgdGhlIGF3cy5zMyBwYWNrYWdlOgpgYGB7ciBzM2Nvbm5lY3RfdGVzdH0gCmxpYnJhcnkoYXdzLnMzKQoKdGVhbWJ1Y2tldCA8LSAiczM6Ly9wcm9kLXNkYy1zZGktOTExMDYxMjYyODUyLXVzLWVhc3QtMS1idWNrZXQiCgpnZXRfYnVja2V0KHRlYW1idWNrZXQpCmdldF9sb2NhdGlvbih0ZWFtYnVja2V0KQpidWNrZXRfZXhpc3RzKHRlYW1idWNrZXQpCgpnZXRfb2JqZWN0KCkKCmBgYAoKVGhlIGF3cy5zMyBwYWNrYWdlIGluIFIgbG9va3MgZm9yIGNyZWRlbnRpYWxzIGluIGEgYC5hd3NgIGZvbGRlciwgd2hpY2ggZG9lcyBub3QgYXBwbHkgaW4gdGhpcyBjb25maWd1cmF0aW9uIChjb25uZWN0aW9uIHRvIFMzIGlzIGJhc2VkIG9uIFNTSCwgcGVyIFNhbnRvc2gpLiBTbyBuZWVkIHRvIHJ1biB0aGUgcmVhZC93cml0ZSBzY3JpcHRzIGRpcmVjdGx5LCBlaXRoZXIgYXMgc2hlbGwgc2NyaXB0cyBvdXRzaWRlIFIgb3IgcG9zc2libHkgcGFzc2luZyBBV1MgQ0xJIGNvbW1hbmRzIHZpYSBgc3lzdGVtKClgIHdpdGhpbiBSLgoKClBvc3NpYmxlIHNvbHV0aW9uczogCgpGcm9tIFJTdHVkaW8gc2Vzc2lvbiwgc2F2ZSBmaWxlcyB0byBhIHRlbXBvcnkgb3V0cHV0IGxvY2F0aW9uLCBsaWtlICJ0ZW1wb3V0IgoKMS4gV2l0aGluIHRoZSBSU3R1ZGlvIHNlc3Npb24sIHJ1biB0aGUgc2NyaXB0IGBzZGNfczNfb3V0LnNoYAoKYGBge3J9Cm91dHB1dC5sb2MgPC0gIn4vdGVtcG91dCIKCiMgYXNzdW1pbmcgYSBkYXRhLmZyYW1lICdyZXN1bHRzJyBleGlzdHMsIGZyb20gY29ubmVjdF9yZWRzaGlmdF9wZ3NxbC5SCndyaXRlLmNzdihyZXN1bHRzWzE6MTAwLF0sIGZpbGUgPSBmaWxlLnBhdGgob3V0cHV0LmxvYywgIlRlc3RSZXN1bHRzMy5jc3YiKSwgcm93Lm5hbWVzID0gRikKCmRpcigifi90ZW1wb3V0IikgIyBsaXN0IG91dHB1dCBmaWxlcwoKc3lzdGVtKCJ+L1NESV9XYXplL3V0aWxpdHkvc2RjX3MzX291dC5zaCIpCgpgYGAKCgoKCgoKMi4gQXMgYGVjMi11c2VyYCwgcnVuIHRoZSBzY3JpcHQgYHNkY19zM19vdXQuc2hgOgotIEZyb20gSnVweXRlciBOb3RlYm9vaywgcnVuIHRoZSBzY3JpcHQgYHNkY19zM19vdXQuc2hgIHdoaWxlIGxvZ2dlZCBpbiBhcyBgZWMyLXVzZXJgLiBUaGlzIGlzIHRoZSBvbmx5IHVzZXIgd2l0aCBwZXJtaXNzaW9ucyB0byB3cml0ZSBvdXQgdG8gdGhlIHNoYXJlZCBTMyBidWNrZXRzLgogICsgT3BlbiBhIEp1cHR5ZXIgTm90ZWJvb2sgc2Vzc2lvbiBhdCBodHRwczovLzx1c2VybmFtZT4td29ya3NwYWNlLnNlY3VyZWRhdGFjb21tb25zLmNvbTo4ODg4LwogICsgTmV3ID4gVGVybWluYWwgb3IgUnVubmluZyA+IHNlbGVjdCBhbiBhbHJlYWR5LXJ1bm5pbmcgdGVybWluYWwKICArIFJ1biB0aGUgc2NyaXB0IGFzIGZvbGxvd3MsIHdpdGggeW91ciB1c2VybmFtZSBpbiB0aGUgcGF0aDoKICAKYGBgCnN1ZG8gL2hvbWUvZGFuaWVsL1NESV9XYXplL3V0aWxpdHkvc2RjX3MzX291dC5zaApgYGAKCklmIHRoaXMgZmFpbHMsIG1ha2Ugc3VyZSBwZXJtaXNzaW9ucyBhcmUgc2V0IHVwIGNvcnJlY3RseSwgc28gdGhhdCB0aGlzIGAuc2hgIHNjcmlwdCBjYW4gYmUgZXhlY3V0ZWQgYnkgZWMyLXVzZXI6CgpgYGAKc3VkbyBjaG1vZCAreCAvaG9tZS9kYW5pZWwvU0RJX1dhemUvdXRpbGl0eS9zZGNfczNfb3V0LnNoCmBgYAoKSGVyZSBpcyB0aGUgc2NyaXB0IHRvIHdyaXRlIG91dCBzb21lIHRlc3QgZmlsZXM6CgpgYGB7cn0Kb3V0cHV0LmxvYyA8LSAifi90ZW1wb3V0IgoKCiMgYXNzdW1pbmcgYSBkYXRhLmZyYW1lICdyZXN1bHRzJyBleGlzdHMKd3JpdGUuY3N2KHJlc3VsdHNbMToxMDAsXSwgZmlsZSA9IGZpbGUucGF0aChvdXRwdXQubG9jLCAiVGVzdFJlc3VsdHMzLmNzdiIpLCByb3cubmFtZXMgPSBGKQpgYGAKClRoZW4gZ28gdG8gSnVwdHllciBOb3RlYm9vayB0ZXJtaW5hbCBhbmQgcnVuIHRoZSBzY3JpcHQuCgoKIyMgUmVhZGluZyBmcm9tIHNoYXJlZCBidWNrZXQKCkZyb20gd2l0aGluIFJTdHVkaW8gc2Vzc2lvbiwgZ2V0IGxpc3Qgb2YgYXZhaWxhYmxlIG9iamVjdHMgYW5kIGNvcHkgc2VsZWN0ZWQgb2JqZWN0cyB0byB0aGlzIHNlc3Npb24uCgpVc2UgYSBkaXJlY3RvcnkgInRlbXBpbiIgdG8gaG9sZCBmaWxlcyBjb3BpZWQgZnJvbSB0aGUgUzMgYnVja2V0LiBUaGlzIHNob3VsZCBub3QgYmUgYSBwZXJtYW5lbnQgc3RvcmFnZSBsb2NhdGlvbiBmb3Igd29ya2luZyBmaWxlcywganVzdCB0ZW1wb3JhcnkgZGlyZWN0b3J5IHRvIGhvbGQgZmlsZXMgZHVyaW5nIHRoaXMgc2Vzc2lvbi4gCgoKYGBge3IgczNyZWFkfQpkaXIuY3JlYXRlKCJ+L3RlbXBpbiIsIHNob3dXYXJuaW5ncyA9IEYpICMgd2lsbCBjcmVhdGUgaXQgaWYgZG9lcyBub3QgYWxyZWFkeSBleGlzdCwgd2lsbCBza2lwIGlmIGFscmVhZHkgZXhpc3RzCgpsaXN0LmNtZCA8LSBwYXN0ZSgiYXdzIHMzIGxzIiwgdGVhbWJ1Y2tldCkKc3lzdGVtKGxpc3QuY21kKQoKZ2V0b2JqZWN0LmNtZCA8LSBwYXN0ZSgiYXdzIHMzIGNwIiwgZmlsZS5wYXRoKHRlYW1idWNrZXQsICJUZXN0UmVzdWx0czIuY3N2IiksICJ+L3RlbXBpbiIpCgpzeXN0ZW0oZ2V0b2JqZWN0LmNtZCkKYGBgCgpQb3NzaWJsZSBlbmhhbmNlbWVudDogbWFrZSBmdW5jdGlvbnMgaW4gYC91dGlsaXR5YCB0byBjYXJyeSBvdXQgdGhlc2UgbGlzdC9yZWFkL3dyaXRlIGNvbW1hbmRzLgo=</div>
 
 
 

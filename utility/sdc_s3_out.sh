@@ -12,13 +12,13 @@
 
 STARTTIME=$(date +%s)
 
-sudo aws s3 cp /home/daniel/tempout s3://prod-sdc-sdi-911061262852-us-east-1-bucket --recursive --include "*"
+aws s3 cp /home/daniel/tempout s3://prod-sdc-sdi-911061262852-us-east-1-bucket --recursive --include "*"
 
 ENDTIME=$(date +%s)
 
 echo "$(($ENDTIME - $STARTTIME)) second(s) elapsed"
 
-sudo aws s3 ls s3://prod-sdc-sdi-911061262852-us-east-1-bucket
+aws s3 ls s3://prod-sdc-sdi-911061262852-us-east-1-bucket
 
 echo "Delete files in temporary output directory?"
 select yn in "Yes" "No"; do
