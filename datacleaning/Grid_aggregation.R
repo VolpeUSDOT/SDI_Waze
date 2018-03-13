@@ -32,7 +32,7 @@ source(file.path(codedir, "utility/wazefunctions.R")) # for movefiles() function
 setwd(wazedir)
 
 # Read in data
-load(file.path(volpewazedir, "spatial_layers/MD_hex.RData")) # has the complete grid as hex2, and a subset of just the grid cells in use for this month as hex.md
+load(file.path(volpewazedir, "Data/MD_hex.RData")) # has the complete grid as hex2, and a subset of just the grid cells in use for this month as hex.md
 
 # Loop through months of available merged data
 avail.months = unique(substr(dir(wazemonthdir)[grep("^merged.waze.edt", dir(wazemonthdir))], 
@@ -41,9 +41,9 @@ avail.months = unique(substr(dir(wazemonthdir)[grep("^merged.waze.edt", dir(waze
 
 temp.outputdir = tempdir()# for temporary storage 
 
-for(j in avail.months){ # j = "05"
+for(j in avail.months){ j = "05"
   
-  load(file.path(wazemonthdir, paste0("merged.waze.edt.", j,"_MD.RData"))) # includes both waze (link.waze.edt) and edt (edt.df) data, with grid for central and neighboring cells
+  load(file.path(wazemonthdir, paste("merged.waze.edt.", j,"_MD.RData"))) # includes both waze (link.waze.edt) and edt (edt.df) data, with grid for central and neighboring cells
   
   # format(object.size(link.waze.edt), "Mb"); format(object.size(edt.df), "Mb")
   # EDT time needs to be POSIXct, not POSIXlt. ct: seconds since beginning of 1970 in UTC. lt is a list of vectors representing seconds, min, hours, day, year. ct is better for analysis, while lt is more human-readable.
@@ -83,14 +83,14 @@ for(j in avail.months){ # j = "05"
   t.max = max(GridIDTime$GridDayHour)
   i = t.min
   
-  Waze.hex.time <- vector()
+  Waze.hex.time.all <- vector()
   while(i+3600 <= t.max){
     ti.GridIDTime = filter(GridIDTime,GridDayHour==i)
     ti.link.waze.edt = filter(link.waze.edt, time >= i & time <= i+3600| last.pull.time >=i & last.pull.time <=i+3600)
   
     ti.Waze.hex <- inner_join(ti.GridIDTime, ti.link.waze.edt) #Use left_join to get zeros if no match  
     
-    Waze.hex.time <- rbind(Waze.hex.time, ti.Waze.hex)
+    Waze.hex.time.all <- rbind(Waze.hex.time.all, ti.Waze.hex)
     i=i+3600
     print(i)
   } # end loop
@@ -98,13 +98,20 @@ for(j in avail.months){ # j = "05"
   EndTime <- Sys.time()-StartTime
   EndTime
   
+  Waze.hex.time <- filter(Waze.hex.time.all, !is.na(GRID_ID))
+  
+  #if the EDT or Waze data have not been updated for a given month, you can skip the Waze.hex.time steps and read in the file directly
+  #Split the Waze.hex.time step into a separate script for the cloud pipeline version 
+  load(file.path(paste(outputdir, "/WazeHexTimeList_", j,".RData",sep=""))) #82MB - takes 10+ minutes
+  
+  
+  # includes both waze (link.waze.edt) and edt (edt.df) data, with grid for central and neighboring cells
   
   #summarize counts of Waze events in each hexagon and EDT matches to the Waze events (could be in neighboring hexagon)
-  
   names(Waze.hex.time)
   StartTime <- Sys.time()
   
-  waze.hex <- filter(Waze.hex.time, !is.na(GRID_ID)) %>%
+  waze.hex <- Waze.hex.time %>%
     group_by(GRID_ID, day = format(GridDayHour, "%j"), hour = format(GridDayHour, "%H")) %>%
     summarize(
       DayOfWeek = weekdays(time)[1], #Better way to select one value?
@@ -150,6 +157,7 @@ for(j in avail.months){ # j = "05"
   EndTime
   
   #Compute grid counts for EDT data
+  #Add accident severity counts by grid cell 
   names(edt.df)
   edt.hex <- 
     edt.df %>%
@@ -172,9 +180,14 @@ for(j in avail.months){ # j = "05"
  # names(waze.edt.hex)
   
 #  save(list="waze.edt.hex", file = paste(temp.outputdir, "/WazeEdtHex_", j,".RData",sep=""))
-  save(list="wazeTime.edt.hex", file = paste(temp.outputdir, "/WazeTimeEdtHex_", j,".RData",sep=""))
-  write.csv(wazeTime.edt.hex, file = paste(temp.outputdir, "/WazeTimeEdtHex_", j,".csv",sep=""))
 
+  #Save list of Grid cells and time windows with EDT or Waze data, so we don't re-run this    
+  save(list="Waze.hex.time", file = paste(temp.outputdir, "/WazeHexTimeList_", j,".RData",sep=""))
+  write.csv(Waze.hex.time, file = paste(temp.outputdir, "/WazeHexTimeList_", j,".csv",sep=""))
+
+    save(list="wazeTime.edt.hex", file = paste(temp.outputdir, "/WazeTimeEdtHex_", j,".RData",sep=""))
+  write.csv(wazeTime.edt.hex, file = paste(temp.outputdir, "/WazeTimeEdtHex_", j,".csv",sep=""))
+  
 } # End month aggregation loop ----
 
 movefiles(dir(temp.outputdir)[grep("Hex", dir(temp.outputdir))], temp.outputdir, outputdir)
