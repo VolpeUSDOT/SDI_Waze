@@ -163,7 +163,20 @@ for(j in avail.months){ j = "05"
     edt.df %>%
     group_by(GRID_ID.edt, day = format(CrashDate_Local, "%j"), hour = format(CrashDate_Local, "%H")) %>%
     summarize(
-      uniqEDTreports= n_distinct(CrashCaseID)) 
+      uniqEDTreports= n_distinct(CrashCaseID),
+      nMaxDamDisabling = n_distinct(CrashCaseID[MaxExtentofDamage=="Disabling Damage"]),
+      nMaxDamFunctional = n_distinct(CrashCaseID[MaxExtentofDamage==" Functional Damage"]),
+      nMaxDamMinor = n_distinct(CrashCaseID[MaxExtentofDamage=="Minor Damage"]),
+      nMaxDamNone = n_distinct(CrashCaseID[MaxExtentofDamage==" No Damage"]),
+      nMaxDamNotReported = n_distinct(CrashCaseID[MaxExtentofDamage=="Not Reported"]),
+      nMaxDamUnknown = n_distinct(CrashCaseID[MaxExtentofDamage=="Unknown"]),
+      
+      nInjuryFatal = n_distinct(CrashCaseID[MaxExtentofDamage=="Fatal Injury (K)"]),
+      nInjuryNone = n_distinct(CrashCaseID[MaxExtentofDamage=="No Apparent Injury (O)"]),
+      nInjuryPossible = n_distinct(CrashCaseID[MaxExtentofDamage=="Possible Injury (C)"]),
+      nInjurySuspMinor = n_distinct(CrashCaseID[MaxExtentofDamage=="Suspected Minor Injury(B)"]),
+      nInjurySuspSerious = n_distinct(CrashCaseID[MaxExtentofDamage=="Suspected Serious Injury(A)"])
+      ) 
   
   #Merge EDT counts to waze counts by hexagons
   names(waze.hex)
