@@ -1,9 +1,11 @@
 # Waze clip
 # Filtering Waze data for MD based on US Census Bureau polygon for the state
 # Started 2017-11-29
+# Now working in SDC
 
 # <><><><><><><><><><><><><><><><><><><><>
 # Setup ----
+
 library(sp)
 library(maps) # for mapping base layers
 library(reshape)
