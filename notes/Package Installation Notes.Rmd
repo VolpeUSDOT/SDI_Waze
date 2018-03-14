@@ -76,7 +76,7 @@ sudo yum install geos geos-devel
 ```
 Now try again:
 
-```{r}
+```{r, eval = F}
 install.packages(c("rgeos", "rgdal"), dep=T, type = "source")
 ```
 
@@ -98,10 +98,12 @@ Now try to install `gdal`:
 sudo yum --enablerepo=epel install gdal proj proj-devel
 
 ```
+
 See that gdal is installed with
+
 ```
 gdalinfo --version
-``
+```
 
 Still doesn't work. Try updating the dynamic library symbolic links
 https://stackoverflow.com/questions/40305095/cannot-install-rgdal-package-in-r-on-rhel6-unable-to-load-shared-object-rgdal-s
@@ -120,7 +122,7 @@ Try updating the PATH:
 https://stackoverflow.com/questions/48823509/error-loading-rgdal
 
 ```
-export LD_LIBRARY_PATH="/home/daniel/bin/gdal/lib:$LD_LIBRARY_PATH"
+export LD_LIBRARY_PATH="/home/ec2-user/gdal-2.2.3/lib:$LD_LIBRARY_PATH"
 ldd /home/daniel/R/x86_64-pc-linux-gnu-library/3.4/rgdal/libs/rgdal.so
 ```
 

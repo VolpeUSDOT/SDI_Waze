@@ -6,9 +6,17 @@
 # <><><><><><><><><><><><><><><><><><><><>
 # Setup ----
 
+# read functions
+codeloc <- "~/SDI_Waze"
+source(file.path(codeloc, 'utility/wazefunctions.R'))
+
+# Check for package installations
+source(file.path(codeloc, 'utility/get_packages.R'))
+
+
+
 library(sp)
 library(maps) # for mapping base layers
-library(reshape)
 library(maptools) # readShapePoly() and others
 library(mapproj) # for coord_map()
 library(rgdal) # for readOGR(), needed for reading in ArcM shapefiles
@@ -17,9 +25,6 @@ library(raster)
 
 VERSION = 2 # Choose which type of aggregation and clipping to do. 1 was for original aggregated files from Lia; 2 is from .RData files; 3 is for both EDT and Waze, clipping to a 5 x 5 mi square
 
-# read functions
-codeloc <- "~/git/SDI_Waze"
-source(file.path(codeloc, 'wazefunctions.R'))
 
 
 # Version 1: from .csv aggregations made by Lia ----
