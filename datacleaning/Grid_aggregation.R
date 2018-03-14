@@ -102,7 +102,7 @@ for(j in avail.months){ #j = "05"
   #if the EDT or Waze data have not been updated for a given month, you can skip the Waze.hex.time steps and read in the file directly
   #Split the Waze.hex.time step into a separate script for the cloud pipeline version 
  #uncomment to skip above steps and read in the file directly
-    ##load(file.path(paste(outputdir, "/WazeHexTimeList_", j,".RData",sep=""))) #82MB - takes 10+ minutes
+    ##load(file.path(paste(outputdir, "/WazeHexTimeList_", j,".RData",sep="")))
   
   
   # includes both waze (link.waze.edt) and edt (edt.df) data, with grid for central and neighboring cells
@@ -194,26 +194,30 @@ for(j in avail.months){ #j = "05"
   #Accident counts for neighboring cells
   nWazeAcc <- wazeTime.edt.hex %>%
     ungroup()%>%
-    select(GRID_ID, day, hour, nWazeAccident)
-  wazeTime.edt.hex_NW <- left_join(wazeTime.edt.hex, nWazeAcc, by = c("GRID_ID_NW"="GRID_ID","day"="day", "hour"="hour")) %>%
-    rename(nWazeAcc_NW=nWazeAccident.y)
-  wazeTime.edt.hex_NW_N <- left_join(wazeTime.edt.hex_NW, nWazeAcc, by = c("GRID_ID_N"="GRID_ID","day"="day", "hour"="hour")) %>%
-    rename(nWazeAcc_N=nWazeAccident, nWazeAccident=nWazeAccident.x)
-  wazeTime.edt.hex_NW_N_NE <- left_join(wazeTime.edt.hex_NW_N, nWazeAcc, by = c("GRID_ID_NE"="GRID_ID","day"="day", "hour"="hour"))%>%
-    rename(nWazeAcc_NE=nWazeAccident.y, nWazeAccident=nWazeAccident.x)
-  wazeTime.edt.hex_NW_N_NE_SW <- left_join(wazeTime.edt.hex_NW_N_NE, nWazeAcc, by = c("GRID_ID_SW"="GRID_ID","day"="day", "hour"="hour"))%>%
-    rename(nWazeAcc_SW=nWazeAccident.y, nWazeAccident=nWazeAccident.x)
-  wazeTime.edt.hex_NW_N_NE_SW_S <- left_join(wazeTime.edt.hex_NW_N_NE_SW, nWazeAcc, by = c("GRID_ID_S"="GRID_ID","day"="day", "hour"="hour"))%>%
-    rename(nWazeAcc_S=nWazeAccident.y, nWazeAccident=nWazeAccident.x)
-  wazeTime.edt.hex_NW_N_NE_SW_S_SE <- left_join(wazeTime.edt.hex_NW_N_NE_SW_S, nWazeAcc, by = c("GRID_ID_SE"="GRID_ID","day"="day", "hour"="hour"))%>%
-    rename(nWazeAcc_SE=nWazeAccident.y, nWazeAccident=nWazeAccident.x)
+    select(GRID_ID, day, hour, nWazeAccident)%>%
+    rename(nWazeAcc_neighbor=nWazeAccident)
   
+  wazeTime.edt.hex_NW <- left_join(wazeTime.edt.hex, nWazeAcc, by = c("GRID_ID_NW"="GRID_ID","day"="day", "hour"="hour")) %>%
+    rename(nWazeAcc_NW=nWazeAcc_neighbor)
+  wazeTime.edt.hex_NW_N <- left_join(wazeTime.edt.hex_NW, nWazeAcc, by = c("GRID_ID_N"="GRID_ID","day"="day", "hour"="hour")) %>%
+    rename(nWazeAcc_N=nWazeAcc_neighbor)
+  wazeTime.edt.hex_NW_N_NE <- left_join(wazeTime.edt.hex_NW_N, nWazeAcc, by = c("GRID_ID_NE"="GRID_ID","day"="day", "hour"="hour"))%>%
+    rename(nWazeAcc_NE=nWazeAcc_neighbor)
+  wazeTime.edt.hex_NW_N_NE_SW <- left_join(wazeTime.edt.hex_NW_N_NE, nWazeAcc, by = c("GRID_ID_SW"="GRID_ID","day"="day", "hour"="hour"))%>%
+    rename(nWazeAcc_SW=nWazeAcc_neighbor)
+  wazeTime.edt.hex_NW_N_NE_SW_S <- left_join(wazeTime.edt.hex_NW_N_NE_SW, nWazeAcc, by = c("GRID_ID_S"="GRID_ID","day"="day", "hour"="hour"))%>%
+    rename(nWazeAcc_S=nWazeAcc_neighbor)
+  wazeTime.edt.hex_NW_N_NE_SW_S_SE <- left_join(wazeTime.edt.hex_NW_N_NE_SW_S, nWazeAcc, by = c("GRID_ID_SE"="GRID_ID","day"="day", "hour"="hour"))%>%
+    rename(nWazeAcc_SE=nWazeAcc_neighbor)
   
   #test process - look at value for highest count in nWazeAcc_NW column (10)
   t=filter(wazeTime.edt.hex_NW_N_NE_SW_S_SE, GRID_ID=="EG-53" & day=="141" & hour=="15")
   t #10 - this matches, test more
   
-  wazeTime.edt.hexAll <- wazeTime.edt.hex_NW_N_NE_SW_S_SE
+  wazeTime.edt.hexAll <- wazeTime.edt.hex_NW_N_NE_SW_S_SE%>%
+    mutate_all(funs(replace(., is.na(.), 0)))
+  #Replace NA with zero (for the grid counts here, 0 means there were no reported Waze events or EDT crashes in the neighbor grid cell at that hour)
+  
   #Update time variable 
   hextimeChar <- paste(wazeTime.edt.hexAll$day,wazeTime.edt.hexAll$hour,sep=":")
   wazeTime.edt.hexAll$hextime <- strptime(hextimeChar, "%j:%H", tz=)
