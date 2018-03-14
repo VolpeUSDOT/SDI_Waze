@@ -212,19 +212,19 @@ for(j in avail.months){ j = "05"
   t=filter(wazeTime.edt.hex_NW_N_NE_SW_S_SE, GRID_ID=="EG-53" & day=="141" & hour=="15")
   t #10 - this matches, test more
   
+  wazeTime.edt.hexAll <- wazeTime.edt.hex_NW_N_NE_SW_S_SE
   #Update time variable 
-  hextimeChar <- paste(wazeTime.edt.hex$day,wazeTime.edt.hex$hour,sep=":")
-  wazeTime.edt.hex$hextime <- strptime(hextimeChar, "%j:%H", tz=)
+  hextimeChar <- paste(wazeTime.edt.hexAll$day,wazeTime.edt.hexAll$hour,sep=":")
+  wazeTime.edt.hexAll$hextime <- strptime(hextimeChar, "%j:%H", tz=)
 
-  
 #  save(list="waze.edt.hex", file = paste(temp.outputdir, "/WazeEdtHex_", j,".RData",sep=""))
 
   #Save list of Grid cells and time windows with EDT or Waze data, so we don't re-run this    
   save(list="Waze.hex.time", file = paste(temp.outputdir, "/WazeHexTimeList_", j,".RData",sep=""))
   write.csv(Waze.hex.time, file = paste(temp.outputdir, "/WazeHexTimeList_", j,".csv",sep=""))
 
-    save(list="wazeTime.edt.hex", file = paste(temp.outputdir, "/WazeTimeEdtHex_", j,".RData",sep=""))
-  write.csv(wazeTime.edt.hex, file = paste(temp.outputdir, "/WazeTimeEdtHex_", j,".csv",sep=""))
+  save(list="wazeTime.edt.hexAll", file = paste(temp.outputdir, "/WazeTimeEdtHexAll_", j,".RData",sep=""))
+  write.csv(wazeTime.edt.hexAll, file = paste(temp.outputdir, "/WazeTimeEdtHexAll_", j,".csv",sep=""))
   
 } # End month aggregation loop ----
 
