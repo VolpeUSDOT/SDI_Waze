@@ -210,6 +210,26 @@ for(j in avail.months){ #j = "05"
   wazeTime.edt.hex_NW_N_NE_SW_S_SE <- left_join(wazeTime.edt.hex_NW_N_NE_SW_S, nWazeAcc, by = c("GRID_ID_SE"="GRID_ID","day"="day", "hour"="hour"))%>%
     rename(nWazeAcc_SE=nWazeAcc_neighbor)
   
+  #Jam counts for neighboring cells
+  nWazeJam <- wazeTime.edt.hex %>%
+    ungroup()%>%
+    select(GRID_ID, day, hour, nWazeJam)%>%
+    rename(nWazeJam_neighbor=nWazeJam)
+  
+  wazeTime.edt.hex <- wazeTime.edt.hex_NW_N_NE_SW_S_SE #edit names so we're not overwriting earlier df
+  wazeTime.edt.hex_NW <- left_join(wazeTime.edt.hex, nWazeJam, by = c("GRID_ID_NW"="GRID_ID","day"="day", "hour"="hour")) %>%
+    rename(nWazeJam_NW=nWazeJam_neighbor)
+  wazeTime.edt.hex_NW_N <- left_join(wazeTime.edt.hex_NW, nWazeJam, by = c("GRID_ID_N"="GRID_ID","day"="day", "hour"="hour")) %>%
+    rename(nWazeJam_N=nWazeJam_neighbor)
+  wazeTime.edt.hex_NW_N_NE <- left_join(wazeTime.edt.hex_NW_N, nWazeJam, by = c("GRID_ID_NE"="GRID_ID","day"="day", "hour"="hour"))%>%
+    rename(nWazeJam_NE=nWazeJam_neighbor)
+  wazeTime.edt.hex_NW_N_NE_SW <- left_join(wazeTime.edt.hex_NW_N_NE, nWazeJam, by = c("GRID_ID_SW"="GRID_ID","day"="day", "hour"="hour"))%>%
+    rename(nWazeJam_SW=nWazeJam_neighbor)
+  wazeTime.edt.hex_NW_N_NE_SW_S <- left_join(wazeTime.edt.hex_NW_N_NE_SW, nWazeJam, by = c("GRID_ID_S"="GRID_ID","day"="day", "hour"="hour"))%>%
+    rename(nWazeJam_S=nWazeJam_neighbor)
+  wazeTime.edt.hex_NW_N_NE_SW_S_SE <- left_join(wazeTime.edt.hex_NW_N_NE_SW_S, nWazeJam, by = c("GRID_ID_SE"="GRID_ID","day"="day", "hour"="hour"))%>%
+    rename(nWazeJam_SE=nWazeJam_neighbor)
+  
   #test process - look at value for highest count in nWazeAcc_NW column (10)
   t=filter(wazeTime.edt.hex_NW_N_NE_SW_S_SE, GRID_ID=="EG-53" & day=="141" & hour=="15")
   t #10 - this matches, test more
