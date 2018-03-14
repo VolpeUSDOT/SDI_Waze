@@ -41,9 +41,9 @@ avail.months = unique(substr(dir(wazemonthdir)[grep("^merged.waze.edt", dir(waze
 
 temp.outputdir = tempdir()# for temporary storage 
 
-for(j in avail.months){ j = "05"
+for(j in avail.months){ #j = "05"
   
-  load(file.path(wazemonthdir, paste("merged.waze.edt.", j,"_MD.RData"))) # includes both waze (link.waze.edt) and edt (edt.df) data, with grid for central and neighboring cells
+  load(file.path(wazemonthdir, paste0("merged.waze.edt.", j,"_MD.RData"))) # includes both waze (link.waze.edt) and edt (edt.df) data, with grid for central and neighboring cells
   
   # format(object.size(link.waze.edt), "Mb"); format(object.size(edt.df), "Mb")
   # EDT time needs to be POSIXct, not POSIXlt. ct: seconds since beginning of 1970 in UTC. lt is a list of vectors representing seconds, min, hours, day, year. ct is better for analysis, while lt is more human-readable.
@@ -77,7 +77,6 @@ for(j in avail.months){ j = "05"
   
   # Temporally matching
   # Match between the first reported time and last pull time of the Waze event. 
-  
   StartTime <- Sys.time()
   t.min = min(GridIDTime$GridDayHour)
   t.max = max(GridIDTime$GridDayHour)
@@ -102,7 +101,8 @@ for(j in avail.months){ j = "05"
   
   #if the EDT or Waze data have not been updated for a given month, you can skip the Waze.hex.time steps and read in the file directly
   #Split the Waze.hex.time step into a separate script for the cloud pipeline version 
-  load(file.path(paste(outputdir, "/WazeHexTimeList_", j,".RData",sep=""))) #82MB - takes 10+ minutes
+ #uncomment to skip above steps and read in the file directly
+    ##load(file.path(paste(outputdir, "/WazeHexTimeList_", j,".RData",sep=""))) #82MB - takes 10+ minutes
   
   
   # includes both waze (link.waze.edt) and edt (edt.df) data, with grid for central and neighboring cells
@@ -207,6 +207,7 @@ for(j in avail.months){ j = "05"
     rename(nWazeAcc_S=nWazeAccident.y, nWazeAccident=nWazeAccident.x)
   wazeTime.edt.hex_NW_N_NE_SW_S_SE <- left_join(wazeTime.edt.hex_NW_N_NE_SW_S, nWazeAcc, by = c("GRID_ID_SE"="GRID_ID","day"="day", "hour"="hour"))%>%
     rename(nWazeAcc_SE=nWazeAccident.y, nWazeAccident=nWazeAccident.x)
+  
   
   #test process - look at value for highest count in nWazeAcc_NW column (10)
   t=filter(wazeTime.edt.hex_NW_N_NE_SW_S_SE, GRID_ID=="EG-53" & day=="141" & hour=="15")
