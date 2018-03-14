@@ -109,10 +109,11 @@ for(j in avail.months){ j = "05"
   
   #summarize counts of Waze events in each hexagon and EDT matches to the Waze events (could be in neighboring hexagon)
   names(Waze.hex.time)
-  StartTime <- Sys.time()
   
+  StartTime <- Sys.time()
   waze.hex <- Waze.hex.time %>%
-    group_by(GRID_ID, day = format(GridDayHour, "%j"), hour = format(GridDayHour, "%H")) %>%
+    group_by(GRID_ID, GRID_ID_NW, GRID_ID_N, GRID_ID_NE, GRID_ID_SW, GRID_ID_S, GRID_ID_SE,
+             day = format(GridDayHour, "%j"), hour = format(GridDayHour, "%H")) %>%
     summarize(
       DayOfWeek = weekdays(time)[1], #Better way to select one value?
       nWazeRowsInMatch = n(), #includes duplicates that match more than one EDT report (don't use in model)
@@ -164,18 +165,18 @@ for(j in avail.months){ j = "05"
     group_by(GRID_ID.edt, day = format(CrashDate_Local, "%j"), hour = format(CrashDate_Local, "%H")) %>%
     summarize(
       uniqEDTreports= n_distinct(CrashCaseID),
-      nMaxDamDisabling = n_distinct(CrashCaseID[MaxExtentofDamage=="Disabling Damage"]),
-      nMaxDamFunctional = n_distinct(CrashCaseID[MaxExtentofDamage==" Functional Damage"]),
-      nMaxDamMinor = n_distinct(CrashCaseID[MaxExtentofDamage=="Minor Damage"]),
-      nMaxDamNone = n_distinct(CrashCaseID[MaxExtentofDamage==" No Damage"]),
-      nMaxDamNotReported = n_distinct(CrashCaseID[MaxExtentofDamage=="Not Reported"]),
-      nMaxDamUnknown = n_distinct(CrashCaseID[MaxExtentofDamage=="Unknown"]),
+      nEDTMaxDamDisabling = n_distinct(CrashCaseID[MaxExtentofDamage=="Disabling Damage"]),
+      nEDTMaxDamFunctional = n_distinct(CrashCaseID[MaxExtentofDamage==" Functional Damage"]),
+      nEDTMaxDamMinor = n_distinct(CrashCaseID[MaxExtentofDamage=="Minor Damage"]),
+      nEDTMaxDamNone = n_distinct(CrashCaseID[MaxExtentofDamage==" No Damage"]),
+      nEDTMaxDamNotReported = n_distinct(CrashCaseID[MaxExtentofDamage=="Not Reported"]),
+      nEDTMaxDamUnknown = n_distinct(CrashCaseID[MaxExtentofDamage=="Unknown"]),
       
-      nInjuryFatal = n_distinct(CrashCaseID[MaxExtentofDamage=="Fatal Injury (K)"]),
-      nInjuryNone = n_distinct(CrashCaseID[MaxExtentofDamage=="No Apparent Injury (O)"]),
-      nInjuryPossible = n_distinct(CrashCaseID[MaxExtentofDamage=="Possible Injury (C)"]),
-      nInjurySuspMinor = n_distinct(CrashCaseID[MaxExtentofDamage=="Suspected Minor Injury(B)"]),
-      nInjurySuspSerious = n_distinct(CrashCaseID[MaxExtentofDamage=="Suspected Serious Injury(A)"])
+      nEDTInjuryFatal = n_distinct(CrashCaseID[MaxExtentofDamage=="Fatal Injury (K)"]),
+      nEDTInjuryNone = n_distinct(CrashCaseID[MaxExtentofDamage=="No Apparent Injury (O)"]),
+      nEDTInjuryPossible = n_distinct(CrashCaseID[MaxExtentofDamage=="Possible Injury (C)"]),
+      nEDTInjurySuspMinor = n_distinct(CrashCaseID[MaxExtentofDamage=="Suspected Minor Injury(B)"]),
+      nEDTInjurySuspSerious = n_distinct(CrashCaseID[MaxExtentofDamage=="Suspected Serious Injury(A)"])
       ) 
   
   #Merge EDT counts to waze counts by hexagons
@@ -187,10 +188,34 @@ for(j in avail.months){ j = "05"
     mutate_all(funs(replace(., is.na(.), 0)))
   #Replace NA with zero (for the grid counts here, 0 means there were no reported Waze events or EDT crashes in the grid cell at that hour)
   
+  #Add columns containing data for neighboring grid cells 
+  names(wazeTime.edt.hex)
+
+  #Accident counts for neighboring cells
+  nWazeAcc <- wazeTime.edt.hex %>%
+    ungroup()%>%
+    select(GRID_ID, day, hour, nWazeAccident)
+  wazeTime.edt.hex_NW <- left_join(wazeTime.edt.hex, nWazeAcc, by = c("GRID_ID_NW"="GRID_ID","day"="day", "hour"="hour")) %>%
+    rename(nWazeAcc_NW=nWazeAccident.y)
+  wazeTime.edt.hex_NW_N <- left_join(wazeTime.edt.hex_NW, nWazeAcc, by = c("GRID_ID_N"="GRID_ID","day"="day", "hour"="hour")) %>%
+    rename(nWazeAcc_N=nWazeAccident, nWazeAccident=nWazeAccident.x)
+  wazeTime.edt.hex_NW_N_NE <- left_join(wazeTime.edt.hex_NW_N, nWazeAcc, by = c("GRID_ID_NE"="GRID_ID","day"="day", "hour"="hour"))%>%
+    rename(nWazeAcc_NE=nWazeAccident.y, nWazeAccident=nWazeAccident.x)
+  wazeTime.edt.hex_NW_N_NE_SW <- left_join(wazeTime.edt.hex_NW_N_NE, nWazeAcc, by = c("GRID_ID_SW"="GRID_ID","day"="day", "hour"="hour"))%>%
+    rename(nWazeAcc_SW=nWazeAccident.y, nWazeAccident=nWazeAccident.x)
+  wazeTime.edt.hex_NW_N_NE_SW_S <- left_join(wazeTime.edt.hex_NW_N_NE_SW, nWazeAcc, by = c("GRID_ID_S"="GRID_ID","day"="day", "hour"="hour"))%>%
+    rename(nWazeAcc_S=nWazeAccident.y, nWazeAccident=nWazeAccident.x)
+  wazeTime.edt.hex_NW_N_NE_SW_S_SE <- left_join(wazeTime.edt.hex_NW_N_NE_SW_S, nWazeAcc, by = c("GRID_ID_SE"="GRID_ID","day"="day", "hour"="hour"))%>%
+    rename(nWazeAcc_SE=nWazeAccident.y, nWazeAccident=nWazeAccident.x)
+  
+  #test process - look at value for highest count in nWazeAcc_NW column (10)
+  t=filter(wazeTime.edt.hex_NW_N_NE_SW_S_SE, GRID_ID=="EG-53" & day=="141" & hour=="15")
+  t #10 - this matches, test more
+  
+  #Update time variable 
   hextimeChar <- paste(wazeTime.edt.hex$day,wazeTime.edt.hex$hour,sep=":")
   wazeTime.edt.hex$hextime <- strptime(hextimeChar, "%j:%H", tz=)
-  
- # names(waze.edt.hex)
+
   
 #  save(list="waze.edt.hex", file = paste(temp.outputdir, "/WazeEdtHex_", j,".RData",sep=""))
 
