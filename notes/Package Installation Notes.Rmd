@@ -64,4 +64,84 @@ for(i in loadpacks){if(length(grep(i, (.packages(all.available=T))))==0) install
 
 ```
 
+# Other problem packages on SDC
+## `rgeos`
+
+Both `rgeos` and `rgdal` depend some tools that need to be installed as root:
+
+References [1](https://askubuntu.com/questions/312294/once-installed-geos-library-c-and-c-and-then-trying-to-install-rgeos-packa) and [2](https://stackoverflow.com/questions/21683138/unable-to-install-rgdal-and-rgeos-r-libraries-on-red-hat-linux#24866775)
+
+```
+sudo yum install geos geos-devel
+```
+Now try again:
+
+```{r}
+install.packages(c("rgeos", "rgdal"), dep=T, type = "source")
+```
+
+This fails with the error:
+`libgdal.so.20: cannot open shared object file: No such file or directory`
+
+This exists, and is in `/usr/local/lib`, see
+```
+whereis 'libgdal.so.20'
+```
+
+Try again, by loading packages from the Extra Packages for Enterprise Linux repository (EPEL):
+
+https://aws.amazon.com/premiumsupport/knowledge-center/ec2-enable-epel/
+
+Now try to install `gdal`:
+
+```
+sudo yum --enablerepo=epel install gdal proj proj-devel
+
+```
+See that gdal is installed with
+```
+gdalinfo --version
+``
+
+Still doesn't work. Try updating the dynamic library symbolic links
+https://stackoverflow.com/questions/40305095/cannot-install-rgdal-package-in-r-on-rhel6-unable-to-load-shared-object-rgdal-s
+
+
+```
+echo "/usr/local/lib" >> /etc/ld.so.conf.d/R-dependencies-x86_64.conf
+ldconfig
+```
+Do not have permission to write to /etc/ld.so.conf.d/
+
+
+
+Try updating the PATH:
+
+https://stackoverflow.com/questions/48823509/error-loading-rgdal
+
+```
+export LD_LIBRARY_PATH="/home/daniel/bin/gdal/lib:$LD_LIBRARY_PATH"
+ldd /home/daniel/R/x86_64-pc-linux-gnu-library/3.4/rgdal/libs/rgdal.so
+```
+
+
+Try this
+
+```
+sudo yum -y update
+sudo yum-config-manager --enable epel
+sudo yum -y install make automake gcc gcc-c++ libcurl-devel proj-devel geos-devel
+cd /tmp
+curl -L http://download.osgeo.org/gdal/2.0.0/gdal-2.0.0.tar.gz | tar zxf -
+cd gdal-2.0.0/
+./configure --prefix=/usr/local --without-python
+make -j4
+sudo make install
+cd /usr/local
+tar zcvf ~/gdal-2.0.0-amz1.tar.gz *
+```
+
+## `rgdal`
+
+## `ncdf4`
 
