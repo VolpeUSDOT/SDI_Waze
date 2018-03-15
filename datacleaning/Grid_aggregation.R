@@ -29,6 +29,15 @@ outputdir <- "S:/SDI Pilot Projects/Waze/MASTER Data Files/Waze Aggregated/Hexag
 
 source(file.path(codedir, "utility/wazefunctions.R")) # for movefiles() function
 
+HEXSIZE = c("1", "4", "05")[1] # Change the value in the bracket to use 4 sq mi or 0.5 sq mi
+
+# Read in jobs data from LODES LEHD: Workplace Area Characteristics (WAC) and Residential Area Characteristics (RAC).
+# Since these data are already grid-aggregated, simply append to the output of the grid aggregation loop.
+# https://lehd.ces.census.gov/data/ 
+# https://lehd.ces.census.gov/data/lodes/LODES7/LODESTechDoc7.3.pdf 
+wac <- readOGR(file.path(volpewazedir, "Data/MD_hexagons_shapefiles"), layer = paste0("hexagons_", HEXSIZE, "mi_bg_lodes_sum"))
+
+
 setwd(wazedir)
 
 # Read in data

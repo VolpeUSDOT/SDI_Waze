@@ -28,18 +28,23 @@ source(file.path(codedir, "utility/wazefunctions.R")) # for movefiles
 
 setwd(wazedir)
 
+TEST = T # Change to F to run for all available months, T for only a subset of months
+
+# Read in spatial data ----
+
 # Read in urban/rural layer from Census
 # From: https://www.census.gov/geo/maps-data/data/cbf/cbf_ua.html
 # https://www2.census.gov/geo/pdfs/maps-data/data/tiger/tgrshprd13/TGRSHPrd13_TechDoc_A.pdf
 
 ua <- readOGR(file.path(wazedir, "Working Documents/Census Files"), layer = "cb_2016_us_ua10_500k")
 
-# Read in hexagon shapefile. This is a rectangular surface of 1 sq mi area hexagons, 
-hex <- readOGR(file.path(volpewazedir, "spatial_layers/MD_hexagons_shapefiles"), layer = "MD_hexagons_1mi_newExtent")
-
-# read in county shapefile
-
+# Read in county shapefile
 co <- readOGR(file.path(wazedir, "Working Documents/Census Files"), layer = "cb_2015_us_county_500k")
+
+HEXSIZE = c("1", "4", "05")[3] # Change the value in the bracket to use 4 sq mi or 0.5 sq mi
+
+# Read in hexagon shapefile. This is a rectangular surface of 1 sq mi area hexagons, 
+hex <- readOGR(file.path(volpewazedir, "Data/MD_hexagons_shapefiles"), layer = paste0("MD_hexagons_", HEXSIZE, "mi_newExtent_neighbors"))
 
 # match coordinate reference system of hexagons to Urban Areas and counties
 # proj4string(hex)
@@ -65,6 +70,8 @@ avail.waze.months <- unique(substr(waze.monthly[grep("MD_buffered__", waze.month
 
 shared.avail.months = c(avail.edt.months, avail.waze.months)[duplicated(c(avail.edt.months, avail.waze.months))]
 
+if(TEST) shared.avail.months = c("04", "05", "06") # Change TEST to F to run for all available months
+
 # Start loop over months ----
 
 # Save files first to a local temporary directory, then move to the shared drive and delete local copies when complete, using movefiles() from utility/wazefunctions.R.
@@ -72,8 +79,6 @@ temp.outputdir = tempdir()
 
 
 for(i in shared.avail.months){
-  
-  # i = shared.avail.months[1] # test
   
   load(file.path(wazedir, paste0("MASTER Data Files/EDT_month/2017-", i, "_1_CrashFact_edited.RData")))
   # find the edt file for this month and assign to temporary working file name. Remove the month-named data frame
@@ -164,9 +169,9 @@ for(i in shared.avail.months){
   names(link.waze.edt)[grep("id.accident", names(link.waze.edt))] = "ID"
   
   # save the merged file as CSV and RData versions, to temporary output directory 
-  write.csv(link.waze.edt, file=file.path(temp.outputdir, paste0("merged.waze.edt.", i,"_MD.csv")), row.names = F)
+  write.csv(link.waze.edt, file=file.path(temp.outputdir, paste0("merged.waze.edt.", i,"_", HEXSIZE, "mi_MD.csv")), row.names = F)
   
-  save(list=c("link.waze.edt", "edt.df"), file = file.path(temp.outputdir, paste0("merged.waze.edt.", i,"_MD.RData")))
+  save(list=c("link.waze.edt", "edt.df"), file = file.path(temp.outputdir, paste0("merged.waze.edt.", i,"_", HEXSIZE, "mi_MD.RData")))
   
   
 } # End month loop ----
