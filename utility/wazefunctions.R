@@ -177,8 +177,9 @@ showobjsize <- function(units = "Mb", limit = 100) {
 # given a 2x2 table where columns are observed negative and postive, and rows are predicted negative and positive:
 # |: ---------------------------- Observed ------:|
 # |: ----------------------:|:Negative:|:Positive:|
-# |: Predicted  :|:Negative:|   A      |    B     |
-# |:            :|:Positive:|   C      |    D     |
+# |: Predicted  :|:Negative:|   TN     |    FN    |
+# |:            :|:Positive:|   FP     |    TP    |
+
 bin.mod.diagnostics <- function(predtab){
 
   accuracy = (predtab[1,1] + predtab[2,2] )/ sum(predtab) # true positives and true negatives divided by all observations
