@@ -64,8 +64,8 @@ for(i in loadpacks){if(length(grep(i, (.packages(all.available=T))))==0) install
 
 ```
 
-# Other problem packages on SDC
-## `rgeos`
+# GIS Packages on SDC
+## `rgeos` and `rgdal`
 
 Both `rgeos` and `rgdal` depend some tools that need to be installed as root:
 
@@ -95,11 +95,11 @@ https://aws.amazon.com/premiumsupport/knowledge-center/ec2-enable-epel/
 Now try to install `gdal`:
 
 ```
-sudo yum --enablerepo=epel install gdal proj proj-devel
+sudo yum --enablerepo=epel install -y gdal proj proj-devel gdal-devel proj-epsg proj-nad
 
 ```
 
-See that gdal is installed with
+See that gdal is installed with:
 
 ```
 gdalinfo --version
@@ -122,28 +122,50 @@ Try updating the PATH:
 https://stackoverflow.com/questions/48823509/error-loading-rgdal
 
 ```
-export LD_LIBRARY_PATH="/home/ec2-user/gdal-2.2.3/lib:$LD_LIBRARY_PATH"
+export LD_LIBRARY_PATH="/usr/bin/gdal/lib:$LD_LIBRARY_PATH"
 ldd /home/daniel/R/x86_64-pc-linux-gnu-library/3.4/rgdal/libs/rgdal.so
 ```
 
+Where is gdal-libs? This seems to be the problem, mentioned in several solutions on SO, but not available via yum. Look at what gdal packages are available:
 
-Try this
+```
+yum repo-pkgs epel list gdal*
+sudo yum search all "gdal"
+```
+
+No luck, try this:
+
+
+```{r, eval=F}
+install.packages("rgdal", method="curl", configure.args = c("--with-proj-include=/usr/bin/proj/include","--with-proj-lib=/usr/bin/proj/lib"))
+```
+Same problem as above.
+
+Ok, trying to get gdal-libs installed by manually downloading from RedHat Package Manager:
+```
+wget http://mirror.nodesdirect.com/epel/7/x86_64/Packages/g/gdal-libs-1.11.4-3.el7.x86_64.rpm
+sudo yum install gdal-libs-1.11.4-3.el7.x86_64.rpm
+
+wget https://rpmfind.net/linux/epel/6/x86_64/Packages/c/cfitsio-3.240-3.el6.x86_64.rpm
+```
+
+
+
+
+
+
+Edit: nope, also doesnot work:
 
 ```
 sudo yum -y update
 sudo yum-config-manager --enable epel
 sudo yum -y install make automake gcc gcc-c++ libcurl-devel proj-devel geos-devel
 cd /tmp
-curl -L http://download.osgeo.org/gdal/2.0.0/gdal-2.0.0.tar.gz | tar zxf -
-cd gdal-2.0.0/
+curl -L http://download.osgeo.org/gdal/2.2.3/gdal-2.2.3.tar.gz | tar zxf -
+cd gdal-2.3.3/
 ./configure --prefix=/usr/local --without-python
-make -j4
+sudo make -j4
 sudo make install
 cd /usr/local
 tar zcvf ~/gdal-2.0.0-amz1.tar.gz *
 ```
-
-## `rgdal`
-
-## `ncdf4`
-
