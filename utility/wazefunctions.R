@@ -107,11 +107,21 @@ makelink.nonpar <- function(accfile = edt.april, incfile = waze.april,
 # moving files from a temporary directory on local machine to shared drive. 
 # Files are removed from the local machine by this process.
 movefiles <- function(filelist, temp = outdir, wazedir){
-  for(i in filelist){
+  
+  # Check to make sure the from and to directories are accessible
+  if(!dir.exists(wazedir)) stop("Destination output directory does not exist or shared drive is not connected")
+  if(!dir.exists(wazedir)) stop("Destination output directory does not exist or shared drive is not connected")
+  if(length(filelist) < 1) stop("No files selected to move, check filelist argument")
+  if(length(dir(temp)[grep(filelist[1], dir(temp))]) < 1) stop("Selected files not found in the temporary output directory")
+    
+  if(.Platform$OS.type == "windows"){
     # Fix path separators for Windows / R 
     temp <- gsub("\\\\", "/", temp)
     temp <- gsub("C:/U", "C://U", temp)
-    
+  }
+  
+  for(i in filelist){
+      
     # Encase the destination path in quotes, because of spaces in path name
     system(paste0("mv ", file.path(temp, i), ' \"', file.path(wazedir, i), '\"'))
     
