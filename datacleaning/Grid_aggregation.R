@@ -29,6 +29,8 @@ outputdir <- "S:/SDI Pilot Projects/Waze/MASTER Data Files/Waze Aggregated/Hexag
 
 source(file.path(codedir, "utility/wazefunctions.R")) # for movefiles() function
 
+#test branch process
+
 HEXSIZE = c("1", "4", "05")[1] # Change the value in the bracket to use 4 sq mi or 0.5 sq mi
 
 # Read in jobs data from LODES LEHD: Workplace Area Characteristics (WAC) and Residential Area Characteristics (RAC).
