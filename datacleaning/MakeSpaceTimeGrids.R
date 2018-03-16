@@ -92,7 +92,7 @@ for(j in todo.months){ # j="04"
     i=i+3600
     
     timediff <- round(Sys.time()-starttime, 2)
-    cat(i, "complete \n", timediff, attr(timediff, "units"), "elapsed \n", rep("<>",20), "\n")
+    cat(i, "complete \n", timediff, attr(timediff, "units"), "elapsed \n", rep("<>",36000), "\n")
     
     
   } # end loop
