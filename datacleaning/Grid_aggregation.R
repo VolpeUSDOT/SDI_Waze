@@ -29,16 +29,7 @@ outputdir <- "S:/SDI Pilot Projects/Waze/MASTER Data Files/Waze Aggregated/Hexag
 
 source(file.path(codedir, "utility/wazefunctions.R")) # for movefiles() function
 
-#test branch process
-
-HEXSIZE = c("1", "4", "05")[1] # Change the value in the bracket to use 4 sq mi or 0.5 sq mi
-
-# Read in jobs data from LODES LEHD: Workplace Area Characteristics (WAC) and Residential Area Characteristics (RAC).
-# Since these data are already grid-aggregated, simply append to the output of the grid aggregation loop.
-# https://lehd.ces.census.gov/data/ 
-# https://lehd.ces.census.gov/data/lodes/LODES7/LODESTechDoc7.3.pdf 
-wac <- readOGR(file.path(volpewazedir, "Data/MD_hexagons_shapefiles"), layer = paste0("hexagons_", HEXSIZE, "mi_bg_lodes_sum"))
-
+HEXSIZE = c("1", "4", "05")[2] # Change the value in the bracket to use 4 sq mi or 0.5 sq mi
 
 setwd(wazedir)
 
@@ -52,7 +43,9 @@ avail.months = unique(substr(dir(wazemonthdir)[grep("^merged.waze.edt", dir(waze
 
 temp.outputdir = tempdir()# for temporary storage 
 
-for(j in avail.months){ #j = "05"
+todo.months = avail.months[2:4]
+
+for(j in todo.months){ #j = "05"
   
   load(file.path(wazemonthdir, paste0("merged.waze.edt.", j,"_MD.RData"))) # includes both waze (link.waze.edt) and edt (edt.df) data, with grid for central and neighboring cells
   
@@ -70,53 +63,8 @@ for(j in avail.months){ #j = "05"
   # The same, but for each of the neighboring grid cells (N, NE, SE, S, SW, NW). 
   # counts for roadType, 11 columns: length(unique(link.waze.edt$roadType[!is.na(link.waze.edt$roadType)]))
   
-  ##############
-  
-  #Dataframe of Grid IDs by day of year and time of day in month of April data (all grid IDs with Waze or EDT data)
-  GridIDall <- c(unique(as.character(link.waze.edt$GRID_ID)), unique(as.character(link.waze.edt$GRID_ID.edt)))
-  
-  month.days <- unique(as.numeric(format(link.waze.edt$CrashDate_Local, "%d")))
-  lastday = max(month.days[!is.na(month.days)])
-  
-  Month.hour <- seq(from = as.POSIXct(paste0("2017-", j,"-01 0:00"), tz="America/New_York"), 
-                    to = as.POSIXct(paste0("2017-", j,"-", lastday, " 23:00"), tz="America/New_York"),
-                    by = "hour")
-  
-  GridIDTime <- expand.grid(Month.hour,GridIDall)
-  names(GridIDTime) <- c("GridDayHour","GRID_ID")
-  
-  
-  # Temporally matching
-  # Match between the first reported time and last pull time of the Waze event. 
-  StartTime <- Sys.time()
-  t.min = min(GridIDTime$GridDayHour)
-  t.max = max(GridIDTime$GridDayHour)
-  i = t.min
-  
-  Waze.hex.time.all <- vector()
-  while(i+3600 <= t.max){
-    ti.GridIDTime = filter(GridIDTime,GridDayHour==i)
-    ti.link.waze.edt = filter(link.waze.edt, time >= i & time <= i+3600| last.pull.time >=i & last.pull.time <=i+3600)
-  
-    ti.Waze.hex <- inner_join(ti.GridIDTime, ti.link.waze.edt) #Use left_join to get zeros if no match  
-    
-    Waze.hex.time.all <- rbind(Waze.hex.time.all, ti.Waze.hex)
-    i=i+3600
-    print(i)
-  } # end loop
-  
-  EndTime <- Sys.time()-StartTime
-  EndTime
-  
-  Waze.hex.time <- filter(Waze.hex.time.all, !is.na(GRID_ID))
-  
-  #if the EDT or Waze data have not been updated for a given month, you can skip the Waze.hex.time steps and read in the file directly
-  #Split the Waze.hex.time step into a separate script for the cloud pipeline version 
- #uncomment to skip above steps and read in the file directly
-    ##load(file.path(paste(outputdir, "/WazeHexTimeList_", j,".RData",sep="")))
-  
-  
-  # includes both waze (link.waze.edt) and edt (edt.df) data, with grid for central and neighboring cells
+#Read in the data frame of all Grid IDs by day of year and time of day in each month of data (subet to all grid IDs with Waze OR EDT data)
+  load(file.path(paste(outputdir, "/WazeHexTimeList_", j,"_",HEXSIZE,"mi",".RData",sep="")))
   
   #summarize counts of Waze events in each hexagon and EDT matches to the Waze events (could be in neighboring hexagon)
   names(Waze.hex.time)
@@ -253,15 +201,8 @@ for(j in avail.months){ #j = "05"
   hextimeChar <- paste(wazeTime.edt.hexAll$day,wazeTime.edt.hexAll$hour,sep=":")
   wazeTime.edt.hexAll$hextime <- strptime(hextimeChar, "%j:%H", tz=)
 
-#  save(list="waze.edt.hex", file = paste(temp.outputdir, "/WazeEdtHex_", j,".RData",sep=""))
+  save(list="wazeTime.edt.hexAll", file = paste(temp.outputdir, "/WazeTimeEdtHexAll_", j,"_",HEXSIZE,"mi",".RData",sep=""))
 
-  #Save list of Grid cells and time windows with EDT or Waze data, so we don't re-run this    
-  save(list="Waze.hex.time", file = paste(temp.outputdir, "/WazeHexTimeList_", j,".RData",sep=""))
-  write.csv(Waze.hex.time, file = paste(temp.outputdir, "/WazeHexTimeList_", j,".csv",sep=""))
-
-  save(list="wazeTime.edt.hexAll", file = paste(temp.outputdir, "/WazeTimeEdtHexAll_", j,".RData",sep=""))
-  write.csv(wazeTime.edt.hexAll, file = paste(temp.outputdir, "/WazeTimeEdtHexAll_", j,".csv",sep=""))
-  
 } # End month aggregation loop ----
 
 movefiles(dir(temp.outputdir)[grep("Hex", dir(temp.outputdir))], temp.outputdir, outputdir)
