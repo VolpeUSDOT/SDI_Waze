@@ -13,24 +13,28 @@ library(rgdal) # for readOGR(), needed for reading in ArcM shapefiles
 library(lubridate)
 library(utils)
 
+#Set parameters for data to process
+HEXSIZE = c("1", "4", "05")[2] # Change the value in the bracket to use 1, 4, or 0.5 sq mi hexagon grids
+
+
 #Flynn drive
 codedir <- "~/git/SDI_Waze" 
 wazemonthdir <- "W:/SDI Pilot Projects/Waze/MASTER Data Files/Waze Aggregated/month_MD_clipped"
 wazedir <- "W:/SDI Pilot Projects/Waze/"
 volpewazedir <- "//vntscex.local/DFS/Projects/PROJ-OR02A2/SDI/"
-outputdir <- "W:/SDI Pilot Projects/Waze/MASTER Data Files/Waze Aggregated/month_MD_clipped"
+outputdir <- paste0("W:/SDI Pilot Projects/Waze/MASTER Data Files/Waze Aggregated/HexagonWazeEDT/",
+                    "WazeEDT Agg",HEXSIZE,"mile Rdata Input")
 
 #Sudderth drive
 codedir <- "~/GitHub/SDI_Waze"  #CONNECT TO VPN FIRST
 wazemonthdir <- "S:/SDI Pilot Projects/Waze/MASTER Data Files/Waze Aggregated/month_MD_clipped"
 wazedir <- "S:/SDI Pilot Projects/Waze/"
 volpewazedir <- "//vntscex.local/DFS/Projects/PROJ-OR02A2/SDI/"
-outputdir <- "S:/SDI Pilot Projects/Waze/MASTER Data Files/Waze Aggregated/HexagonWazeEDT"
+outputdir <- paste0("S:/SDI Pilot Projects/Waze/MASTER Data Files/Waze Aggregated/HexagonWazeEDT/",
+                    "WazeEDT Agg",HEXSIZE,"mile Rdata Input")
+
 
 source(file.path(codedir, "utility/wazefunctions.R")) # for movefiles() function
-
-HEXSIZE = c("1", "4", "05")[2] # Change the value in the bracket to use 4 sq mi or 0.5 sq mi
-
 setwd(wazedir)
 
 # Read in data
@@ -45,9 +49,9 @@ temp.outputdir = tempdir()# for temporary storage
 
 todo.months = avail.months[2]
 
-for(j in todo.months){ #j = "04"
+for(j in todo.months){ j = "04"
   
-  load(file.path(wazemonthdir, paste0("merged.waze.edt.", j,"_MD.RData"))) # includes both waze (link.waze.edt) and edt (edt.df) data, with grid for central and neighboring cells
+  load(file.path(wazemonthdir, paste0("merged.waze.edt.", j,"_",HEXSIZE,"mi","_MD.RData"))) # includes both waze (link.waze.edt) and edt (edt.df) data, with grid for central and neighboring cells
   
   # format(object.size(link.waze.edt), "Mb"); format(object.size(edt.df), "Mb")
   # EDT time needs to be POSIXct, not POSIXlt. ct: seconds since beginning of 1970 in UTC. lt is a list of vectors representing seconds, min, hours, day, year. ct is better for analysis, while lt is more human-readable.
@@ -72,9 +76,8 @@ for(j in todo.months){ #j = "04"
   StartTime <- Sys.time()
   waze.hex <- Waze.hex.time %>%
     group_by(GRID_ID, GRID_ID_NW, GRID_ID_N, GRID_ID_NE, GRID_ID_SW, GRID_ID_S, GRID_ID_SE,
-             day = format(GridDayHour, "%j"), hour = format(GridDayHour, "%H")) %>%
+             day = format(GridDayHour, "%j"), hour = format(GridDayHour, "%H"), weekday = format(GridDayHour, "%u")) %>%
     summarize(
-      DayOfWeek = weekdays(time)[1], #Better way to select one value?
       nWazeRowsInMatch = n(), #includes duplicates that match more than one EDT report (don't use in model)
       uniqWazeEvents= n_distinct(uuid.waze),
       nMatchEDT_buffer = n_distinct(CrashCaseID[match=="M"]),
@@ -92,17 +95,34 @@ for(j in todo.months){ #j = "04"
       nWazeRoadClosed = n_distinct(uuid.waze[type=="ROAD_CLOSED"]),
       nWazeWeatherOrHazard = n_distinct(uuid.waze[type=="WEATHERHAZARD"]),
       
+      nHazardOnRoad = n_distinct(uuid.waze[subtype=="HAZARD_ON_ROAD"|subtype=="HAZARD_ON_ROAD_CAR_STOPPED"
+                                           |subtype=="HAZARD_ON_ROAD_CAR_STOPPED"|subtype=="HAZARD_ON_ROAD_CONSTRUCTION"
+                                           |subtype=="HAZARD_ON_ROAD_ICE"|subtype=="HAZARD_ON_ROAD_LANE_CLOSED"
+                                           |subtype=="HAZARD_ON_ROAD_OBJECT"|subtype=="HAZARD_ON_ROAD_POT_HOLE"
+                                           |subtype=="HAZARD_ON_ROAD_ROAD_KILL"]),
+      nHazardOnShoulder = n_distinct(uuid.waze[subtype=="HAZARD_ON_SHOULDER"|subtype=="HAZARD_ON_SHOULDER_ANIMALS"
+                                               |subtype=="HAZARD_ON_ROAD_CAR_STOPPED"|subtype=="HAZARD_ON_SHOULDER_CAR_STOPPED"
+                                               |subtype=="HAZARD_ON_SHOULDER_MISSING_SIGN"]),
+      nHazardWeather = n_distinct(uuid.waze[subtype=="HAZARD_WEATHER"|subtype=="HAZARD_WEATHER_FLOOD"
+                                            |subtype=="HAZARD_WEATHER_FOG"|subtype=="HAZARD_WEATHER_HAIL"
+                                            |subtype=="HAZARD_WEATHER_MONSOON"|subtype=="HAZARD_WEATHER_FREEZING_RAIN"
+                                            |subtype=="HAZARD_WEATHER_HEAVY_SNOW"|subtype=="HAZARD_WEATHER_HEAVY_RAIN"]),
+
       nWazeAccidentMajor = n_distinct(uuid.waze[subtype=="ACCIDENT_MAJOR"]),
       nWazeAccidentMinor = n_distinct(uuid.waze[subtype=="ACCIDENT_MINOR"]),
+
       nWazeHazardCarStoppedRoad = n_distinct(uuid.waze[subtype=="HAZARD_ON_ROAD_CAR_STOPPED"]),
-      nWazeHazardCarStoppedShould = n_distinct(uuid.waze[subtype=="HAZARD_ON_SHOULDER_CAR_STOPPED"]),
+      nWazeHazardCarStoppedShoulder = n_distinct(uuid.waze[subtype=="HAZARD_ON_SHOULDER_CAR_STOPPED"]),
       nWazeHazardConstruction = n_distinct(uuid.waze[subtype=="HAZARD_ON_ROAD_CONSTRUCTION"]),
       nWazeHazardObjectOnRoad = n_distinct(uuid.waze[subtype=="HAZARD_ON_ROAD_OBJECT"]),
+      nWazeHazardPotholeOnRoad = n_distinct(uuid.waze[subtype=="HAZARD_ON_ROAD_POT_HOLE"]),
+      nWazeHazardRoadKillOnRoad = n_distinct(uuid.waze[subtype=="HAZARD_ON_ROAD_ROAD_KILL"]),
       nWazeJamModerate = n_distinct(uuid.waze[subtype=="JAM_MODERATE_TRAFFIC"]),
       nWazeJamHeavy = n_distinct(uuid.waze[subtype=="JAM_HEAVY_TRAFFIC"]),
       nWazeJamStandStill = n_distinct(uuid.waze[subtype=="JAM_STAND_STILL_TRAFFIC"]),
       nWazeWeatherFlood = n_distinct(uuid.waze[subtype=="HAZARD_WEATHER_FLOOD"]),
       nWazeWeatherFog = n_distinct(uuid.waze[subtype=="HAZARD_WEATHER_FOG"]),
+      nWazeHazardIceRoad = n_distinct(uuid.waze[subtype=="HAZARD_ON_ROAD_ICE"]),
       
       nWazeRT3 = n_distinct(uuid.waze[roadType=="3"]),
       nWazeRT4 = n_distinct(uuid.waze[roadType=="4"]),
@@ -111,8 +131,20 @@ for(j in todo.months){ #j = "04"
       nWazeRT2 = n_distinct(uuid.waze[roadType=="2"]),
       nWazeRT0 = n_distinct(uuid.waze[roadType=="0"]),
       nWazeRT1 = n_distinct(uuid.waze[roadType=="1"]),
-      nWazeRT20 = n_distinct(uuid.waze[roadType=="20"])) 
-  
+      nWazeRT20 = n_distinct(uuid.waze[roadType=="20"]),
+      nWazeRT17 = n_distinct(uuid.waze[roadType=="17"]),
+      
+      medLastRepRate = median(last.reportRating),
+      medLastConf = median(last.confidence),
+      medLastReliab = median(last.reliability),
+      
+      medMagVar = median(magvar),
+      nMagVar0to60 = n_distinct(uuid.waze[magvar>= 0 & magvar<60]),
+      nMagVar60to120 = n_distinct(uuid.waze[magvar>= 60 & magvar<120]),
+      nMagVar120to180 = n_distinct(uuid.waze[magvar>= 120 & magvar<180]),
+      nMagVar180to240 = n_distinct(uuid.waze[magvar>= 180 & magvar<240]),
+      nMagVar240to360 = n_distinct(uuid.waze[magvar>= 240 & magvar<360])) 
+
   EndTime <- Sys.time()-StartTime
   EndTime
   
