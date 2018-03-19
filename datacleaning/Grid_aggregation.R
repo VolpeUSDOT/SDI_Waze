@@ -37,9 +37,6 @@ outputdir <- paste0("S:/SDI Pilot Projects/Waze/MASTER Data Files/Waze Aggregate
 source(file.path(codedir, "utility/wazefunctions.R")) # for movefiles() function
 setwd(wazedir)
 
-# Read in data
-#load(file.path(volpewazedir, "Data/MD_hex.RData")) # has the complete grid as hex2, and a subset of just the grid cells in use for this month as hex.md
-
 # Loop through months of available merged data
 avail.months = unique(substr(dir(wazemonthdir)[grep("^merged.waze.edt", dir(wazemonthdir))], 
                       start = 17,
