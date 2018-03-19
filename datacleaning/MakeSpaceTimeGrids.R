@@ -100,6 +100,6 @@ for(j in todo.months){ # j="04"
 
 print(j)
 
-movefiles(dir(temp.outputdir)[grep("Hex", dir(temp.outputdir))], temp.outputdir, outputdir)
+#movefiles(dir(temp.outputdir)[grep("Hex", dir(temp.outputdir))], temp.outputdir, outputdir)
 
   

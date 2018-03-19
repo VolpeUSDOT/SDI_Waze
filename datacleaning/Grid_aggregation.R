@@ -44,9 +44,9 @@ avail.months = unique(substr(dir(wazemonthdir)[grep("^merged.waze.edt", dir(waze
 
 temp.outputdir = tempdir()# for temporary storage 
 
-todo.months = avail.months[2]
+todo.months = avail.months[c(2:4)]
 
-for(j in todo.months){ j = "04"
+for(j in todo.months){ #j = "04"
   
   load(file.path(wazemonthdir, paste0("merged.waze.edt.", j,"_",HEXSIZE,"mi","_MD.RData"))) # includes both waze (link.waze.edt) and edt (edt.df) data, with grid for central and neighboring cells
   
