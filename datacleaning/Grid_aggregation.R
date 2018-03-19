@@ -34,7 +34,7 @@ HEXSIZE = c("1", "4", "05")[2] # Change the value in the bracket to use 4 sq mi 
 setwd(wazedir)
 
 # Read in data
-load(file.path(volpewazedir, "Data/MD_hex.RData")) # has the complete grid as hex2, and a subset of just the grid cells in use for this month as hex.md
+#load(file.path(volpewazedir, "Data/MD_hex.RData")) # has the complete grid as hex2, and a subset of just the grid cells in use for this month as hex.md
 
 # Loop through months of available merged data
 avail.months = unique(substr(dir(wazemonthdir)[grep("^merged.waze.edt", dir(wazemonthdir))], 
@@ -43,9 +43,9 @@ avail.months = unique(substr(dir(wazemonthdir)[grep("^merged.waze.edt", dir(waze
 
 temp.outputdir = tempdir()# for temporary storage 
 
-todo.months = avail.months[2:4]
+todo.months = avail.months[2]
 
-for(j in todo.months){ #j = "05"
+for(j in todo.months){ #j = "04"
   
   load(file.path(wazemonthdir, paste0("merged.waze.edt.", j,"_MD.RData"))) # includes both waze (link.waze.edt) and edt (edt.df) data, with grid for central and neighboring cells
   
@@ -56,15 +56,15 @@ for(j in todo.months){ #j = "05"
   
   # <><><><><><><><><><><><><><><><><><><><>
   
+  #Read in the data frame of all Grid IDs by day of year and time of day in each month of data (subet to all grid IDs with Waze OR EDT data)
+  load(file.path(paste(outputdir, "/WazeHexTimeList_", j,"_",HEXSIZE,"mi",".RData",sep="")))
+  
   # aggregate: new data frame will have one row per cell, per hour, per day.
   # Response variable column: count of unique EDT events matching Waze events in this cell, within this time window. 
   # Predictor variable columns: median values for the numeric characteristics: report rating, confidence..
   # Counts for the number of waze events of each type and subtype, inside this grid cell at this time.
   # The same, but for each of the neighboring grid cells (N, NE, SE, S, SW, NW). 
   # counts for roadType, 11 columns: length(unique(link.waze.edt$roadType[!is.na(link.waze.edt$roadType)]))
-  
-#Read in the data frame of all Grid IDs by day of year and time of day in each month of data (subet to all grid IDs with Waze OR EDT data)
-  load(file.path(paste(outputdir, "/WazeHexTimeList_", j,"_",HEXSIZE,"mi",".RData",sep="")))
   
   #summarize counts of Waze events in each hexagon and EDT matches to the Waze events (could be in neighboring hexagon)
   names(Waze.hex.time)

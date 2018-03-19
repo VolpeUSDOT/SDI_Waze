@@ -9,26 +9,29 @@ library(tidyverse)
 library(lubridate)
 library(utils)
 
+#Set parameters for data to process
+HEXSIZE = c("1", "4", "05")[2] # Change the value in the bracket to use 1, 4, or 0.5 sq mi hexagon grids
+
+
 #Flynn drive
 codedir <- "~/git/SDI_Waze" 
 wazemonthdir <- "W:/SDI Pilot Projects/Waze/MASTER Data Files/Waze Aggregated/month_MD_clipped"
 wazedir <- "W:/SDI Pilot Projects/Waze/"
 volpewazedir <- "//vntscex.local/DFS/Projects/PROJ-OR02A2/SDI/"
-outputdir <- "W:/SDI Pilot Projects/Waze/MASTER Data Files/Waze Aggregated/month_MD_clipped"
+outputdir <- paste0("W:/SDI Pilot Projects/Waze/MASTER Data Files/Waze Aggregated/HexagonWazeEDT/",
+                    "WazeEDT Agg",HEXSIZE,"mile Rdata Input")
 
 #Sudderth drive
-codedir <- "~/GitHub/SDI_Waze"  #CONNECT TO VPN FIRST
+#NEED TO CONNECT TO VPN AND CLICK ON "S" DRIVE IN FILE EXPLORER FIRST
+codedir <- "~/GitHub/SDI_Waze"  
 wazemonthdir <- "S:/SDI Pilot Projects/Waze/MASTER Data Files/Waze Aggregated/month_MD_clipped"
 wazedir <- "S:/SDI Pilot Projects/Waze/"
 volpewazedir <- "//vntscex.local/DFS/Projects/PROJ-OR02A2/SDI/"
-outputdir <- "S:/SDI Pilot Projects/Waze/MASTER Data Files/Waze Aggregated/HexagonWazeEDT"
+outputdir <- paste0("S:/SDI Pilot Projects/Waze/MASTER Data Files/Waze Aggregated/HexagonWazeEDT/",
+                    "WazeEDT Agg",HEXSIZE,"mile Rdata Input")
+
 
 source(file.path(codedir, "utility/wazefunctions.R")) # for movefiles() function
-
-
-HEXSIZE = c("1", "4", "05")[2] # Change the value in the bracket to use 4 sq mi or 0.5 sq mi
-#Run the scripts to get the 0.5 and 4mi grids for months 07-09   
-  
 setwd(wazedir)
 
 # Loop through months of available merged data
@@ -36,7 +39,7 @@ avail.months = unique(substr(dir(wazemonthdir)[grep("^merged.waze.edt", dir(waze
                       start = 17,
                       stop = 18))
 
-todo.months = avail.months[2:4]
+todo.months = avail.months[c(1,4:7)]
 
 temp.outputdir = tempdir()# for temporary storage 
 starttime <- Sys.time()
@@ -83,7 +86,6 @@ for(j in todo.months){ # j="04"
     Waze.hex.time.all <- rbind(Waze.hex.time.all, ti.Waze.hex)
     i=i+3600
 
-    
    } # end loop
   
   EndTime <- Sys.time()-StartTime
