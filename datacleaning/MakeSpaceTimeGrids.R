@@ -27,13 +27,9 @@ source(file.path(codedir, "utility/wazefunctions.R")) # for movefiles() function
 
 
 HEXSIZE = c("1", "4", "05")[2] # Change the value in the bracket to use 4 sq mi or 0.5 sq mi
-#TODO: Change file names in S:\SDI Pilot Projects\Waze\MASTER Data Files\Waze Aggregated\month_MD_clipped to add the 1mi label 
 #Run the scripts to get the 0.5 and 4mi grids for months 07-09   
   
 setwd(wazedir)
-
-# Read in data
-#load(file.path(volpewazedir, "Data/MD_hex.RData")) # has the complete grid as hex2, and a subset of just the grid cells in use for this month as hex.md
 
 # Loop through months of available merged data
 avail.months = unique(substr(dir(wazemonthdir)[grep("^merged.waze.edt", dir(wazemonthdir))], 
