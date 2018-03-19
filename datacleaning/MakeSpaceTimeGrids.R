@@ -12,7 +12,7 @@ library(utils)
 #Set parameters for data to process
 HEXSIZE = c("1", "4", "05")[2] # Change the value in the bracket to use 1, 4, or 0.5 sq mi hexagon grids
 
-
+##Set file paths - remove for cloud pipeline
 #Flynn drive
 codedir <- "~/git/SDI_Waze" 
 wazemonthdir <- "W:/SDI Pilot Projects/Waze/MASTER Data Files/Waze Aggregated/month_MD_clipped"
