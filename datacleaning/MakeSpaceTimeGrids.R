@@ -86,12 +86,9 @@ for(j in todo.months){ # j="04"
     
     Waze.hex.time.all <- rbind(Waze.hex.time.all, ti.Waze.hex)
     i=i+3600
+
     
-    timediff <- round(Sys.time()-starttime, 2)
-    cat(i, "complete \n", timediff, attr(timediff, "units"), "elapsed \n", rep("<>",36000), "\n")
-    
-    
-  } # end loop
+   } # end loop
   
   EndTime <- Sys.time()-StartTime
   EndTime
@@ -102,6 +99,8 @@ for(j in todo.months){ # j="04"
   save(list="Waze.hex.time", file = paste(temp.outputdir, "/WazeHexTimeList_", j,"_",HEXSIZE,"mi",".RData",sep=""))
 
   } # End SpaceTimeGrid loop ----
+
+print(j)
 
 movefiles(dir(temp.outputdir)[grep("Hex", dir(temp.outputdir))], temp.outputdir, outputdir)
 
