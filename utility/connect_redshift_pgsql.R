@@ -3,7 +3,7 @@
 # additional detail from https://aws.amazon.com/blogs/big-data/connecting-r-with-amazon-redshift/
 # https://daniel-workspace.securedatacommons.com:8888
 # install.packages("RPostgreSQL", dep = T)
-TESTCONN = F # Set to T to test connection 
+TESTCONN = T # Set to T to test connection 
 
 library(RPostgreSQL)
 
@@ -37,24 +37,25 @@ if(TESTCONN){
 # time functions: strftime and to_timestamp
 # WHERE pub_millis BETWEEN to_date('01-APR-17','DD-MON-YY') AND to_date('03-APR-17','DD-MON-YY')
 
-# add to end to limit the nrows: LIMIT 50000
+# add to end to limit the rows of queried data: LIMIT 50000
 
 
 alert_query_MD <- "SELECT * FROM alert 
                     WHERE state='MD' 
                     AND pub_utc_timestamp BETWEEN to_timestamp('2017-04-01 00:00:00','YYYY-MM-DD HH24:MI:SS') 
                                           AND     to_timestamp('2017-04-30 23:59:59','YYYY-MM-DD HH24:MI:SS')
+                    LIMIT 50000
                       " # end query
 
 results <- dbGetQuery(conn, alert_query_MD)
 
 
 
-format(object.size(results), "Gb") # 1.3 Gb for April 2017 Md data,
+format(object.size(results), "Gb") # 1.3 Gb for April 2017 Md data, 
 
 summary(duplicated(results$alert_uuid)) # Avg 8x duplicated uuids
 
-system('free -m') # 16 GB ram, 6 used 
+system('free -m') # 16 GB ram, 6 used in previous instance. Now 31 Gb free 
 
 # is the pub_utc_timestamp direclty converted from pub_millis?
 
