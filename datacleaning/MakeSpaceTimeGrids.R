@@ -30,7 +30,6 @@ volpewazedir <- "//vntscex.local/DFS/Projects/PROJ-OR02A2/SDI/"
 outputdir <- paste0("S:/SDI Pilot Projects/Waze/MASTER Data Files/Waze Aggregated/HexagonWazeEDT/",
                     "WazeEDT Agg",HEXSIZE,"mile Rdata Input")
 
-
 source(file.path(codedir, "utility/wazefunctions.R")) # for movefiles() function
 setwd(wazedir)
 

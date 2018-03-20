@@ -136,9 +136,9 @@ for(j in todo.months){ #j = "04"
       medLastReliab = median(last.reliability),
       
       medMagVar = median(magvar),
-      nMagVar0to60 = n_distinct(uuid.waze[magvar>= 0 & magvar<60]),
-      nMagVar60to120 = n_distinct(uuid.waze[magvar>= 60 & magvar<120]),
-      nMagVar120to180 = n_distinct(uuid.waze[magvar>= 120 & magvar<180]),
+      nMagVar330to30 = n_distinct(uuid.waze[magvar>= 330 & magvar<30]),
+      nMagVar30to60 = n_distinct(uuid.waze[magvar>= 60 & magvar<120]),
+      nMagVar90to180 = n_distinct(uuid.waze[magvar>= 120 & magvar<180]),
       nMagVar180to240 = n_distinct(uuid.waze[magvar>= 180 & magvar<240]),
       nMagVar240to360 = n_distinct(uuid.waze[magvar>= 240 & magvar<360])) 
 
