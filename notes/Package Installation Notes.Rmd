@@ -6,6 +6,7 @@ output: html_document
 Issue originally with `install.packages('tidyverse')` failing. Traces back to an issue with `openssl`, a necessary package for a number of purposes, including for `aws.s3`.
 
 SDC instance is Linux, running Redhat OS. Openssl is installed, and can check from the terminal:
+
 ```
 [daniel@ip-172-18-33-183 ~]$ openssl version -a
 OpenSSL 1.0.2k-fips  26 Jan 2017
@@ -113,8 +114,12 @@ https://stackoverflow.com/questions/40305095/cannot-install-rgdal-package-in-r-o
 echo "/usr/local/lib" >> /etc/ld.so.conf.d/R-dependencies-x86_64.conf
 ldconfig
 ```
-Do not have permission to write to /etc/ld.so.conf.d/
+Do not have permission to write to /etc/ld.so.conf.d/, so run this instead:
 
+```
+sudo ldconfig -c "echo '/usr/local/lib' >> /etc/ld.so.conf.d/R-dependencies-x86_64.conf"
+
+```
 
 
 Try updating the PATH:
