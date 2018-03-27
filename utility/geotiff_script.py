@@ -211,32 +211,35 @@ def write_daily_geotiffs(start_date,end_date, station, save_path = "/home/tannag
     grids = []
     radars = []
     for my_datetime in my_daterange:
-        grids, radars = 0, 0
-        gc.collect()
-        print(my_datetime.strftime('%Y/%m/%d/'))
-        radars = get_hourly_radars_from_aws(station, my_datetime)
-        grids = radars_to_grids(radars)
-	radars = 0
+        try:
+           grids, radars = 0, 0
+           gc.collect()
+           print(my_datetime.strftime('%Y/%m/%d/'))
+           radars = get_hourly_radars_from_aws(station, my_datetime)
+           grids = radars_to_grids(radars)
+           radars = 0
  
 
-        for i, grid in enumerate(grids):
-            #write to geotiff file 
-            """
-            Note: there is a warp argument that uses gdal to warp the output to a lat/lon WGS84 grid, 
+           for i, grid in enumerate(grids):
+               #write to geotiff file 
+               """
+               Note: there is a warp argument that uses gdal to warp the output to a lat/lon WGS84 grid, 
             might be important for working on certain projections? unsure...
 
-            ( from the man on pyart.io.write_grid_geotiff() ):
+               ( from the man on pyart.io.write_grid_geotiff() ):
 
-            warp : bool, optional
-                True - Use gdalwarp (called from command line using os.system)
-                       to warp to a lat/lon WGS84 grid.
-                False - No warping will be performed. Output will be Az. Equidistant.)
-            """
+               warp : bool, optional
+            True - Use gdalwarp (called from command line using os.system)
+                   to warp to a lat/lon WGS84 grid.
+            False - No warping will be performed. Output will be Az. Equidistant.)
+               """
 
-            pyart.io.write_grid_geotiff(grid, my_datetime.strftime('%Y-%m-%d-') + str(i+1) + station, 'reflectivity')
-            print("wrote a geotiff!")
-
-
+               pyart.io.write_grid_geotiff(grid, my_datetime.strftime('%Y-%m-%d-') + str(i+1) + station, 'reflectivity')
+               print("wrote a geotiff!")
+        except:
+           pass
+    
+    
 def main():
 
    ## main write out to geotiff function call
