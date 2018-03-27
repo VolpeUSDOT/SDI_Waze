@@ -41,7 +41,7 @@ ua <- readOGR(file.path(wazedir, "Working Documents/Census Files"), layer = "cb_
 # Read in county shapefile
 co <- readOGR(file.path(wazedir, "Working Documents/Census Files"), layer = "cb_2015_us_county_500k")
 
-HEXSIZE = c("1", "4", "05")[3] # Change the value in the bracket to use 4 sq mi or 0.5 sq mi
+HEXSIZE = c("1", "4", "05")[1] # Change the value in the bracket to use 4 sq mi or 0.5 sq mi
 
 # Read in hexagon shapefile. This is a rectangular surface of 1 sq mi area hexagons, 
 hex <- readOGR(file.path(volpewazedir, "Data/MD_hexagons_shapefiles"), layer = paste0("MD_hexagons_", HEXSIZE, "mi_newExtent_neighbors"))
@@ -70,7 +70,7 @@ avail.waze.months <- unique(substr(waze.monthly[grep("MD_buffered__", waze.month
 
 shared.avail.months = c(avail.edt.months, avail.waze.months)[duplicated(c(avail.edt.months, avail.waze.months))]
 
-if(TEST) shared.avail.months = c("04", "05", "06") # Change TEST to F to run for all available months
+if(TEST) shared.avail.months = c("04") # Change TEST to F to run for all available months
 
 # Start loop over months ----
 
