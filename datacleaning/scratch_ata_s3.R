@@ -9,14 +9,18 @@ aws.signature::use_credentials()
 
 
 # local csv to Rdata frame; pick a csv on the local machine
-test <- readr::read_csv("Summary_RIEM_Regression_Output.csv")
+test <- data.frame(runif(1000))
 
 # save frame to s3
 s3save(test, object = "working/test.Rdata", bucket = "ata-waze")
+rm(test)
 
 # read frame from bucket
-testR <- s3load("working/test.Rdata", bucket = "ata-waze")
+s3load("working/test.Rdata", bucket = "ata-waze")
+head(test)
 
-# write frame to bucket
-s3save(testR, object = "working/testOut.Rdata", bucket = "ata-waze")
+# Moving files up ----
+# From local machine, use SFTP to transfer census, hex, and derived data to the analysis instance, in "s3_transfer".
+# Then run this to move all files over directly
+system("aws s3 cp /home/dflynn-volpe/s3_transfer s3://ata-waze --recursive --include '*'")
 

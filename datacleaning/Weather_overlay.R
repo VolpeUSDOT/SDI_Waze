@@ -1,6 +1,6 @@
 # Weather data overlay on grid aggregated data.
 # Working with geoTIFFs from NEXRAD, from utility/geotiff_script.py
-# This step follows Grid_aggregation.R
+# This step follows Grid_aggregation.R.
 
 # <><><><><><><><><><><><><><><><><><><><>
 # Setup ----
@@ -11,6 +11,8 @@ library(rgeos)
 library(raster)
 library(foreach)
 library(doParallel)
+library(aws.s3)
+library(tidyverse)
 
 # Set hexagon size
 HEXSIZE = c("1", "4", "05")[1] # Change the value in the bracket to use 1, 4, or 0.5 sq mi hexagon grids
@@ -18,25 +20,31 @@ HEXSIZE = c("1", "4", "05")[1] # Change the value in the bracket to use 1, 4, or
 runmonths = c("04", "05", "06")
 BYPOLY = F # leave as F for looping over files rather than over polygons within a file
 
-#Flynn drive
-codedir <- "~/git/SDI_Waze" 
-wazemonthdir <- paste0("W:/SDI Pilot Projects/Waze/MASTER Data Files/Waze Aggregated/HexagonWazeEDT/",
-                       "WazeEDT Agg",HEXSIZE,"mile Rdata Input")
-wazedir <- "W:/SDI Pilot Projects/Waze/"
-volpewazedir <- "//vntscex.local/DFS/Projects/PROJ-OR02A2/SDI/"
-outputdir <- paste0("W:/SDI Pilot Projects/Waze/MASTER Data Files/Waze Aggregated/HexagonWazeEDT/",
-                    "WazeEDT Agg",HEXSIZE,"mile Rdata Input")
+# Updating to run on ATA
+codedir <- "~/SDI_Waze" 
+waze.bucket <- "ata-waze"
+inputdir <- paste0("WazeEDT_Agg", HEXSIZE, "mile_Rdata_Input")
+outputdir <- inputdir # write out to the same subfolder in this S3 bucket.
+localdir <- "/home/dflynn-volpe/workingdata" # location on this instance to hold working data files that can be s3loaded. *Need full path, cannot abbreviate to ~/woringdata, for readOGR*
 
-source(file.path(codedir, "utility/wazefunctions.R")) # for movefiles() function
-setwd(wazedir)
+aws.signature::use_credentials()
+
+source(file.path(codedir, "utility/wazefunctions.R"))
 
 # Read in data: hexagons, and Grid-aggregated Waze data ----
 # Weather data read in inside the foreach loop
+# Grab any necessary data from the s3 bucket
+s3transfer = paste("aws s3 cp s3://ata-waze/MD_hexagon_shapefiles", localdir, "--recursive --include '*'")
+system(s3transfer)
+
+s3transfer = paste("aws s3 cp s3://ata-waze/additional_data/census_files", localdir, "--recursive --include '*'")
+system(s3transfer)
+
 # Hexagons:
-hex <- readOGR(file.path(volpewazedir, "Data/MD_hexagons_shapefiles"), layer = paste0("MD_hexagons_", HEXSIZE, "mi_newExtent_neighbors"))
+hex <- readOGR(localdir, layer = paste0("MD_hexagons_", HEXSIZE, "mi_newExtent_neighbors"))
 
 # Read in county shapefile, and match all projections. See http://rspatial.org/spatial/rst/6-crs.html
-co <- readOGR(file.path(wazedir, "Working Documents/Census Files"), layer = "cb_2015_us_county_500k")
+co <- readOGR(localdir, layer = "cb_2015_us_county_500k")
 
 # maryland FIPS = 24
 md.co <- co[co$STATEFP == 24,]
@@ -52,15 +60,16 @@ registerDoParallel(cl)
 
 # Start month loop ----
 # Big loop, over months. Process weather data inside this loop.
-for(mo in runmonths){  # mo = "04"
+starttime <- Sys.time()
+
+for(mo in runmonths){ 
   
-  # Waze - aggregated
-  wazedatamonth <- dir(wazemonthdir)[grep(paste0("WazeTimeEdtHexAll_", mo), dir(wazemonthdir))]
+  # Waze - aggregated. s3load directly, not saving file to instance
+  # s3load(object = paste0("WazeTimeEdtHexAll_", mo,".RData"), bucket = inputdir)
+  s3load(object = file.path(inputdir, paste0("WazeTimeEdtHexAll_", mo,".RData")), bucket = waze.bucket)
   
-  load(file.path(wazemonthdir, wazedatamonth))
-  
-  # Weather
-  weatherdir <- file.path(volpewazedir, "Data/Weather_Geotiffs")
+  # Weather - temp wd for now, need to move all these to s3 bucket (or better, edit NEXRAD script to save directly to S3)
+  weatherdir <- "/home/dflynn-volpe/s3_transfer/additional_data/weather/Weather_Geotiffs" #file.path(localdir, "Weather_Geotiffs")
   
   # Get grid values for hex polygons with extract(). S.l.o.w.. Consider resampling and parallelizing. Also consider rasterizing the poloygons and using getValues instead of extract: https://gis.stackexchange.com/questions/130522/increasing-speed-of-crop-mask-extract-raster-by-many-polygons-in-r/188834
 
@@ -68,7 +77,7 @@ for(mo in runmonths){  # mo = "04"
   # Get list of weather tifs for this month
   mo.wx <- dir(weatherdir)[grep(paste0("2017-", mo), dir(weatherdir))]
   
-  wx.cb <- foreach(i = 1:length(mo.wx), .combine = rbind, .packages = "raster") %dopar% {
+wx.cb <- foreach(i = 1:length(mo.wx), .combine = rbind, .packages = "raster") %dopar% {
     
     # Get the hour and day for this file
     if(nchar(mo.wx[i]) == 21){
@@ -91,19 +100,29 @@ for(mo in runmonths){  # mo = "04"
                       fun = max, na.rm = T, # summarize by taking the MAX value for the cells that intersect with this polygon
                       df = T) # return results as a data frame
     
-    wx.mo <- data.frame(GRID_ID = hex.md$GRID_ID, yr, dy, hr, wx = hex.wx[,2])
-    
+    wx.mo <- data.frame(GRID_ID = hex.md$GRID_ID, year = yr, day = dy, hour = hr, wx = hex.wx[,2])
+    wx.mo$wx[wx.mo$wx == -Inf] = NA
+    wx.mo
   } # end foreach loop over files within month
   
-  assign(paste0("wx.mo.", mo), wx.mo) # create object for this month
+  assign(paste0("wx.mo.", mo), wx.cb) # create object for the combined output of this month
   
-  WazeTime.edt.wx <- left_join(wazeTime.edt.hexAll, wx.mo)
+  wte <- wazeTime.edt.hexAll
+  wte$hextime <- as.character(wte$hextime)
+  wte$year <- "2017" # update after fixing Grid_aggregate to include year
+  
+  WazeTime.edt.wx <- left_join(wte, wx.cb, 
+                               by = c("GRID_ID", "year", "day", "hour"))
 
-  save(list = c("wx.mo", "WazeTime.edt.wx"), file = file.path(wazemonthdir, paste0(paste0("WazeTimeEdtHexWx_", mo))))
-         
+  s3save(list = c(paste0("wx.mo.", mo), "WazeTime.edt.wx"), 
+         object = file.path(outputdir, paste0(paste0("WazeTimeEdtHexWx_", mo))),
+         bucket = waze.bucket
+          )
+  timediff <- Sys.time() - starttime
+  cat(mo, "complete", round(timediff, 2), attr(timediff, "units"), "elapsed \n")       
 } # end month loop
 
-                    
+                  
 stopCluster(cl) # stop the cluster when done
 
 
