@@ -16,7 +16,7 @@ library(tidyverse)
 
 # Set hexagon size
 HEXSIZE = c("1", "4", "05")[1] # Change the value in the bracket to use 1, 4, or 0.5 sq mi hexagon grids
-# starting now with April 1 2017
+
 runmonths = c("04", "05", "06")
 BYPOLY = F # leave as F for looping over files rather than over polygons within a file
 
@@ -114,10 +114,17 @@ wx.cb <- foreach(i = 1:length(mo.wx), .combine = rbind, .packages = "raster") %d
   WazeTime.edt.wx <- left_join(wte, wx.cb, 
                                by = c("GRID_ID", "year", "day", "hour"))
 
-  s3save(list = c(paste0("wx.mo.", mo), "WazeTime.edt.wx"), 
-         object = file.path(outputdir, paste0(paste0("WazeTimeEdtHexWx_", mo))),
+  # Separately save wx and Grid aggregated files
+  s3save(list = paste0("wx.mo.", mo), 
+         object = paste0("additional_data/weather/", mo, "_", HEXSIZE, "_mi.RData"),
+         bucket = waze.bucket
+  )
+  
+  s3save(list = "WazeTime.edt.wx", 
+         object = file.path(outputdir, paste0("WazeTimeEdtHexWx_", mo, ".RData")),
          bucket = waze.bucket
           )
+  
   timediff <- Sys.time() - starttime
   cat(mo, "complete", round(timediff, 2), attr(timediff, "units"), "elapsed \n")       
 } # end month loop
