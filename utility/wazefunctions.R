@@ -204,9 +204,16 @@ prep.hex <- function(hexname, month, s3 = T, bucket = waze.bucket){
     load(hexname, envir = environment())
   }
   
-  wte <- get(ls(envir = environment())[grep("Waze", ls(envir = environment()))])
+  wte <- get(ls(envir = environment())[grep("WazeTime", ls(envir = environment()), ignore.case = T)])
   
-  wte$DayOfWeek <- as.factor(wte$DayOfWeek)
+  if(length(grep("DayOfWeek", names(wte)) > 0)){
+    wte$DayOfWeek <- as.factor(wte$DayOfWeek)
+  }
+
+  if(length(grep("weekday", names(wte)) > 0)){
+    wte$DayOfWeek <- as.factor(wte$weekday)
+  }
+  
   wte$hour <- as.numeric(wte$hour)
   
   # Going to binary for all Waze buffer match:
