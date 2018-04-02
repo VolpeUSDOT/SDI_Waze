@@ -189,3 +189,40 @@ bin.mod.diagnostics <- function(predtab){
 
   round(t(data.frame(accuracy, precision, recall, false.positive.rate)), 4)  
 }
+
+
+# Read in hexagonally-gridded data of a specific name, prep fields, and save it as a short-named data frame
+prep.hex <- function(hexname, month, s3 = T, bucket = waze.bucket){
+  # Defaults to read from S3 bucket specified with waze.bucket 
+  # Specify month as two-digit character value, e.g. "04" for April
+  # Specify full path in hexname, e.g. file.path(inputdir, paste0("WazeTimeEdtHexWx_", mo,".RData"))
+  
+  mo = month
+  if(s3) { 
+    s3load(object = hexname, bucket = bucket, envir = environment())
+  } else {
+    load(hexname, envir = environment())
+  }
+  
+  wte <- get(ls(envir = environment())[grep("Waze", ls(envir = environment()))])
+  
+  wte$DayOfWeek <- as.factor(wte$DayOfWeek)
+  wte$hour <- as.numeric(wte$hour)
+  
+  # Going to binary for all Waze buffer match:
+  
+  wte$MatchEDT_buffer <- wte$nMatchEDT_buffer
+  wte$MatchEDT_buffer[wte$MatchEDT_buffer > 0] = 1 
+  wte$MatchEDT_buffer <- as.factor(wte$MatchEDT_buffer)
+  wte$MatchEDT_buffer_Acc <- wte$nMatchEDT_buffer_Acc
+  wte$MatchEDT_buffer_Acc[wte$MatchEDT_buffer_Acc > 0] = 1 
+  wte$MatchEDT_buffer_Acc <- as.factor(wte$MatchEDT_buffer_Acc)
+  
+  # Going to binary for all Waze Accident buffer match:
+  
+  wte$MatchEDT_buffer_Acc <- wte$nMatchEDT_buffer_Acc
+  wte$MatchEDT_buffer_Acc[wte$MatchEDT_buffer_Acc > 0] = 1 
+  wte$MatchEDT_buffer_Acc <- as.factor(wte$MatchEDT_buffer_Acc)
+  
+  assign(paste("w", mo, sep="."), wte, envir = globalenv()) 
+  }
