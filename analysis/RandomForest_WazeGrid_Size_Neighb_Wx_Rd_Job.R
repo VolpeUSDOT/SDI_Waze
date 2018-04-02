@@ -40,9 +40,16 @@ source(file.path(codeloc, 'utility/wazefunctions.R'))
 aws.signature::use_credentials()
 
 # Read in data ----
-# Grab any necessary data from the S3 bucket. This transfers all contents of MD_hexagons_shapefiles to the local instance. For this script, we will use shapefiles_funClass.zip (road classification data), shapefiles_rac.zip (Residence Area Characteristics), shapefiles_wac.zip (Workplace Area Characteristics).
+# Grab any necessary data from the S3 bucket. This transfers all contents of MD_hexagons_shapefiles to the local instance. For this script, we will use shapefiles_funClass.zip (road classification data), shapefiles_rac.zip (Residence Area Characteristics), shapefiles_wac.zip (Workplace Area Characteristics). Unzip these into the local dir
 s3transfer = paste("aws s3 cp s3://ata-waze/MD_hexagon_shapefiles", localdir, "--recursive --include '*'")
 system(s3transfer)
+
+for(dd in c("shapefiles_funClass.zip", "shapefiles_rac.zip", "shapefile_wac.zip")){
+  uz <- paste("unzip", file.path(localdir, dd))
+  system(uz)
+}
+# move any files which are in an unnecessary "shapefiles" folder up to the top level of the localdir
+system("mv -v ~/workingdata/shapefiles/* ~/workingdata/")
 
 # rename data files by month. For each month, prep time and response variables
 # See prep.hex() in wazefunctions.R for details.
@@ -54,9 +61,16 @@ for(mo in c("04","05","06")){
 # summary(w.05$nMatchEDT_buffer > 1)
 # table(w.05$nMatchEDT_buffer[w.05$nMatchEDT_buffer > 1])
 
+# Set up for parallel anaysis, 
+cl <- makeCluster(parallel::detectCores()) # make a cluster of all available cores
+registerDoParallel(cl)
+
+(avail.cores <- parallel::detectCores()) # 4 on local, 8 on r4 instance
+ntree.use = avail.cores * 100
+
 # Analysis ----
 
-# Models 1, 2, 3: 1 mile, no additional data, no neighbors.
+# Models 01, 02, 03: 1 mile, no additional data, no neighbors.
 
 # Variables to test. Use Waze only predictors, and omit grid ID and day as predictors as well. Here also omitting precipitation and neighboring grid cells
 # Omit as predictors in this vector:
@@ -66,7 +80,6 @@ omits = c(grep("GRID_ID", names(w.04), value = T), "day", "hextime", "year",
           "wx",
           grep("nWazeAcc_", names(w.04), value = T), # neighboring accidents
           grep("nWazeJam_", names(w.04), value = T) # neighboring jams
-          
           )
 
 fitvars <- names(w.04)[is.na(match(names(w.04), omits))]
@@ -75,14 +88,6 @@ fitvars <- names(w.04)[is.na(match(names(w.04), omits))]
 wazeAccformula <- reformulate(termlabels = fitvars[is.na(match(fitvars,
                                                             "MatchEDT_buffer_Acc"))], 
                            response = "MatchEDT_buffer_Acc")
-
-# <><><><><><><><><><><><><><><><><><><><><><><><><><><>
-# Random forest parallel ----
-cl <- makeCluster(parallel::detectCores()) # make a cluster of all available cores
-registerDoParallel(cl)
-
-(avail.cores <- parallel::detectCores()) # 4 on local, 8 on r4 instance
-ntree.use = avail.cores * 100
 
 keyoutputs = list() # to store model diagnostics
 
@@ -664,7 +669,126 @@ s3save(list = c("rf.0405.all",
 
 save("keyoutputs", file = paste0("Outputs_up_to_", modelno))
 
-# To do ----
-# Next: models 14 and 15, adding road functional class. Then 16 and 17, adding jobs.
+# Model 14: April, 1 mi, neighbors, wx, roads ----
+# Models 14 and 15, adding road functional class
+modelno = "14"
+
+for(w in c("w.04", "w.05", "w.06")){
+  append.hex(hexname = w, data.to.add = "hexagons_1mi_routes_sum")
+}
+
+omits = c(grep("GRID_ID", names(w.04), value = T), "day", "hextime", "year",
+          "nMatchWaze_buffer", "nNoMatchWaze_buffer",
+          grep("EDT", names(w.04), value = T),
+          grep("^med", names(w.04), value = T), # not present in 1 mile version
+          grep("nMagVar", names(w.04), value = T)
+)
+
+fitvars <- names(w.04)[is.na(match(names(w.04), omits))]
+
+wazeAccformula <- reformulate(termlabels = fitvars[is.na(match(fitvars,
+                                                               "MatchEDT_buffer_Acc"))], 
+                              response = "MatchEDT_buffer_Acc")
+
+trainrows <- sort(sample(1:nrow(w.04), size = nrow(w.04)*.7, replace = F))
+testrows <- (1:nrow(w.04))[!1:nrow(w.04) %in% trainrows]
+
+system.time(rf.04 <- foreach(ntree = c(ntree.use/avail.cores, avail.cores),
+                             .combine = combine,
+                             .packages = "randomForest") %dopar% {
+                               randomForest(wazeAccformula, data = w.04[trainrows,], ntree = ntree)})
+
+rf.04.pred <- predict(rf.04, w.04[testrows, fitvars])
+
+Nobs <- data.frame(t(c(nrow(w.04),
+                       summary(w.04$MatchEDT_buffer),
+                       length(w.04$nWazeAccident[w.04$nWazeAccident>0]) )))
+
+colnames(Nobs) = c("N", "No EDT", "EDT present", "Waze accident present")
+(predtab <- table(w.04$MatchEDT_buffer[testrows], rf.04.pred)) 
+
+keyoutputs[[modelno]] = list(Nobs,
+                             predtab,
+                             diag = bin.mod.diagnostics(predtab)
+)
+
+# save output predictions
+out.04 <- data.frame(w.04[testrows, c("GRID_ID", "day", "hour", "MatchEDT_buffer")], rf.04.pred)
+out.04$day <- as.numeric(out.04$day)
+names(out.04)[4:5] <- c("Obs", "Pred")
+out.04 = data.frame(out.04,
+                    TN = out.04$Obs == 0 &  out.04$Pred == 0,
+                    FP = out.04$Obs == 0 &  out.04$Pred == 1,
+                    FN = out.04$Obs == 1 &  out.04$Pred == 0,
+                    TP = out.04$Obs == 1 &  out.04$Pred == 1)
+write.csv(out.04,
+          file = paste(modelno, "RandomForest_pred_04.csv", sep = "_"),
+          row.names = F)
+s3save(list = c("rf.04",
+                "rf.04.pred",
+                "testrows",
+                "trainrows",
+                "w.04",
+                "out.04"),
+       object = file.path(outputdir, paste("Model", modelno, "RandomForest_Output_04.RData", sep= "_")),
+       bucket = waze.bucket)
+
+# Model 15: April + May, predict June, 1 mi, neighbors, wx, roads ----
+modelno = "15"
+
+system.time(rf.0405.all <- foreach(ntree = c(ntree.use/avail.cores, avail.cores),
+                                   .combine = combine,
+                                   .packages = "randomForest") %dopar% {
+                                     randomForest(wazeAccformula, data = w.0405, ntree = ntree)})
+
+rf.0405.06.pred <- predict(rf.0405.all, w.06[, fitvars])
+w.040506 <- rbind(w.0405, w.06)
+Nobs <- data.frame(t(c(nrow(w.040506),
+                       summary(w.040506$MatchEDT_buffer),
+                       length(w.040506$nWazeAccident[w.040506$nWazeAccident>0]))))
+
+colnames(Nobs) = c("N", "No EDT", "EDT present", "Waze accident present")
+(predtab <- table(w.06$MatchEDT_buffer, rf.0405.06.pred))
+
+keyoutputs[[modelno]] = list(Nobs,
+                             predtab,
+                             diag = bin.mod.diagnostics(predtab))
+
+out.06 <- data.frame(w.06[c("GRID_ID","day","hour", "MatchEDT_buffer")], rf.0405.06.pred)
+names(out.06)[4:5] <- c("Obs", "Pred")
+out.06 = data.frame(out.06,
+                    TN = out.06$Obs == 0 &  out.06$Pred == 0,
+                    FP = out.06$Obs == 0 &  out.06$Pred == 1,
+                    FN = out.06$Obs == 1 &  out.06$Pred == 0,
+                    TP = out.06$Obs == 1 &  out.06$Pred == 1)
+write.csv(out.06,
+          file = paste(modelno, "RandomForest_pred_0405_06.csv", sep = "_"),
+          row.names = F)
+
+s3save(list = c("rf.0405.all",
+                "rf.0405.06.pred",
+                "w.06",
+                "out.06"),
+       object = file.path(outputdir, paste("Model", modelno, "RandomForest_Output_0405_06.RData", sep= "_")),
+       bucket = waze.bucket)
+
+save("keyoutputs", file = paste0("Outputs_up_to_", modelno))
+
+
+# Models 16 and 17, adding jobs.
+
 
 stopCluster(cl) # stop the cluster when done
+
+# Summary from keyoutputs ----
+
+Nobs.frame <- data.frame(matrix(unlist(lapply(keyoutputs, FUN = function(x) x[[1]])), nrow = length(keyoutputs)))
+rownames(Nobs.frame) <- names(keyoutputs)
+colnames(Nobs.frame) <- names(keyoutputs[[1]][[1]])
+
+Diag.frame <- data.frame(matrix(unlist(lapply(keyoutputs, FUN = function(x) x[[3]])), ncol = length(keyoutputs)))
+colnames(Diag.frame) <- names(keyoutputs)
+rownames(Diag.frame) <- rownames(keyoutputs[[1]][[3]])
+
+
+
