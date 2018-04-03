@@ -5,6 +5,7 @@
 # <><><><><><><><><><><><><><><><><><><><>
 # Setup ----
 library(maps)
+library(maptools)
 library(sp)
 library(rgdal)
 library(rgeos)
@@ -44,15 +45,14 @@ system(s3transfer)
 hex <- readOGR(localdir, layer = paste0("MD_hexagons_", HEXSIZE, "mi_newExtent_neighbors"))
 
 # Read in county shapefile, and match all projections. See http://rspatial.org/spatial/rst/6-crs.html
-co <- readOGR(localdir, layer = "cb_2015_us_county_500k")
 
-# maryland FIPS = 24
-md.co <- co[co$STATEFP == 24,]
+md_buff <- readOGR(localdir, layer = "MD_buffered")
 
-hex <- spTransform(hex, proj4string(md.co)) # identical(crs(hex), crs(md.co))
+hex <- spTransform(hex, proj4string(md_buff)) # identical(crs(hex), crs(md_buff))
 
 # Clip hex to MD 
-hex.md <- intersect(hex, md.co)
+hex.md.int <- gIntersects(md_buff, hex, byid = T) # Problem with using md.co: introduces duplicate grid IDs at county boundaries.
+hex.md <- hex[hex.md.int[,1],]
 
 # Set up cluster
 cl <- makeCluster(parallel::detectCores()) # make a cluster of all available cores
@@ -107,12 +107,25 @@ wx.cb <- foreach(i = 1:length(mo.wx), .combine = rbind, .packages = "raster") %d
   
   assign(paste0("wx.mo.", mo), wx.cb) # create object for the combined output of this month
   
+  # Read from previous: s3load( paste0("additional_data/weather/", mo, "_", HEXSIZE, "_mi.RData"), bucket = waze.bucket); wx.cb = wx.mo.05 # Manually update month
+  
   wte <- wazeTime.edt.hexAll
   wte$hextime <- as.character(wte$hextime)
   wte$year <- "2017" # update after fixing Grid_aggregate to include year
+  wte$hour <- as.character(wte$hour)
+  wx.cb$hour <- as.character(wx.cb$hour)
+  wte$day <- as.character(wte$day)
+  wx.cb$day <- as.character(wx.cb$day)
+  wte$GRID_ID <- as.character(wte$GRID_ID)
+  wx.cb$GRID_ID <- as.character(wx.cb$GRID_ID)
+  wx.cb$year <- as.character(wx.cb$year)
   
-  WazeTime.edt.wx <- left_join(wte, wx.cb, 
-                               by = c("GRID_ID", "year", "day", "hour"))
+  # Collapse wx to only unique grid ID x day x hour combinations (not a problem with new code)
+  wx.cb <- wx.cb[!duplicated(with(wx.cb, paste(GRID_ID, year, day, hour))),]
+  
+  WazeTime.edt.wx <- left_join(wte, wx.cb,
+                               by = c("GRID_ID", "day", "hour", "year")
+                               )
 
   # Separately save wx and Grid aggregated files
   s3save(list = paste0("wx.mo.", mo), 

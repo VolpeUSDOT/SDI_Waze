@@ -157,7 +157,7 @@ gettime <- function(x, tz = "America/New_York"){
   dt <- strptime(paste(d, t), "%Y-%m-%d %H-%M-%S", tz = tz)
 }
 
-# Function to show obejcts in the memory, orderd by size. Useful for cleaning up the workspace to free up RAM
+# Function to show objects in the memory, orderd by size. Useful for cleaning up the workspace to free up RAM
 showobjsize <- function(units = "Mb", limit = 100) {
   sizes <- vector()
   for (thing in ls(envir = .GlobalEnv)) { 
@@ -214,6 +214,7 @@ prep.hex <- function(hexname, month, s3 = T, bucket = waze.bucket){
     wte$DayOfWeek <- as.factor(wte$weekday)
   }
   
+  wte$hextime <- as.character(wte$hextime)
   wte$hour <- as.numeric(wte$hour)
   
   # Going to binary for all Waze buffer match:
