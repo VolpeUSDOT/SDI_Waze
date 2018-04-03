@@ -18,7 +18,6 @@ library(foreach) # for parallel implementation
 library(doParallel) # includes iterators and parallel
 library(aws.s3)
 library(tidyverse)
-
 # Run this if you don't have these packages:
 # install.packages(c("rpart", "randomForest", "maptree", "party", "partykit", "rgdal", "foreach", "doParallel"), dep = T)
 
@@ -54,14 +53,39 @@ system("mv -v ~/workingdata/shapefiles/* ~/workingdata/")
 # rename data files by month. For each month, prep time and response variables
 # See prep.hex() in wazefunctions.R for details.
 for(mo in c("04","05","06")){
-  prep.hex(file.path(inputdir, paste0("WazeTimeEdtHexWx_", mo,".RData")), month = mo)
+  prep.hex(file.path(inputdir, paste0("WazeTimeEdtHexAll_", mo,".RData")), month = mo)
 }
+
+# # Manual loading, from freshly uploaded files, to track issue with precision
+# for(mo in c("04","05","06")){
+#   prep.hex(file.path(localdir, "w_1", paste0("WazeTimeEdtHexAll_", mo,"_1mi.RData")), month = mo, s3 = F)
+# }
+# load(file.path(localdir, "w_1", paste0("WazeTimeEdtHexAll_", mo,"_1mi.RData")))
+# 
+# wazeTime.edt.hex <- wazeTime.edt.hexAll
+# 
+# wazeTime.edt.hex$DayOfWeek <- as.factor(wazeTime.edt.hex$DayOfWeek)
+# wazeTime.edt.hex$hour <- as.numeric(wazeTime.edt.hex$hour)
+# 
+# # Going to binary for all Waze buffer match:
+# wazeTime.edt.hex$MatchEDT_buffer <- wazeTime.edt.hex$nMatchEDT_buffer
+# wazeTime.edt.hex$MatchEDT_buffer[wazeTime.edt.hex$MatchEDT_buffer > 0] = 1 
+# wazeTime.edt.hex$MatchEDT_buffer <- as.factor(wazeTime.edt.hex$MatchEDT_buffer)
+# 
+# # Going to binary for all Waze Accident buffer match:
+# 
+# wazeTime.edt.hex$MatchEDT_buffer_Acc <- wazeTime.edt.hex$nMatchEDT_buffer_Acc
+# wazeTime.edt.hex$MatchEDT_buffer_Acc[wazeTime.edt.hex$MatchEDT_buffer_Acc > 0] = 1 
+# wazeTime.edt.hex$MatchEDT_buffer_Acc <- as.factor(wazeTime.edt.hex$MatchEDT_buffer_Acc)
+# 
+# w.04 <- wazeTime.edt.hex; rm(wazeTime.edt.hex) 
+# #w.04$hextime <- as.character(w.04$hextime)
 
 # Exploration of response variable: For April, only 1,600 out of 310,000 cells have > 1 EDT event matching. Consider converting to binary. Of the >1 cell, 886 are 2 events, 122 3 events, tiny number have greater. 15,000 have 1.
 # summary(w.05$nMatchEDT_buffer > 1)
 # table(w.05$nMatchEDT_buffer[w.05$nMatchEDT_buffer > 1])
 
-# Set up for parallel anaysis, 
+# Set up for parallel anaysis. Stopping cluster after each set of RF models will help clear RAM.
 cl <- makeCluster(parallel::detectCores()) # make a cluster of all available cores
 registerDoParallel(cl)
 
@@ -89,6 +113,15 @@ wazeAccformula <- reformulate(termlabels = fitvars[is.na(match(fitvars,
                                                             "MatchEDT_buffer_Acc"))], 
                            response = "MatchEDT_buffer_Acc")
 
+wazeAccformula.manual <- as.formula(c("MatchEDT_buffer_Acc ~ hour + DayOfWeek + nWazeRowsInMatch + uniqWazeEvents + 
+  nWazeAccident + nWazeJam + nWazeRoadClosed + nWazeWeatherOrHazard + 
+  nWazeAccidentMajor + nWazeAccidentMinor + nWazeHazardCarStoppedRoad + 
+  nWazeHazardCarStoppedShould + nWazeHazardConstruction + nWazeHazardObjectOnRoad + 
+  nWazeJamModerate + nWazeJamHeavy + nWazeJamStandStill + nWazeWeatherFlood + 
+  nWazeWeatherFog + nWazeRT3 + nWazeRT4 + nWazeRT6 + nWazeRT7 + 
+  nWazeRT2 + nWazeRT0 + nWazeRT1 + nWazeRT20"))
+
+
 keyoutputs = list() # to store model diagnostics
 
 # Model 01: April ----
@@ -108,7 +141,7 @@ Nobs <- data.frame(t(c(nrow(w.04),
                length(w.04$nWazeAccident[w.04$nWazeAccident>0]) )))
 
 colnames(Nobs) = c("N", "No EDT", "EDT present", "Waze accident present")
-(predtab <- table(w.04$MatchEDT_buffer[testrows], rf.04.pred)) 
+(predtab <- table(w.04$MatchEDT_buffer_Acc[testrows], rf.04.pred)) 
 
 keyoutputs[[modelno]] = list(Nobs,
                      predtab,
@@ -153,7 +186,7 @@ Nobs <- data.frame(t(c(nrow(w.0405),
                        length(w.0405$nWazeAccident[w.0405$nWazeAccident>0]))))
 
 colnames(Nobs) = c("N", "No EDT", "EDT present", "Waze accident present")
-(predtab <- table(w.0405$MatchEDT_buffer[testrows], rf.0405.pred))
+(predtab <- table(w.0405$MatchEDT_buffer_Acc[testrows], rf.0405.pred))
 keyoutputs[[modelno]] = list(Nobs,
                           predtab,
                           diag = bin.mod.diagnostics(predtab))
@@ -193,7 +226,7 @@ Nobs <- data.frame(t(c(nrow(w.040506),
                        length(w.040506$nWazeAccident[w.040506$nWazeAccident>0]))))
 
 colnames(Nobs) = c("N", "No EDT", "EDT present", "Waze accident present")
-(predtab <- table(w.06$MatchEDT_buffer, rf.0405.06.pred))
+(predtab <- table(w.06$MatchEDT_buffer_Acc, rf.0405.06.pred))
 
 keyoutputs[[modelno]] = list(Nobs,
                           predtab,
@@ -272,7 +305,7 @@ Nobs <- data.frame(t(c(nrow(w.04),
                        length(w.04$nWazeAccident[w.04$nWazeAccident>0]) )))
 
 colnames(Nobs) = c("N", "No EDT", "EDT present", "Waze accident present")
-(predtab <- table(w.04$MatchEDT_buffer[testrows], rf.04.pred)) 
+(predtab <- table(w.04$MatchEDT_buffer_Acc[testrows], rf.04.pred)) 
 
 keyoutputs[[modelno]] = list(Nobs,
                              predtab,
@@ -312,7 +345,7 @@ Nobs <- data.frame(t(c(nrow(w.040506),
                        length(w.040506$nWazeAccident[w.040506$nWazeAccident>0]))))
 
 colnames(Nobs) = c("N", "No EDT", "EDT present", "Waze accident present")
-(predtab <- table(w.06$MatchEDT_buffer, rf.0405.06.pred))
+(predtab <- table(w.06$MatchEDT_buffer_Acc, rf.0405.06.pred))
 
 keyoutputs[[modelno]] = list(Nobs,
                              predtab,
@@ -385,7 +418,7 @@ Nobs <- data.frame(t(c(nrow(w.04),
                        length(w.04$nWazeAccident[w.04$nWazeAccident>0]) )))
 
 colnames(Nobs) = c("N", "No EDT", "EDT present", "Waze accident present")
-(predtab <- table(w.04$MatchEDT_buffer[testrows], rf.04.pred)) 
+(predtab <- table(w.04$MatchEDT_buffer_Acc[testrows], rf.04.pred)) 
 
 keyoutputs[[modelno]] = list(Nobs,
                              predtab,
@@ -429,7 +462,7 @@ Nobs <- data.frame(t(c(nrow(w.040506),
                        length(w.040506$nWazeAccident[w.040506$nWazeAccident>0]))))
 
 colnames(Nobs) = c("N", "No EDT", "EDT present", "Waze accident present")
-(predtab <- table(w.06$MatchEDT_buffer, rf.0405.06.pred))
+(predtab <- table(w.06$MatchEDT_buffer_Acc, rf.0405.06.pred))
 
 keyoutputs[[modelno]] = list(Nobs,
                              predtab,
@@ -507,7 +540,7 @@ Nobs <- data.frame(t(c(nrow(w.04),
                        length(w.04$nWazeAccident[w.04$nWazeAccident>0]) )))
 
 colnames(Nobs) = c("N", "No EDT", "EDT present", "Waze accident present")
-(predtab <- table(w.04$MatchEDT_buffer[testrows], rf.04.pred)) 
+(predtab <- table(w.04$MatchEDT_buffer_Acc[testrows], rf.04.pred)) 
 
 keyoutputs[[modelno]] = list(Nobs,
                              predtab,
@@ -549,7 +582,7 @@ Nobs <- data.frame(t(c(nrow(w.040506),
                        length(w.040506$nWazeAccident[w.040506$nWazeAccident>0]))))
 
 colnames(Nobs) = c("N", "No EDT", "EDT present", "Waze accident present")
-(predtab <- table(w.06$MatchEDT_buffer, rf.0405.06.pred))
+(predtab <- table(w.06$MatchEDT_buffer_Acc, rf.0405.06.pred))
 
 keyoutputs[[modelno]] = list(Nobs,
                              predtab,
@@ -622,7 +655,7 @@ Nobs <- data.frame(t(c(nrow(w.04),
                        length(w.04$nWazeAccident[w.04$nWazeAccident>0]) )))
 
 colnames(Nobs) = c("N", "No EDT", "EDT present", "Waze accident present")
-(predtab <- table(w.04$MatchEDT_buffer[testrows], rf.04.pred)) 
+(predtab <- table(w.04$MatchEDT_buffer_Acc[testrows], rf.04.pred)) 
 
 keyoutputs[[modelno]] = list(Nobs,
                              predtab,
@@ -664,7 +697,7 @@ Nobs <- data.frame(t(c(nrow(w.040506),
                        length(w.040506$nWazeAccident[w.040506$nWazeAccident>0]))))
 
 colnames(Nobs) = c("N", "No EDT", "EDT present", "Waze accident present")
-(predtab <- table(w.06$MatchEDT_buffer, rf.0405.06.pred))
+(predtab <- table(w.06$MatchEDT_buffer_Acc, rf.0405.06.pred))
 
 keyoutputs[[modelno]] = list(Nobs,
                              predtab,
@@ -733,7 +766,7 @@ Nobs <- data.frame(t(c(nrow(w.04),
                        length(w.04$nWazeAccident[w.04$nWazeAccident>0]) )))
 
 colnames(Nobs) = c("N", "No EDT", "EDT present", "Waze accident present")
-(predtab <- table(w.04$MatchEDT_buffer[testrows], rf.04.pred)) 
+(predtab <- table(w.04$MatchEDT_buffer_Acc[testrows], rf.04.pred)) 
 
 keyoutputs[[modelno]] = list(Nobs,
                              predtab,
@@ -775,7 +808,7 @@ Nobs <- data.frame(t(c(nrow(w.040506),
                        length(w.040506$nWazeAccident[w.040506$nWazeAccident>0]))))
 
 colnames(Nobs) = c("N", "No EDT", "EDT present", "Waze accident present")
-(predtab <- table(w.06$MatchEDT_buffer, rf.0405.06.pred))
+(predtab <- table(w.06$MatchEDT_buffer_Acc, rf.0405.06.pred))
 
 keyoutputs[[modelno]] = list(Nobs,
                              predtab,
