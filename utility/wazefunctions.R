@@ -217,6 +217,11 @@ prep.hex <- function(hexname, month, s3 = T, bucket = waze.bucket){
   wte$hextime <- as.character(wte$hextime)
   wte$hour <- as.numeric(wte$hour)
   
+  # Set NA values in wx (reflectivity) to zero
+  if(length(grep("wx", names(wte)) > 0)){
+    wte$wx[is.na(wte$wx)] = 0
+  }
+  
   # Going to binary for all Waze buffer match:
   
   wte$MatchEDT_buffer <- wte$nMatchEDT_buffer
@@ -242,23 +247,26 @@ prep.hex <- function(hexname, month, s3 = T, bucket = waze.bucket){
 # 3. rgdal and tidyverse libraries are loaded
 # 4. The data files to add are unzipped files in the localdir (i.e., they have already been copied over from the S3 bucket, and are sitting on the instance)
 
-append.hex <- function(hexname, data.to.add){
+append.hex <- function(hexname, data.to.add, na.action = c("omit", "keep", "fill0")){
   # hexname: string of data frame names in working memory like "w.04"
   # data.to.add: string of unzipped file set in the localdir, like "hexagons_1mi_routes_sum", "hexagons_1mi_bg_rac_sum", "hexagons_1mi_bg_lodes_sum"
+  # na.action: what to do if missing any values; applies this action across the whole data frame, not just the appended data
+  if(missing(na.action)) { na.action = "omit" } # set default value
+  na.action <- match.arg(na.action) # match partially entered values
+  
   w <- get(hexname)
   
   # Check to see if this shapefile has been read in already:
   if(!exists(data.to.add)){
-    assign(data.to.add, readOGR(localdir, layer = data.to.add), envir = globalenv())
+    assign(data.to.add, rgdal::readOGR(localdir, layer = data.to.add), envir = globalenv())
   }
+  
   dd <- get(data.to.add)
   
   if(length(grep("routes", data.to.add)) > 0){
-    
     dd <- dd@data %>% 
       group_by(GRID_ID) %>%
       tidyr::spread(key = F_SYSTEM_V, value = SUM_miles, fill = 0, sep = "_")
-    
   }
   
   if(length(grep("bg_rac_", data.to.add)) > 0){
@@ -275,7 +283,7 @@ append.hex <- function(hexname, data.to.add){
     
   }
   
-  if(length(grep("bg_wac_", data.to.add)) > 0){
+  if(length(grep("bg_lodes_", data.to.add)) > 0){
     
     dd <- dd@data 
     dd <- dd[c("GRID_ID", 
@@ -291,7 +299,12 @@ append.hex <- function(hexname, data.to.add){
     
   }
   
+  
   w2 <- left_join(w, dd, by = "GRID_ID")
+  # Consider assigning 0 to NA values after joining; e.g. no road info available, give 0 miles
+  if(na.action == "fill0") { w2[is.na(w2)] = 0 }
+  if(na.action == "omit") { w2 = w2[complete.cases(w2),] }
+  
   assign(hexname, w2, envir = globalenv()) 
   
 }
