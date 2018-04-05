@@ -38,7 +38,7 @@ avail.months = unique(substr(dir(wazemonthdir)[grep("^merged.waze.edt", dir(waze
                       start = 17,
                       stop = 18))
 
-todo.months = avail.months[c(1,4:7)]
+todo.months = avail.months[c(5:7)]
 
 temp.outputdir = tempdir()# for temporary storage 
 starttime <- Sys.time()
@@ -99,6 +99,6 @@ for(j in todo.months){ # j="04"
 
 print(j)
 
-#movefiles(dir(temp.outputdir)[grep("Hex", dir(temp.outputdir))], temp.outputdir, outputdir)
+movefiles(dir(temp.outputdir)[grep("Hex", dir(temp.outputdir))], temp.outputdir, outputdir)
 
   

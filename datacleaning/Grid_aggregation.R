@@ -14,7 +14,7 @@ library(lubridate)
 library(utils)
 
 #Set parameters for data to process
-HEXSIZE = c("1", "4", "05")[2] # Change the value in the bracket to use 1, 4, or 0.5 sq mi hexagon grids
+HEXSIZE = c("1", "4", "05")[3] # Change the value in the bracket to use 1, 4, or 0.5 sq mi hexagon grids
 
 
 #Flynn drive
@@ -44,7 +44,7 @@ avail.months = unique(substr(dir(wazemonthdir)[grep("^merged.waze.edt", dir(waze
 
 temp.outputdir = tempdir()# for temporary storage 
 
-todo.months = avail.months[c(2:4)]
+todo.months = avail.months[c(5:7)]
 
 for(j in todo.months){ #j = "04"
   

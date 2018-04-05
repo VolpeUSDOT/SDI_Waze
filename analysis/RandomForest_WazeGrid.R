@@ -50,7 +50,13 @@ source(file.path(codeloc, 'utility/wazefunctions.R'))
 
 # Read in data, renaming data files by month. For each month, prep time and response variables
 
-load("WazeTimeEdtHex_04.RData")
+# Old version:
+load("Archives/WazeEDT Agg1mile Rdata Input/WazeTimeEdtHex_04.RData")
+
+# New version of aggregation:
+load("WazeEDT Agg1mile Rdata Input/WazeTimeEdtHexAll_04_1mi.RData")
+wazeTime.edt.hex <- wazeTime.edt.hexAll
+
 wazeTime.edt.hex$DayOfWeek <- as.factor(wazeTime.edt.hex$DayOfWeek)
 wazeTime.edt.hex$hour <- as.numeric(wazeTime.edt.hex$hour)
 
@@ -67,7 +73,7 @@ wazeTime.edt.hex$MatchEDT_buffer_Acc <- as.factor(wazeTime.edt.hex$MatchEDT_buff
 
 w.04 <- wazeTime.edt.hex; rm(wazeTime.edt.hex) 
 
-load("WazeTimeEdtHex_05.RData")
+load("Archives/WazeEDT Agg1mile Rdata Input/WazeTimeEdtHex_05.RData")
 wazeTime.edt.hex$DayOfWeek <- as.factor(wazeTime.edt.hex$DayOfWeek)
 wazeTime.edt.hex$hour <- as.numeric(wazeTime.edt.hex$hour)
 wazeTime.edt.hex$MatchEDT_buffer <- wazeTime.edt.hex$nMatchEDT_buffer
@@ -83,7 +89,7 @@ wazeTime.edt.hex$MatchEDT_buffer_Acc <- as.factor(wazeTime.edt.hex$MatchEDT_buff
 
 w.05 <- wazeTime.edt.hex; rm(wazeTime.edt.hex) 
 
-load("WazeTimeEdtHex_06.RData")
+load("Archives/WazeEDT Agg1mile Rdata Input/WazeTimeEdtHex_06.RData")
 wazeTime.edt.hex$DayOfWeek <- as.factor(wazeTime.edt.hex$DayOfWeek)
 wazeTime.edt.hex$hour <- as.numeric(wazeTime.edt.hex$hour)
 wazeTime.edt.hex$MatchEDT_buffer <- wazeTime.edt.hex$nMatchEDT_buffer
@@ -108,11 +114,16 @@ w.06 <- wazeTime.edt.hex; rm(wazeTime.edt.hex)
 
 # Variables to test. Use Waze only predictors, and omit grid ID and day as predictors as well
 #All Waze matches
-fitvars <- names(w.04)[is.na(match(names(w.04),
-                                             c("GRID_ID", "day", # place variables to omit as predictors in this vector 
-                                               "nMatchWaze_buffer", "nNoMatchWaze_buffer",
-                                               grep("EDT", names(w.04), value = T)
-                                               )))]
+omits = c(grep("GRID_ID", names(w.04), value = T), "day", "hextime", "year",
+          "nMatchWaze_buffer", "nNoMatchWaze_buffer",
+          grep("EDT", names(w.04), value = T),
+          "wx",
+           grep("nWazeAcc_", names(w.04), value = T), # neighboring accidents
+           grep("nWazeJam_", names(w.04), value = T) # neighboring jams
+)
+
+fitvars <- names(w.04)[is.na(match(names(w.04), omits))]
+
 
 # Unnecessary now: all rows are complete cases
 # fitdat.04 <- w.04[complete.cases(w.04[,fitvars]),]
@@ -120,6 +131,7 @@ fitvars <- names(w.04)[is.na(match(names(w.04),
 # fitdat.06 <- w.06[complete.cases(w.06[,fitvars]),]
 
 # Change response to nMatch for regression; output will be continuous, much more RAM intensive.
+
 
 wazeformula <- reformulate(termlabels = fitvars[is.na(match(fitvars,
                                                               "MatchEDT_buffer"))], 
@@ -139,7 +151,6 @@ registerDoParallel(cl)
 (avail.cores <- parallel::detectCores()) # 4 on local
 ntree.use = avail.cores * 100
 
-
 # Model 1: April, 70/30 ----
 # approx 2.5 min to run on 218k rows of training data with 4 cores
 
@@ -148,8 +159,8 @@ testrows <- (1:nrow(w.04))[!1:nrow(w.04) %in% trainrows]
  
 # length(testrows) + length(trainrows) == nrow(w.04)
 
-system.time(rf.04 <- foreach(ntree = c(ntree.use/avail.cores, avail.cores),
-                .combine = combine,
+system.time(rf.04 <- foreach(ntree = rep(ntree.use/avail.cores, avail.cores),
+                .combine = randomForest::combine, .multicombine = T,
                 .packages = "randomForest") %dopar%
           randomForest(wazeformula,
                data = w.04[trainrows,],
@@ -501,14 +512,12 @@ testrows <- (1:nrow(w.04))[!1:nrow(w.04) %in% trainrows]
 
 # length(testrows) + length(trainrows) == nrow(w.04)
 
-system.time(rf.04.AccMatch <- foreach(ntree = c(ntree.use/avail.cores, avail.cores),
-                             .combine = combine,
+system.time(rf.04.AccMatch <- foreach(ntree = rep(ntree.use/avail.cores, avail.cores),
+                             .combine = randomForest::combine, .multicombine = T,
                              .packages = "randomForest") %dopar%
               randomForest(wazeAccformula,
                            data = w.04[trainrows,],
-                           ntree = ntree,
-                           nodesize = 5,
-                           mtry = 9)
+                           ntree = ntree)
 )
 
 
