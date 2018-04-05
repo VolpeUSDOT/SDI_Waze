@@ -35,11 +35,18 @@ source(file.path(codedir, "utility/wazefunctions.R"))
 # Read in data: hexagons, and Grid-aggregated Waze data ----
 # Weather data read in inside the foreach loop
 # Grab any necessary data from the s3 bucket
-s3transfer = paste("aws s3 cp s3://ata-waze/MD_hexagon_shapefiles", localdir, "--recursive --include '*'")
-system(s3transfer)
-
-s3transfer = paste("aws s3 cp s3://ata-waze/additional_data/census_files", localdir, "--recursive --include '*'")
-system(s3transfer)
+if(length(dir(localdir)[grep("shapefiles_funClass", dir(localdir))]) == 0){
+  
+  s3transfer = paste("aws s3 cp s3://ata-waze/MD_hexagon_shapefiles", localdir, "--recursive --include '*'")
+  system(s3transfer)
+  
+  for(dd in c("shapefiles_funClass.zip", "shapefiles_rac.zip", "shapefile_wac.zip")){
+    uz <- paste("unzip", file.path(localdir, dd))
+    system(uz)
+  }
+  # move any files which are in an unnecessary "shapefiles" folder up to the top level of the localdir
+  system("mv -v ~/workingdata/shapefiles/* ~/workingdata/")
+}
 
 # Hexagons:
 hex <- readOGR(localdir, layer = paste0("MD_hexagons_", HEXSIZE, "mi_newExtent_neighbors"))
@@ -65,8 +72,7 @@ starttime <- Sys.time()
 for(mo in runmonths){ 
   
   # Waze - aggregated. s3load directly, not saving file to instance
-  # s3load(object = paste0("WazeTimeEdtHexAll_", mo,".RData"), bucket = inputdir)
-  s3load(object = file.path(inputdir, paste0("WazeTimeEdtHexAll_", mo,".RData")), bucket = waze.bucket)
+  s3load(object = file.path(inputdir, paste0("WazeTimeEdtHexAll_", mo, "_", HEXSIZE, "mi.RData")), bucket = waze.bucket)
   
   # Weather - temp wd for now, need to move all these to s3 bucket (or better, edit NEXRAD script to save directly to S3)
   weatherdir <- "/home/dflynn-volpe/s3_transfer/additional_data/weather/Weather_Geotiffs" #file.path(localdir, "Weather_Geotiffs")
@@ -107,7 +113,7 @@ wx.cb <- foreach(i = 1:length(mo.wx), .combine = rbind, .packages = "raster") %d
   
   assign(paste0("wx.mo.", mo), wx.cb) # create object for the combined output of this month
   
-  # Read from previous: s3load( paste0("additional_data/weather/", mo, "_", HEXSIZE, "_mi.RData"), bucket = waze.bucket); wx.cb = wx.mo.05 # Manually update month
+  # Read from previous: s3load( paste0("additional_data/weather/", mo, "_", HEXSIZE, "_mi.RData"), bucket = waze.bucket); wx.cb = wx.mo.06 # Manually update month
   
   wte <- wazeTime.edt.hexAll
   wte$hextime <- as.character(wte$hextime)
@@ -134,7 +140,7 @@ wx.cb <- foreach(i = 1:length(mo.wx), .combine = rbind, .packages = "raster") %d
   )
   
   s3save(list = "WazeTime.edt.wx", 
-         object = file.path(outputdir, paste0("WazeTimeEdtHexWx_", mo, ".RData")),
+         object = file.path(outputdir, paste0("WazeTimeEdtHexWx_", mo, "_", HEXSIZE, "_mi.RData")),
          bucket = waze.bucket
           )
   
