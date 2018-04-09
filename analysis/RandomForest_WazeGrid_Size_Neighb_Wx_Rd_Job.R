@@ -243,7 +243,7 @@ inputdir <- paste0("WazeEDT_Agg", HEXSIZE, "mile_Rdata_Input")
 outputdir <- paste0("WazeEDT_Agg", HEXSIZE, "mile_RandForest_Output")
 
 for(mo in c("04","05","06")){
-  prep.hex(file.path(inputdir, paste0("WazeTimeEdtHexAll_", mo,"_4mi.RData")), month = mo)
+  prep.hex(file.path(inputdir, paste0("WazeTimeEdtHexAll_", mo, "_", HEXSIZE, "_mi.RData")), month = mo)
 }
 w.0405 <- rbind(w.04, w.05)
 w.040506 <- rbind(w.0405, w.06)
@@ -251,15 +251,14 @@ w.040506 <- rbind(w.0405, w.06)
 modelno = "04"
 
 # Formula for 4 mi hex
-omits = c(grep("GRID_ID", names(w.04), value = T), "day", "hextime", "year",
+omits = c(grep("GRID_ID", names(w.04), value = T), "day", "hextime", "year", "weekday",
+          "uniqWazeEvents", "nWazeRowsInMatch", "nWazeAccident",
           "nMatchWaze_buffer", "nNoMatchWaze_buffer",
           grep("EDT", names(w.04), value = T),
           "wx",
           grep("nWazeAcc_", names(w.04), value = T), # neighboring accidents
-          grep("nWazeJam_", names(w.04), value = T), # neighboring jams
-          grep("^med", names(w.04), value = T), # not present in 1 mile version
-          grep("nMagVar", names(w.04), value = T)
-          )
+          grep("nWazeJam_", names(w.04), value = T) # neighboring jams
+)
 
 fitvars <- names(w.04)[is.na(match(names(w.04), omits))]
 
@@ -369,15 +368,14 @@ w.040506 <- rbind(w.0405, w.06)
 modelno = "06"
 
 # Formula for 0.5 mi hex
-omits = c(grep("GRID_ID", names(w.04), value = T), "day", "hextime", "year",
-          "weekday",
+omits = c(grep("GRID_ID", names(w.04), value = T), "day", "hextime", "year", "weekday",
           "uniqWazeEvents", "nWazeRowsInMatch", "nWazeAccident",
           "nMatchWaze_buffer", "nNoMatchWaze_buffer",
           grep("EDT", names(w.04), value = T),
           "wx",
           grep("nWazeAcc_", names(w.04), value = T), # neighboring accidents
           grep("nWazeJam_", names(w.04), value = T) # neighboring jams
-        )
+)
 
 fitvars <- names(w.04)[is.na(match(names(w.04), omits))]
 
@@ -480,20 +478,18 @@ inputdir <- paste0("WazeEDT_Agg", HEXSIZE, "mile_Rdata_Input")
 outputdir <- paste0("WazeEDT_Agg", HEXSIZE, "mile_RandForest_Output")
 
 for(mo in c("04","05","06")){
-  prep.hex(file.path(inputdir, paste0("WazeTimeEdtHexWx_", mo,".RData")), month = mo)
+  prep.hex(file.path(inputdir, paste0("WazeTimeEdtHexWx_", mo, "_", HEXSIZE, "_mi.RData")), month = mo)
 }
 w.0405 <- rbind(w.04, w.05)
 w.040506 <- rbind(w.04, w.05, w.06)
 
 modelno = "08"
 
-omits = c(grep("GRID_ID", names(w.04), value = T), "day", "hextime", "year",
+omits = c(grep("GRID_ID", names(w.04), value = T), "day", "hextime", "year", "weekday",
+          "uniqWazeEvents", "nWazeRowsInMatch", "nWazeAccident",
           "nMatchWaze_buffer", "nNoMatchWaze_buffer",
           grep("EDT", names(w.04), value = T),
-          "wx",
-          grep("^med", names(w.04), value = T), # not present in 1 mile version
-          grep("nMagVar", names(w.04), value = T)
-)
+          "wx")
 
 fitvars <- names(w.04)[is.na(match(names(w.04), omits))]
 
@@ -600,7 +596,7 @@ inputdir <- paste0("WazeEDT_Agg", HEXSIZE, "mile_Rdata_Input")
 outputdir <- paste0("WazeEDT_Agg", HEXSIZE, "mile_RandForest_Output")
 
 for(mo in c("04","05","06")){
-  prep.hex(file.path(inputdir, paste0("WazeTimeEdtHexAll_", mo,"_4mi.RData")), month = mo)
+  prep.hex(file.path(inputdir, paste0("WazeTimeEdtHexAll_", mo, "_", HEXSIZE, "_mi.RData")), month = mo)
 }
 w.0405 <- rbind(w.04, w.05)
 w.040506 <- rbind(w.04, w.05, w.06)
@@ -608,12 +604,11 @@ w.040506 <- rbind(w.04, w.05, w.06)
 modelno = "10"
 
 # Formula for 4 mi hex
-omits = c(grep("GRID_ID", names(w.04), value = T), "day", "hextime", "year",
+omits = c(grep("GRID_ID", names(w.04), value = T), "day", "hextime", "year", "weekday",
+          "uniqWazeEvents", "nWazeRowsInMatch", "nWazeAccident",
           "nMatchWaze_buffer", "nNoMatchWaze_buffer",
           grep("EDT", names(w.04), value = T),
-          "wx",
-          grep("^med", names(w.04), value = T), # not present in 1 mile version
-          grep("nMagVar", names(w.04), value = T)
+          "wx"
           )
 
 fitvars <- names(w.04)[is.na(match(names(w.04), omits))]
@@ -719,18 +714,17 @@ inputdir <- paste0("WazeEDT_Agg", HEXSIZE, "mile_Rdata_Input")
 outputdir <- paste0("WazeEDT_Agg", HEXSIZE, "mile_RandForest_Output")
 
 for(mo in c("04","05","06")){
-  prep.hex(file.path(inputdir, paste0("WazeTimeEdtHexWx_", mo,".RData")), month = mo)
+  prep.hex(file.path(inputdir, paste0("WazeTimeEdtHexWx_", mo, "_", HEXSIZE, "_mi.RData")), month = mo)
 }
 w.0405 <- rbind(w.04, w.05)
 w.040506 <- rbind(w.04, w.05, w.06)
 
 modelno = "12"
 
-omits = c(grep("GRID_ID", names(w.04), value = T), "day", "hextime", "year",
+omits = c(grep("GRID_ID", names(w.04), value = T), "day", "hextime", "year", "weekday",
+          "uniqWazeEvents", "nWazeRowsInMatch", "nWazeAccident",
           "nMatchWaze_buffer", "nNoMatchWaze_buffer",
-          grep("EDT", names(w.04), value = T),
-          grep("^med", names(w.04), value = T), # not present in 1 mile version
-          grep("nMagVar", names(w.04), value = T)
+          grep("EDT", names(w.04), value = T)
           )
 
 fitvars <- names(w.04)[is.na(match(names(w.04), omits))]
@@ -837,7 +831,7 @@ inputdir <- paste0("WazeEDT_Agg", HEXSIZE, "mile_Rdata_Input")
 outputdir <- paste0("WazeEDT_Agg", HEXSIZE, "mile_RandForest_Output")
 
 for(mo in c("04","05","06")){
-  prep.hex(file.path(inputdir, paste0("WazeTimeEdtHexWx_", mo,".RData")), month = mo)
+  prep.hex(file.path(inputdir, paste0("WazeTimeEdtHexWx_", mo, "_", HEXSIZE, "_mi.RData")), month = mo)
 }
 
 for(w in c("w.04", "w.05", "w.06")){
@@ -846,17 +840,10 @@ for(w in c("w.04", "w.05", "w.06")){
 w.0405 <- rbind(w.04, w.05)
 w.040506 <- rbind(w.04, w.05, w.06)
 
-omits = c(grep("GRID_ID", names(w.04), value = T), "day", "hextime", "year",
+omits = c(grep("GRID_ID", names(w.04), value = T), "day", "hextime", "year", "weekday",
+          "uniqWazeEvents", "nWazeRowsInMatch", "nWazeAccident",
           "nMatchWaze_buffer", "nNoMatchWaze_buffer",
-          grep("EDT", names(w.04), value = T),
-          grep("^med", names(w.04), value = T), # not present in 1 mile version
-          grep("nMagVar", names(w.04), value = T),
-          # "uniqWazeEvents",
-          # "nWazeRowsInMatch",
-          "nWazeAccident",
-          grep("nWazeRT", names(w.04), value = T),
-          grep("nWazeJam_", names(w.04), value = T) # experiment: omit neighboring jams
-        )
+          grep("EDT", names(w.04), value = T))
 
 fitvars <- names(w.04)[is.na(match(names(w.04), omits))]
 
@@ -969,7 +956,7 @@ inputdir <- paste0("WazeEDT_Agg", HEXSIZE, "mile_Rdata_Input")
 outputdir <- paste0("WazeEDT_Agg", HEXSIZE, "mile_RandForest_Output")
 
 for(mo in c("04","05","06")){
-  prep.hex(file.path(inputdir, paste0("WazeTimeEdtHexWx_", mo,".RData")), month = mo)
+  prep.hex(file.path(inputdir, paste0("WazeTimeEdtHexWx_", mo, "_", HEXSIZE, "_mi.RData")), month = mo)
 }
 
 # Add road functional class characteristics
@@ -998,14 +985,10 @@ table(r.na$nWazeAccident)
 # What percent of EDT crashes are we discarding? 1.3% of April data
 100*length(r.na$MatchEDT_buffer_Acc==1)/length(w.04$MatchEDT_buffer_Acc==1)
 
-omits = c(grep("GRID_ID", names(w.04), value = T), "day", "hextime", "year",
+omits = c(grep("GRID_ID", names(w.04), value = T), "day", "hextime", "year", "weekday",
+          "uniqWazeEvents", "nWazeRowsInMatch", "nWazeAccident",
           "nMatchWaze_buffer", "nNoMatchWaze_buffer",
           grep("EDT", names(w.04), value = T),
-          grep("^med", names(w.04), value = T), # not present in 1 mile version
-          grep("nMagVar", names(w.04), value = T),
-          # "uniqWazeEvents",
-          "nWazeRowsInMatch",
-          "nWazeAccident",
           grep("nWazeRT", names(w.04), value = T), # omit Waze RT
           grep("nWazeJam_", names(w.04), value = T) # experiment: omit neighboring jams
 )

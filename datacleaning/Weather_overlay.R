@@ -18,7 +18,7 @@ library(tidyverse)
 # Set hexagon size
 HEXSIZE = c("1", "4", "05")[1] # Change the value in the bracket to use 1, 4, or 0.5 sq mi hexagon grids
 
-runmonths = c("04", "05", "06")
+runmonths = c("07", "08", "09") #c("04", "05", "06")
 BYPOLY = F # leave as F for looping over files rather than over polygons within a file
 
 # Updating to run on ATA
@@ -33,7 +33,7 @@ aws.signature::use_credentials()
 source(file.path(codedir, "utility/wazefunctions.R"))
 
 # Read in data: hexagons, and Grid-aggregated Waze data ----
-# Weather data read in inside the foreach loop
+# Weather data read in inside the foreach loop, need to move to EC2 instance first
 # Grab any necessary data from the s3 bucket
 if(length(dir(localdir)[grep("shapefiles_funClass", dir(localdir))]) == 0){
   
@@ -46,6 +46,12 @@ if(length(dir(localdir)[grep("shapefiles_funClass", dir(localdir))]) == 0){
   }
   # move any files which are in an unnecessary "shapefiles" folder up to the top level of the localdir
   system("mv -v ~/workingdata/shapefiles/* ~/workingdata/")
+}
+
+if(length(dir(localdir)[grep(paste0("2017-", runmonths[length(runmonths)], "-30"), dir(localdir))]) == 0){
+  # Put weather data into temporary directory on EC2 instance
+  s3transfer = paste("aws s3 cp s3://ata-waze/additional_data/weather", localdir, "--recursive --include '*'")
+  system(s3transfer)
 }
 
 # Hexagons:
@@ -74,16 +80,16 @@ for(mo in runmonths){
   # Waze - aggregated. s3load directly, not saving file to instance
   s3load(object = file.path(inputdir, paste0("WazeTimeEdtHexAll_", mo, "_", HEXSIZE, "mi.RData")), bucket = waze.bucket)
   
-  # Weather - temp wd for now, need to move all these to s3 bucket (or better, edit NEXRAD script to save directly to S3)
-  weatherdir <- "/home/dflynn-volpe/s3_transfer/additional_data/weather/Weather_Geotiffs" #file.path(localdir, "Weather_Geotiffs")
+  # Weather - localdir for now, copied above from S3 bucket (still good to edit NEXRAD script to save directly to S3)
+  weatherdir <- localdir
   
-  # Get grid values for hex polygons with extract(). S.l.o.w.. Consider resampling and parallelizing. Also consider rasterizing the poloygons and using getValues instead of extract: https://gis.stackexchange.com/questions/130522/increasing-speed-of-crop-mask-extract-raster-by-many-polygons-in-r/188834
+  # Get grid values for hex polygons with extract(). S.l.o.w.. Parallized; consider resampling. Also consider rasterizing the poloygons and using getValues instead of extract: https://gis.stackexchange.com/questions/130522/increasing-speed-of-crop-mask-extract-raster-by-many-polygons-in-r/188834, see BYPOLY below. Also possibly faster to compile hourly to a monthly GRD and read a brick.
 
   # Parallize by file:----
   # Get list of weather tifs for this month
   mo.wx <- dir(weatherdir)[grep(paste0("2017-", mo), dir(weatherdir))]
   
-wx.cb <- foreach(i = 1:length(mo.wx), .combine = rbind, .packages = "raster") %dopar% {
+  wx.cb <- foreach(i = 1:length(mo.wx), .combine = rbind, .packages = "raster") %dopar% {
     
     # Get the hour and day for this file
     if(nchar(mo.wx[i]) == 21){
@@ -97,7 +103,7 @@ wx.cb <- foreach(i = 1:length(mo.wx), .combine = rbind, .packages = "raster") %d
     
     # read in weather data from GeoTIFF. Reads in as class RasterLayer, with dimensions and resolution set from the write-out procecure. Comes with a coordiante reference system (CRS) as well, in wx@crs
     wx <- raster(file.path(weatherdir, mo.wx[i]))
-    wx <- projectRaster(wx, crs = proj4string(md.co))
+    wx <- projectRaster(wx, crs = proj4string(md_buff))
     
     # Crop the raster to the hex.md layer
     w2 <- crop(wx, extent(hex.md)) # very fast, only rectangular cropping but actually makes it smaller. 
