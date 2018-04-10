@@ -3,7 +3,7 @@
 # additional detail from https://aws.amazon.com/blogs/big-data/connecting-r-with-amazon-redshift/
 # https://daniel-workspace.securedatacommons.com:8888
 # install.packages("RPostgreSQL", dep = T)
-TESTCONN = T # Set to T to test connection 
+TESTCONN = F # Set to T to test connection 
 
 library(RPostgreSQL)
 
@@ -13,8 +13,6 @@ if(Sys.getenv("sdc_waze_username")==""){
   cat("Please enter SDC Waze username and password manually, in the console, the first time accessing the Redshift database, using: \n Sys.setenv('sdc_waze_username' = <see email from SDC Administrator>) \n Sys.setenv('sdc_waze_password' = <see email from SDC Administrator>)")
 
 }
-
-
 
 
 redshift_host <- "prod-dot-sdc-redshift-cluster.cctxatvt4w6t.us-east-1.redshift.amazonaws.com"
@@ -44,7 +42,7 @@ alert_query_MD <- "SELECT * FROM alert
                     WHERE state='MD' 
                     AND pub_utc_timestamp BETWEEN to_timestamp('2017-04-01 00:00:00','YYYY-MM-DD HH24:MI:SS') 
                                           AND     to_timestamp('2017-04-30 23:59:59','YYYY-MM-DD HH24:MI:SS')
-                    LIMIT 50000
+                    LIMIT 5000
                       " # end query
 
 results <- dbGetQuery(conn, alert_query_MD)
