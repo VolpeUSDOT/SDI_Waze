@@ -225,13 +225,24 @@ for(j in todo.months){ #j = "04"
   wazeTime.edt.hex_NW_N_NE_SW_S_SE <- left_join(wazeTime.edt.hex_NW_N_NE_SW_S, nWazeJam, by = c("GRID_ID_SE"="GRID_ID","day"="day", "hour"="hour"))%>%
     rename(nWazeJam_SE=nWazeJam_neighbor)
   
-  #test process - look at value for highest count in nWazeAcc_NW column (10)
-  t=filter(wazeTime.edt.hex_NW_N_NE_SW_S_SE, GRID_ID=="EG-53" & day=="141" & hour=="15")
-  t #10 - this matches, test more
+  #test process - look at value for highest count in nWazeAcc_NW column and confirm match
+  GridID.maxWazeAcc = which(wazeTime.edt.hex_NW_N_NE_SW_S_SE$nWazeAccident==max(wazeTime.edt.hex_NW_N_NE_SW_S_SE$nWazeAccident))
+  print(paste("Max Number waze accidents = ", wazeTime.edt.hex_NW_N_NE_SW_S_SE$nWazeAccident[GridID.maxWazeAcc]))
+  GridID.maxWazeAcc.naccSouth = wazeTime.edt.hex_NW_N_NE_SW_S_SE$nWazeAcc_S[GridID.maxWazeAcc]
+  print(paste("Number waze accidents South Max = ", GridID.maxWazeAcc.naccSouth))
+  GridID.south = wazeTime.edt.hex_NW_N_NE_SW_S_SE$GRID_ID_S[GridID.maxWazeAcc]
+  day = wazeTime.edt.hex_NW_N_NE_SW_S_SE$day[GridID.maxWazeAcc]
+  hour = wazeTime.edt.hex_NW_N_NE_SW_S_SE$hour[GridID.maxWazeAcc]
+  GridID.south.nWazeAcc = wazeTime.edt.hex_NW_N_NE_SW_S_SE$nWazeAccident[
+    wazeTime.edt.hex_NW_N_NE_SW_S_SE$GRID_ID==GridID.south & 
+      wazeTime.edt.hex_NW_N_NE_SW_S_SE$day==day & 
+      wazeTime.edt.hex_NW_N_NE_SW_S_SE$hour==hour]
+  Test.match = GridID.maxWazeAcc.naccSouth == GridID.south.nWazeAcc
+  print(paste("Number Waze Accidents South of Max Matches Grid Cell Count = ", Test.match))
   
   wazeTime.edt.hexAll <- wazeTime.edt.hex_NW_N_NE_SW_S_SE%>%
     mutate_all(funs(replace(., is.na(.), 0)))
-  #Replace NA with zero (for the grid counts here, 0 means there were no reported Waze events or EDT crashes in the neighbor grid cell at that hour)
+  #Replace NA with zero (for the neighbor grid counts here, 0 means there were no reported Waze events of the column type or EDT crashes at that hour)
   
   #Update time variable 
   hextimeChar <- paste(wazeTime.edt.hexAll$day,wazeTime.edt.hexAll$hour,sep=":")
