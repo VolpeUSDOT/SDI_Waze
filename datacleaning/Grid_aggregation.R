@@ -4,7 +4,9 @@
 
 #Notes on data coverage
 #For data completeness context, there are 33,184 1-mile hexagon grid cells in MD (including border cells) and ~720 Day-hours. 
-#Complete observations for all grid-cells/day-hours would consist of ~23.9 million rows 
+#Complete observations for all grid-cells/day-hours would consist of ~23.9 million rows
+#For April, we have ~1.3 million rows, or hex grid cells/day-hours with at least one Waze events or EDT report.
+#This includes ~ 4.5/33K unique grid cells and 717/720 unique 1-hour time periods over April.
 
 
 # <><><><><><><><><><><><><><><><><><><><>
