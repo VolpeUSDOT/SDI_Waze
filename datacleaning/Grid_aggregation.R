@@ -1,6 +1,10 @@
 # Aggregation of Waze and EDT by grid cell
-# Goal: create a gridded data set where grid cell contain the count of 
+# Goal: create a gridded data set where grid cell contain the count of Waze and EDT records and other auxiliary data. 
 # Start from UrbanArea_overlay.R
+
+#Notes on data coverage
+#For data completeness context, there are 33,184 1-mile hexagon grid cells in MD (including border cells) and ~720 Day-hours. 
+#Complete observations for all grid-cells/day-hours would consist of ~23.9 million rows 
 
 
 # <><><><><><><><><><><><><><><><><><><><>
@@ -14,7 +18,7 @@ library(lubridate)
 library(utils)
 
 #Set parameters for data to process
-HEXSIZE = c("1", "4", "05")[3] # Change the value in the bracket to use 1, 4, or 0.5 sq mi hexagon grids
+HEXSIZE = c("1", "4", "05")[1] # Change the value in the bracket to use 1, 4, or 0.5 sq mi hexagon grids
 
 
 #Flynn drive
@@ -44,11 +48,12 @@ avail.months = unique(substr(dir(wazemonthdir)[grep("^merged.waze.edt", dir(waze
 
 temp.outputdir = tempdir()# for temporary storage 
 
-todo.months = avail.months[c(5:7)]
+todo.months = avail.months#[c(5:7)]
 
 for(j in todo.months){ #j = "04"
   
-  load(file.path(wazemonthdir, paste0("merged.waze.edt.", j,"_",HEXSIZE,"mi","_MD.RData"))) # includes both waze (link.waze.edt) and edt (edt.df) data, with grid for central and neighboring cells
+  load(file.path(wazemonthdir, paste0("merged.waze.edt.", j,"_",HEXSIZE,"mi","_MD.RData"))) 
+  # includes both waze (link.waze.edt) and edt (edt.df) data, with grid for central and neighboring cells (link.waze.edt not used in this script)
   
   # format(object.size(link.waze.edt), "Mb"); format(object.size(edt.df), "Mb")
   # EDT time needs to be POSIXct, not POSIXlt. ct: seconds since beginning of 1970 in UTC. lt is a list of vectors representing seconds, min, hours, day, year. ct is better for analysis, while lt is more human-readable.
@@ -57,7 +62,8 @@ for(j in todo.months){ #j = "04"
   
   # <><><><><><><><><><><><><><><><><><><><>
   
-  #Read in the data frame of all Grid IDs by day of year and time of day in each month of data (subet to all grid IDs with Waze OR EDT data)
+  #Read in the data frame of all Grid IDs by day of year and time of day in each month of data with Waze events OR EDT reports 
+  #For April, the df has ~1.29 million observations (in 4,534 unique grid IDs out of ~33K total in MD, and in 717 unique DayHour periods)
   load(file.path(paste(outputdir, "/WazeHexTimeList_", j,"_",HEXSIZE,"mi",".RData",sep="")))
   
   # aggregate: new data frame will have one row per cell, per hour, per day.
@@ -175,6 +181,7 @@ for(j in todo.months){ #j = "04"
   wazeTime.edt.hex <- full_join(waze.hex, edt.hex, by = c("GRID_ID", "day", "hour")) %>%
     mutate_all(funs(replace(., is.na(.), 0)))
   #Replace NA with zero (for the grid counts here, 0 means there were no reported Waze events or EDT crashes in the grid cell at that hour)
+  #To only include rows with a Waze "signal", rows with no Waze accidents or weather/hazards are removed prior to model fitting in RandomForest scripts
   
   #Add columns containing data for neighboring grid cells 
   names(wazeTime.edt.hex)
@@ -218,13 +225,24 @@ for(j in todo.months){ #j = "04"
   wazeTime.edt.hex_NW_N_NE_SW_S_SE <- left_join(wazeTime.edt.hex_NW_N_NE_SW_S, nWazeJam, by = c("GRID_ID_SE"="GRID_ID","day"="day", "hour"="hour"))%>%
     rename(nWazeJam_SE=nWazeJam_neighbor)
   
-  #test process - look at value for highest count in nWazeAcc_NW column (10)
-  t=filter(wazeTime.edt.hex_NW_N_NE_SW_S_SE, GRID_ID=="EG-53" & day=="141" & hour=="15")
-  t #10 - this matches, test more
+  #test process - look at value for highest count in nWazeAcc_NW column and confirm match
+  GridID.maxWazeAcc = which(wazeTime.edt.hex_NW_N_NE_SW_S_SE$nWazeAccident==max(wazeTime.edt.hex_NW_N_NE_SW_S_SE$nWazeAccident))
+  print(paste("Max Number waze accidents = ", wazeTime.edt.hex_NW_N_NE_SW_S_SE$nWazeAccident[GridID.maxWazeAcc]))
+  GridID.maxWazeAcc.naccSouth = wazeTime.edt.hex_NW_N_NE_SW_S_SE$nWazeAcc_S[GridID.maxWazeAcc]
+  print(paste("Number waze accidents South Max = ", GridID.maxWazeAcc.naccSouth))
+  GridID.south = wazeTime.edt.hex_NW_N_NE_SW_S_SE$GRID_ID_S[GridID.maxWazeAcc]
+  day = wazeTime.edt.hex_NW_N_NE_SW_S_SE$day[GridID.maxWazeAcc]
+  hour = wazeTime.edt.hex_NW_N_NE_SW_S_SE$hour[GridID.maxWazeAcc]
+  GridID.south.nWazeAcc = wazeTime.edt.hex_NW_N_NE_SW_S_SE$nWazeAccident[
+    wazeTime.edt.hex_NW_N_NE_SW_S_SE$GRID_ID==GridID.south & 
+      wazeTime.edt.hex_NW_N_NE_SW_S_SE$day==day & 
+      wazeTime.edt.hex_NW_N_NE_SW_S_SE$hour==hour]
+  Test.match = GridID.maxWazeAcc.naccSouth == GridID.south.nWazeAcc
+  print(paste("Number Waze Accidents South of Max Matches Grid Cell Count = ", Test.match))
   
   wazeTime.edt.hexAll <- wazeTime.edt.hex_NW_N_NE_SW_S_SE%>%
     mutate_all(funs(replace(., is.na(.), 0)))
-  #Replace NA with zero (for the grid counts here, 0 means there were no reported Waze events or EDT crashes in the neighbor grid cell at that hour)
+  #Replace NA with zero (for the neighbor grid counts here, 0 means there were no reported Waze events of the column type or EDT crashes at that hour)
   
   #Update time variable 
   hextimeChar <- paste(wazeTime.edt.hexAll$day,wazeTime.edt.hexAll$hour,sep=":")

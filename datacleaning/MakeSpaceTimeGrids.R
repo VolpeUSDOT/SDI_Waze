@@ -1,6 +1,6 @@
-# Aggregation of Waze and EDT by grid cell
-# Goal: create a gridded data set where grid cell contain the count of 
-# Start from UrbanArea_overlay.R
+# Script to generate list of GridIDs and 1-hour time windows with Waze or EDT data (omit empty grid cells and time periods from list)
+# 
+
 
 
 # <><><><><><><><><><><><><><><><><><><><>
@@ -10,7 +10,7 @@ library(lubridate)
 library(utils)
 
 #Set parameters for data to process
-HEXSIZE = c("1", "4", "05")[2] # Change the value in the bracket to use 1, 4, or 0.5 sq mi hexagon grids
+HEXSIZE = c("1", "4", "05")[1] # Change the value in the bracket to use 1, 4, or 0.5 sq mi hexagon grids
 
 ##Set file paths - remove for cloud pipeline
 #Flynn drive
@@ -38,7 +38,7 @@ avail.months = unique(substr(dir(wazemonthdir)[grep("^merged.waze.edt", dir(waze
                       start = 17,
                       stop = 18))
 
-todo.months = avail.months[c(5:7)]
+todo.months = avail.months #[c(5:7)]
 
 temp.outputdir = tempdir()# for temporary storage 
 starttime <- Sys.time()
@@ -80,7 +80,7 @@ for(j in todo.months){ # j="04"
     ti.GridIDTime = filter(GridIDTime,GridDayHour==i)
     ti.link.waze.edt = filter(link.waze.edt, time >= i & time <= i+3600| last.pull.time >=i & last.pull.time <=i+3600)
   
-    ti.Waze.hex <- inner_join(ti.GridIDTime, ti.link.waze.edt) #Use left_join to get zeros if no match  
+    ti.Waze.hex <- inner_join(ti.GridIDTime, ti.link.waze.edt) #Only keeps cells/times with data - Use left_join to keep zeros if no match  
     
     Waze.hex.time.all <- rbind(Waze.hex.time.all, ti.Waze.hex)
     i=i+3600
