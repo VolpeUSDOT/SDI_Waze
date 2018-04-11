@@ -100,3 +100,23 @@ system(getobject.cmd)
 ```
 
 Possible enhancement: make functions in `/utility` to carry out these list/read/write commands.
+
+
+## Passing commands via `system`
+
+This can allow more flexbilibty with specific variables, e.g. within ATA doing the following:
+
+```
+s3transfer = paste("aws s3 cp s3://ata-waze/MD_hexagon_shapefiles", localdir, "--recursive --include '*'")
+  system(s3transfer)
+```
+
+For Waze_clip.R in SDC, can use the following to copy files from top level of team bucket to a subfolder:
+
+```{r eval=F}
+state = "MD"
+dirtomake = paste0("Raw_", state)
+s3transfer = paste0("aws s3 cp s3://prod-sdc-sdi-911061262852-us-east-1-bucket/ ", file.path("s3://prod-sdc-sdi-911061262852-us-east-1-bucket/", dirtomake), " --recursive --include '*.RData'")
+system(s3transfer)
+```
+
