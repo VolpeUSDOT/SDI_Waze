@@ -1,6 +1,6 @@
-# Aggregation of Waze and EDT by grid cell
-# Goal: create a gridded data set where grid cell contain the count of 
-# Start from UrbanArea_overlay.R
+# Script to generate list of GridIDs and 1-hour time windows with Waze or EDT data (omit empty grid cells and time periods from list)
+# 
+
 
 
 # <><><><><><><><><><><><><><><><><><><><>
@@ -80,7 +80,7 @@ for(j in todo.months){ # j="04"
     ti.GridIDTime = filter(GridIDTime,GridDayHour==i)
     ti.link.waze.edt = filter(link.waze.edt, time >= i & time <= i+3600| last.pull.time >=i & last.pull.time <=i+3600)
   
-    ti.Waze.hex <- inner_join(ti.GridIDTime, ti.link.waze.edt) #Use left_join to get zeros if no match  
+    ti.Waze.hex <- inner_join(ti.GridIDTime, ti.link.waze.edt) #Only keeps cells/times with data - Use left_join to keep zeros if no match  
     
     Waze.hex.time.all <- rbind(Waze.hex.time.all, ti.Waze.hex)
     i=i+3600
