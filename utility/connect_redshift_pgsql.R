@@ -42,11 +42,10 @@ alert_query_MD <- "SELECT * FROM alert
                     WHERE state='MD' 
                     AND pub_utc_timestamp BETWEEN to_timestamp('2017-04-01 00:00:00','YYYY-MM-DD HH24:MI:SS') 
                                           AND     to_timestamp('2017-04-30 23:59:59','YYYY-MM-DD HH24:MI:SS')
-                    LIMIT 5000
+                    LIMIT 50000
                       " # end query
 
 results <- dbGetQuery(conn, alert_query_MD)
-
 
 
 format(object.size(results), "Gb") # 1.3 Gb for April 2017 Md data, 

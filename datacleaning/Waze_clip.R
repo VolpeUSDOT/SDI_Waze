@@ -21,7 +21,7 @@ teambucket <- "prod-sdc-sdi-911061262852-us-east-1-bucket"
 
 inputdir <- paste0("Raw_", state)
 outputdir <- paste0("Clip_", state) 
-localdir <- "/home/daniel/workingdata" # location on this instance to hold working data files that can be s3loaded. *Need full path, cannot abbreviate to ~/woringdata, for readOGR*
+localdir <- "/home/daniel/workingdata" # location on this instance to hold working data files that can be s3loaded. *Need full path, cannot abbreviate to ~/workingdata, for readOGR*
 system(paste('mkdir', localdir))
 
 library(sp)
@@ -31,7 +31,6 @@ library(mapproj) # for coord_map()
 library(rgdal) # for readOGR(), needed for reading in ArcM shapefiles
 library(rgeos) # for gIntersection, to clip two shapefiles
 library(raster)
-
 
 BUFFER = TRUE # Set to false to use original md_counties shapefile, true for 0.5 mi buffered version
 
