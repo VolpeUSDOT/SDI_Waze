@@ -1,0 +1,108 @@
+---
+title: "Waze_coverage"
+output: html_document
+---
+
+```{r setup, echo = F}
+library(tidyverse) 
+library(lubridate)
+library(DT)
+
+# Location of SDC SDI Waze team S3 bucket. Files will first be written to a temporary directory in this EC2 instance, then copied to the team bucket.
+teambucket <- "prod-sdc-sdi-911061262852-us-east-1-bucket"
+output.loc <- "~/tempout"
+codeloc <- "~/SDI_Waze"
+```
+
+# Overview of Waze data coverage for all states
+
+Can also look at EDT states
+Will have to clip to borders for each state
+Possibly multiple tables for large states
+
+### Metrics
+- Date of first and last entry in alert table for each state
+- pct of 5 min intervals complete for each state, for time range April 1 2017 - March 30 2018
+
+### Outputs
+
+- number of major/minor accidents per day by state, by county
+- Saved as flat files, to be sent to ATA for Tableau visualization
+
+## Connect to Redshift and build test query
+```{r}
+source(file.path(codeloc, 'utility/connect_redshift_pgsql.R'))
+```
+
+### Test states in Redshift
+```{r}
+# How many records are there in each state, total for last year
+
+state_alert_query <- paste0("SELECT COUNT(DISTINCT alert_uuid), state
+                            FROM alert 
+WHERE alert_type = 'ACCIDENT_MAJOR' AND pub_utc_timestamp BETWEEN to_timestamp('2017-04-01 00:00:00','YYYY-MM-DD HH24:MI:SS') AND to_timestamp('2018-03-30 23:59:59','YYYY-MM-DD HH24:MI:SS')
+                            GROUP BY state")
+system.time(results <- dbGetQuery(conn, state_alert_query))
+
+datatable(results)
+```
+
+To do: same, but by month, counting distinct 5-min time intervals
+
+### Query parameters
+Get year/month, year/month/day, and last day of month vectors to create the SQL queries
+
+```{r}
+year = 2017 # can be vector of multiple years
+months = 3:12
+state = "MD"
+
+yearmonths <- paste(year, rep(formatC(months, width = 2, flag = "0"), length(year)), sep = "-")
+yearmonths.1 <- paste(year, rep(formatC(months, width = 2, flag = "0"), length(year)), "01", sep = "-")
+lastdays <- days_in_month(as.POSIXct(yearmonths.1)) # from lubridate
+yearmonths.end <- paste(yearmonths, lastdays, sep="-")
+```
+
+
+### Loop over year-months for each state
+```{r}
+for(i in 1:length(yearmonths)){ # i = 1
+  
+  # read data by month for processing
+  alert_query <- paste0("SELECT * FROM alert WHERE state='", state,
+                  "' AND pub_utc_timestamp BETWEEN to_timestamp('", yearmonths.1[i], 
+                  " 00:00:00','YYYY-MM-DD HH24:MI:SS') AND to_timestamp('", yearmonths.end[i], " 23:59:59','YYYY-MM-DD HH24:MI:SS')") # end query
+  
+  
+  results <- dbGetQuery(conn, alert_query) # can be ~ 2-3 min per month; consider moving the summarise steps below to the SQL query.
+
+  cat(yearmonths[i], "queried, ", format(nrow(results), big.mark = ","), "observations \n\n")
+  
+  # Convert values to numeric
+  numconv <- c("report_rating", "confidence", "reliability", "pub_millis", "location_lon", "location_lat", "magvar")
+
+  results[numconv] <- apply(results[numconv], 2, function(x) as.numeric(x))
+    
+
+  d <- as.tibble(results)
+  
+  d.test = d[1:5000,]
+  
+  ll <- d %>%
+    group_by(alert_uuid) %>%
+    summarise(
+      median.reportRating = median(report_rating),
+      median.confidence = median(confidence),
+      median.reliability = median(reliability),
+      pubMillis = min(pub_millis),
+      lon = median(location_lon),
+      lat = median(location_lat),
+      last.time = max(pub_millis),
+      nrecord = n()
+    )
+```
+  
+Move to S3 bucket
+```{r}
+system("~/SDI_Waze/utility/sdc_s3_out.sh")
+```

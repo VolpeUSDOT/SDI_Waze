@@ -15,14 +15,13 @@ source(file.path(codeloc, 'utility/wazefunctions.R'))
 # Check for package installations
 source(file.path(codeloc, 'utility/get_packages.R'))
 
-
 # Location of SDC SDI Waze team S3 bucket. Monthly files live here
 teambucket <- "prod-sdc-sdi-911061262852-us-east-1-bucket"
 
 inputdir <- paste0("Raw_", state)
 outputdir <- paste0("Clip_", state) 
 localdir <- "/home/daniel/workingdata" # location on this instance to hold working data files that can be s3loaded. *Need full path, cannot abbreviate to ~/workingdata, for readOGR*
-system(paste('mkdir', localdir))
+if(length(grep(system(paste('mkdir', localdir))
 
 library(sp)
 library(maps) # for mapping base layers
