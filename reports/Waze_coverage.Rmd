@@ -3,7 +3,8 @@ title: "Waze_coverage"
 output: html_document
 ---
 
-```{r setup, echo = F}
+```{r setup, echo = F, message=FALSE}
+knitr::opts_chunk$set(message = FALSE)
 library(tidyverse) 
 library(lubridate)
 library(DT)
@@ -35,24 +36,32 @@ source(file.path(codeloc, 'utility/connect_redshift_pgsql.R'))
 ```
 
 ### Test states in Redshift
-```{r}
-# How many records are there in each state, total for last year
+```{r statealert_n, cache=TRUE}
+# How many records are there in each state, total for last year. ~ 55 min
 
-state_alert_query <- paste0("SELECT COUNT(DISTINCT alert_uuid), state
+state_alert_query <- paste0("SELECT COUNT(DISTINCT alert_uuid), state, alert_type
                             FROM alert 
-WHERE alert_type = 'ACCIDENT_MAJOR' AND pub_utc_timestamp BETWEEN to_timestamp('2017-04-01 00:00:00','YYYY-MM-DD HH24:MI:SS') AND to_timestamp('2018-03-30 23:59:59','YYYY-MM-DD HH24:MI:SS')
-                            GROUP BY state")
+WHERE pub_utc_timestamp BETWEEN to_timestamp('2017-04-01 00:00:00','YYYY-MM-DD HH24:MI:SS') AND to_timestamp('2018-03-30 23:59:59','YYYY-MM-DD HH24:MI:SS')
+                            GROUP BY state, alert_type;")
 system.time(results <- dbGetQuery(conn, state_alert_query))
 
-datatable(results)
+write.csv(results, "~/workingdata/State_Alert-Type_Count.csv", row.names= F)
 ```
 
-To do: same, but by month, counting distinct 5-min time intervals
+```{r DTresults1}
+
+datatable(results, filter = 'top', 
+          caption = "Count of Waze alerts by state and type, for the year from 2017-04-01 to 2018-03-30",
+          options = list('pageLength' = 25)) %>%
+          formatRound('count', digits = 0)
+```
+
+To do: same, but by month, counting distinct 5-min time intervals. Following chunks not complete.
 
 ### Query parameters
 Get year/month, year/month/day, and last day of month vectors to create the SQL queries
 
-```{r}
+```{r, eval = FALSE}
 year = 2017 # can be vector of multiple years
 months = 3:12
 state = "MD"
@@ -65,7 +74,10 @@ yearmonths.end <- paste(yearmonths, lastdays, sep="-")
 
 
 ### Loop over year-months for each state
-```{r}
+
+Code from `ReduceWaze_SDC.R`, to be adapted
+
+```{r, eval = FALSE}
 for(i in 1:length(yearmonths)){ # i = 1
   
   # read data by month for processing
@@ -103,6 +115,6 @@ for(i in 1:length(yearmonths)){ # i = 1
 ```
   
 Move to S3 bucket
-```{r}
+```{r, eval = FALSE}
 system("~/SDI_Waze/utility/sdc_s3_out.sh")
 ```
