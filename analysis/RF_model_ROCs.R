@@ -10,25 +10,28 @@ library(aws.s3)
 
 
 codeloc <- "~/SDI_Waze" 
-
 source(file.path(codeloc, 'utility/wazefunctions.R'))
-
 waze.bucket <- "ata-waze"
+aws.signature::use_credentials() 
 
 
 HEXSIZE = c("1", "4", "05")[1] # Change the value in the bracket to use 1, 4, or 0.5 sq mi hexagon grids
 
 dir <- paste0("WazeEDT_Agg", HEXSIZE, "mile_RandForest_Output")
-aws_contents <- system("aws s3 ls s3://ata-waze/", dir, "/")
+aws_contents <- system(paste0("aws s3 ls s3://ata-waze/", dir, "/"), intern = TRUE)
+models <-  gsub('\")', '' ,substr(strsplit(aws_contents, " "),47,90))
+  
+#for copying to local folder
+# if(length(dir(localdir)) == 0){
+#  system(paste0("aws s3 cp s3://ata-waze/", dir, "/"))
+# }
 
-for(i in aws_contents) == 0){
+for(i in models){
+  model_no <- substr(i, 7,8)
+  s3load("s3://ata-waze/", dir, "/", i)
   
-  s3transfer = paste("aws s3 ls s3://ata-waze/", dir, "/")
-  system(s3transfer)
-  
-}
-# Model 17
-# April + May, predict June, 1 mi, neighbors, wx, roads, jobs ----
+  }
+
 
 #Reloading model and recreating needed variables to rerun predictions
 load("C:/Users/graham.robart/Documents/Model_17_RandomForest_Output_0405_06.RData")
@@ -58,6 +61,10 @@ names(out.17)[4:7] <- c("Obs", "Pred", "Prob.True", "Prob.False")
 
 #using pROC
 plot(roc(out.17$Obs, out.17$Prob.True, auc = TRUE))
+model_auc <- auc(out.17$Obs, out.17$Prob.True)
+
+
+
 
 
 #Using ROCR
