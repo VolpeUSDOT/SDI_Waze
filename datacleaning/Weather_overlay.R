@@ -16,9 +16,9 @@ library(aws.s3)
 library(tidyverse)
 
 # Set hexagon size
-HEXSIZE = c("1", "4", "05")[2] # Change the value in the bracket to use 1, 4, or 0.5 sq mi hexagon grids
+HEXSIZE = c("1", "4", "05")[3] # Change the value in the bracket to use 1, 4, or 0.5 sq mi hexagon grids
 
-runmonths = c("04", "05", "06") # c("07", "08", "09") 
+runmonths = c("04", "05", "06", "07", "08", "09") 
 BYPOLY = F # leave as F for looping over files rather than over polygons within a file
 
 # Updating to run on ATA
