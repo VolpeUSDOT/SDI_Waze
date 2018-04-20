@@ -20,12 +20,18 @@
 
 # rf.inputs - list of arguments to pass to randomForest
 
+# thin.dat - value from 0 to 1 for proportion of the training and test data to use in fitting the model. E.g. thin.dat = 0.2, use only 20% of the training and test data; useful for testing new features. 
+
 do.rf <- function(train.dat, omits, response.var = "MatchEDT_buffer_Acc", model.no,
                   rf.formula = NULL, test.dat = NULL, test.split = .30,
+                  thin.dat = NULL,
                   rf.inputs = list(ntree.use = 500, avail.cores = 4, mtry = NULL, maxnodes = NULL, nodesize = 5)){
   
   starttime = Sys.time()
-    
+  
+  cl <- makeCluster(parallel::detectCores()) # make a cluster of all available cores
+  registerDoParallel(cl)
+  
   if(!is.null(test.dat) & !missing(test.split)) stop("Specify either test.dat or test.split, but not both")
 
   class(train.dat) <- "data.frame"
@@ -44,6 +50,14 @@ do.rf <- function(train.dat, omits, response.var = "MatchEDT_buffer_Acc", model.
     mtry.use = if (!is.factor(response.var)) max(floor(length(fitvars)/3), 1) else floor(sqrt(length(fitvars)))
   } else {mtry.use = rf.inputs$mtry}
   
+  # Thin data sets if thin.dat provided
+  if(!is.null(thin.dat)) {
+    train.dat <- train.dat[sample(1:nrow(train.dat), size = nrow(train.dat)*thin.dat),]
+    if(!is.null(test.dat)){
+      test.dat <- test.dat[sample(1:nrow(test.dat), size = nrow(test.dat)*thin.dat),]
+    }
+  }
+  
   # 70:30 split or Separate training and test data
   if(is.null(test.dat)){
     trainrows <- sort(sample(1:nrow(train.dat), size = nrow(train.dat)*(1-test.split), replace = F))
@@ -58,30 +72,29 @@ do.rf <- function(train.dat, omits, response.var = "MatchEDT_buffer_Acc", model.
     comb.dat <- rbind(train.dat, test.dat)
   }
    
-  # cl <- makeCluster(parallel::detectCores()) # make a cluster of all available cores
-  # registerDoParallel(cl) 
+ 
   
   rf.out <- foreach(ntree = rep(rf.inputs$ntree.use/rf.inputs$avail.cores, rf.inputs$avail.cores),
                   .combine = randomForest::combine, .multicombine=TRUE, .packages = 'randomForest') %dopar% 
-            randomForest(rf.formula, data = rundat, ntree = ntree, mtry = mtry.use, maxnodes = rf.inputs$maxnodes, nodesize = rf.inputs$nodesize)
-
+    randomForest(x = rundat[,fitvars], y = rundat[,response.var], ntree = ntree, mtry = mtry.use, maxnodes = rf.inputs$maxnodes, nodesize = rf.inputs$nodesize)
+  
   timediff = Sys.time() - starttime
   cat(round(timediff,2), attr(timediff, "unit"), "to fit model", model.no, "\n")
   
   rf.pred <- predict(rf.out, test.dat.use[fitvars])
 
-  Nobs <- data.frame(nrow(train.dat),
-                 sum(as.numeric(train.dat[,response.var]) == 0),
-                 sum(as.numeric(train.dat[,response.var]) > 0),
-                 length(train.dat$nWazeAccident[train.dat$nWazeAccident>0]) )
+  Nobs <- data.frame(nrow(rundat),
+                 sum(as.numeric(as.character(rundat[,response.var])) == 0),
+                 sum(as.numeric(as.character(rundat[,response.var])) > 0),
+                 length(rundat$nWazeAccident[train.dat$nWazeAccident>0]) )
   
   colnames(Nobs) = c("N", "No EDT", "EDT present", "Waze accident present")
   predtab <- table(test.dat.use[,response.var], rf.pred)
 
   # save output predictions. Will need to re-work for non-binary outcomes
-  if(is.null(test.dat)) userows = testrows else userows = 1:nrow(train.dat) # use testrows if 70/30 or all rows if separate train and test dat
+  if(is.null(test.dat)) { userows = testrows } else { userows = 1:nrow(test.dat.use) }# use testrows if 70/30 or all rows if separate train and test dat
   
-  out.df <- data.frame(train.dat[userows, c("GRID_ID", "day", "hour", response.var)], rf.pred)
+  out.df <- data.frame(test.dat.use[userows, c("GRID_ID", "day", "hour", response.var)], rf.pred)
   out.df$day <- as.numeric(out.df$day)
   names(out.df)[4:5] <- c("Obs", "Pred")
   out.df = data.frame(out.df,
@@ -93,15 +106,22 @@ do.rf <- function(train.dat, omits, response.var = "MatchEDT_buffer_Acc", model.
             file = paste(model.no, "RandomForest_pred.csv", sep = "_"),
             row.names = F)
   
-  savelist = c("rf.out", "rf.pred", "train.dat", "out.df")
+  savelist = c("rf.out", "rf.pred", "out.df") 
   if(is.null(test.dat)) savelist = c(savelist, "testrows", "trainrows")
+  if(!is.null(thin.dat)) savelist = c(savelist, "test.dat.use")
      
   s3save(list = savelist,
      object = file.path(outputdir, paste("Model", model.no, "RandomForest_Output.RData", sep= "_")),
      bucket = waze.bucket)
-
-  # Output is list of three elements: Nobs data frame, predtab table, and binary model diagnotics table
-  list(Nobs, predtab, diag = bin.mod.diagnostics(predtab)) 
+  
+  stopCluster(cl); gc()
+  
+  # Output is list of three elements: Nobs data frame, predtab table, binary model diagnotics table, and mean squared error
+  list(Nobs, predtab, diag = bin.mod.diagnostics(predtab), 
+       mse = mean(as.numeric(as.character(test.dat.use[,response.var])) - 
+                as.numeric(as.character(rf.pred)))^2,
+       runtime = timediff
+  ) 
   
 } # end do.rf function
 

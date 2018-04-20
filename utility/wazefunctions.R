@@ -256,28 +256,44 @@ append.hex <- function(hexname, data.to.add, na.action = c("omit", "keep", "fill
   
   w <- get(hexname)
   
-  # Check to see if this shapefile has been read in already:
+  # Check to see if this shapefile has been read in already. For FARS multipoint data, simply read DBF file
   if(!exists(data.to.add)){
+    if(length(grep("FARS_MD", data.to.add)) > 0){
+      assign(data.to.add, foreign::read.dbf(file = file.path(localdir, data.to.add)), envir = globalenv())
+    }
+
     assign(data.to.add, rgdal::readOGR(localdir, layer = data.to.add), envir = globalenv())
   }
   
   dd <- get(data.to.add)
   
-  if(length(grep("routes", data.to.add)) > 0){
+  if(length(grep("routes_AADT_total_sum", data.to.add)) > 0){
+    dd <- dd@data
+  }
+  
+  if(length(grep("routes_sum", data.to.add)) > 0){
     dd <- dd@data %>% 
       group_by(GRID_ID) %>%
       tidyr::spread(key = F_SYSTEM_V, value = SUM_miles, fill = 0, sep = "_")
   }
+
+  if(length(grep("FARS_MD", data.to.add)) > 0){
+    dd <- dd %>% 
+      group_by(GRID_ID) %>%
+      summarise(CRASH_SUM = sum(CRASH_SUM),
+                FATALS_SUM = sum(FATALS_SUM))
+  }
   
+
   if(length(grep("bg_rac_", data.to.add)) > 0){
     
     dd <- dd@data 
     dd <- dd[c("GRID_ID", 
                "SUM_C000",                                                            # Total jobs
-               "SUM_CA01", "SUM_CA02", "SUM_CA03",                                    # By age category
-               "SUM_CE01", "SUM_CE02", "SUM_CE03",                                    # By earnings
-               "SUM_CD01", "SUM_CD02", "SUM_CD03", "SUM_CD04",                        # By educational attainment
-               "SUM_CS01", "SUM_CS02"                                                 # By sex
+#               "SUM_CA01", "SUM_CA02", "SUM_CA03",                                    # By age category
+               "SUM_CE01", "SUM_CE02", "SUM_CE03"                                    # By earnings
+#               ,"SUM_CD01", "SUM_CD02", "SUM_CD03", "SUM_CD04",                        # By educational attainment
+#               "SUM_CS01", "SUM_CS02"                                                 # By sex
     )]
     names(dd)[2:length(names(dd))] <- paste("RAC", names(dd)[2:length(names(dd))], sep = "_")
     
@@ -288,11 +304,11 @@ append.hex <- function(hexname, data.to.add, na.action = c("omit", "keep", "fill
     dd <- dd@data 
     dd <- dd[c("GRID_ID", 
                "SUM_C000",                                                            # Total jobs
-               "SUM_CA01", "SUM_CA02", "SUM_CA03",                                    # By age category
+#               "SUM_CA01", "SUM_CA02", "SUM_CA03",                                    # By age category
                "SUM_CE01", "SUM_CE02", "SUM_CE03",                                    # By earnings
-               "SUM_CD01", "SUM_CD02", "SUM_CD03", "SUM_CD04",                        # By educational attainment
+#              "SUM_CD01", "SUM_CD02", "SUM_CD03", "SUM_CD04",                        # By educational attainment
                "SUM_CS01", "SUM_CS02",                                                # By sex
-               "SUM_CFA01", "SUM_CFA02" ,"SUM_CFA03" ,"SUM_CFA04", "SUM_CFA05",       # By firm age
+#             "SUM_CFA01", "SUM_CFA02" ,"SUM_CFA03" ,"SUM_CFA04", "SUM_CFA05",       # By firm age
                "SUM_CFS01", "SUM_CFS02", "SUM_CFS03", "SUM_CFS04",  "SUM_CFS05"       # By firm size
     )]
     names(dd)[2:length(names(dd))] <- paste("WAC", names(dd)[2:length(names(dd))], sep = "_")
