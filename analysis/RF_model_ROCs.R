@@ -1,3 +1,5 @@
+# Tanner: add descptive comment at the top :)
+
 library(data.table)
 library(pROC)
 library(caret)
@@ -7,6 +9,7 @@ library(plotROC)
 library(ROCR)
 library(aws.s3)
 
+# install.packages(c("data.table", "pROC", "caret", "randomForest","plotROC","ROCR"), dep = T)
 
 
 codeloc <- "~/SDI_Waze" 
@@ -17,8 +20,8 @@ aws.signature::use_credentials()
 
 HEXSIZE = c("1", "4", "05")[1] # Change the value in the bracket to use 1, 4, or 0.5 sq mi hexagon grids
 
-dir <- paste0("WazeEDT_Agg", HEXSIZE, "mile_RandForest_Output")
-aws_contents <- system(paste0("aws s3 ls s3://ata-waze/", dir, "/"), intern = TRUE)
+wdir <- paste0("WazeEDT_Agg", HEXSIZE, "mile_RandForest_Output")
+aws_contents <- system(paste0("aws s3 ls s3://ata-waze/", wdir, "/"), intern = TRUE)
 models <-  gsub('\")', '' ,substr(strsplit(aws_contents, " "),47,90))
   
 #for copying to local folder
@@ -28,13 +31,21 @@ models <-  gsub('\")', '' ,substr(strsplit(aws_contents, " "),47,90))
 
 for(i in models){
   model_no <- substr(i, 7,8)
-  s3load("s3://ata-waze/", dir, "/", i)
+  s3load("s3://ata-waze/", wdir, "/", i)
   
   }
 
 
 #Reloading model and recreating needed variables to rerun predictions
-load("C:/Users/graham.robart/Documents/Model_17_RandomForest_Output_0405_06.RData")
+# load("C:/Users/graham.robart/Documents/Model_17_RandomForest_Output_0405_06.RData")
+# manual loading of one model from S3
+modelno = "17"
+# s3load(object = file.path(wdir, paste("Model", modelno, "RandomForest_Output.RData", sep= "_")), 
+#        bucket = waze.bucket)
+
+s3load(object = file.path(wdir,"Model_17_RandomForest_Output_0405_06.RData"),
+       bucket = waze.bucket)
+
 
 omits = c(grep("GRID_ID", names(w.06), value = T), "day", "hextime", "year", "weekday",
           "uniqWazeEvents", "nWazeRowsInMatch", "nWazeAccident",
@@ -43,9 +54,7 @@ omits = c(grep("GRID_ID", names(w.06), value = T), "day", "hextime", "year", "we
 
 fitvars <- names(w.06)[is.na(match(names(w.06), omits))]
 
-
 #Predictions, modified to use probabilities in addition to discrete predictions
-
 model.17.pred <- predict(rf.0405.all, w.06[, fitvars])
 model.17.prob <- predict(rf.0405.all, w.06[, fitvars], type = "prob")
 

@@ -209,7 +209,7 @@ keyoutputs[[modelno]] = do.rf(train.dat = w.04_09,
 save("keyoutputs", file = paste0("Output_to_", modelno))
 
 # 23 Add all together
-modeno = "23"
+modelno = "23"
 
 omits = c(alwaysomit, 
           grep("MagVar", names(w.04), value = T), # direction of travel

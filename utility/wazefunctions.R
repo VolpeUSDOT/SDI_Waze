@@ -259,10 +259,10 @@ append.hex <- function(hexname, data.to.add, na.action = c("omit", "keep", "fill
   # Check to see if this shapefile has been read in already. For FARS multipoint data, simply read DBF file
   if(!exists(data.to.add)){
     if(length(grep("FARS_MD", data.to.add)) > 0){
-      assign(data.to.add, foreign::read.dbf(file = file.path(localdir, data.to.add)), envir = globalenv())
-    }
-
+      assign(data.to.add, foreign::read.dbf(file = file.path(localdir, paste0(data.to.add, ".dbf"))), envir = globalenv())
+    } else {
     assign(data.to.add, rgdal::readOGR(localdir, layer = data.to.add), envir = globalenv())
+    }
   }
   
   dd <- get(data.to.add)
