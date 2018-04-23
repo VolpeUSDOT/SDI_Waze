@@ -1,66 +1,174 @@
 ---
-title: "Random Forest Work"
-output: html_document
+title: ""
+output:
+  html_notebook:
+    df_print: paged
+    self_contained: yes
+    toc: yes
+    toc_float:
+      collapsed: no
+      smooth_scroll: no
+  html_document:
+    df_print: paged
+    toc: yes
+    toc_float:
+      collapsed: no
+      smooth_scroll: no
 ---
 
 ```{r setup, include=FALSE, echo = FALSE}
-knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+
+HEXSIZE = "1"
+
+ONLOCAL = T
+
+if(ONLOCAL){
+  codeloc = "~/git/SDI_Waze"
+  inputdir <- file.path("W:/SDI Pilot Projects/Waze/MASTER Data Files/Waze Aggregated/HexagonWazeEDT/WazeEDT Agg", HEXSIZE,"mile Rdata Input")
+  outputdir1 <- file.path("//vntscex.local/DFS/Projects/PROJ-OR02A2/SDI/Model_Output/RF1")
+  outputdir2 <- file.path("//vntscex.local/DFS/Projects/PROJ-OR02A2/SDI/Model_Output/RF2")
+
+  localdir <- outputdir2 
+  } else {
+  codeloc <- "~/SDI_Waze" 
+  inputdir <- paste0("WazeEDT_Agg", HEXSIZE, "mile_Rdata_Input")
+  outputdir <- paste0("WazeEDT_Agg", HEXSIZE, "mile_RandForest_Output")
+  aws.signature::use_credentials()
+  waze.bucket <- "ata-waze"
+  localdir <- "/home/dflynn-volpe/workingdata" 
+}
 
 library(knitr)
 library(kableExtra)
 library(randomForest)
-library(foreach) # for parallel implementation
-library(doParallel) # includes iterators and parallel
 library(aws.s3)
 library(tidyverse)
-library(rgdal)
+library(pander)
 # Run this if you don't have these packages:
-# install.packages(c("rpart", "randomForest", "maptree", "party", "partykit", "rgdal", "foreach", "doParallel"), dep = T)
-
-codeloc <- "~/SDI_Waze" 
-# Set grid size:
-HEXSIZE = c("1", "4", "05")[1] # Change the value in the bracket to use 1, 4, or 0.5 sq mi hexagon grids
-do.months = c("04","05","06","07","08","09")
-
-inputdir <- paste0("WazeEDT_Agg", HEXSIZE, "mile_Rdata_Input")
-outputdir <- paste0("WazeEDT_Agg", HEXSIZE, "mile_RandForest_Output")
-
-aws.signature::use_credentials()
-waze.bucket <- "ata-waze"
-localdir <- "/home/dflynn-volpe/workingdata" 
+# install.packages(c("kableExtra","randomForest","aws.s3","tidyverse","pander"), dep = T)
 
 knitr::opts_knit$set(root.dir = localdir)
-#setwd(localdir)
-# read utility functions, including movefiles
+# setwd(localdir)
+# read utility functions
 source(file.path(codeloc, 'utility/wazefunctions.R'))
 
 # read random forest function
 source(file.path(codeloc, "analysis/RandomForest_WazeGrid_Fx.R"))
 ```
 
-```{r getsuppdata}
-# check if already complted this transfer on this instance
-if(length(dir(localdir)[grep("shapefiles_funClass", dir(localdir))]) == 0){
+# Random Forest Overview
 
-  s3transfer = paste("aws s3 cp s3://ata-waze/MD_hexagon_shapefiles", localdir, "--recursive --include '*'")
-  system(s3transfer)
-  
-  for(dd in c("shapefiles_funClass.zip", "shapefiles_rac.zip", "shapefile_wac.zip")){
-    uz <- paste("unzip", file.path(localdir, dd))
-    system(uz)
-  }
-  # move any files which are in an unnecessary "shapefiles" folder up to the top level of the localdir
-  system("mv -v ~/workingdata/shapefiles/* ~/workingdata/")
-}
+For the SDI Waze project, the analysis being used is a estimation of EDT crashes, based on Waze predictors. Currently, there are seven months of data where geolocated EDT and Waze data are available, from March - September, 2017, for Maryland. The models developed to date are training on data for which the presence of an EDT crash (binary) or count of EDT crashes is modeled based on a large number of predictors from the Waze data, such as number of Waze accidents, the type of Waze events, number of Waze events in total, and other variables. 
 
-# rename data files by month. For each month, prep time and response variables
-# See prep.hex() in wazefunctions.R for details.
-for(mo in do.months){
-  prep.hex(file.path(inputdir, paste0("WazeTimeEdtHexWx_", mo, "_", HEXSIZE, "_mi.RData")), month = mo)
-}
+A random forest model trained on known data can then be employed on data for which only Waze data are provided. This would be the case if incoming Waze data is used to estimate the number and spatial/temporal pattern of EDT-level crashes for times or states when EDT data are not available. In the model development process, the testing is done for a subset of the data where the known EDT values are held back, and then the estimates produced by the model fit to training data can be compared to the known data. A goal of the SDI Waze project is to produce estimated EDT-level crash counts which best fit the observed data in terms of overall accuracy and precision in spatial and temporal patterns. 
+
+The first phase of random forest models aimed to resolve initial questions about what features to include, as well as the consequence of adding months of data and the spatial grain of the data aggregation. The first phase used April, May, and June 2017 data from Maryland. Additional features beyond Waze data included hourly weather features, roadway characteristics, and socio-economic variables from census sources. 
+
+The second phase of random forest models included a complete set of predictor features, including historical FARS accident counts, and average annual daily traffic (AADT). The second phase also extended the time extent of the training and testing across all available months of complete data, April - September 2017 for Maryland. 
+
+There are multiple criteria for evaluating classification and regression models. For all the models, we used two different data sets to train and test the model. *Training* refers to fitting the model parameters with a large set of known EDT crashes and associated Waze events and other predictors, while *testing* refers to applying the fitted model parameters to a new set of Waze events and other predictors, generating estimated EDT crashes. The estimated EDT crashes are then compared to the known, observed EDT crashes in the test data set to evaluate model performance.
+
+Here we use three criteria, each of which can also be applied to the regularized regression models in the next phase:
+
+**1. Diagnostics from a confusion matrix**
+
+  For binary classification models, it is possible to create a 2x2 table where columns are observed negative and positive, and rows are predicted negative and positive. This is know as a *confusion matrix*, and shows four quantities to represent model performance:
+
+```{r diagtable, results = "asis"}
+tabl <- "
+ |          |        |:      OBSERVED    :|
+ |----------|--------|:-------:|:--------:| 
+ |          |        |Negative | Positive |
+ |<b>PREDICTED |Negative|   TN    |    FN    |
+ |          |Positive|   FP    |    TP    |
+"
+pander::pander(tabl, style = "rmarkdown")
 ```
 
-```{r keyoutputsummary}
+False positives (FP) can be considered Type I errors, and false negatives (FN) can be considered Type II errors. 
+
+  - *Accuracy* = TN + TP / All observations 
+    + True positives and true negatives divided by all observations. A high value indicates that the observed occurrences and absences of EDT crashes are correctly being estimated. 
+  
+  - *Precision* = TP / FP + TP 
+     + True positives divided by all predicted positives. A high value indicates that there are relatively few false positives (locations and times where a crash is estimated, but did not actually occur).
+  
+  - *Recall* = TP / FN + TP
+    + True positives divided by all observed positives. This is also called *Sensitivity*, or the *true postitive rate*. A high value indicates that there are relatively few false negatives (locations and times where a crash was not estimated, but did actually occur).
+  
+  - *False Positive Rate* = FP / TN + FP
+    + False positives divided by all observed negatives. A low value indicates that there are relatively few false positives compared to all observed absences of EDT crashes.
+
+
+**2. Mean Squared Error**
+
+For binary and continuous models, mean squared error is simply the mean squared residual between observed and estimated values.  
+
+**3. Area under Reciever-Operator Characteristic Curve (AUROC, ROC curve)**
+
+For a binary model, we can additionally calculate one other quantity:
+
+  - *Specificity* = TN / TN + FP
+  + True negatives divided by all observed negatives, also called the true negative rate.
+
+Balancing between high specificity (where false positives are avoided) and high sensitivity (where false negatives are avoided) is an important decision point in evaluating a model. High sensitivity (i.e., recall or true positive rate) with high specificity (low false positive rate) is ideal. Plotting the false positive rate versus the true positive rate allows a visualization of this balance, and is known the 'receiver-operator characteristic (ROC) curve'. The larger the area under the ROC curve, the more high specificity is maximized with low loss of sensitivity. An area of 0.5 is equivalent to flipping a coin; and area of 1 is perfect estimation, with no false positives or false negatives. 
+
+```{r roc, echo=FALSE, fig.cap="ROC curves, [CC BY-SA 3.0 Wikimedia](https://commons.wikimedia.org/w/index.php?curid=44059691)", out.width = '50%'}
+knitr::include_graphics("ROC_curves.png")
+```
+
+
+# Phase 1 model testing
+
+
+
+
+### Spatial grain
+We tested three options, and and selected 1 mile grid size for all future work.
+
+ - 1 mi
+ - 4 mi
+ - 0.5 mi
+
+### Time windows: Deferred: Using with 1 hr aggregations for all models
+4hr windows would require new aggregation in GridAggregation.R
+
+ - 1 hr
+ - 4 hr
+
+### Neighbors:
+
+ - Without
+ - With
+
+### Model versions
+
+- April, 70/30
+- April+May, 70/30
+- April+May, test on June
+
+### Order of model tests
+- 1 mi, 1 hr, with and without neighbor grid cells: Model 1 vs. Model 10 (April) and Model 3 vs. Model 11 (April+May, test on June)
+- 4 mi, 1 hr, with and without neighbor grid cells: Model 4 vs. Model 12 (April) and Model 5 vs. Model 14 (April+May, test on June)
+- After looking at results for neighbor testing, consider time windows. These tests will help us decide the spatial extent and how much better the models perform with the neighbors.
+Additional data testing: Model 1 vs. Model 15 and Model 3 vs. Model 16.
+
+## General Summary of what we learned from this testing 
+
+(more thorough testing outlined below for decision points)
+
+- 1mi grid size is best
+
+- Adding more months of data does not really improve model: focus on adding data features
+- Run future models on April-Sept (6 months) with 70/30 training/test split
+
+Some improvements with some new data features. Expand testing in next phase
+Something about neighbors?
+
+```{r keyoutputsummary1}
+load(file.path(localdir, "Outputs_up_to_17"))
+
 # Summary from keyoutputs ----
 
 Nobs.frame <- data.frame(matrix(unlist(lapply(keyoutputs, FUN = function(x) x[[1]])), nrow = length(keyoutputs)))
@@ -73,45 +181,49 @@ rownames(Diag.frame) <- rownames(keyoutputs[[1]][[3]])
 
 kable(Diag.frame)
 
-mse.frame <- data.frame(matrix(unlist(lapply(keyoutputs, FUN = function(x) x[['mse']])), ncol = length(keyoutputs)))
-colnames(Diag.frame) <- names(keyoutputs)
-rownames(Diag.frame) <- rownames(keyoutputs[[1]][[3]])
+# mse.frame <- data.frame(matrix(unlist(lapply(keyoutputs, FUN = function(x) x[['mse']])), ncol = length(keyoutputs)))
+# colnames(Diag.frame) <- names(keyoutputs)
+# rownames(Diag.frame) <- rownames(keyoutputs[[1]][[3]])
 
 ```
 
-
-# Models 01-03 
-
-Summary of initial models
-
 ```{r m01-03}
 modelno = "01"
+
+if(ONLOCAL) {load(file.path(outputdir1, paste("Model", modelno, "RandomForest_Output_04.RData", sep= "_")))} else {s3load(object = file.path(outputdir, paste("Model", modelno, "RandomForest_Output.RData", sep= "_")), bucket = waze.bucket)}
+
+
+rf.04$call
+kable(round(rf.04$importance[order(rf.04$importance, decreasing = T),], 3))
 
 
 modelno = "02"
 
 modelno = "03"
 
-s3load(object = file.path(outputdir, paste("Model", modelno, "RandomForest_Output.RData", sep= "_")), 
-       bucket = waze.bucket)
-
-rf.out$call
-kable(round(rf.out$importance[order(rf.out$importance, decreasing = T),], 3))
 
 ```
 
-# Set A: All Waze 
 
-18 Base: All Waze features from event type (but not the counts of all Waze events together)
-19 Add FARS only
-20 Add Weather only
-21 Add road class, AADT only
-22 Add jobs only
-23 Add all together
+
+# Phase 2 model testing
+- Expand all models to six months (April to September 70/30 training test split)
+- Start with base models below (A then B then C)
+- Run and document tests in markdown file and run with updated RF functions
+
+
+## Set A: All Waze 
+
+- 18 Base: All Waze features from event type (but not the counts of all Waze events together)
+- 19 Add FARS only
+- 20 Add Weather only
+- 21 Add road class, AADT only
+- 22 Add jobs only
+- 23 Add all together
 
 Identify best combination and explore/visualize/document performance
 
-```{r m18}
+```{r m18, eval = F}
 modelno = "18"
 
 s3load(object = file.path(outputdir, paste("Model", modelno, "RandomForest_Output.RData", sep= "_")), 
@@ -122,105 +234,57 @@ kable(round(rf.out$importance[order(rf.out$importance, decreasing = T),], 3))
 
 ```
 
-# B: TypeCounts
+## B: TypeCounts
 
-24 Base: nWazeAccident, nWazeJam, nWazeWeatherOrHazard, nWazeRoadClosed
-25 Add other Waze only (confidence, reliability, magvar, neighbors)
-26 Add FARS only
-27 Add Weather only
-28 Add road class, AADT only
-29 Add jobs only
-30 Add all (but not Waze event subtypes or sub-subtypes)
-31 Pick best and test removing EDT only rows
-32 Pick best and test removing road closure only rows
+- 24 Base: nWazeAccident, nWazeJam, nWazeWeatherOrHazard, nWazeRoadClosed
+- 25 Add other Waze only (confidence, reliability, magvar, neighbors)
+- 26 Add FARS only
+- 27 Add Weather only
+- 28 Add road class, AADT only
+- 29 Add jobs only
+- 30 Add all (but not Waze event subtypes or sub-subtypes)
+- 31 Pick best and test removing EDT only rows
+- 32 Pick best and test removing road closure only rows
 
 ```{r m24}
-omits = c(alwaysomit, alert_subtypes,
-          "nMatchWaze_buffer", "nNoMatchWaze_buffer",
-          "wx",
-          grep("MagVar", names(w.04), value = T), # direction of travel
-          grep("medLast", names(w.04), value = T), # report rating, reliability, confidence
-          grep("nWazeAcc_", names(w.04), value = T), # neighboring accidents
-          grep("nWazeJam_", names(w.04), value = T) # neighboring jams
-          )
 
-w.04_09 <- rbind(w.04, w.05, w.06, w.07, w.08, w.09)
-
-modelno = "24"
-
-keyoutputs[[modelno]] = do.rf(train.dat = w.04_09, 
-                              omits, response.var = "MatchEDT_buffer_Acc", 
-                              #thin.dat = 0.1,
-                              model.no = modelno, rf.inputs = rf.inputs) 
 ```
 
 ```{r m25}
-omits = c(alwaysomit, alert_subtypes,
-          "nMatchWaze_buffer", "nNoMatchWaze_buffer",
-          "wx")
 
-modelno = "25"
-
-keyoutputs[[modelno]] = do.rf(train.dat = w.04_09, 
-                              omits, response.var = "MatchEDT_buffer_Acc", 
-                              #thin.dat = 0.1, 
-                              model.no = modelno, rf.inputs = rf.inputs) 
 ```
 
 
-# C. SubtypeCounts
+## C. SubtypeCounts
 
-33 Base: nWazeAccidentMajor, nWazeAccidentMinor, nWazeJamModerate, nWazeJamHeavy, nWazeJamStandStill, nHazardOnRoad, nHazardOnShoulder, nHazardWeather
-34 Add other Waze only (confidence, reliability, magvar, neighbors)
-35 Add FARS only
-36 Add Weather only
-37 Add road class, AADT only
-38 Add jobs only
-39 Add all (but not Waze event sub-subtypes)
-40 Pick best and test removing EDT only rows
-41 Pick best and test removing road closure only rows
+- 33 Base: nWazeAccidentMajor, nWazeAccidentMinor, nWazeJamModerate, nWazeJamHeavy, nWazeJamStandStill,
+nHazardOnRoad, nHazardOnShoulder, nHazardWeather
+- 34 Add other Waze only (confidence, reliability, magvar, neighbors)
+- 35 Add FARS only
+- 36 Add Weather only
+- 37 Add road class, AADT only
+- 38 Add jobs only
+- 39 Add all (but not Waze event sub-subtypes)
+- 40 Pick best and test removing EDT only rows
+- 41 Pick best and test removing road closure only rows
 
 ```{r m33}
-omits = c(alwaysomit, alert_types, 
-          "nMatchWaze_buffer", "nNoMatchWaze_buffer",
-          "wx",
-          grep("MagVar", names(w.04), value = T), # direction of travel
-          grep("medLast", names(w.04), value = T), # report rating, reliability, confidence
-          grep("nWazeAcc_", names(w.04), value = T), # neighboring accidents
-          grep("nWazeJam_", names(w.04), value = T) # neighboring jams
-          )
 
-modelno = "33"
-
-keyoutputs[[modelno]] = do.rf(train.dat = w.04_09, 
-                              omits, response.var = "MatchEDT_buffer_Acc", 
-                             # thin.dat = 0.1, 
-                              model.no = modelno, rf.inputs = rf.inputs) 
 ```
 
 ```{r m34}
-omits = c(alwaysomit, alert_types, 
-          "nMatchWaze_buffer", "nNoMatchWaze_buffer",
-          "wx")
-
-modelno = "34"
-
-keyoutputs[[modelno]] = do.rf(train.dat = w.04_09, 
-                              omits, response.var = "MatchEDT_buffer_Acc", 
-                              #thin.dat = 0.1, 
-                              model.no = modelno, rf.inputs = rf.inputs) 
 ```
 
 
 
-# D. EDT counts vs binary response:
+## D. EDT counts vs binary response:
 
-42 Run best combination of each base model (A, B, and C) on counts vs binary
-43 Pick best and test removing EDT only rows
-44 Pick best and test removing road closure only rows
+- 42 Run best combination of each base model (A, B, and C) on counts vs binary 
+- 43 Pick best and test removing EDT only rows
+- 44 Pick best and test removing road closure only rows
 
-# E. Buffer vs grid cell counts for response variable
+## E. Buffer vs grid cell counts for response variable
 
-45 Run best combination of each base model (A, B, and C) on buffer counts vs grid cell counts
-46 Pick best and test removing EDT only rows
-47 Pick best and test removing road closure only rows
+- 45 Run best combination of each base model (A, B, and C) on buffer counts vs grid cell counts 
+- 46 Pick best and test removing EDT only rows
+- 47 Pick best and test removing road closure only rows
