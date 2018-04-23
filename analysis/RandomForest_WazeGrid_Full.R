@@ -61,8 +61,7 @@ alwaysomit = c(grep("GRID_ID", names(w.04), value = T), "day", "hextime", "year"
 
 alert_types = c("nWazeAccident", "nWazeJam", "nWazeRoadClosed", "nWazeWeatherOrHazard")
 
-alert_subtypes = c("nHazardOnRoad", "nHazardOnShoulder" ,"nHazardWeather", "nWazeAccidentMajor", "nWazeAccidentMinor", "nWazeHazardCarStoppedRoad", "nWazeHazardCarStoppedShoulder",
-                   "nWazeHazardConstruction", "nWazeHazardObjectOnRoad", "nWazeHazardPotholeOnRoad", "nWazeHazardRoadKillOnRoad", "nWazeJamModerate", "nWazeJamHeavy" ,"nWazeJamStandStill",            "nWazeWeatherFlood", "nWazeWeatherFog", "nWazeHazardIceRoad")
+alert_subtypes = c("nHazardOnRoad", "nHazardOnShoulder" ,"nHazardWeather", "nWazeAccidentMajor", "nWazeAccidentMinor", "nWazeHazardCarStoppedRoad", "nWazeHazardCarStoppedShoulder", "nWazeHazardConstruction", "nWazeHazardObjectOnRoad", "nWazeHazardPotholeOnRoad", "nWazeHazardRoadKillOnRoad", "nWazeJamModerate", "nWazeJamHeavy" ,"nWazeJamStandStill",  "nWazeWeatherFlood", "nWazeWeatherFog", "nWazeHazardIceRoad")
 
 response.var = "MatchEDT_buffer_Acc"
 
@@ -224,92 +223,298 @@ keyoutputs[[modelno]] = do.rf(train.dat = w.04_09,
 
 save("keyoutputs", file = paste0("Output_to_", modelno))
 
-# B: TypeCounts
+# B: TypeCounts ----
 
 # 24 Base: nWazeAccident, nWazeJam, nWazeWeatherOrHazard, nWazeRoadClosed
-# 25 Add other Waze only (confidence, reliability, magvar, neighbors)
-# 26 Add FARS only
-# 27 Add Weather only
-# 28 Add road class, AADT only
-# 29 Add jobs only
-# 30 Add all (but not Waze event subtypes or sub-subtypes)
-# 31 Pick best and test removing EDT only rows
-# 32 Pick best and test removing road closure only rows
+modelno = "24"
 
 omits = c(alwaysomit, alert_subtypes,
-          "nMatchWaze_buffer", "nNoMatchWaze_buffer",
           "wx",
+          c("CRASH_SUM", "FATALS_SUM"), # FARS variables, added in 19
+          grep("F_SYSTEM", names(w.04), value = T), # road class
+          c("MEAN_AADT", "SUM_AADT"), # AADT
+          grep("WAC", names(w.04), value = T), # Jobs workplace
+          grep("RAC", names(w.04), value = T), # Jobs residential
           grep("MagVar", names(w.04), value = T), # direction of travel
           grep("medLast", names(w.04), value = T), # report rating, reliability, confidence
           grep("nWazeAcc_", names(w.04), value = T), # neighboring accidents
           grep("nWazeJam_", names(w.04), value = T) # neighboring jams
           )
 
-w.04_09 <- rbind(w.04, w.05, w.06, w.07, w.08, w.09)
 
-modelno = "24"
-
-keyoutputs[[modelno]] = do.rf(train.dat = w.04_09, 
-                              omits, response.var = "MatchEDT_buffer_Acc", 
-                              #thin.dat = 0.1,
+keyoutputs[[modelno]] = do.rf(train.dat = w.04_09, omits, response.var = "MatchEDT_buffer_Acc", 
                               model.no = modelno, rf.inputs = rf.inputs) 
 
-omits = c(alwaysomit, alert_subtypes,
-          "nMatchWaze_buffer", "nNoMatchWaze_buffer",
-          "wx")
-
+# 25 Add other Waze only (confidence, reliability, magvar, neighbors)
 modelno = "25"
 
-keyoutputs[[modelno]] = do.rf(train.dat = w.04_09, 
-                              omits, response.var = "MatchEDT_buffer_Acc", 
-                              #thin.dat = 0.1, 
+omits = c(alwaysomit, alert_subtypes,
+          "wx",
+          c("CRASH_SUM", "FATALS_SUM"), # FARS variables, added in 19
+          grep("F_SYSTEM", names(w.04), value = T), # road class
+          c("MEAN_AADT", "SUM_AADT"), # AADT
+          grep("WAC", names(w.04), value = T), # Jobs workplace
+          grep("RAC", names(w.04), value = T) # Jobs residential
+          )
+
+keyoutputs[[modelno]] = do.rf(train.dat = w.04_09, omits, response.var = "MatchEDT_buffer_Acc",  
+                              model.no = modelno, rf.inputs = rf.inputs) 
+
+save("keyoutputs", file = paste0("Output_to_", modelno))
+
+# 26 Add FARS only
+modelno = "26"
+
+omits = c(alwaysomit, alert_subtypes,
+          "wx",
+          grep("F_SYSTEM", names(w.04), value = T), # road class
+          c("MEAN_AADT", "SUM_AADT"), # AADT
+          grep("WAC", names(w.04), value = T), # Jobs workplace
+          grep("RAC", names(w.04), value = T), # Jobs residential
+          grep("MagVar", names(w.04), value = T), # direction of travel
+          grep("medLast", names(w.04), value = T), # report rating, reliability, confidence
+          grep("nWazeAcc_", names(w.04), value = T), # neighboring accidents
+          grep("nWazeJam_", names(w.04), value = T) # neighboring jams
+          )
+
+keyoutputs[[modelno]] = do.rf(train.dat = w.04_09, omits, response.var = "MatchEDT_buffer_Acc",  
                               model.no = modelno, rf.inputs = rf.inputs) 
 
 save("keyoutputs", file = paste0("Output_to_", modelno))
 
 
-# C. SubtypeCounts
+# 27 Add Weather only
+modelno = "27"
 
-# 33 Base: nWazeAccidentMajor, nWazeAccidentMinor, nWazeJamModerate, nWazeJamHeavy, nWazeJamStandStill, nHazardOnRoad, nHazardOnShoulder, nHazardWeather
-# 34 Add other Waze only (confidence, reliability, magvar, neighbors)
-# 35 Add FARS only
-# 36 Add Weather only
-# 37 Add road class, AADT only
-# 38 Add jobs only
-# 39 Add all (but not Waze event sub-subtypes)
-# 40 Pick best and test removing EDT only rows
-# 41 Pick best and test removing road closure only rows
-
-omits = c(alwaysomit, alert_types, 
-          "nMatchWaze_buffer", "nNoMatchWaze_buffer",
-          "wx",
+omits = c(alwaysomit, alert_subtypes,
+          #"wx",
+          c("CRASH_SUM", "FATALS_SUM"), # FARS variables, added in 19
+          grep("F_SYSTEM", names(w.04), value = T), # road class
+          c("MEAN_AADT", "SUM_AADT"), # AADT
+          grep("WAC", names(w.04), value = T), # Jobs workplace
+          grep("RAC", names(w.04), value = T), # Jobs residential
           grep("MagVar", names(w.04), value = T), # direction of travel
           grep("medLast", names(w.04), value = T), # report rating, reliability, confidence
           grep("nWazeAcc_", names(w.04), value = T), # neighboring accidents
           grep("nWazeJam_", names(w.04), value = T) # neighboring jams
           )
+
+keyoutputs[[modelno]] = do.rf(train.dat = w.04_09, omits, response.var = "MatchEDT_buffer_Acc",  
+                              model.no = modelno, rf.inputs = rf.inputs) 
+
+save("keyoutputs", file = paste0("Output_to_", modelno))
+
+# 28 Add road class, AADT only
+modelno = "28"
+
+omits = c(alwaysomit, alert_subtypes,
+          #"wx",
+          c("CRASH_SUM", "FATALS_SUM"), # FARS variables, added in 19
+          #grep("F_SYSTEM", names(w.04), value = T), # road class
+          #c("MEAN_AADT", "SUM_AADT"), # AADT
+          grep("WAC", names(w.04), value = T), # Jobs workplace
+          grep("RAC", names(w.04), value = T), # Jobs residential
+          grep("MagVar", names(w.04), value = T), # direction of travel
+          grep("medLast", names(w.04), value = T), # report rating, reliability, confidence
+          grep("nWazeAcc_", names(w.04), value = T), # neighboring accidents
+          grep("nWazeJam_", names(w.04), value = T) # neighboring jams
+          )
+
+keyoutputs[[modelno]] = do.rf(train.dat = w.04_09, omits, response.var = "MatchEDT_buffer_Acc",  
+                              model.no = modelno, rf.inputs = rf.inputs) 
+
+save("keyoutputs", file = paste0("Output_to_", modelno))
+
+# 29 Add jobs only
+modelno = "29"
+omits = c(alwaysomit, alert_subtypes,
+          "wx",
+          c("CRASH_SUM", "FATALS_SUM"), # FARS variables, added in 19
+          grep("F_SYSTEM", names(w.04), value = T), # road class
+          c("MEAN_AADT", "SUM_AADT"), # AADT
+          #grep("WAC", names(w.04), value = T), # Jobs workplace
+          #grep("RAC", names(w.04), value = T), # Jobs residential
+          grep("MagVar", names(w.04), value = T), # direction of travel
+          grep("medLast", names(w.04), value = T), # report rating, reliability, confidence
+          grep("nWazeAcc_", names(w.04), value = T), # neighboring accidents
+          grep("nWazeJam_", names(w.04), value = T) # neighboring jams
+          )
+
+keyoutputs[[modelno]] = do.rf(train.dat = w.04_09, omits, response.var = "MatchEDT_buffer_Acc",  
+                              model.no = modelno, rf.inputs = rf.inputs) 
+
+save("keyoutputs", file = paste0("Output_to_", modelno))
+
+# 30 Add all (but not Waze event subtypes or sub-subtypes)
+modelno = "30"
+omits = c(alwaysomit, alert_subtypes
+          #"wx",
+          #c("CRASH_SUM", "FATALS_SUM"), # FARS variables, added in 19
+          #grep("F_SYSTEM", names(w.04), value = T), # road class
+          #c("MEAN_AADT", "SUM_AADT"), # AADT
+          #grep("WAC", names(w.04), value = T), # Jobs workplace
+          #grep("RAC", names(w.04), value = T), # Jobs residential
+          #grep("MagVar", names(w.04), value = T), # direction of travel
+          #grep("medLast", names(w.04), value = T), # report rating, reliability, confidence
+          #grep("nWazeAcc_", names(w.04), value = T), # neighboring accidents
+          #grep("nWazeJam_", names(w.04), value = T) # neighboring jams
+          )
+
+# 31 Pick best and test removing EDT only rows
+
+# 32 Pick best and test removing road closure only rows
+
+# C. SubtypeCounts ----
+
+# 33 Base: nWazeAccidentMajor, nWazeAccidentMinor, nWazeJamModerate, nWazeJamHeavy, nWazeJamStandStill, nHazardOnRoad, nHazardOnShoulder, nHazardWeather
 
 modelno = "33"
 
+omits = c(alwaysomit, alert_types,
+          "wx",
+          c("CRASH_SUM", "FATALS_SUM"), # FARS variables, added in 19
+          grep("F_SYSTEM", names(w.04), value = T), # road class
+          c("MEAN_AADT", "SUM_AADT"), # AADT
+          grep("WAC", names(w.04), value = T), # Jobs workplace
+          grep("RAC", names(w.04), value = T), # Jobs residential
+          grep("MagVar", names(w.04), value = T), # direction of travel
+          grep("medLast", names(w.04), value = T), # report rating, reliability, confidence
+          grep("nWazeAcc_", names(w.04), value = T), # neighboring accidents
+          grep("nWazeJam_", names(w.04), value = T) # neighboring jams
+          )
+
 keyoutputs[[modelno]] = do.rf(train.dat = w.04_09, 
                               omits, response.var = "MatchEDT_buffer_Acc", 
-                             # thin.dat = 0.1, 
                               model.no = modelno, rf.inputs = rf.inputs) 
-
-omits = c(alwaysomit, alert_types, 
-          "nMatchWaze_buffer", "nNoMatchWaze_buffer",
-          "wx")
-
-modelno = "34"
-
-keyoutputs[[modelno]] = do.rf(train.dat = w.04_09, 
-                              omits, response.var = "MatchEDT_buffer_Acc", 
-                              #thin.dat = 0.1, 
-                              model.no = modelno, rf.inputs = rf.inputs) 
-
-
 
 save("keyoutputs", file = paste0("Output_to_", modelno))
+
+# 34 Add other Waze only (confidence, reliability, magvar, neighbors)
+modelno = "34"
+
+omits = c(alwaysomit, alert_types,
+          "wx",
+          c("CRASH_SUM", "FATALS_SUM"), # FARS variables, added in 19
+          grep("F_SYSTEM", names(w.04), value = T), # road class
+          c("MEAN_AADT", "SUM_AADT"), # AADT
+          grep("WAC", names(w.04), value = T), # Jobs workplace
+          grep("RAC", names(w.04), value = T) # Jobs residential
+          # grep("MagVar", names(w.04), value = T), # direction of travel
+          # grep("medLast", names(w.04), value = T), # report rating, reliability, confidence
+          # grep("nWazeAcc_", names(w.04), value = T), # neighboring accidents
+          # grep("nWazeJam_", names(w.04), value = T) # neighboring jams
+          )
+
+keyoutputs[[modelno]] = do.rf(train.dat = w.04_09, 
+                              omits, response.var = "MatchEDT_buffer_Acc", 
+                              model.no = modelno, rf.inputs = rf.inputs) 
+
+# 35 Add FARS only
+modelno = "35"
+
+omits = c(alwaysomit, alert_types,
+          "wx",
+          #c("CRASH_SUM", "FATALS_SUM"), # FARS variables, added in 19
+          grep("F_SYSTEM", names(w.04), value = T), # road class
+          c("MEAN_AADT", "SUM_AADT"), # AADT
+          grep("WAC", names(w.04), value = T), # Jobs workplace
+          grep("RAC", names(w.04), value = T), # Jobs residential
+          grep("MagVar", names(w.04), value = T), # direction of travel
+          grep("medLast", names(w.04), value = T), # report rating, reliability, confidence
+          grep("nWazeAcc_", names(w.04), value = T), # neighboring accidents
+          grep("nWazeJam_", names(w.04), value = T) # neighboring jams
+)
+
+keyoutputs[[modelno]] = do.rf(train.dat = w.04_09, 
+                              omits, response.var = "MatchEDT_buffer_Acc", 
+                              model.no = modelno, rf.inputs = rf.inputs) 
+
+# 36 Add Weather only
+modelno = "36"
+
+omits = c(alwaysomit, alert_types,
+          # "wx",
+          c("CRASH_SUM", "FATALS_SUM"), # FARS variables, added in 19
+          grep("F_SYSTEM", names(w.04), value = T), # road class
+          c("MEAN_AADT", "SUM_AADT"), # AADT
+          grep("WAC", names(w.04), value = T), # Jobs workplace
+          grep("RAC", names(w.04), value = T), # Jobs residential
+          grep("MagVar", names(w.04), value = T), # direction of travel
+          grep("medLast", names(w.04), value = T), # report rating, reliability, confidence
+          grep("nWazeAcc_", names(w.04), value = T), # neighboring accidents
+          grep("nWazeJam_", names(w.04), value = T) # neighboring jams
+)
+
+keyoutputs[[modelno]] = do.rf(train.dat = w.04_09, 
+                              omits, response.var = "MatchEDT_buffer_Acc", 
+                              model.no = modelno, rf.inputs = rf.inputs) 
+
+# 37 Add road class, AADT only
+modelno = "37"
+
+omits = c(alwaysomit, alert_types,
+          "wx",
+          c("CRASH_SUM", "FATALS_SUM"), # FARS variables, added in 19
+          # grep("F_SYSTEM", names(w.04), value = T), # road class
+          # c("MEAN_AADT", "SUM_AADT"), # AADT
+          grep("WAC", names(w.04), value = T), # Jobs workplace
+          grep("RAC", names(w.04), value = T), # Jobs residential
+          grep("MagVar", names(w.04), value = T), # direction of travel
+          grep("medLast", names(w.04), value = T), # report rating, reliability, confidence
+          grep("nWazeAcc_", names(w.04), value = T), # neighboring accidents
+          grep("nWazeJam_", names(w.04), value = T) # neighboring jams
+)
+
+keyoutputs[[modelno]] = do.rf(train.dat = w.04_09, 
+                              omits, response.var = "MatchEDT_buffer_Acc", 
+                              model.no = modelno, rf.inputs = rf.inputs) 
+
+save("keyoutputs", file = paste0("Output_to_", modelno))
+
+# 38 Add jobs only
+modelno = "38"
+
+omits = c(alwaysomit, alert_types,
+          "wx",
+          c("CRASH_SUM", "FATALS_SUM"), # FARS variables, added in 19
+          grep("F_SYSTEM", names(w.04), value = T), # road class
+          c("MEAN_AADT", "SUM_AADT"), # AADT
+          # grep("WAC", names(w.04), value = T), # Jobs workplace
+          # grep("RAC", names(w.04), value = T), # Jobs residential
+          grep("MagVar", names(w.04), value = T), # direction of travel
+          grep("medLast", names(w.04), value = T), # report rating, reliability, confidence
+          grep("nWazeAcc_", names(w.04), value = T), # neighboring accidents
+          grep("nWazeJam_", names(w.04), value = T) # neighboring jams
+)
+
+keyoutputs[[modelno]] = do.rf(train.dat = w.04_09, 
+                              omits, response.var = "MatchEDT_buffer_Acc", 
+                              model.no = modelno, rf.inputs = rf.inputs) 
+
+# 39 Add all (but not Waze event sub-subtypes)
+modelno = "39"
+
+omits = c(alwaysomit, alert_types
+          # "wx",
+          # c("CRASH_SUM", "FATALS_SUM"), # FARS variables, added in 19
+          # grep("F_SYSTEM", names(w.04), value = T), # road class
+          # c("MEAN_AADT", "SUM_AADT"), # AADT
+          # grep("WAC", names(w.04), value = T), # Jobs workplace
+          # grep("RAC", names(w.04), value = T), # Jobs residential
+          # grep("MagVar", names(w.04), value = T), # direction of travel
+          # grep("medLast", names(w.04), value = T), # report rating, reliability, confidence
+          # grep("nWazeAcc_", names(w.04), value = T), # neighboring accidents
+          # grep("nWazeJam_", names(w.04), value = T) # neighboring jams
+)
+
+keyoutputs[[modelno]] = do.rf(train.dat = w.04_09, 
+                              omits, response.var = "MatchEDT_buffer_Acc", 
+                              model.no = modelno, rf.inputs = rf.inputs) 
+
+# 40 Pick best and test removing EDT only rows
+
+# 41 Pick best and test removing road closure only rows
+
 
 # D. EDT counts vs binary response: ----
  
@@ -322,5 +527,26 @@ save("keyoutputs", file = paste0("Output_to_", modelno))
 # 45 Run best combination of each base model (A, B, and C) on buffer counts vs grid cell counts
 # 46 Pick best and test removing EDT only rows
 # 47 Pick best and test removing road closure only rows
+
+modelno = "45a"
+
+omits = c(alwaysomit, 
+          "wx",
+          c("CRASH_SUM", "FATALS_SUM"), # FARS variables, added in 19
+          grep("F_SYSTEM", names(w.04), value = T), # road class
+          c("MEAN_AADT", "SUM_AADT"), # AADT
+          grep("WAC", names(w.04), value = T), # Jobs workplace
+          grep("RAC", names(w.04), value = T), # Jobs residential
+          grep("MagVar", names(w.04), value = T), # direction of travel
+          grep("medLast", names(w.04), value = T), # report rating, reliability, confidence
+          grep("nWazeAcc_", names(w.04), value = T), # neighboring accidents
+          grep("nWazeJam_", names(w.04), value = T) # neighboring jams
+)
+
+keyoutputs[[modelno]] = do.rf(train.dat = w.04_09, 
+                              omits, response.var = "nMatchEDT_buffer_Acc", 
+                              model.no = modelno, rf.inputs = rf.inputs) 
+
+
 
 save("keyoutputs", file = paste0("Output_to_", modelno))
