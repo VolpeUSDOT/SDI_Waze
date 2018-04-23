@@ -1,5 +1,6 @@
 # Random Forest work for Waze
 # Set up for ATA
+# Updated to use function
 
 # Goals: produce random forest analysis for features of Waze accidents and other event types that predict matching with EDT reports. Test effects for two spatial scales (1 and 4 mile aggregations), with and without information from neighboring cells for Waze accidents and jams.
 
@@ -29,6 +30,8 @@ HEXSIZE = c("1", "4", "05")[1] # Change the value in the bracket to use 1, 4, or
 inputdir <- paste0("WazeEDT_Agg", HEXSIZE, "mile_Rdata_Input")
 outputdir <- paste0("WazeEDT_Agg", HEXSIZE, "mile_RandForest_Output")
 
+do.months = c("04", "05", "06")
+
 waze.bucket <- "ata-waze"
 localdir <- "/home/dflynn-volpe/workingdata" 
 
@@ -36,19 +39,19 @@ setwd(localdir)
 
 # read utility functions, including movefiles
 source(file.path(codeloc, 'utility/wazefunctions.R'))
-
-aws.signature::use_credentials()
+# read random forest function
+source(file.path(codeloc, "analysis/RandomForest_WazeGrid_Fx.R"))
 
 # Read in data ----
 # Grab any necessary data from the S3 bucket. This transfers all contents of MD_hexagons_shapefiles to the local instance. For this script, we will use shapefiles_funClass.zip (road classification data), shapefiles_rac.zip (Residence Area Characteristics), shapefiles_wac.zip (Workplace Area Characteristics). Unzip these into the local dir
 
 # check if already complted this transfer on this instance
 if(length(dir(localdir)[grep("shapefiles_funClass", dir(localdir))]) == 0){
-
+  
   s3transfer = paste("aws s3 cp s3://ata-waze/MD_hexagon_shapefiles", localdir, "--recursive --include '*'")
   system(s3transfer)
   
-  for(dd in c("shapefiles_funClass.zip", "shapefiles_rac.zip", "shapefile_wac.zip")){
+  for(dd in c("shapefiles_funClass.zip", "shapefiles_rac.zip", "shapefile_wac.zip", "shapefiles_AADT.zip", "shapefiles_FARS.zip")){
     uz <- paste("unzip", file.path(localdir, dd))
     system(uz)
   }
@@ -58,16 +61,27 @@ if(length(dir(localdir)[grep("shapefiles_funClass", dir(localdir))]) == 0){
 
 # rename data files by month. For each month, prep time and response variables
 # See prep.hex() in wazefunctions.R for details.
-for(mo in c("04","05","06")){
+for(mo in do.months){
   prep.hex(file.path(inputdir, paste0("WazeTimeEdtHexWx_", mo, "_", HEXSIZE, "_mi.RData")), month = mo)
 }
 
-# Set up for parallel anaysis. Stopping cluster after each set of RF models will help clear RAM.
-cl <- makeCluster(parallel::detectCores()) # make a cluster of all available cores
-registerDoParallel(cl)
+# Omit as predictors in this vector:
+alwaysomit = c(grep("GRID_ID", names(w.04), value = T), "day", "hextime", "year", "weekday", 
+               "uniqWazeEvents", "nWazeRowsInMatch", 
+               "nMatchWaze_buffer", "nNoMatchWaze_buffer",
+               grep("EDT", names(w.04), value = T))
 
-(avail.cores <- parallel::detectCores()) # 4 on local, 8 on r4 instance
-ntree.use = avail.cores * 50
+alert_types = c("nWazeAccident", "nWazeJam", "nWazeRoadClosed", "nWazeWeatherOrHazard")
+
+alert_subtypes = c("nHazardOnRoad", "nHazardOnShoulder" ,"nHazardWeather", "nWazeAccidentMajor", "nWazeAccidentMinor", "nWazeHazardCarStoppedRoad", "nWazeHazardCarStoppedShoulder", "nWazeHazardConstruction", "nWazeHazardObjectOnRoad", "nWazeHazardPotholeOnRoad", "nWazeHazardRoadKillOnRoad", "nWazeJamModerate", "nWazeJamHeavy" ,"nWazeJamStandStill",  "nWazeWeatherFlood", "nWazeWeatherFog", "nWazeHazardIceRoad")
+
+response.var = "MatchEDT_buffer_Acc"
+
+avail.cores = parallel::detectCores()
+rf.inputs = list(ntree.use = avail.cores * 50, avail.cores = avail.cores, mtry = 8, maxnodes = NULL, nodesize = 50)
+keyoutputs = list() # to store model diagnostics
+
+aws.signature::use_credentials()
 
 # Analysis ----
 
@@ -75,168 +89,40 @@ ntree.use = avail.cores * 50
 
 # Variables to test. Use Waze only predictors, and omit grid ID and day as predictors as well. Here also omitting precipitation and neighboring grid cells
 # Omit as predictors in this vector:
-omits = c(grep("GRID_ID", names(w.04), value = T), "day", "hextime", "year", "weekday",
-          "uniqWazeEvents", "nWazeRowsInMatch", "nWazeAccident",
-          "nMatchWaze_buffer", "nNoMatchWaze_buffer",
-          grep("EDT", names(w.04), value = T),
+omits = c(alwaysomit,
           "wx",
           grep("nWazeAcc_", names(w.04), value = T), # neighboring accidents
           grep("nWazeJam_", names(w.04), value = T) # neighboring jams
           )
 
-fitvars <- names(w.04)[is.na(match(names(w.04), omits))]
-
-# Change response to nMatch for regression; output will be continuous, much more RAM intensive.
-wazeAccformula <- reformulate(termlabels = fitvars[is.na(match(fitvars,
-                                                            "MatchEDT_buffer_Acc"))], 
-                           response = "MatchEDT_buffer_Acc")
-
-# wazeAccformula.manual <- as.formula(c("MatchEDT_buffer_Acc ~ hour + DayOfWeek + nWazeRowsInMatch + uniqWazeEvents + 
-#   nWazeAccident + nWazeJam + nWazeRoadClosed + nWazeWeatherOrHazard + 
-#   nWazeAccidentMajor + nWazeAccidentMinor + nWazeHazardCarStoppedRoad + 
-#   nWazeHazardCarStoppedShould + nWazeHazardConstruction + nWazeHazardObjectOnRoad + 
-#   nWazeJamModerate + nWazeJamHeavy + nWazeJamStandStill + nWazeWeatherFlood + 
-#   nWazeWeatherFog + nWazeRT3 + nWazeRT4 + nWazeRT6 + nWazeRT7 + 
-#   nWazeRT2 + nWazeRT0 + nWazeRT1 + nWazeRT20"))
-
-keyoutputs = list() # to store model diagnostics
-
 # Model 01: April ----
 modelno = "01"
 
-trainrows <- sort(sample(1:nrow(w.04), size = nrow(w.04)*.7, replace = F))
-testrows <- (1:nrow(w.04))[!1:nrow(w.04) %in% trainrows]
- 
-system.time(rf.04 <- foreach(ntree = rep(ntree.use/avail.cores, avail.cores),
-                .combine = randomForest::combine, .multicombine=TRUE, .packages = 'randomForest') %dopar% 
-          randomForest(wazeAccformula, data = w.04[trainrows,], ntree = ntree) )
+keyoutputs[[modelno]] = do.rf(train.dat = w.04, 
+                              omits, response.var = "MatchEDT_buffer_Acc", 
+                              model.no = modelno, rf.inputs = rf.inputs) 
 
-rf.04.pred <- predict(rf.04, w.04[testrows, fitvars])
-
-Nobs <- data.frame(t(c(nrow(w.04),
-               summary(w.04$MatchEDT_buffer_Acc),
-               length(w.04$nWazeAccident[w.04$nWazeAccident>0]) )))
-
-colnames(Nobs) = c("N", "No EDT", "EDT present", "Waze accident present")
-(predtab <- table(w.04$MatchEDT_buffer_Acc[testrows], rf.04.pred)) 
-
-keyoutputs[[modelno]] = list(Nobs,
-                     predtab,
-                     diag = bin.mod.diagnostics(predtab)
-                     )
-
-# save output predictions
-out.04 <- data.frame(w.04[testrows, c("GRID_ID", "day", "hour", "MatchEDT_buffer")], rf.04.pred)
-out.04$day <- as.numeric(out.04$day)
-names(out.04)[4:5] <- c("Obs", "Pred")
-out.04 = data.frame(out.04,
-                    TN = out.04$Obs == 0 &  out.04$Pred == 0,
-                    FP = out.04$Obs == 0 &  out.04$Pred == 1,
-                    FN = out.04$Obs == 1 &  out.04$Pred == 0,
-                    TP = out.04$Obs == 1 &  out.04$Pred == 1)
-write.csv(out.04,
-          file = paste(modelno, "RandomForest_pred_04.csv", sep = "_"),
-          row.names = F)
-s3save(list = c("rf.04",
-              "rf.04.pred",
-              "testrows",
-              "trainrows",
-              "w.04",
-              "out.04"),
-     object = file.path(outputdir, paste("Model", modelno, "RandomForest_Output_04.RData", sep= "_")),
-     bucket = waze.bucket)
+save("keyoutputs", file = paste0("Output_to_", modelno))
 
 # Model 02: April + May ----
 modelno = "02"
-w.0405 <- rbind(w.04, w.05)
-trainrows <- sort(sample(1:nrow(w.0405), size = nrow(w.0405)*.7, replace = F))
-testrows <- (1:nrow(w.0405))[!1:nrow(w.0405) %in% trainrows]
 
-system.time(rf.0405 <- foreach(ntree = rep(ntree.use/avail.cores, avail.cores),
-                             .combine = randomForest::combine, .multicombine = TRUE, 
-                             .packages = "randomForest") %dopar% {
-              randomForest(wazeAccformula, data = w.0405[trainrows,], ntree = ntree)})
-
-rf.0405.pred <- predict(rf.0405, w.0405[testrows, fitvars])
-Nobs <- data.frame(t(c(nrow(w.0405),
-                       summary(w.0405$MatchEDT_buffer_Acc),
-                       length(w.0405$nWazeAccident[w.0405$nWazeAccident>0]))))
-
-colnames(Nobs) = c("N", "No EDT", "EDT present", "Waze accident present")
-(predtab <- table(w.0405$MatchEDT_buffer_Acc[testrows], rf.0405.pred))
-keyoutputs[[modelno]] = list(Nobs,
-                          predtab,
-                          diag = bin.mod.diagnostics(predtab))
-# save output predictions
-out.0405 <- data.frame(w.0405[testrows, c("GRID_ID", "day", "hour", "MatchEDT_buffer")], rf.0405.pred)
-out.0405$day <- as.numeric(out.0405$day)
-names(out.0405)[4:5] <- c("Obs", "Pred")
-out.0405 = data.frame(out.0405,
-                    TN = out.0405$Obs == 0 &  out.0405$Pred == 0,
-                    FP = out.0405$Obs == 0 &  out.0405$Pred == 1,
-                    FN = out.0405$Obs == 1 &  out.0405$Pred == 0,
-                    TP = out.0405$Obs == 1 &  out.0405$Pred == 1)
-write.csv(out.0405,
-          file = paste(modelno, "RandomForest_pred_0405.csv"),
-          row.names = F)
-s3save(list = c("rf.0405",
-              "rf.0405.pred",
-              "testrows",
-              "trainrows",
-              "w.0405",
-              "out.0405"),
-       object = file.path(outputdir, paste("Model", modelno, "RandomForest_Output_0405.RData", sep="_")),
-       bucket = waze.bucket)
+keyoutputs[[modelno]] = do.rf(train.dat = rbind(w.04, w.05), 
+                              omits, response.var = "MatchEDT_buffer_Acc", 
+                              model.no = modelno, rf.inputs = rf.inputs) 
 
 # Model 03: April + May, predict June ----
 modelno = "03"
 
-system.time(rf.0405.all <- foreach(ntree = rep(ntree.use/avail.cores, avail.cores),
-                               .combine = randomForest::combine, .multicombine = TRUE, 
-                               .packages = "randomForest") %dopar%
-              randomForest(wazeAccformula, data = w.0405, ntree = ntree))
-
-rf.0405.06.pred <- predict(rf.0405.all, w.06[, fitvars])
-w.040506 <- rbind(w.0405, w.06)
-Nobs <- data.frame(t(c(nrow(w.040506),
-                       summary(w.040506$MatchEDT_buffer_Acc),
-                       length(w.040506$nWazeAccident[w.040506$nWazeAccident>0]))))
-
-colnames(Nobs) = c("N", "No EDT", "EDT present", "Waze accident present")
-(predtab <- table(w.06$MatchEDT_buffer_Acc, rf.0405.06.pred))
-
-keyoutputs[[modelno]] = list(Nobs,
-                          predtab,
-                          diag = bin.mod.diagnostics(predtab)
-)
-
-out.06 <- data.frame(w.06[c("GRID_ID","day","hour", "MatchEDT_buffer")], rf.0405.06.pred)
-names(out.06)[4:5] <- c("Obs", "Pred")
-out.06 = data.frame(out.06,
-                      TN = out.06$Obs == 0 &  out.06$Pred == 0,
-                      FP = out.06$Obs == 0 &  out.06$Pred == 1,
-                      FN = out.06$Obs == 1 &  out.06$Pred == 0,
-                      TP = out.06$Obs == 1 &  out.06$Pred == 1)
-write.csv(out.06,
-          file = paste(modelno, "RandomForest_pred_0405_06.csv", sep = "_"),
-          row.names = F)
-
-s3save(list = c("rf.0405.all",
-              "rf.0405.06.pred",
-              "w.06",
-              "out.06"),
-       object = file.path(outputdir, paste("Model", modelno, "RandomForest_Output_0405_06.RData", sep= "_")),
-       bucket = waze.bucket)
-
-save("keyoutputs", file = paste0("Outputs_up_to_", modelno))
+keyoutputs[[modelno]] = do.rf(train.dat = rbind(w.04, w.05), test.dat = w.06, 
+                              omits, response.var = "MatchEDT_buffer_Acc", 
+                              model.no = modelno, rf.inputs = rf.inputs) 
 
 # cleanup
-rm(rf.04, rf.0405.all, w.04, w.05, w.06, w.0405, w.040506); stopCluster(cl); gc()
+rm(w.04, w.05, w.06); gc()
 
 # Model 04: April, 4 mi ----
 # note file names is WazeTimeEdtHexAll, as weather data not prepped yet for 4 mi hexagons
-cl <- makeCluster(parallel::detectCores()) # make a cluster of all available cores
-registerDoParallel(cl)
 
 HEXSIZE = "4"
 inputdir <- paste0("WazeEDT_Agg", HEXSIZE, "mile_Rdata_Input")
@@ -245,116 +131,37 @@ outputdir <- paste0("WazeEDT_Agg", HEXSIZE, "mile_RandForest_Output")
 for(mo in c("04","05","06")){
   prep.hex(file.path(inputdir, paste0("WazeTimeEdtHexAll_", mo, "_", HEXSIZE, "_mi.RData")), month = mo)
 }
-w.0405 <- rbind(w.04, w.05)
-w.040506 <- rbind(w.0405, w.06)
 
-modelno = "04"
-
-# Formula for 4 mi hex
-omits = c(grep("GRID_ID", names(w.04), value = T), "day", "hextime", "year", "weekday",
-          "uniqWazeEvents", "nWazeRowsInMatch", "nWazeAccident",
-          "nMatchWaze_buffer", "nNoMatchWaze_buffer",
-          grep("EDT", names(w.04), value = T),
+omits = c(alwaysomit,
           "wx",
           grep("nWazeAcc_", names(w.04), value = T), # neighboring accidents
           grep("nWazeJam_", names(w.04), value = T) # neighboring jams
 )
 
-fitvars <- names(w.04)[is.na(match(names(w.04), omits))]
+modelno = "04"
 
-wazeAccformula <- reformulate(termlabels = fitvars[is.na(match(fitvars,
-                                                               "MatchEDT_buffer_Acc"))], 
-                              response = "MatchEDT_buffer_Acc")
+keyoutputs[[modelno]] = do.rf(train.dat = w.04, 
+                              omits, response.var = "MatchEDT_buffer_Acc", 
+                              model.no = modelno, rf.inputs = rf.inputs) 
 
-trainrows <- sort(sample(1:nrow(w.04), size = nrow(w.04)*.7, replace = F))
-testrows <- (1:nrow(w.04))[!1:nrow(w.04) %in% trainrows]
+save("keyoutputs", file = paste0("Output_to_", modelno))
 
-system.time(rf.04 <- foreach(ntree = rep(ntree.use/avail.cores, avail.cores),
-                             .combine = randomForest::combine, .multicombine = TRUE, 
-                             .packages = "randomForest") %dopar% {
-              randomForest(wazeAccformula, data = w.04[trainrows,], ntree = ntree)})
-
-rf.04.pred <- predict(rf.04, w.04[testrows, fitvars])
-
-Nobs <- data.frame(t(c(nrow(w.04),
-                       summary(w.04$MatchEDT_buffer_Acc),
-                       length(w.04$nWazeAccident[w.04$nWazeAccident>0]) )))
-
-colnames(Nobs) = c("N", "No EDT", "EDT present", "Waze accident present")
-(predtab <- table(w.04$MatchEDT_buffer_Acc[testrows], rf.04.pred)) 
-
-keyoutputs[[modelno]] = list(Nobs,
-                             predtab,
-                             diag = bin.mod.diagnostics(predtab))
-# save output predictions
-out.04 <- data.frame(w.04[testrows, c("GRID_ID", "day", "hour", "MatchEDT_buffer")], rf.04.pred)
-out.04$day <- as.numeric(out.04$day)
-names(out.04)[4:5] <- c("Obs", "Pred")
-out.04 = data.frame(out.04,
-                    TN = out.04$Obs == 0 &  out.04$Pred == 0,
-                    FP = out.04$Obs == 0 &  out.04$Pred == 1,
-                    FN = out.04$Obs == 1 &  out.04$Pred == 0,
-                    TP = out.04$Obs == 1 &  out.04$Pred == 1)
-write.csv(out.04,
-          file = paste(modelno, "RandomForest_pred_04.csv", sep = "_"),
-          row.names = F)
-s3save(list = c("rf.04",
-                "rf.04.pred",
-                "testrows",
-                "trainrows",
-                "w.04",
-                "out.04"),
-       object = file.path(outputdir, paste("Model", modelno, "RandomForest_Output_04.RData", sep= "_")),
-       bucket = waze.bucket)
 
 # Model 05: April + May, predict June, 4 mi ----
 modelno = "05"
 
-system.time(rf.0405.all <- foreach(ntree = rep(ntree.use/avail.cores, avail.cores),
-                                   .combine = randomForest::combine, .multicombine = TRUE, 
-                                   .packages = "randomForest") %dopar%
-              randomForest(wazeAccformula, data = w.0405, ntree = ntree))
+keyoutputs[[modelno]] = do.rf(train.dat = rbind(w.04, w.05), test.dat = w.06,
+                              omits, response.var = "MatchEDT_buffer_Acc", 
+                              model.no = modelno, rf.inputs = rf.inputs) 
 
-rf.0405.06.pred <- predict(rf.0405.all, w.06[, fitvars])
-Nobs <- data.frame(t(c(nrow(w.040506),
-                       summary(w.040506$MatchEDT_buffer_Acc),
-                       length(w.040506$nWazeAccident[w.040506$nWazeAccident>0]))))
 
-colnames(Nobs) = c("N", "No EDT", "EDT present", "Waze accident present")
-(predtab <- table(w.06$MatchEDT_buffer_Acc, rf.0405.06.pred))
-
-keyoutputs[[modelno]] = list(Nobs,
-                             predtab,
-                             diag = bin.mod.diagnostics(predtab))
-
-out.06 <- data.frame(w.06[c("GRID_ID","day","hour", "MatchEDT_buffer")], rf.0405.06.pred)
-names(out.06)[4:5] <- c("Obs", "Pred")
-out.06 = data.frame(out.06,
-                    TN = out.06$Obs == 0 &  out.06$Pred == 0,
-                    FP = out.06$Obs == 0 &  out.06$Pred == 1,
-                    FN = out.06$Obs == 1 &  out.06$Pred == 0,
-                    TP = out.06$Obs == 1 &  out.06$Pred == 1)
-write.csv(out.06,
-          file = paste(modelno, "RandomForest_pred_0405_06.csv", sep = "_"),
-          row.names = F)
-
-s3save(list = c("rf.0405.all",
-                "rf.0405.06.pred",
-                "w.06",
-                "out.06"),
-       object = file.path(outputdir, paste("Model", modelno, "RandomForest_Output_0405_06.RData", sep= "_")),
-       bucket = waze.bucket)
-
-save("keyoutputs", file = paste0("Outputs_up_to_", modelno))
+save("keyoutputs", file = paste0("Output_to_", modelno))
 
 # cleanup
-rm(rf.04, rf.0405.all, w.04, w.05, w.06, w.0405, w.040506); stopCluster(cl); gc()
+rm(w.04, w.05, w.06); gc()
 
 # Model 06: April, 0.5 mi ----
 # note file names is WazeTimeEdtHexAll, as weather data not prepped yet for 4 mi hexagons
-cl <- makeCluster(parallel::detectCores()) # make a cluster of all available cores
-registerDoParallel(cl)
-
 HEXSIZE = "05"
 inputdir <- paste0("WazeEDT_Agg", HEXSIZE, "mile_Rdata_Input")
 outputdir <- paste0("WazeEDT_Agg", HEXSIZE, "mile_RandForest_Output")
@@ -362,117 +169,24 @@ outputdir <- paste0("WazeEDT_Agg", HEXSIZE, "mile_RandForest_Output")
 for(mo in c("04","05","06")){
   prep.hex(file.path(inputdir, paste0("WazeTimeEdtHexAll_", mo,"_", HEXSIZE, "mi.RData")), month = mo)
 }
-w.0405 <- rbind(w.04, w.05)
-w.040506 <- rbind(w.0405, w.06)
 
 modelno = "06"
 
-# Formula for 0.5 mi hex
-omits = c(grep("GRID_ID", names(w.04), value = T), "day", "hextime", "year", "weekday",
-          "uniqWazeEvents", "nWazeRowsInMatch", "nWazeAccident",
-          "nMatchWaze_buffer", "nNoMatchWaze_buffer",
-          grep("EDT", names(w.04), value = T),
-          "wx",
-          grep("nWazeAcc_", names(w.04), value = T), # neighboring accidents
-          grep("nWazeJam_", names(w.04), value = T) # neighboring jams
-)
-
-fitvars <- names(w.04)[is.na(match(names(w.04), omits))]
-
-wazeAccformula <- reformulate(termlabels = fitvars[is.na(match(fitvars,
-                                                               "MatchEDT_buffer_Acc"))], 
-                              response = "MatchEDT_buffer_Acc")
-
-trainrows <- sort(sample(1:nrow(w.04), size = nrow(w.04)*.7, replace = F))
-testrows <- (1:nrow(w.04))[!1:nrow(w.04) %in% trainrows]
-
-system.time(rf.04 <- foreach(ntree = rep(ntree.use/avail.cores, avail.cores),
-                             .combine = randomForest::combine, .multicombine = TRUE, 
-                             .packages = "randomForest") %dopar% {
-                               randomForest(wazeAccformula, data = w.04[trainrows,], ntree = ntree)})
-
-rf.04.pred <- predict(rf.04, w.04[testrows, fitvars])
-
-Nobs <- data.frame(t(c(nrow(w.04),
-                       summary(w.04$MatchEDT_buffer_Acc),
-                       length(w.04$nWazeAccident[w.04$nWazeAccident>0]) )))
-
-colnames(Nobs) = c("N", "No EDT", "EDT present", "Waze accident present")
-(predtab <- table(w.04$MatchEDT_buffer_Acc[testrows], rf.04.pred)) 
-
-keyoutputs[[modelno]] = list(Nobs,
-                             predtab,
-                             diag = bin.mod.diagnostics(predtab))
-# save output predictions
-out.04 <- data.frame(w.04[testrows, c("GRID_ID", "day", "hour", "MatchEDT_buffer")], rf.04.pred)
-out.04$day <- as.numeric(out.04$day)
-names(out.04)[4:5] <- c("Obs", "Pred")
-out.04 = data.frame(out.04,
-                    TN = out.04$Obs == 0 &  out.04$Pred == 0,
-                    FP = out.04$Obs == 0 &  out.04$Pred == 1,
-                    FN = out.04$Obs == 1 &  out.04$Pred == 0,
-                    TP = out.04$Obs == 1 &  out.04$Pred == 1)
-write.csv(out.04,
-          file = paste(modelno, "RandomForest_pred_04.csv", sep = "_"),
-          row.names = F)
-s3save(list = c("rf.04",
-                "rf.04.pred",
-                "testrows",
-                "trainrows",
-                "w.04",
-                "out.04"),
-       object = file.path(outputdir, paste("Model", modelno, "RandomForest_Output_04.RData", sep= "_")),
-       bucket = waze.bucket)
+keyoutputs[[modelno]] = do.rf(train.dat = w.04, 
+                              omits, response.var = "MatchEDT_buffer_Acc", 
+                              model.no = modelno, rf.inputs = rf.inputs) 
 
 # Model 07: April + May, predict June, 0.5 mi ----
 modelno = "07"
 
-system.time(rf.0405.all <- foreach(ntree = rep(ntree.use/avail.cores, avail.cores),
-                                   .combine = randomForest::combine, .multicombine = TRUE, 
-                                   .packages = "randomForest") %dopar%
-              randomForest(wazeAccformula, data = w.0405, ntree = ntree))
-
-rf.0405.06.pred <- predict(rf.0405.all, w.06[, fitvars])
-Nobs <- data.frame(t(c(nrow(w.040506),
-                       summary(w.040506$MatchEDT_buffer_Acc),
-                       length(w.040506$nWazeAccident[w.040506$nWazeAccident>0]))))
-
-colnames(Nobs) = c("N", "No EDT", "EDT present", "Waze accident present")
-(predtab <- table(w.06$MatchEDT_buffer_Acc, rf.0405.06.pred))
-
-keyoutputs[[modelno]] = list(Nobs,
-                             predtab,
-                             diag = bin.mod.diagnostics(predtab))
-
-out.06 <- data.frame(w.06[c("GRID_ID","day","hour", "MatchEDT_buffer")], rf.0405.06.pred)
-names(out.06)[4:5] <- c("Obs", "Pred")
-out.06 = data.frame(out.06,
-                    TN = out.06$Obs == 0 &  out.06$Pred == 0,
-                    FP = out.06$Obs == 0 &  out.06$Pred == 1,
-                    FN = out.06$Obs == 1 &  out.06$Pred == 0,
-                    TP = out.06$Obs == 1 &  out.06$Pred == 1)
-write.csv(out.06,
-          file = paste(modelno, "RandomForest_pred_0405_06.csv", sep = "_"),
-          row.names = F)
-
-s3save(list = c("rf.0405.all",
-                "rf.0405.06.pred",
-                "w.06",
-                "out.06"),
-       object = file.path(outputdir, paste("Model", modelno, "RandomForest_Output_0405_06.RData", sep= "_")),
-       bucket = waze.bucket)
-
-save("keyoutputs", file = paste0("Outputs_up_to_", modelno))
+keyoutputs[[modelno]] = do.rf(train.dat = rbind(w.04, w.05), test.dat = w.06,
+                               omits, response.var = "MatchEDT_buffer_Acc", 
+                               model.no = modelno, rf.inputs = rf.inputs) 
 
 # cleanup
-rm(rf.04, rf.0405.all, w.04, w.05, w.06, w.0405, w.040506); stopCluster(cl); gc()
-
-
+rm(w.04, w.05, w.06); gc()
 
 # Model 08: April, 1 mi, neighbors ----
-cl <- makeCluster(parallel::detectCores()) # make a cluster of all available cores
-registerDoParallel(cl)
-
 HEXSIZE = "1"
 inputdir <- paste0("WazeEDT_Agg", HEXSIZE, "mile_Rdata_Input")
 outputdir <- paste0("WazeEDT_Agg", HEXSIZE, "mile_RandForest_Output")
@@ -480,117 +194,33 @@ outputdir <- paste0("WazeEDT_Agg", HEXSIZE, "mile_RandForest_Output")
 for(mo in c("04","05","06")){
   prep.hex(file.path(inputdir, paste0("WazeTimeEdtHexWx_", mo, "_", HEXSIZE, "_mi.RData")), month = mo)
 }
-w.0405 <- rbind(w.04, w.05)
-w.040506 <- rbind(w.04, w.05, w.06)
 
 modelno = "08"
 
-omits = c(grep("GRID_ID", names(w.04), value = T), "day", "hextime", "year", "weekday",
-          "uniqWazeEvents", "nWazeRowsInMatch", "nWazeAccident",
-          "nMatchWaze_buffer", "nNoMatchWaze_buffer",
-          grep("EDT", names(w.04), value = T),
-          "wx")
-
-fitvars <- names(w.04)[is.na(match(names(w.04), omits))]
-
-wazeAccformula <- reformulate(termlabels = fitvars[is.na(match(fitvars,
-                                                               "MatchEDT_buffer_Acc"))], 
-                              response = "MatchEDT_buffer_Acc")
-
-trainrows <- sort(sample(1:nrow(w.04), size = nrow(w.04)*.7, replace = F))
-testrows <- (1:nrow(w.04))[!1:nrow(w.04) %in% trainrows]
-
-system.time(rf.04 <- foreach(ntree = rep(ntree.use/avail.cores, avail.cores),
-                             .combine = randomForest::combine, .multicombine = TRUE, 
-                             .packages = "randomForest") %dopar%
-              randomForest(wazeAccformula, data = w.04[trainrows,], ntree = ntree))
-
-rf.04.pred <- predict(rf.04, w.04[testrows, fitvars])
-
-Nobs <- data.frame(t(c(nrow(w.04),
-                       summary(w.04$MatchEDT_buffer_Acc),
-                       length(w.04$nWazeAccident[w.04$nWazeAccident>0]) )))
-
-colnames(Nobs) = c("N", "No EDT", "EDT present", "Waze accident present")
-(predtab <- table(w.04$MatchEDT_buffer_Acc[testrows], rf.04.pred)) 
-
-keyoutputs[[modelno]] = list(Nobs,
-                             predtab,
-                             diag = bin.mod.diagnostics(predtab)
+omits = c(alwaysomit,
+          "wx"
+        #  grep("nWazeAcc_", names(w.04), value = T), # neighboring accidents
+        #  grep("nWazeJam_", names(w.04), value = T) # neighboring jams
 )
 
-# save output predictions
-out.04 <- data.frame(w.04[testrows, c("GRID_ID", "day", "hour", "MatchEDT_buffer")], rf.04.pred)
-out.04$day <- as.numeric(out.04$day)
-names(out.04)[4:5] <- c("Obs", "Pred")
-out.04 = data.frame(out.04,
-                    TN = out.04$Obs == 0 &  out.04$Pred == 0,
-                    FP = out.04$Obs == 0 &  out.04$Pred == 1,
-                    FN = out.04$Obs == 1 &  out.04$Pred == 0,
-                    TP = out.04$Obs == 1 &  out.04$Pred == 1)
-write.csv(out.04,
-          file = paste(modelno, "RandomForest_pred_04.csv", sep = "_"),
-          row.names = F)
-s3save(list = c("rf.04",
-                "rf.04.pred",
-                "testrows",
-                "trainrows",
-                "w.04",
-                "out.04"),
-       object = file.path(outputdir, paste("Model", modelno, "RandomForest_Output_04.RData", sep= "_")),
-       bucket = waze.bucket)
+keyoutputs[[modelno]] = do.rf(train.dat = w.04, 
+                              omits, response.var = "MatchEDT_buffer_Acc", 
+                              model.no = modelno, rf.inputs = rf.inputs) 
 
 # Model 09: April + May, predict June, 1 mi, neighbors ----
 modelno = "09"
 
-system.time(rf.0405.all <- foreach(ntree = rep(ntree.use/avail.cores, avail.cores),
-                                   .combine = randomForest::combine, .multicombine = TRUE, 
-                                   .packages = "randomForest") %dopar%
-              randomForest(wazeAccformula, data = w.0405, ntree = ntree))
-
-rf.0405.06.pred <- predict(rf.0405.all, w.06[, fitvars])
-
-Nobs <- data.frame(t(c(nrow(w.040506),
-                       summary(w.040506$MatchEDT_buffer_Acc),
-                       length(w.040506$nWazeAccident[w.040506$nWazeAccident>0]))))
-
-colnames(Nobs) = c("N", "No EDT", "EDT present", "Waze accident present")
-(predtab <- table(w.06$MatchEDT_buffer_Acc, rf.0405.06.pred))
-
-keyoutputs[[modelno]] = list(Nobs,
-                             predtab,
-                             diag = bin.mod.diagnostics(predtab))
-
-out.06 <- data.frame(w.06[c("GRID_ID","day","hour", "MatchEDT_buffer")], rf.0405.06.pred)
-names(out.06)[4:5] <- c("Obs", "Pred")
-out.06 = data.frame(out.06,
-                    TN = out.06$Obs == 0 &  out.06$Pred == 0,
-                    FP = out.06$Obs == 0 &  out.06$Pred == 1,
-                    FN = out.06$Obs == 1 &  out.06$Pred == 0,
-                    TP = out.06$Obs == 1 &  out.06$Pred == 1)
-write.csv(out.06,
-          file = paste(modelno, "RandomForest_pred_0405_06.csv", sep = "_"),
-          row.names = F)
-
-s3save(list = c("rf.0405.all",
-                "rf.0405.06.pred",
-                "w.06",
-                "out.06"),
-       object = file.path(outputdir, paste("Model", modelno, "RandomForest_Output_0405_06.RData", sep= "_")),
-       bucket = waze.bucket)
+keyoutputs[[modelno]] = do.rf(train.dat = rbind(w.04, w.05), test.dat = w.06,
+                              omits, response.var = "MatchEDT_buffer_Acc", 
+                              model.no = modelno, rf.inputs = rf.inputs) 
 
 save("keyoutputs", file = paste0("Outputs_up_to_", modelno))
 
 # cleanup
-rm(rf.04, rf.0405.all, w.04, w.05, w.06, w.0405, w.040506); stopCluster(cl); gc()
-
-
+rm(w.04, w.05, w.06); gc()
 
 # Model 10: April, 4 mi, neighbors ----
 # note file names is WazeTimeEdtHexAll, as weather data not prepped yet for 4 mi hexagons
-cl <- makeCluster(parallel::detectCores()) # make a cluster of all available cores
-registerDoParallel(cl)
-
 HEXSIZE = "4"
 inputdir <- paste0("WazeEDT_Agg", HEXSIZE, "mile_Rdata_Input")
 outputdir <- paste0("WazeEDT_Agg", HEXSIZE, "mile_RandForest_Output")
@@ -598,117 +228,26 @@ outputdir <- paste0("WazeEDT_Agg", HEXSIZE, "mile_RandForest_Output")
 for(mo in c("04","05","06")){
   prep.hex(file.path(inputdir, paste0("WazeTimeEdtHexAll_", mo, "_", HEXSIZE, "_mi.RData")), month = mo)
 }
-w.0405 <- rbind(w.04, w.05)
-w.040506 <- rbind(w.04, w.05, w.06)
 
 modelno = "10"
 
-# Formula for 4 mi hex
-omits = c(grep("GRID_ID", names(w.04), value = T), "day", "hextime", "year", "weekday",
-          "uniqWazeEvents", "nWazeRowsInMatch", "nWazeAccident",
-          "nMatchWaze_buffer", "nNoMatchWaze_buffer",
-          grep("EDT", names(w.04), value = T),
-          "wx"
-          )
-
-fitvars <- names(w.04)[is.na(match(names(w.04), omits))]
-
-# Change response to nMatch for regression; output will be continuous, much more RAM intensive.
-wazeAccformula <- reformulate(termlabels = fitvars[is.na(match(fitvars,
-                                                               "MatchEDT_buffer_Acc"))], 
-                              response = "MatchEDT_buffer_Acc")
-
-trainrows <- sort(sample(1:nrow(w.04), size = nrow(w.04)*.7, replace = F))
-testrows <- (1:nrow(w.04))[!1:nrow(w.04) %in% trainrows]
-
-system.time(rf.04 <- foreach(ntree = rep(ntree.use/avail.cores, avail.cores),
-                             .combine = randomForest::combine, .multicombine = TRUE, 
-                             .packages = "randomForest") %dopar% {
-              randomForest(wazeAccformula, data = w.04[trainrows,], ntree = ntree)}) 
-
-rf.04.pred <- predict(rf.04, w.04[testrows, fitvars])
-
-Nobs <- data.frame(t(c(nrow(w.04),
-                       summary(w.04$MatchEDT_buffer_Acc),
-                       length(w.04$nWazeAccident[w.04$nWazeAccident>0]) )))
-
-colnames(Nobs) = c("N", "No EDT", "EDT present", "Waze accident present")
-(predtab <- table(w.04$MatchEDT_buffer_Acc[testrows], rf.04.pred)) 
-
-keyoutputs[[modelno]] = list(Nobs,
-                             predtab,
-                             diag = bin.mod.diagnostics(predtab))
-
-# save output predictions
-out.04 <- data.frame(w.04[testrows, c("GRID_ID", "day", "hour", "MatchEDT_buffer")], rf.04.pred)
-out.04$day <- as.numeric(out.04$day)
-names(out.04)[4:5] <- c("Obs", "Pred")
-out.04 = data.frame(out.04,
-                    TN = out.04$Obs == 0 &  out.04$Pred == 0,
-                    FP = out.04$Obs == 0 &  out.04$Pred == 1,
-                    FN = out.04$Obs == 1 &  out.04$Pred == 0,
-                    TP = out.04$Obs == 1 &  out.04$Pred == 1)
-write.csv(out.04,
-          file = paste(modelno, "RandomForest_pred_04.csv", sep = "_"),
-          row.names = F)
-s3save(list = c("rf.04",
-                "rf.04.pred",
-                "testrows",
-                "trainrows",
-                "w.04",
-                "out.04"),
-       object = file.path(outputdir, paste("Model", modelno, "RandomForest_Output_04.RData", sep= "_")),
-       bucket = waze.bucket)
+keyoutputs[[modelno]] = do.rf(train.dat = w.04,
+                              omits, response.var = "MatchEDT_buffer_Acc", 
+                              model.no = modelno, rf.inputs = rf.inputs) 
 
 # Model 11: April + May, predict June, 4 mi, neighbors ----
 modelno = "11"
 
-system.time(rf.0405.all <- foreach(ntree = rep(ntree.use/avail.cores, avail.cores),
-                                   .combine = randomForest::combine, .multicombine = TRUE, 
-                                   .packages = "randomForest") %dopar% {
-              randomForest(wazeAccformula, data = w.0405, ntree = ntree) } )
-
-rf.0405.06.pred <- predict(rf.0405.all, w.06[, fitvars])
-
-Nobs <- data.frame(t(c(nrow(w.040506),
-                       summary(w.040506$MatchEDT_buffer_Acc),
-                       length(w.040506$nWazeAccident[w.040506$nWazeAccident>0]))))
-
-colnames(Nobs) = c("N", "No EDT", "EDT present", "Waze accident present")
-(predtab <- table(w.06$MatchEDT_buffer_Acc, rf.0405.06.pred))
-
-keyoutputs[[modelno]] = list(Nobs,
-                             predtab,
-                             diag = bin.mod.diagnostics(predtab)
-)
-
-out.06 <- data.frame(w.06[c("GRID_ID","day","hour", "MatchEDT_buffer")], rf.0405.06.pred)
-names(out.06)[4:5] <- c("Obs", "Pred")
-out.06 = data.frame(out.06,
-                    TN = out.06$Obs == 0 &  out.06$Pred == 0,
-                    FP = out.06$Obs == 0 &  out.06$Pred == 1,
-                    FN = out.06$Obs == 1 &  out.06$Pred == 0,
-                    TP = out.06$Obs == 1 &  out.06$Pred == 1)
-write.csv(out.06,
-          file = paste(modelno, "RandomForest_pred_0405_06.csv", sep = "_"),
-          row.names = F)
-
-s3save(list = c("rf.0405.all",
-                "rf.0405.06.pred",
-                "w.06",
-                "out.06"),
-       object = file.path(outputdir, paste("Model", modelno, "RandomForest_Output_0405_06.RData", sep= "_")),
-       bucket = waze.bucket)
+keyoutputs[[modelno]] = do.rf(train.dat = rbind(w.04, w.05), test.dat = w.06,
+                              omits, response.var = "MatchEDT_buffer_Acc", 
+                              model.no = modelno, rf.inputs = rf.inputs) 
 
 save("keyoutputs", file = paste0("Outputs_up_to_", modelno))
 
 # cleanup
-rm(rf.04, rf.0405.all, w.04, w.05, w.06, w.0405, w.040506); stopCluster(cl); gc()
+rm(w.04, w.05, w.06); gc()
 
 # Model 12: April, 1 mi, neighbors, wx ----
-cl <- makeCluster(parallel::detectCores()) 
-registerDoParallel(cl)
-
 HEXSIZE = "1"
 inputdir <- paste0("WazeEDT_Agg", HEXSIZE, "mile_Rdata_Input")
 outputdir <- paste0("WazeEDT_Agg", HEXSIZE, "mile_RandForest_Output")
@@ -716,114 +255,34 @@ outputdir <- paste0("WazeEDT_Agg", HEXSIZE, "mile_RandForest_Output")
 for(mo in c("04","05","06")){
   prep.hex(file.path(inputdir, paste0("WazeTimeEdtHexWx_", mo, "_", HEXSIZE, "_mi.RData")), month = mo)
 }
-w.0405 <- rbind(w.04, w.05)
-w.040506 <- rbind(w.04, w.05, w.06)
+
+omits = c(alwaysomit
+          # "wx"
+          #  grep("nWazeAcc_", names(w.04), value = T), # neighboring accidents
+          #  grep("nWazeJam_", names(w.04), value = T) # neighboring jams
+)
 
 modelno = "12"
 
-omits = c(grep("GRID_ID", names(w.04), value = T), "day", "hextime", "year", "weekday",
-          "uniqWazeEvents", "nWazeRowsInMatch", "nWazeAccident",
-          "nMatchWaze_buffer", "nNoMatchWaze_buffer",
-          grep("EDT", names(w.04), value = T)
-          )
-
-fitvars <- names(w.04)[is.na(match(names(w.04), omits))]
-
-wazeAccformula <- reformulate(termlabels = fitvars[is.na(match(fitvars,
-                                                               "MatchEDT_buffer_Acc"))], 
-                              response = "MatchEDT_buffer_Acc")
-
-trainrows <- sort(sample(1:nrow(w.04), size = nrow(w.04)*.7, replace = F))
-testrows <- (1:nrow(w.04))[!1:nrow(w.04) %in% trainrows]
-
-system.time(rf.04 <- foreach(ntree = rep(ntree.use/avail.cores, avail.cores),
-                             .combine = randomForest::combine, .multicombine = TRUE, 
-                             .packages = "randomForest") %dopar% {
-              randomForest(wazeAccformula, data = w.04[trainrows,], ntree = ntree)})
-
-rf.04.pred <- predict(rf.04, w.04[testrows, fitvars])
-
-Nobs <- data.frame(t(c(nrow(w.04),
-                       summary(w.04$MatchEDT_buffer_Acc),
-                       length(w.04$nWazeAccident[w.04$nWazeAccident>0]) )))
-
-colnames(Nobs) = c("N", "No EDT", "EDT present", "Waze accident present")
-(predtab <- table(w.04$MatchEDT_buffer_Acc[testrows], rf.04.pred)) 
-
-keyoutputs[[modelno]] = list(Nobs,
-                             predtab,
-                             diag = bin.mod.diagnostics(predtab)
-)
-
-# save output predictions
-out.04 <- data.frame(w.04[testrows, c("GRID_ID", "day", "hour", "MatchEDT_buffer")], rf.04.pred)
-out.04$day <- as.numeric(out.04$day)
-names(out.04)[4:5] <- c("Obs", "Pred")
-out.04 = data.frame(out.04,
-                    TN = out.04$Obs == 0 &  out.04$Pred == 0,
-                    FP = out.04$Obs == 0 &  out.04$Pred == 1,
-                    FN = out.04$Obs == 1 &  out.04$Pred == 0,
-                    TP = out.04$Obs == 1 &  out.04$Pred == 1)
-write.csv(out.04,
-          file = paste(modelno, "RandomForest_pred_04.csv", sep = "_"),
-          row.names = F)
-s3save(list = c("rf.04",
-                "rf.04.pred",
-                "testrows",
-                "trainrows",
-                "w.04",
-                "out.04"),
-       object = file.path(outputdir, paste("Model", modelno, "RandomForest_Output_04.RData", sep= "_")),
-       bucket = waze.bucket)
+keyoutputs[[modelno]] = do.rf(train.dat = w.04,
+                              omits, response.var = "MatchEDT_buffer_Acc", 
+                              model.no = modelno, rf.inputs = rf.inputs) 
 
 # Model 13: April + May, predict June, 1 mi, neighbors, wx ----
 modelno = "13"
 
-system.time(rf.0405.all <- foreach(ntree = rep(ntree.use/avail.cores, avail.cores),
-                                   .combine = randomForest::combine, .multicombine = TRUE, 
-                                   .packages = "randomForest") %dopar% {
-              randomForest(wazeAccformula, data = w.0405, ntree = ntree)})
-
-rf.0405.06.pred <- predict(rf.0405.all, w.06[, fitvars])
-Nobs <- data.frame(t(c(nrow(w.040506),
-                       summary(w.040506$MatchEDT_buffer_Acc),
-                       length(w.040506$nWazeAccident[w.040506$nWazeAccident>0]))))
-
-colnames(Nobs) = c("N", "No EDT", "EDT present", "Waze accident present")
-(predtab <- table(w.06$MatchEDT_buffer_Acc, rf.0405.06.pred))
-
-keyoutputs[[modelno]] = list(Nobs,
-                             predtab,
-                             diag = bin.mod.diagnostics(predtab))
-
-out.06 <- data.frame(w.06[c("GRID_ID","day","hour", "MatchEDT_buffer")], rf.0405.06.pred)
-names(out.06)[4:5] <- c("Obs", "Pred")
-out.06 = data.frame(out.06,
-                    TN = out.06$Obs == 0 &  out.06$Pred == 0,
-                    FP = out.06$Obs == 0 &  out.06$Pred == 1,
-                    FN = out.06$Obs == 1 &  out.06$Pred == 0,
-                    TP = out.06$Obs == 1 &  out.06$Pred == 1)
-write.csv(out.06,
-          file = paste(modelno, "RandomForest_pred_0405_06.csv", sep = "_"),
-          row.names = F)
-
-s3save(list = c("rf.0405.all",
-                "rf.0405.06.pred",
-                "w.06",
-                "out.06"),
-       object = file.path(outputdir, paste("Model", modelno, "RandomForest_Output_0405_06.RData", sep= "_")),
-       bucket = waze.bucket)
+keyoutputs[[modelno]] = do.rf(train.dat = rbind(w.04, w.05), test.dat = w.06,
+                              omits, response.var = "MatchEDT_buffer_Acc", 
+                              model.no = modelno, rf.inputs = rf.inputs) 
 
 save("keyoutputs", file = paste0("Outputs_up_to_", modelno))
 
+
 # cleanup
-rm(rf.04, rf.0405.all, w.04, w.05, w.06, w.0405, w.040506); stopCluster(cl); gc()
+rm(w.04, w.05, w.06);gc()
 
 # Model 14: April, 1 mi, neighbors, wx, roads ----
 # Models 14 and 15, adding road functional class
-cl <- makeCluster(parallel::detectCores()) # make a cluster of all available cores
-registerDoParallel(cl)
-
 modelno = "14"
 
 HEXSIZE = "1"
@@ -837,118 +296,26 @@ for(mo in c("04","05","06")){
 for(w in c("w.04", "w.05", "w.06")){
   append.hex(hexname = w, data.to.add = "hexagons_1mi_routes_sum")
 }
-w.0405 <- rbind(w.04, w.05)
-w.040506 <- rbind(w.04, w.05, w.06)
 
-omits = c(grep("GRID_ID", names(w.04), value = T), "day", "hextime", "year", "weekday",
-          "uniqWazeEvents", "nWazeRowsInMatch", "nWazeAccident",
-          "nMatchWaze_buffer", "nNoMatchWaze_buffer",
-          grep("EDT", names(w.04), value = T))
+omits = c(alwaysomit)
 
-fitvars <- names(w.04)[is.na(match(names(w.04), omits))]
-
-wazeAccformula <- reformulate(termlabels = fitvars[is.na(match(fitvars,
-                                                               "MatchEDT_buffer_Acc"))], 
-                              response = "MatchEDT_buffer_Acc")
-
-trainrows <- sort(sample(1:nrow(w.04), size = nrow(w.04)*.7, replace = F))
-testrows <- (1:nrow(w.04))[!1:nrow(w.04) %in% trainrows]
-
-system.time(rf.04 <- foreach(ntree = rep(ntree.use/avail.cores, avail.cores),
-                             .combine = randomForest::combine, .multicombine = TRUE, 
-                             .packages = "randomForest") %dopar% {
-                               randomForest(wazeAccformula, data = w.04[trainrows,], ntree = ntree)})
-
-rf.04.pred <- predict(rf.04, w.04[testrows, fitvars])
-
-Nobs <- data.frame(t(c(nrow(w.04),
-                       summary(w.04$MatchEDT_buffer_Acc),
-                       length(w.04$nWazeAccident[w.04$nWazeAccident>0]) )))
-
-colnames(Nobs) = c("N", "No EDT", "EDT present", "Waze accident present")
-(predtab <- table(w.04$MatchEDT_buffer_Acc[testrows], rf.04.pred)) 
-
-keyoutputs[[modelno]] = list(Nobs,
-                             predtab,
-                             diag = bin.mod.diagnostics(predtab)
-)
-
-# save output predictions
-out.04 <- data.frame(w.04[testrows, c("GRID_ID", "day", "hour", "MatchEDT_buffer")], rf.04.pred)
-out.04$day <- as.numeric(out.04$day)
-names(out.04)[4:5] <- c("Obs", "Pred")
-out.04 = data.frame(out.04,
-                    TN = out.04$Obs == 0 &  out.04$Pred == 0,
-                    FP = out.04$Obs == 0 &  out.04$Pred == 1,
-                    FN = out.04$Obs == 1 &  out.04$Pred == 0,
-                    TP = out.04$Obs == 1 &  out.04$Pred == 1)
-write.csv(out.04,
-          file = paste(modelno, "RandomForest_pred_04.csv", sep = "_"),
-          row.names = F)
-s3save(list = c("rf.04",
-                "rf.04.pred",
-                "testrows",
-                "trainrows",
-                "w.04",
-                "out.04"),
-       object = file.path(outputdir, paste("Model", modelno, "RandomForest_Output_04.RData", sep= "_")),
-       bucket = waze.bucket)
-
-pdf(paste(modelno, "varImp.pdf", sep = "_"))
-varImpPlot(rf.04)
-dev.off()
+keyoutputs[[modelno]] = do.rf(train.dat = w.04,
+                              omits, response.var = "MatchEDT_buffer_Acc", 
+                              model.no = modelno, rf.inputs = rf.inputs) 
 
 # Model 15: April + May, predict June, 1 mi, neighbors, wx, roads ----
 modelno = "15"
 
-system.time(rf.0405.all <- foreach(ntree = rep(ntree.use/avail.cores, avail.cores),
-                                   .combine = randomForest::combine, .multicombine = TRUE, 
-                                   .packages = "randomForest") %dopar% {
-                                     randomForest(wazeAccformula, data = w.0405, ntree = ntree)})
-
-rf.0405.06.pred <- predict(rf.0405.all, w.06[, fitvars])
-Nobs <- data.frame(t(c(nrow(w.040506),
-                       summary(w.040506$MatchEDT_buffer_Acc),
-                       length(w.040506$nWazeAccident[w.040506$nWazeAccident>0]))))
-
-colnames(Nobs) = c("N", "No EDT", "EDT present", "Waze accident present")
-(predtab <- table(w.06$MatchEDT_buffer_Acc, rf.0405.06.pred))
-
-keyoutputs[[modelno]] = list(Nobs,
-                             predtab,
-                             diag = bin.mod.diagnostics(predtab))
-
-out.06 <- data.frame(w.06[c("GRID_ID","day","hour", "MatchEDT_buffer")], rf.0405.06.pred)
-names(out.06)[4:5] <- c("Obs", "Pred")
-out.06 = data.frame(out.06,
-                    TN = out.06$Obs == 0 &  out.06$Pred == 0,
-                    FP = out.06$Obs == 0 &  out.06$Pred == 1,
-                    FN = out.06$Obs == 1 &  out.06$Pred == 0,
-                    TP = out.06$Obs == 1 &  out.06$Pred == 1)
-write.csv(out.06,
-          file = paste(modelno, "RandomForest_pred_0405_06.csv", sep = "_"),
-          row.names = F)
-
-s3save(list = c("rf.0405.all",
-                "rf.0405.06.pred",
-                "w.06",
-                "out.06"),
-       object = file.path(outputdir, paste("Model", modelno, "RandomForest_Output_0405_06.RData", sep= "_")),
-       bucket = waze.bucket)
+keyoutputs[[modelno]] = do.rf(train.dat = rbind(w.04, w.05), test.dat = w.06,
+                              omits, response.var = "MatchEDT_buffer_Acc", 
+                              model.no = modelno, rf.inputs = rf.inputs) 
 
 save("keyoutputs", file = paste0("Outputs_up_to_", modelno))
 
-pdf(paste(modelno, "varImp.pdf", sep = "_"))
-varImpPlot(rf.0405.all)
-dev.off()
-
 # cleanup
-rm(rf.04, rf.0405.all, w.04, w.05, w.06, w.0405, w.040506); stopCluster(cl); gc()
+rm( w.04, w.05, w.06)
 
 # Model 16: April, 1 mi, neighbors, wx, roads, jobs ----
-cl <- makeCluster(parallel::detectCores()) 
-registerDoParallel(cl)
-
 modelno = "16"
 
 HEXSIZE = "1"
@@ -974,9 +341,6 @@ for(w in c("w.04", "w.05", "w.06")){
   append.hex(hexname = w, data.to.add = "hexagons_1mi_bg_rac_sum")
 }
 
-w.0405 <- rbind(w.04, w.05)
-w.040506 <- rbind(w.04, w.05, w.06)
-
 # Look at NA for road data (using na.action = "keep" in append.hex above)
 r.na <- w.04[is.na(w.04$F_SYSTEM_V_1),]
 head(r.na)
@@ -985,127 +349,24 @@ table(r.na$nWazeAccident)
 # What percent of EDT crashes are we discarding? 1.3% of April data
 100*length(r.na$MatchEDT_buffer_Acc==1)/length(w.04$MatchEDT_buffer_Acc==1)
 
-omits = c(grep("GRID_ID", names(w.04), value = T), "day", "hextime", "year", "weekday",
-          "uniqWazeEvents", "nWazeRowsInMatch", "nWazeAccident",
-          "nMatchWaze_buffer", "nNoMatchWaze_buffer",
-          grep("EDT", names(w.04), value = T),
-          grep("nWazeRT", names(w.04), value = T), # omit Waze RT
-          grep("nWazeJam_", names(w.04), value = T) # experiment: omit neighboring jams
+omits = c(alwaysomit
+          # grep("nWazeRT", names(w.04), value = T), # omit Waze RT
+          # grep("nWazeJam_", names(w.04), value = T) # experiment: omit neighboring jams
 )
 
-fitvars <- names(w.04)[is.na(match(names(w.04), omits))]
-
-wazeAccformula <- reformulate(termlabels = fitvars[is.na(match(fitvars,
-                                                               "MatchEDT_buffer_Acc"))], 
-                              response = "MatchEDT_buffer_Acc")
-
-trainrows <- sort(sample(1:nrow(w.04), size = nrow(w.04)*.7, replace = F))
-testrows <- (1:nrow(w.04))[!1:nrow(w.04) %in% trainrows]
-
-system.time(rf.04 <- foreach(ntree = rep(ntree.use/avail.cores, avail.cores),
-                             .combine = randomForest::combine, .multicombine = TRUE, 
-                             .packages = "randomForest") %dopar% {
-                               randomForest(wazeAccformula, data = w.04[trainrows,], ntree = ntree)})
-
-rf.04.pred <- predict(rf.04, w.04[testrows, fitvars])
-
-Nobs <- data.frame(t(c(nrow(w.04),
-                       summary(w.04$MatchEDT_buffer_Acc),
-                       length(w.04$nWazeAccident[w.04$nWazeAccident>0]) )))
-
-colnames(Nobs) = c("N", "No EDT", "EDT present", "Waze accident present")
-(predtab <- table(w.04$MatchEDT_buffer_Acc[testrows], rf.04.pred)) 
-
-keyoutputs[[modelno]] = list(Nobs,
-                             predtab,
-                             diag = bin.mod.diagnostics(predtab)
-)
-
-# save output predictions
-out.04 <- data.frame(w.04[testrows, c("GRID_ID", "day", "hour", "MatchEDT_buffer")], rf.04.pred)
-out.04$day <- as.numeric(out.04$day)
-names(out.04)[4:5] <- c("Obs", "Pred")
-out.04 = data.frame(out.04,
-                    TN = out.04$Obs == 0 &  out.04$Pred == 0,
-                    FP = out.04$Obs == 0 &  out.04$Pred == 1,
-                    FN = out.04$Obs == 1 &  out.04$Pred == 0,
-                    TP = out.04$Obs == 1 &  out.04$Pred == 1)
-write.csv(out.04,
-          file = paste(modelno, "RandomForest_pred_04.csv", sep = "_"),
-          row.names = F)
-s3save(list = c("rf.04",
-                "rf.04.pred",
-                "testrows",
-                "trainrows",
-                "w.04",
-                "out.04"),
-       object = file.path(outputdir, paste("Model", modelno, "RandomForest_Output_04.RData", sep= "_")),
-       bucket = waze.bucket)
-
-pdf(paste(modelno, "varImp.pdf", sep = "_"))
-varImpPlot(rf.04)
-dev.off()
+keyoutputs[[modelno]] = do.rf(train.dat = w.04,
+                              omits, response.var = "MatchEDT_buffer_Acc", 
+                              model.no = modelno, rf.inputs = rf.inputs) 
 
 
 # Model 17: April + May, predict June, 1 mi, neighbors, wx, roads, jobs ----
 modelno = "17"
 
-system.time(rf.0405.all <- foreach(ntree = rep(ntree.use/avail.cores, avail.cores),
-                                   .combine = randomForest::combine, .multicombine = TRUE, 
-                                   .packages = "randomForest") %dopar% {
-                                     randomForest(wazeAccformula, data = w.0405, ntree = ntree)})
-
-rf.0405.06.pred <- predict(rf.0405.all, w.06[, fitvars])
-Nobs <- data.frame(t(c(nrow(w.040506),
-                       summary(w.040506$MatchEDT_buffer_Acc),
-                       length(w.040506$nWazeAccident[w.040506$nWazeAccident>0]))))
-
-colnames(Nobs) = c("N", "No EDT", "EDT present", "Waze accident present")
-(predtab <- table(w.06$MatchEDT_buffer_Acc, rf.0405.06.pred))
-
-keyoutputs[[modelno]] = list(Nobs,
-                             predtab,
-                             diag = bin.mod.diagnostics(predtab))
-
-out.06 <- data.frame(w.06[c("GRID_ID","day","hour", "MatchEDT_buffer")], rf.0405.06.pred)
-names(out.06)[4:5] <- c("Obs", "Pred")
-out.06 = data.frame(out.06,
-                    TN = out.06$Obs == 0 &  out.06$Pred == 0,
-                    FP = out.06$Obs == 0 &  out.06$Pred == 1,
-                    FN = out.06$Obs == 1 &  out.06$Pred == 0,
-                    TP = out.06$Obs == 1 &  out.06$Pred == 1)
-write.csv(out.06,
-          file = paste(modelno, "RandomForest_pred_0405_06.csv", sep = "_"),
-          row.names = F)
-
-s3save(list = c("rf.0405.all",
-                "rf.0405.06.pred",
-                "w.06",
-                "out.06"),
-       object = file.path(outputdir, paste("Model", modelno, "RandomForest_Output_0405_06.RData", sep= "_")),
-       bucket = waze.bucket)
-
-save("keyoutputs", file = paste0("Outputs_up_to_", modelno))
-
-pdf(paste(modelno, "varImp.pdf", sep = "_"))
-varImpPlot(rf.0405.all)
-dev.off()
+keyoutputs[[modelno]] = do.rf(train.dat = rbind(w.04, w.05), test.dat = w.06,
+                              omits, response.var = "MatchEDT_buffer_Acc", 
+                              model.no = modelno, rf.inputs = rf.inputs) 
 
 save("keyoutputs", file = paste0("Outputs_up_to_", modelno))
 
 # cleanup
-rm(rf.04, rf.0405.all, w.04, w.05, w.06, w.0405, w.040506); stopCluster(cl); gc()
-
-
-# Summary from keyoutputs ----
-
-Nobs.frame <- data.frame(matrix(unlist(lapply(keyoutputs, FUN = function(x) x[[1]])), nrow = length(keyoutputs)))
-rownames(Nobs.frame) <- names(keyoutputs)
-colnames(Nobs.frame) <- names(keyoutputs[[1]][[1]])
-
-Diag.frame <- data.frame(matrix(unlist(lapply(keyoutputs, FUN = function(x) x[[3]])), ncol = length(keyoutputs)))
-colnames(Diag.frame) <- names(keyoutputs)
-rownames(Diag.frame) <- rownames(keyoutputs[[1]][[3]])
-
-
-
+rm(w.04, w.05, w.06); gc()
