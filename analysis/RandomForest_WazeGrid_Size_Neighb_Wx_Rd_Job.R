@@ -43,6 +43,8 @@ source(file.path(codeloc, 'utility/wazefunctions.R'))
 source(file.path(codeloc, "analysis/RandomForest_WazeGrid_Fx.R"))
 
 # Read in data ----
+aws.signature::use_credentials()
+
 # Grab any necessary data from the S3 bucket. This transfers all contents of MD_hexagons_shapefiles to the local instance. For this script, we will use shapefiles_funClass.zip (road classification data), shapefiles_rac.zip (Residence Area Characteristics), shapefiles_wac.zip (Workplace Area Characteristics). Unzip these into the local dir
 
 # check if already complted this transfer on this instance
@@ -81,7 +83,6 @@ avail.cores = parallel::detectCores()
 rf.inputs = list(ntree.use = avail.cores * 50, avail.cores = avail.cores, mtry = 8, maxnodes = NULL, nodesize = 50)
 keyoutputs = list() # to store model diagnostics
 
-aws.signature::use_credentials()
 
 # Analysis ----
 
@@ -129,7 +130,7 @@ inputdir <- paste0("WazeEDT_Agg", HEXSIZE, "mile_Rdata_Input")
 outputdir <- paste0("WazeEDT_Agg", HEXSIZE, "mile_RandForest_Output")
 
 for(mo in c("04","05","06")){
-  prep.hex(file.path(inputdir, paste0("WazeTimeEdtHexAll_", mo, "_", HEXSIZE, "_mi.RData")), month = mo)
+  prep.hex(file.path(inputdir, paste0("WazeTimeEdtHexWx_", mo, "_", HEXSIZE, "_mi.RData")), month = mo)
 }
 
 omits = c(alwaysomit,
@@ -226,7 +227,7 @@ inputdir <- paste0("WazeEDT_Agg", HEXSIZE, "mile_Rdata_Input")
 outputdir <- paste0("WazeEDT_Agg", HEXSIZE, "mile_RandForest_Output")
 
 for(mo in c("04","05","06")){
-  prep.hex(file.path(inputdir, paste0("WazeTimeEdtHexAll_", mo, "_", HEXSIZE, "_mi.RData")), month = mo)
+  prep.hex(file.path(inputdir, paste0("WazeTimeEdtHexWx_", mo, "_", HEXSIZE, "_mi.RData")), month = mo)
 }
 
 modelno = "10"

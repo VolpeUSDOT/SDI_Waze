@@ -1,12 +1,12 @@
 # Random Forest functions for Waze
-
+require(pROC)
 ######################################################################
 # do.rf function for running random forest models in parallel ----
 
 # Arguments:
 # train.dat - Data frame containing all the predictors and the response variable
 
-# omits - Vector of column names in the data to omit from the model. Used to genearte the model formula, if the formula is not otherwise provided in the `formula` argument.
+# omits - Vector of column names in the data to omit from the model. Used to generate the model formula, if the formula is not otherwise provided in the `formula` argument.
 
 # response.var - Vector of the data to use as the response variable, e.g. MatchEDT_buffer_Acc or nMatchEDT_buffer_Acc
 
@@ -82,6 +82,7 @@ do.rf <- function(train.dat, omits, response.var = "MatchEDT_buffer_Acc", model.
   cat(round(timediff,2), attr(timediff, "unit"), "to fit model", model.no, "\n")
   
   rf.pred <- predict(rf.out, test.dat.use[fitvars])
+  rf.prob <- predict(rf.out, test.dat.use[fitvars], type = "prob")
 
   Nobs <- data.frame(nrow(rundat),
                  sum(as.numeric(as.character(rundat[,response.var])) == 0),
@@ -90,7 +91,15 @@ do.rf <- function(train.dat, omits, response.var = "MatchEDT_buffer_Acc", model.
   
   colnames(Nobs) = c("N", "No EDT", "EDT present", "Waze accident present")
   predtab <- table(test.dat.use[,response.var], rf.pred)
-
+  
+  model_auc <- pROC::auc(test.dat.use[,response.var], rf.prob[,colnames(rf.prob)=="1"])
+  
+  plot(pROC::roc(test.dat.use[,response.var], rf.prob[,colnames(rf.prob)=="1"], auc = TRUE),
+      main = paste0("Model ", model.no))
+  legend("bottomright", legend = round(model_auc, 4), title = "AUC", inset = 0.1)
+  
+  dev.print(device = jpeg, file = paste0("AUC_", model.no, ".jpg"), width = 500, height = 500)
+  
   # save output predictions. Will need to re-work for non-binary outcomes
   if(is.null(test.dat)) { userows = testrows } else { userows = 1:nrow(test.dat.use) }# use testrows if 70/30 or all rows if separate train and test dat
   
@@ -120,7 +129,8 @@ do.rf <- function(train.dat, omits, response.var = "MatchEDT_buffer_Acc", model.
   list(Nobs, predtab, diag = bin.mod.diagnostics(predtab), 
        mse = mean(as.numeric(as.character(test.dat.use[,response.var])) - 
                 as.numeric(as.character(rf.pred)))^2,
-       runtime = timediff
+       runtime = timediff,
+       auc = model_auc
   ) 
   
 } # end do.rf function
@@ -142,8 +152,8 @@ do.rf <- function(train.dat, omits, response.var = "MatchEDT_buffer_Acc", model.
 # 
 # modelno = "01"
 # train.dat = w.04[sample(1:nrow(w.04), size = 10000),]
+# test.dat = NULL
 # response.var = "MatchEDT_buffer_Acc"
-# avail.cores = parallel::detectCores()
 # rf.inputs = list(ntree.use = avail.cores * 50, avail.cores = avail.cores, mtry = NULL, maxnodes = NULL)
 # 
 # do.rf(train.dat = w.04, omits, response.var = "MatchEDT_buffer_Acc", 
