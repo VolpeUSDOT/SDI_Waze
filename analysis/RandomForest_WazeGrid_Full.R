@@ -50,7 +50,9 @@ for(mo in do.months){
 }
 
 avail.cores = parallel::detectCores()
-rf.inputs = list(ntree.use = avail.cores * 50, avail.cores = avail.cores, mtry = 8, maxnodes = NULL, nodesize = 50)
+
+rf.inputs = list(ntree.use = avail.cores * 50, avail.cores = avail.cores, mtry = 10, maxnodes = 1000, nodesize = 100)
+
 keyoutputs = list() # to store model diagnostics
 
 # Omit as predictors in this vector:
@@ -65,36 +67,6 @@ alert_subtypes = c("nHazardOnRoad", "nHazardOnShoulder" ,"nHazardWeather", "nWaz
 
 response.var = "MatchEDT_buffer_Acc"
 
-# Models 01-03 ----
-REDO01_03 = FALSE
-
-if(REDO01_03){
-# Re-running here to check consistency with previous work
-omits = c(alwaysomit, alert_types,
-          "nMatchWaze_buffer", "nNoMatchWaze_buffer",
-          "wx", 
-          grep("nWazeAcc_", names(w.04), value = T), # neighboring accidents
-          grep("nWazeJam_", names(w.04), value = T) # neighboring jams
-          )
-
-modelno = "01"
-
-keyoutputs[[modelno]] = do.rf(train.dat = w.04, 
-                              omits, response.var = "MatchEDT_buffer_Acc", 
-                              model.no = modelno, rf.inputs = rf.inputs) 
-
-modelno = "02"
-keyoutputs[[modelno]] = do.rf(train.dat = rbind(w.04, w.05), 
-                              omits, response.var = "MatchEDT_buffer_Acc", 
-                              model.no = modelno, rf.inputs = rf.inputs) 
-
-modelno = "03"
-keyoutputs[[modelno]] = do.rf(train.dat = rbind(w.04, w.05), test.dat = w.06, 
-                              omits, response.var = "MatchEDT_buffer_Acc", 
-                              model.no = modelno, rf.inputs = rf.inputs) 
-
-save("keyoutputs", file = paste0("Output_to_", modelno))
-}
 # A: All Waze ----
 
 # 18 Base: All Waze features from event type (but not the counts of all Waze events together)
@@ -118,7 +90,7 @@ modelno = "18"
 
 keyoutputs[[modelno]] = do.rf(train.dat = w.04_09, 
                               omits, response.var = "MatchEDT_buffer_Acc", 
-                              #thin.dat = 0.1,
+                             # thin.dat = 0.8,
                               model.no = modelno, rf.inputs = rf.inputs) 
 
 save("keyoutputs", file = paste0("Output_to_", modelno))

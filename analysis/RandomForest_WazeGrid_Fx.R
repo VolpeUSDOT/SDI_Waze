@@ -23,28 +23,27 @@ require(pROC)
 # thin.dat - value from 0 to 1 for proportion of the training and test data to use in fitting the model. E.g. thin.dat = 0.2, use only 20% of the training and test data; useful for testing new features. 
 
 do.rf <- function(train.dat, omits, response.var = "MatchEDT_buffer_Acc", model.no,
-                  rf.formula = NULL, test.dat = NULL, test.split = .30,
+                  # rf.formula = NULL, 
+                  test.dat = NULL, test.split = .30,
                   thin.dat = NULL,
                   rf.inputs = list(ntree.use = 500, avail.cores = 4, mtry = NULL, maxnodes = NULL, nodesize = 5)){
-  
-  starttime = Sys.time()
-  
-  cl <- makeCluster(parallel::detectCores()) # make a cluster of all available cores
-  registerDoParallel(cl)
   
   if(!is.null(test.dat) & !missing(test.split)) stop("Specify either test.dat or test.split, but not both")
 
   class(train.dat) <- "data.frame"
   
-  # If no formula provided, create one from names of training data - vector of omits. 
-  # If formula provided, extract the RHS of formula as the fitvars vector of predictor names
-  if(is.null(rf.formula)){
-      fitvars <- names(train.dat)[is.na(match(names(train.dat), omits))]
-      rf.formula <- reformulate(termlabels = fitvars[is.na(match(fitvars, response.var))], response = response.var)
-    } else { 
-      fitvars = attr(terms.formula(rf.formula), "term.labels")
-    }
+  # Can delete, not using formula interface any more
+  # # If no formula provided, create one from names of training data - vector of omits. 
+  # # If formula provided, extract the RHS of formula as the fitvars vector of predictor names
+  # if(is.null(rf.formula)){
+  #     fitvars <- names(train.dat)[is.na(match(names(train.dat), omits))]
+  #     rf.formula <- reformulate(termlabels = fitvars[is.na(match(fitvars, response.var))], response = response.var)
+  #   } else { 
+  #     fitvars = attr(terms.formula(rf.formula), "term.labels")
+  #   }
 
+  fitvars <- names(train.dat)[is.na(match(names(train.dat), omits))]
+  
   # Provide mtry if null
   if(is.null(rf.inputs$mtry)){
     mtry.use = if (!is.factor(response.var)) max(floor(length(fitvars)/3), 1) else floor(sqrt(length(fitvars)))
@@ -73,13 +72,25 @@ do.rf <- function(train.dat, omits, response.var = "MatchEDT_buffer_Acc", model.
   }
    
  
+  # Start RF in parallel
+  starttime = Sys.time()
+  
+  # make a cluster of all available cores
+  cl <- makeCluster(parallel::detectCores(), useXDR = F) 
+  registerDoParallel(cl)
   
   rf.out <- foreach(ntree = rep(rf.inputs$ntree.use/rf.inputs$avail.cores, rf.inputs$avail.cores),
-                  .combine = randomForest::combine, .multicombine=TRUE, .packages = 'randomForest') %dopar% 
-    randomForest(x = rundat[,fitvars], y = rundat[,response.var], ntree = ntree, mtry = mtry.use, maxnodes = rf.inputs$maxnodes, nodesize = rf.inputs$nodesize)
+                  .combine = randomForest::combine, .multicombine=T, .packages = 'randomForest') %dopar% 
+    randomForest(x = rundat[,fitvars], y = rundat[,response.var], 
+                 ntree = ntree, mtry = mtry.use, 
+                 maxnodes = rf.inputs$maxnodes, nodesize = rf.inputs$nodesize,
+                 keep.forest = T)
+  
+  stopCluster(cl); rm(cl); gc(verbose = F) # Stop the cluster immediately after finished the RF
   
   timediff = Sys.time() - starttime
   cat(round(timediff,2), attr(timediff, "unit"), "to fit model", model.no, "\n")
+  # End RF in parallel
   
   rf.pred <- predict(rf.out, test.dat.use[fitvars])
   rf.prob <- predict(rf.out, test.dat.use[fitvars], type = "prob")
@@ -92,14 +103,23 @@ do.rf <- function(train.dat, omits, response.var = "MatchEDT_buffer_Acc", model.
   colnames(Nobs) = c("N", "No EDT", "EDT present", "Waze accident present")
   predtab <- table(test.dat.use[,response.var], rf.pred)
   
+  # pROC::roc - response, predictor
   model_auc <- pROC::auc(test.dat.use[,response.var], rf.prob[,colnames(rf.prob)=="1"])
-  
-  plot(pROC::roc(test.dat.use[,response.var], rf.prob[,colnames(rf.prob)=="1"], auc = TRUE),
-      main = paste0("Model ", model.no))
+
+  plot(pROC::roc(test.dat.use[,response.var], rf.prob[,colnames(rf.prob)=="1"]),
+      main = paste0("Model ", model.no),
+      grid=c(0.1, 0.2))
   legend("bottomright", legend = round(model_auc, 4), title = "AUC", inset = 0.1)
-  
+
   dev.print(device = jpeg, file = paste0("AUC_", model.no, ".jpg"), width = 500, height = 500)
-  
+
+  # AUC::roc - predictions, labels
+  # plot(model_auc2 <- AUC::roc(rf.out$votes[,"1"], factor(1*(rf.out$y==1))),
+  #      main = paste0("Model ", model.no))
+  # plot(AUC::roc(rf.out$votes[,"0"], factor(1*(rf.out$y==0))),
+  #      add = T, col = "red")
+  # AUC::auc(model_auc2)
+   
   # save output predictions. Will need to re-work for non-binary outcomes
   if(is.null(test.dat)) { userows = testrows } else { userows = 1:nrow(test.dat.use) }# use testrows if 70/30 or all rows if separate train and test dat
   
@@ -123,14 +143,12 @@ do.rf <- function(train.dat, omits, response.var = "MatchEDT_buffer_Acc", model.
      object = file.path(outputdir, paste("Model", model.no, "RandomForest_Output.RData", sep= "_")),
      bucket = waze.bucket)
   
-  stopCluster(cl); gc()
-  
   # Output is list of three elements: Nobs data frame, predtab table, binary model diagnotics table, and mean squared error
   list(Nobs, predtab, diag = bin.mod.diagnostics(predtab), 
        mse = mean(as.numeric(as.character(test.dat.use[,response.var])) - 
                 as.numeric(as.character(rf.pred)))^2,
-       runtime = timediff,
-       auc = model_auc
+       runtime = timediff
+       , auc = model_auc
   ) 
   
 } # end do.rf function
