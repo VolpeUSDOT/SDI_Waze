@@ -24,9 +24,10 @@ library(maptree) # for better graphing
 library(foreach) # for parallel implementation
 library(doParallel) # includes iterators and parallel
 
+library(ranger) 
 
 # Run this if you don't have these packages:
-# install.packages(c("rpart", "randomForest", "maptree", "party", "partykit", "rgdal", "foreach", "doParallel"), dep = T)
+# install.packages(c("rpart", "randomForest", "maptree", "party", "partykit", "rgdal", "foreach", "doParallel", "ranger"), dep = T)
 
 setwd("~/")
 
@@ -51,13 +52,16 @@ source(file.path(codeloc, 'utility/wazefunctions.R'))
 # Read in data, renaming data files by month. For each month, prep time and response variables
 
 # Old version:
-load("Archives/WazeEDT Agg1mile Rdata Input/WazeTimeEdtHex_04.RData")
+# load("Archives/WazeEDT Agg1mile Rdata Input/WazeTimeEdtHex_04.RData")
 
 # New version of aggregation:
 load("WazeEDT Agg1mile Rdata Input/WazeTimeEdtHexAll_04_1mi.RData")
+
+class(wazeTime.edt.hexAll) <- "data.frame"
+
 wazeTime.edt.hex <- wazeTime.edt.hexAll
 
-wazeTime.edt.hex$DayOfWeek <- as.factor(wazeTime.edt.hex$DayOfWeek)
+wazeTime.edt.hex$DayOfWeek <- as.factor(wazeTime.edt.hex$weekday)
 wazeTime.edt.hex$hour <- as.numeric(wazeTime.edt.hex$hour)
 
 # Going to binary for all Waze buffer match:
@@ -72,8 +76,11 @@ wazeTime.edt.hex$MatchEDT_buffer_Acc <- as.factor(wazeTime.edt.hex$MatchEDT_buff
 
 w.04 <- wazeTime.edt.hex; rm(wazeTime.edt.hex) 
 
-load("Archives/WazeEDT Agg1mile Rdata Input/WazeTimeEdtHex_05.RData")
-wazeTime.edt.hex$DayOfWeek <- as.factor(wazeTime.edt.hex$DayOfWeek)
+load("WazeEDT Agg1mile Rdata Input/WazeTimeEdtHexAll_05_1mi.RData")
+class(wazeTime.edt.hexAll) <- "data.frame"
+wazeTime.edt.hex <- wazeTime.edt.hexAll
+
+wazeTime.edt.hex$DayOfWeek <- as.factor(wazeTime.edt.hex$weekday)
 wazeTime.edt.hex$hour <- as.numeric(wazeTime.edt.hex$hour)
 wazeTime.edt.hex$MatchEDT_buffer <- wazeTime.edt.hex$nMatchEDT_buffer
 wazeTime.edt.hex$MatchEDT_buffer[wazeTime.edt.hex$MatchEDT_buffer > 0] = 1 
@@ -88,8 +95,11 @@ wazeTime.edt.hex$MatchEDT_buffer_Acc <- as.factor(wazeTime.edt.hex$MatchEDT_buff
 
 w.05 <- wazeTime.edt.hex; rm(wazeTime.edt.hex) 
 
-load("Archives/WazeEDT Agg1mile Rdata Input/WazeTimeEdtHex_06.RData")
-wazeTime.edt.hex$DayOfWeek <- as.factor(wazeTime.edt.hex$DayOfWeek)
+load("WazeEDT Agg1mile Rdata Input/WazeTimeEdtHexAll_06_1mi.RData")
+class(wazeTime.edt.hexAll) <- "data.frame"
+wazeTime.edt.hex <- wazeTime.edt.hexAll
+
+wazeTime.edt.hex$DayOfWeek <- as.factor(wazeTime.edt.hex$weekday)
 wazeTime.edt.hex$hour <- as.numeric(wazeTime.edt.hex$hour)
 wazeTime.edt.hex$MatchEDT_buffer <- wazeTime.edt.hex$nMatchEDT_buffer
 wazeTime.edt.hex$MatchEDT_buffer[wazeTime.edt.hex$MatchEDT_buffer > 0] = 1 
@@ -113,10 +123,17 @@ w.06 <- wazeTime.edt.hex; rm(wazeTime.edt.hex)
 
 # Variables to test. Use Waze only predictors, and omit grid ID and day as predictors as well
 #All Waze matches
-omits = c(grep("GRID_ID", names(w.04), value = T), "day", "hextime", "year",
-          "nMatchWaze_buffer", "nNoMatchWaze_buffer",
-          grep("EDT", names(w.04), value = T),
-          "wx",
+alwaysomit = c(grep("GRID_ID", names(w.04), value = T), "day", "hextime", "year", "weekday", 
+               "uniqWazeEvents", "nWazeRowsInMatch", 
+               "nMatchWaze_buffer", "nNoMatchWaze_buffer",
+               grep("EDT", names(w.04), value = T))
+
+alert_types = c("nWazeAccident", "nWazeJam", "nWazeRoadClosed", "nWazeWeatherOrHazard")
+
+alert_subtypes = c("nHazardOnRoad", "nHazardOnShoulder" ,"nHazardWeather", "nWazeAccidentMajor", "nWazeAccidentMinor", "nWazeHazardCarStoppedRoad", "nWazeHazardCarStoppedShoulder", "nWazeHazardConstruction", "nWazeHazardObjectOnRoad", "nWazeHazardPotholeOnRoad", "nWazeHazardRoadKillOnRoad", "nWazeJamModerate", "nWazeJamHeavy" ,"nWazeJamStandStill",  "nWazeWeatherFlood", "nWazeWeatherFog", "nWazeHazardIceRoad")
+
+
+omits = c(alwaysomit,
            grep("nWazeAcc_", names(w.04), value = T), # neighboring accidents
            grep("nWazeJam_", names(w.04), value = T) # neighboring jams
 )
@@ -148,7 +165,7 @@ registerDoParallel(cl)
 
 # On small job, user time faster but system time greater. On a large job, almost exactly ncore X faster
 (avail.cores <- parallel::detectCores()) # 4 on local
-ntree.use = avail.cores * 100
+ntree.use = avail.cores * 25
 
 # Model 1: April, 70/30 ----
 # approx 2.5 min to run on 218k rows of training data with 4 cores
@@ -163,7 +180,8 @@ system.time(rf.04 <- foreach(ntree = rep(ntree.use/avail.cores, avail.cores),
                 .packages = "randomForest") %dopar%
           randomForest(wazeformula,
                data = w.04[trainrows,],
-               ntree = ntree)
+               ntree = ntree,
+               nodesize = 100)
   )
 
 

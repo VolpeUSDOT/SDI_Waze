@@ -1,0 +1,51 @@
+Debugging notes -- on r4.2xlarge instance, using 8 cores, 61 Gb ram
+
+See commit #c05f04e for working version
+
++++++++++++++++++++++++++++++++++++++++++
+useXDR = T
+multicombine = F
+keep.forest = T
+nodesize = 50
+mtry = 8
+
+ Error in randomForest(x = rundat[, fitvars], y = rundat[, response.var],  : 
+  task 1 failed - "cannot allocate vector of size 1.0 Gb"
+
++++++++++++++++++++++++++++++++++++++++++  
+useXDR = T
+multicombine = F
+keep.forest = T
+nodesize = 100
+mtry = 8
+
+ Error in unserialize(socklist[[n]]) : error reading from connection 
+
+ +++++++++++++++++++++++++++++++++++++++++
+useXDR = F
+multicombine = F
+keep.forest = T
+nodesize = 100
+mtry = 8
+
+ Error in randomForest(x = rundat[, fitvars], y = rundat[, response.var],  : 
+  task 1 failed - "cannot allocate vector of size 535.0 Mb 
+
++++++++++++++++++++++++++++++++++++++++++
+useXDR = F
+multicombine = T
+keep.forest = T
+nodesize = 100
+mtry = NULL
+
+ Error in unserialize(socklist[[n]]) : error reading from connection 
+
++++++++++++++++++++++++++++++++++++++++++ 
+useXDR = F
+multicombine = T
+keep.forest = T
+nodesize = 100
+mtry = 10
+maxnodes = 1000
+
+RUNS

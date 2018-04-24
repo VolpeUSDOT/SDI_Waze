@@ -1,16 +1,18 @@
 ---
 title: ""
 output:
+  html_document:
+    df_print: paged
+    toc: yes
+    toc_depth: 2
+    toc_float:
+      collapsed: no
+      smooth_scroll: no
   html_notebook:
     df_print: paged
     self_contained: yes
     toc: yes
-    toc_float:
-      collapsed: no
-      smooth_scroll: no
-  html_document:
-    df_print: paged
-    toc: yes
+    toc_depth: 2
     toc_float:
       collapsed: no
       smooth_scroll: no
@@ -29,7 +31,7 @@ if(ONLOCAL){
   outputdir1 <- file.path("//vntscex.local/DFS/Projects/PROJ-OR02A2/SDI/Model_Output/RF1")
   outputdir2 <- file.path("//vntscex.local/DFS/Projects/PROJ-OR02A2/SDI/Model_Output/RF2")
 
-  localdir <- outputdir2 
+  localdir <- outputdir1 
   } else {
   codeloc <- "~/SDI_Waze" 
   inputdir <- paste0("WazeEDT_Agg", HEXSIZE, "mile_Rdata_Input")
@@ -45,8 +47,9 @@ library(randomForest)
 library(aws.s3)
 library(tidyverse)
 library(pander)
+library(DT)
 # Run this if you don't have these packages:
-# install.packages(c("kableExtra","randomForest","aws.s3","tidyverse","pander"), dep = T)
+# install.packages(c("kableExtra","randomForest","aws.s3","tidyverse","pander","DT"), dep = T)
 
 knitr::opts_knit$set(root.dir = localdir)
 # setwd(localdir)
@@ -77,10 +80,10 @@ Here we use three criteria, each of which can also be applied to the regularized
 
 ```{r diagtable, results = "asis"}
 tabl <- "
- |          |        |:      OBSERVED    :|
+ |          |        |       OBSERVED     |
  |----------|--------|:-------:|:--------:| 
  |          |        |Negative | Positive |
- |<b>PREDICTED |Negative|   TN    |    FN    |
+ |<b>PREDICTED |Negative|   TN    |    FN |
  |          |Positive|   FP    |    TP    |
 "
 pander::pander(tabl, style = "rmarkdown")
@@ -121,44 +124,69 @@ knitr::include_graphics("ROC_curves.png")
 
 # Phase 1 model testing
 
-
-
+       
 
 ### Spatial grain
-We tested three options, and and selected 1 mile grid size for all future work.
+We tested three options, and and selected 1 mile grid size for all future work. Models at the larger spatial grain (4 square mile hexagonal grid cells) or smaller spatial grain (0.5 square mile hexagonal grid cells) performed relatively similar. There was a small performance gain at the 0.5 mile grain size in some cases. however, run time was substantially longer for data preparation (including approximately **36** hours of computational time per month of data to prepare weather variables at 0.5 mile grid size, compared to approximately **6** hours for a similar process for 1 mile grid cells), and substantially longer for model fitting (xx vs. xx), with 66,220 grid cells at 0.5 square miles versus 33,184 grid cells at 1 square miles.
 
- - 1 mi
- - 4 mi
- - 0.5 mi
+```{r phase1spatial, echo = F}
+load(file.path(localdir, "Outputs_up_to_17"))
 
-### Time windows: Deferred: Using with 1 hr aggregations for all models
+# pairs to compare: 01, 04, 06 - April
+# 03, 05, 07 - April+May, test on June
+
+Diag.frame <- vector()
+for(i in c("01", "04", "06")){
+  Diag.frame <- rbind(Diag.frame, c(keyoutputs[[i]][[3]]))
+ }
+
+colnames(Diag.frame)[1:4] = c("Accuracy", "Precision", "Recall", "False Positive Rate")
+Diag.frame[,1:4] = Diag.frame[,1:4]*100
+
+rownames(Diag.frame) = c("Model 01 - 1 mile", "Model 04 - 4 mile", "Model 06 - 0.5 mile")
+kable(Diag.frame, 
+          caption = "Phase 1 model diagnostics for April 2017",
+          rownames = "Model")
+
+
+Diag.frame <- vector()
+for(i in c("03", "05", "07")){
+  Diag.frame <- rbind(Diag.frame, c(keyoutputs[[i]][[3]]))
+ }
+
+colnames(Diag.frame)[1:4] = c("Accuracy", "Precision", "Recall", "False Positive Rate")
+Diag.frame[,1:4] = Diag.frame[,1:4]*100
+
+rownames(Diag.frame) = c("Model 03 - 1 mile", "Model 05 - 4 mile", "Model 07 - 0.5 mile")
+kable(Diag.frame, 
+          caption = "Phase 1 model diagnostics for April + May, test on June",
+          rownames = "Model")
+
+```   
+
+### Time windows
+Deferred: Using with 1 hr aggregations for all models
 4hr windows would require new aggregation in GridAggregation.R
 
  - 1 hr
  - 4 hr
 
-### Neighbors:
+### Neighbors
+Grid cells 
 
- - Without
+ - Without 
  - With
 
 ### Model versions
 
-- April, 70/30
-- April+May, 70/30
-- April+May, test on June
+- April, 70/30 split between training and test data
+- April + May, 70/30 split between training and test data
+- April + May, complete data used, test on June
 
-### Order of model tests
-- 1 mi, 1 hr, with and without neighbor grid cells: Model 1 vs. Model 10 (April) and Model 3 vs. Model 11 (April+May, test on June)
-- 4 mi, 1 hr, with and without neighbor grid cells: Model 4 vs. Model 12 (April) and Model 5 vs. Model 14 (April+May, test on June)
-- After looking at results for neighbor testing, consider time windows. These tests will help us decide the spatial extent and how much better the models perform with the neighbors.
-Additional data testing: Model 1 vs. Model 15 and Model 3 vs. Model 16.
+## General summary 
+What we learned from this testing is the following:
 
-## General Summary of what we learned from this testing 
-
-(more thorough testing outlined below for decision points)
-
-- 1mi grid size is best
+- 1mi grid size is best. There was 
 
 - Adding more months of data does not really improve model: focus on adding data features
 - Run future models on April-Sept (6 months) with 70/30 training/test split
@@ -170,25 +198,48 @@ Something about neighbors?
 load(file.path(localdir, "Outputs_up_to_17"))
 
 # Summary from keyoutputs ----
+Nobs.frame <- vector()
 
-Nobs.frame <- data.frame(matrix(unlist(lapply(keyoutputs, FUN = function(x) x[[1]])), nrow = length(keyoutputs)))
-rownames(Nobs.frame) <- names(keyoutputs)
-colnames(Nobs.frame) <- names(keyoutputs[[1]][[1]])
+for(i in 1:length(keyoutputs)){
+  Nobs.frame <- rbind(Nobs.frame, c(Model = i, keyoutputs[[i]][[1]]))
+ }
 
-Diag.frame <- data.frame(matrix(unlist(lapply(keyoutputs, FUN = function(x) x[[3]])), ncol = length(keyoutputs)))
-colnames(Diag.frame) <- names(keyoutputs)
-rownames(Diag.frame) <- rownames(keyoutputs[[1]][[3]])
-
-kable(Diag.frame)
-
-# mse.frame <- data.frame(matrix(unlist(lapply(keyoutputs, FUN = function(x) x[['mse']])), ncol = length(keyoutputs)))
-# colnames(Diag.frame) <- names(keyoutputs)
-# rownames(Diag.frame) <- rownames(keyoutputs[[1]][[3]])
+datatable(Nobs.frame, filter = 'top',
+          caption = "Phase 1 model inputs. N: total rows of input training data; No EDT = number rows without EDT crashes; EDT present: number of rows with EDT crashes; Waze accident present: Number of rows at least one `WazeAccident` present",
+          rownames = T,
+          options = list(dom = "tip",
+                         #order = list(list(1, 'desc')),
+                         pageLength = 5)
+          ) %>% formatCurrency(2:5, currency = "", digits = 0)
 
 ```
 
+```{r Diagframe1}
+Diag.frame <- vector()
+
+for(i in 1:length(keyoutputs)){
+  Diag.frame <- rbind(Diag.frame, c(Model = i, keyoutputs[[i]][[3]]))
+ }
+
+colnames(Diag.frame)[2:5] = c("Accuracy", "Precision", "Recall", "False Positive Rate")
+Diag.frame[,1] = as.factor(Diag.frame[,1])
+Diag.frame[,2:5] = Diag.frame[,2:5]*100
+
+datatable(Diag.frame, filter = 'top',
+          caption = "Phase 1 model diagnostics. Best values are highlighed in green.",
+          rownames = T,
+          options = list(dom = "tip",
+                         order = list(list(1, 'desc')),
+                         pageLength = 5)
+          ) %>% formatCurrency(2:5, currency = "", digits = 2) %>%
+          formatStyle(2, background = styleEqual(max(Diag.frame[,2]), 'lightgreen'))%>%
+          formatStyle(3, background = styleEqual(max(Diag.frame[,3]), 'lightgreen'))%>%
+          formatStyle(4, background = styleEqual(max(Diag.frame[,4]), 'lightgreen'))%>%
+          formatStyle(5, background = styleEqual(min(Diag.frame[,5]), 'lightgreen'))
+```
+
 ```{r m01-03}
-modelno = "01"
+modelno = "16"
 
 if(ONLOCAL) {load(file.path(outputdir1, paste("Model", modelno, "RandomForest_Output_04.RData", sep= "_")))} else {s3load(object = file.path(outputdir, paste("Model", modelno, "RandomForest_Output.RData", sep= "_")), bucket = waze.bucket)}
 
