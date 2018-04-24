@@ -23,9 +23,10 @@ library(maptree) # for better graphing
 #library(partykit)
 library(foreach) # for parallel implementation
 library(doParallel) # includes iterators and parallel
-
+library(data.table)
 library(ranger) 
-
+library(pROC)
+library(AUC)
 # Run this if you don't have these packages:
 # install.packages(c("rpart", "randomForest", "maptree", "party", "partykit", "rgdal", "foreach", "doParallel", "ranger"), dep = T)
 
@@ -133,13 +134,6 @@ alert_types = c("nWazeAccident", "nWazeJam", "nWazeRoadClosed", "nWazeWeatherOrH
 alert_subtypes = c("nHazardOnRoad", "nHazardOnShoulder" ,"nHazardWeather", "nWazeAccidentMajor", "nWazeAccidentMinor", "nWazeHazardCarStoppedRoad", "nWazeHazardCarStoppedShoulder", "nWazeHazardConstruction", "nWazeHazardObjectOnRoad", "nWazeHazardPotholeOnRoad", "nWazeHazardRoadKillOnRoad", "nWazeJamModerate", "nWazeJamHeavy" ,"nWazeJamStandStill",  "nWazeWeatherFlood", "nWazeWeatherFog", "nWazeHazardIceRoad")
 
 
-omits = c(alwaysomit,
-           grep("nWazeAcc_", names(w.04), value = T), # neighboring accidents
-           grep("nWazeJam_", names(w.04), value = T) # neighboring jams
-)
-
-fitvars <- names(w.04)[is.na(match(names(w.04), omits))]
-
 
 # Unnecessary now: all rows are complete cases
 # fitdat.04 <- w.04[complete.cases(w.04[,fitvars]),]
@@ -148,15 +142,14 @@ fitvars <- names(w.04)[is.na(match(names(w.04), omits))]
 
 # Change response to nMatch for regression; output will be continuous, much more RAM intensive.
 
-
-wazeformula <- reformulate(termlabels = fitvars[is.na(match(fitvars,
-                                                              "MatchEDT_buffer"))], 
-                           response = "MatchEDT_buffer")
-
-
-wazeAccformula <- reformulate(termlabels = fitvars[is.na(match(fitvars,
-                                                            "MatchEDT_buffer_Acc"))], 
-                           response = "MatchEDT_buffer_Acc")
+# wazeformula <- reformulate(termlabels = fitvars[is.na(match(fitvars,
+#                                                               "MatchEDT_buffer"))], 
+#                            response = "MatchEDT_buffer")
+# 
+# 
+# wazeAccformula <- reformulate(termlabels = fitvars[is.na(match(fitvars,
+#                                                             "MatchEDT_buffer_Acc"))], 
+#                            response = "MatchEDT_buffer_Acc")
 
 # <><><><><><><><><><><><><><><><><><><><><><><><><><><>
 # Random forest parallel ----
@@ -165,27 +158,46 @@ registerDoParallel(cl)
 
 # On small job, user time faster but system time greater. On a large job, almost exactly ncore X faster
 (avail.cores <- parallel::detectCores()) # 4 on local
-ntree.use = avail.cores * 25
+
+rf.inputs = list(ntree.use = avail.cores * 20, avail.cores = avail.cores, mtry = 10, maxnodes = 1000, nodesize = 100)
+
+test.split = 0.3
+response.var = "MatchEDT_buffer_Acc"
 
 # Model 1: April, 70/30 ----
-# approx 2.5 min to run on 218k rows of training data with 4 cores
+# Using this to test AUC calculations 
+modelno = "01"
 
-trainrows <- sort(sample(1:nrow(w.04), size = nrow(w.04)*.7, replace = F))
-testrows <- (1:nrow(w.04))[!1:nrow(w.04) %in% trainrows]
- 
-# length(testrows) + length(trainrows) == nrow(w.04)
+omits = c(alwaysomit,
+          grep("MagVar", names(w.04), value = T), # direction of travel
+          grep("medLast", names(w.04), value = T), # report rating, reliability, confidence
+          grep("nWazeAcc_", names(w.04), value = T), # neighboring accidents
+          grep("nWazeJam_", names(w.04), value = T) # neighboring jams
+)
 
-system.time(rf.04 <- foreach(ntree = rep(ntree.use/avail.cores, avail.cores),
+fitvars <- names(w.04)[is.na(match(names(w.04), omits))]
+
+
+train.dat = w.04
+
+trainrows <- sort(sample(1:nrow(train.dat), size = nrow(train.dat)*(1-test.split), replace = F))
+testrows <- (1:nrow(train.dat))[!1:nrow(train.dat) %in% trainrows]
+
+#  length(trainrows)+length(testrows) == nrow(train.dat)
+
+rundat = train.dat[trainrows,]
+test.dat.use = train.dat[testrows,]
+
+system.time(rf.04 <- foreach(rf.inputs$ntree.use/rf.inputs$avail.cores, rf.inputs$avail.cores,
                 .combine = randomForest::combine, .multicombine = T,
                 .packages = "randomForest") %dopar%
-          randomForest(wazeformula,
-               data = w.04[trainrows,],
-               ntree = ntree,
-               nodesize = 100)
+          randomForest(x = rundat[,fitvars], y = rundat[,response.var],
+               maxnodes = rf.inputs$maxnodes, nodesize = rf.inputs$nodesize)
   )
 
 
-system.time(rf.04.pred <- predict(rf.04, w.04[testrows, fitvars]))
+rf.04.pred <- predict(rf.04, w.04[testrows, fitvars])
+rf.04.prob <- predict(rf.04, w.04[testrows, fitvars], type = "prob")
 
 Nobs <- data.frame(t(c(nrow(w.04),
                summary(w.04$MatchEDT_buffer),
@@ -199,10 +211,26 @@ format(Nobs, big.mark = ",")
 bin.mod.diagnostics(predtab)
 
 # save output predictions
+out.04 <- data.frame(w.04[testrows,c("GRID_ID","day","hour", "MatchEDT_buffer")], rf.04.pred, rf.04.prob)
+names(out.04)[4:7] <- c("Obs", "Pred", "Prob.NoCrash", "Prob.Crash")
 
-out.04 <- data.frame(w.04[testrows, c("GRID_ID", "day", "hour", "MatchEDT_buffer")], rf.04.pred)
-out.04$day <- as.numeric(out.04$day)
-names(out.04)[4:5] <- c("Obs", "Pred")
+
+# plotting probabilities. Nearly all values 
+plot(density(out.04[,"Prob.NoCrash"]), col = "red")
+lines(density(out.04[,"Prob.Crash"]), col = "blue")
+
+#using pROC
+plot(pROC::roc(out.04$Obs, out.04$Prob.Crash, auc = TRUE))
+
+model_auc <- pROC::auc(out.04$Obs, out.04$Prob.Crash)
+
+# From Fx
+# model_auc <- pROC::auc(test.dat.use[,response.var], rf.prob[,colnames(rf.prob)=="1"])
+# 
+# plot(pROC::roc(test.dat.use[,response.var], rf.prob[,colnames(rf.prob)=="1"]),
+#      main = paste0("Model ", model.no),
+#      grid=c(0.1, 0.2))
+# legend("bottomright", legend = round(model_auc, 4), title = "AUC", inset = 0.1)
 
 out.04 = data.frame(out.04,
                     TN = out.04$Obs == 0 &  out.04$Pred == 0,
