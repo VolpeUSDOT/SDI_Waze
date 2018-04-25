@@ -80,7 +80,7 @@ alert_subtypes = c("nHazardOnRoad", "nHazardOnShoulder" ,"nHazardWeather", "nWaz
 response.var = "MatchEDT_buffer_Acc"
 
 avail.cores = parallel::detectCores()
-rf.inputs = list(ntree.use = avail.cores * 50, avail.cores = avail.cores, mtry = 8, maxnodes = NULL, nodesize = 50)
+rf.inputs = list(ntree.use = avail.cores * 50, avail.cores = avail.cores, mtry = 10, maxnodes = 1000, nodesize = 100)
 keyoutputs = list() # to store model diagnostics
 
 

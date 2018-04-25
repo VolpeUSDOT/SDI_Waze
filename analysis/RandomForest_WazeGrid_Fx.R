@@ -23,7 +23,6 @@ require(pROC)
 # thin.dat - value from 0 to 1 for proportion of the training and test data to use in fitting the model. E.g. thin.dat = 0.2, use only 20% of the training and test data; useful for testing new features. 
 
 do.rf <- function(train.dat, omits, response.var = "MatchEDT_buffer_Acc", model.no,
-                  # rf.formula = NULL, 
                   test.dat = NULL, test.split = .30,
                   thin.dat = NULL,
                   rf.inputs = list(ntree.use = 500, avail.cores = 4, mtry = NULL, maxnodes = NULL, nodesize = 5)){
@@ -31,16 +30,6 @@ do.rf <- function(train.dat, omits, response.var = "MatchEDT_buffer_Acc", model.
   if(!is.null(test.dat) & !missing(test.split)) stop("Specify either test.dat or test.split, but not both")
 
   class(train.dat) <- "data.frame"
-  
-  # Can delete, not using formula interface any more
-  # # If no formula provided, create one from names of training data - vector of omits. 
-  # # If formula provided, extract the RHS of formula as the fitvars vector of predictor names
-  # if(is.null(rf.formula)){
-  #     fitvars <- names(train.dat)[is.na(match(names(train.dat), omits))]
-  #     rf.formula <- reformulate(termlabels = fitvars[is.na(match(fitvars, response.var))], response = response.var)
-  #   } else { 
-  #     fitvars = attr(terms.formula(rf.formula), "term.labels")
-  #   }
 
   fitvars <- names(train.dat)[is.na(match(names(train.dat), omits))]
   
@@ -167,6 +156,7 @@ do.rf <- function(train.dat, omits, response.var = "MatchEDT_buffer_Acc", model.
 
 
 
+
 # # Model 01
 # # Test arguments
 # # Variables to test. Use Waze only predictors, and omit grid ID and day as predictors as well. Here also omitting precipitation and neighboring grid cells
@@ -188,3 +178,109 @@ do.rf <- function(train.dat, omits, response.var = "MatchEDT_buffer_Acc", model.
 # 
 # do.rf(train.dat = w.04, omits, response.var = "MatchEDT_buffer_Acc", 
 #       model.no = "01", rf.inputs = rf.inputs) 
+
+# Function to re-assess model predictions and diagnostics for an already-fit model ----
+# To do: validate using testrows and training rows from previous model runs
+
+reassess.rf <- function(train.dat, omits, response.var = "MatchEDT_buffer_Acc", model.no,
+                        test.dat = NULL, test.split = .30,
+                        thin.dat = NULL,
+                        rf.inputs = list(ntree.use = 500, avail.cores = 4, mtry = NULL, maxnodes = NULL, nodesize = 5),
+                        cutoff = c(0.8, 0.2)){
+
+  if(!is.null(test.dat) & !missing(test.split)) stop("Specify either test.dat or test.split, but not both")
+  
+  class(train.dat) <- "data.frame"
+  
+  fitvars <- names(train.dat)[is.na(match(names(train.dat), omits))]
+  
+  # 70:30 split or Separate training and test data
+  if(is.null(test.dat)){
+    rundat = train.dat[trainrows,]
+    test.dat.use = train.dat[testrows,]
+  } else {
+    class(test.dat) <- "data.frame"
+    rundat = train.dat
+    test.dat.use = test.dat
+    comb.dat <- rbind(train.dat, test.dat)
+  }
+  
+  # Load fitted model
+  cat("Loading", model.no, "\n")
+  s3load(object = file.path(outputdir, paste("Model", model.no, "RandomForest_Output.RData", sep= "_")),
+         bucket = waze.bucket)  
+  
+  rf.pred <- predict(rf.out, test.dat.use[fitvars], cutoff = cutoff)
+  rf.prob <- predict(rf.out, test.dat.use[fitvars], type = "prob", cutoff = cutoff)
+  
+  Nobs <- data.frame(nrow(rundat),
+                     sum(as.numeric(as.character(rundat[,response.var])) == 0),
+                     sum(as.numeric(as.character(rundat[,response.var])) > 0),
+                     length(rundat$nWazeAccident[train.dat$nWazeAccident>0]) )
+  
+  colnames(Nobs) = c("N", "No EDT", "EDT present", "Waze accident present")
+  
+  predtab <- table(test.dat.use[,response.var], rf.pred)
+  
+  reference.vec <- test.dat.use[,response.var]
+  levels(reference.vec) = c("NoCrash", "Crash")
+  levels(rf.pred) = c("NoCrash","Crash")
+  
+  reference.vec <-as.factor(as.character(reference.vec))
+  rf.pred <-as.factor(as.character(rf.pred))
+  
+  (predtab <- table(rf.pred, reference.vec, 
+                    dnn = c("Predicted","Observed"))) 
+  bin.mod.diagnostics(predtab)
+  
+  # pROC::roc - response, predictor
+  model_auc <- pROC::auc(test.dat.use[,response.var], rf.prob[,colnames(rf.prob)=="1"])
+  
+  plot(pROC::roc(test.dat.use[,response.var], rf.prob[,colnames(rf.prob)=="1"]),
+       main = paste0("Model ", model.no),
+       grid=c(0.1, 0.2),
+       ylim = c(0, 1), xlim = c(1, 0))
+  legend("bottomright", legend = round(model_auc, 4), title = "AUC", inset = 0.25)
+  
+  dev.print(device = jpeg, file = paste0("AUC_", model.no, ".jpg"), width = 500, height = 500)
+  
+  # AUC::roc - predictions, labels
+  # plot(model_auc2 <- AUC::roc(rf.out$votes[,"1"], factor(1*(rf.out$y==1))),
+  #      main = paste0("Model ", model.no))
+  # plot(AUC::roc(rf.out$votes[,"0"], factor(1*(rf.out$y==0))),
+  #      add = T, col = "red")
+  # AUC::auc(model_auc2)
+  
+  # save output predictions. Will need to re-work for non-binary outcomes
+  
+  out.df <- data.frame(test.dat.use[, c("GRID_ID", "day", "hour", response.var)], rf.pred, rf.prob)
+  out.df$day <- as.numeric(out.df$day)
+  names(out.df)[4:7] <- c("Obs", "Pred", "Prob.Noncrash", "Prob.Crash")
+  out.df = data.frame(out.df,
+                      TN = out.df$Obs == 0 &  out.df$Pred == "NoCrash",
+                      FP = out.df$Obs == 0 &  out.df$Pred == "Crash",
+                      FN = out.df$Obs == 1 &  out.df$Pred == "NoCrash",
+                      TP = out.df$Obs == 1 &  out.df$Pred == "Crash")
+  write.csv(out.df,
+            file = paste(model.no, "RandomForest_pred.csv", sep = "_"),
+            row.names = F)
+  
+  savelist = c("rf.out", "rf.pred", "rf.prob", "out.df") 
+  if(is.null(test.dat)) savelist = c(savelist, "testrows", "trainrows")
+  if(!is.null(thin.dat)) savelist = c(savelist, "test.dat.use")
+  
+  # Overwrite previous model outputs
+  s3save(list = savelist,
+         object = file.path(outputdir, paste("Model", model.no, "RandomForest_Output.RData", sep= "_")),
+         bucket = waze.bucket)
+  
+  # Output is list of three elements: Nobs data frame, predtab table, binary model diagnotics table, and mean squared error
+  list(Nobs, predtab, diag = bin.mod.diagnostics(predtab), 
+       mse = mean(as.numeric(as.character(test.dat.use[,response.var])) - 
+                    as.numeric(rf.prob[,"1"]))^2,
+      
+       auc = model_auc
+  ) 
+  
+} # end reassss.rf function
+
