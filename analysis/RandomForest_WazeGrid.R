@@ -4,6 +4,8 @@
 
 # Running on gridded data, with Waze predictors only. Try three versions. For each one, produce confusion matrix, binary model diagnostics, and output .csv of grid IDs and four columns, one each for true negative, false postitive, false negative, true positive.
 
+# This script has been re-purposed to test on local what we are running as do.rf() calls from RandomForest_WazeGrid_Fx.R  
+
 # 1. April, 70/30 split
 # 2. April + May, 70 / 30 split
 # 3. April + May, predict June.
@@ -133,39 +135,26 @@ alert_types = c("nWazeAccident", "nWazeJam", "nWazeRoadClosed", "nWazeWeatherOrH
 
 alert_subtypes = c("nHazardOnRoad", "nHazardOnShoulder" ,"nHazardWeather", "nWazeAccidentMajor", "nWazeAccidentMinor", "nWazeHazardCarStoppedRoad", "nWazeHazardCarStoppedShoulder", "nWazeHazardConstruction", "nWazeHazardObjectOnRoad", "nWazeHazardPotholeOnRoad", "nWazeHazardRoadKillOnRoad", "nWazeJamModerate", "nWazeJamHeavy" ,"nWazeJamStandStill",  "nWazeWeatherFlood", "nWazeWeatherFog", "nWazeHazardIceRoad")
 
-
-
-# Unnecessary now: all rows are complete cases
-# fitdat.04 <- w.04[complete.cases(w.04[,fitvars]),]
-# fitdat.05 <- w.05[complete.cases(w.05[,fitvars]),]
-# fitdat.06 <- w.06[complete.cases(w.06[,fitvars]),]
-
 # Change response to nMatch for regression; output will be continuous, much more RAM intensive.
 
-# wazeformula <- reformulate(termlabels = fitvars[is.na(match(fitvars,
-#                                                               "MatchEDT_buffer"))], 
-#                            response = "MatchEDT_buffer")
-# 
-# 
-# wazeAccformula <- reformulate(termlabels = fitvars[is.na(match(fitvars,
-#                                                             "MatchEDT_buffer_Acc"))], 
-#                            response = "MatchEDT_buffer_Acc")
 
 # <><><><><><><><><><><><><><><><><><><><><><><><><><><>
-# Random forest parallel ----
+# Random forest parallel, previous manual approach (before function) ----
 cl <- makeCluster(parallel::detectCores()) # make a cluster of all available cores
 registerDoParallel(cl)
 
 # On small job, user time faster but system time greater. On a large job, almost exactly ncore X faster
 (avail.cores <- parallel::detectCores()) # 4 on local
 
-rf.inputs = list(ntree.use = avail.cores * 20, avail.cores = avail.cores, mtry = 10, maxnodes = 1000, nodesize = 100)
+rf.inputs = list(ntree.use = avail.cores * 100, avail.cores = avail.cores, mtry = 10, maxnodes = 1000, nodesize = 100)
 
 test.split = 0.3
 response.var = "MatchEDT_buffer_Acc"
 
 # Model 1: April, 70/30 ----
 # Using this to test AUC calculations 
+# This has been updated to match the arguments using in the function do.rf(). Previously was not setting mtry, maxnodes, or nodesize
+
 modelno = "01"
 
 omits = c(alwaysomit,
@@ -192,56 +181,215 @@ system.time(rf.04 <- foreach(rf.inputs$ntree.use/rf.inputs$avail.cores, rf.input
                 .combine = randomForest::combine, .multicombine = T,
                 .packages = "randomForest") %dopar%
           randomForest(x = rundat[,fitvars], y = rundat[,response.var],
-               maxnodes = rf.inputs$maxnodes, nodesize = rf.inputs$nodesize)
-  )
+               maxnodes = rf.inputs$maxnodes, nodesize = rf.inputs$nodesize,
+               mtry = rf.inputs$mtry, keep.forest = T)
+)
 
+summary(rf.04$votes)
+rf.04$call
+rf.04$forest$cutoff
+summary(rf.04$forest)
 
 rf.04.pred <- predict(rf.04, w.04[testrows, fitvars])
 rf.04.prob <- predict(rf.04, w.04[testrows, fitvars], type = "prob")
 
 Nobs <- data.frame(t(c(nrow(w.04),
-               summary(w.04$MatchEDT_buffer),
+               summary(w.04$MatchEDT_buffer_Acc),
                length(w.04$nWazeAccident[w.04$nWazeAccident>0]) 
                )))
 
 colnames(Nobs) = c("N", "No EDT", "EDT present", "Waze accident present")
 format(Nobs, big.mark = ",")
 
-(predtab <- table(w.04$MatchEDT_buffer[testrows], rf.04.pred)) 
+(predtab <- table(w.04$MatchEDT_buffer_Acc[testrows], rf.04.pred)) 
 bin.mod.diagnostics(predtab)
 
 # save output predictions
-out.04 <- data.frame(w.04[testrows,c("GRID_ID","day","hour", "MatchEDT_buffer")], rf.04.pred, rf.04.prob)
+out.04 <- data.frame(w.04[testrows,c("GRID_ID","day","hour", "MatchEDT_buffer_Acc")], rf.04.pred, rf.04.prob)
 names(out.04)[4:7] <- c("Obs", "Pred", "Prob.NoCrash", "Prob.Crash")
 
-
-# plotting probabilities. Nearly all values 
 plot(density(out.04[,"Prob.NoCrash"]), col = "red")
 lines(density(out.04[,"Prob.Crash"]), col = "blue")
 
 #using pROC
 plot(pROC::roc(out.04$Obs, out.04$Prob.Crash, auc = TRUE))
 
-model_auc <- pROC::auc(out.04$Obs, out.04$Prob.Crash)
+(model_auc <- pROC::auc(out.04$Obs, out.04$Prob.Crash))
+
+plot(pROC::roc(out.04$Obs, out.04$Prob.Crash, auc = TRUE))
 
 # From Fx
-# model_auc <- pROC::auc(test.dat.use[,response.var], rf.prob[,colnames(rf.prob)=="1"])
-# 
-# plot(pROC::roc(test.dat.use[,response.var], rf.prob[,colnames(rf.prob)=="1"]),
-#      main = paste0("Model ", model.no),
-#      grid=c(0.1, 0.2))
-# legend("bottomright", legend = round(model_auc, 4), title = "AUC", inset = 0.1)
+(model_auc <- pROC::auc(test.dat.use[,response.var], rf.04.prob[,colnames(rf.04.prob)=="1"]))
 
-out.04 = data.frame(out.04,
-                    TN = out.04$Obs == 0 &  out.04$Pred == 0,
-                    FP = out.04$Obs == 0 &  out.04$Pred == 1,
-                    FN = out.04$Obs == 1 &  out.04$Pred == 0,
-                    TP = out.04$Obs == 1 &  out.04$Pred == 1)
-write.csv(out.04,
-          file = "RandomForest_pred_04.csv",
-          row.names = F)
-                    
+identical(out.04$Obs, test.dat.use[,response.var])
+head(data.frame(out.04$Obs, test.dat.use[,response.var]))
+class(out.04$Obs)
+class(test.dat.use[,response.var])
+
+identical(w.04[testrows, "MatchEDT_buffer_Acc"], test.dat.use[,response.var])
+
+# Other specification from AUC package
+plot(model_auc2 <- AUC::roc(rf.04.prob[,colnames(rf.04.prob)=="1"], test.dat.use[,response.var]))
+auc_sens <- sensitivity(rf.04.prob[,colnames(rf.04.prob)=="1"], test.dat.use[,response.var])
+summary(auc_sens$cutoffs)
+summary(auc_sens$measure)
+auc_spec <- specificity(rf.04.prob[,colnames(rf.04.prob)=="1"], test.dat.use[,response.var])
+
+summary(auc_spec$cutoffs)
+summary(auc_spec$measure)
+
+boxplot(rf.04.prob[,colnames(rf.04.prob)=="1"]~test.dat.use[,response.var])
+
+rf.04.pred2 <- predict(rf.04, w.04[testrows, fitvars], type = "response", cutoff = c(0.9, 0.1))
+rf.04.prob2 <- predict(rf.04, w.04[testrows, fitvars], type = "prob", cutoff = c(0.8, 0.2))
+
+plot(pROC::roc(out.04$Obs, rf.04.prob2[,colnames(rf.04.prob2)=="1"], auc = TRUE))
+
+reference.vec <- w.04$MatchEDT_buffer_Acc[testrows]
+levels(reference.vec) = c("NoCrash", "Crash")
+levels(rf.04.pred2) = c("NoCrash","Crash")
+
+reference.vec <-as.factor(as.character(reference.vec))
+rf.04.pred2 <-as.factor(as.character(rf.04.pred2))
+
+(predtab <- table(rf.04.pred2, reference.vec, 
+                  dnn = c("Predicted","Observed"))) 
+bin.mod.diagnostics(predtab)
+
+# Choosing cutoffs. Low value is most greedy for non-crashes, high value is more greedy for crashes
+co = seq(0.1, 0.9, by = 0.1)
+pt.vec <-vector()
+for(i in co){
+  predx <- predict(rf.04, w.04[testrows, fitvars], type = "response", cutoff = c(1-i, i))
+  levels(predx) = c("NoCrash","Crash")
+  predx <-as.factor(as.character(predx))
+  
+  predtab <- table(predx, reference.vec) # Row 1: observed 
+  pt.vec <- cbind(pt.vec, bin.mod.diagnostics(predtab))
+  cat(i, ". ")
+  }
+colnames(pt.vec) = co
+
+matplot(t(pt.vec), type = "b",
+        pch = c("A", "P", "R", "F"),
+        ylab = "Value",
+        xlab = "Cutoff for crash classification",
+        xaxt = "n")
+axis(1, at = 1:length(co), labels = co)
+legend("bottomleft",
+       legend = c("A: Accuracy",
+                  "R: Recall",
+                  "P: Precision",
+                  "F: False Positive Rate"),
+       inset = 0.1)
+title(main = "Waze-EDT crash classification, April 2017 Maryland")
+# High precision: minimize false positives. Achieved with the strictest requirement for classifying as a crash
+# High recall (sensitivity): minimize false negatives. Acheived with the least strict requrirement for classifiying as a crash
+# Recommended threshold: 0.2 for crash (0.8 for non-crash)
+
+# Repeat Model 1 with function ----
+train.dat = w.04
+response.var = "MatchEDT_buffer_Acc"
+model.no = modelno
+test.split = .30
+class(train.dat) <- "data.frame"
+rf.inputs = list(ntree.use = avail.cores * 100, avail.cores = avail.cores, mtry = 10, maxnodes = 1000, nodesize = 100)
+
+fitvars <- names(train.dat)[is.na(match(names(train.dat), omits))]
+  
+mtry.use = rf.inputs$mtry
+
+
+  # 70:30 split or Separate training and test data
+  # use identical trainrows and testrows as above
+
+    # trainrows <- sort(sample(1:nrow(train.dat), size = nrow(train.dat)*(1-test.split), replace = F))
+    # testrows <- (1:nrow(train.dat))[!1:nrow(train.dat) %in% trainrows]
+    # 
+    rundat = train.dat[trainrows,]
+    test.dat.use = train.dat[testrows,]
+
+  # Start RF in parallel
+  starttime = Sys.time()
+  
+  # make a cluster of all available cores
+  cl <- makeCluster(parallel::detectCores()) 
+  registerDoParallel(cl)
+  
+  rf.out <- foreach(ntree = rep(rf.inputs$ntree.use/rf.inputs$avail.cores, rf.inputs$avail.cores),
+                    .combine = randomForest::combine, .multicombine=T, .packages = 'randomForest') %dopar% 
+    randomForest(x = rundat[,fitvars], y = rundat[,response.var], 
+                 ntree = ntree, mtry = mtry.use, 
+                 maxnodes = rf.inputs$maxnodes, nodesize = rf.inputs$nodesize,
+                 keep.forest = T)
+  
+  stopCluster(cl); rm(cl); gc(verbose = F) # Stop the cluster immediately after finished the RF
+  
+  timediff = Sys.time() - starttime
+  cat(round(timediff,2), attr(timediff, "unit"), "to fit model", model.no, "\n")
+  # End RF in parallel
+  
+  rf.pred <- predict(rf.out, test.dat.use[,fitvars])
+  rf.prob <- predict(rf.out, test.dat.use[,fitvars], type = "prob")
+  
+  Nobs <- data.frame(nrow(rundat),
+                     sum(as.numeric(as.character(rundat[,response.var])) == 0),
+                     sum(as.numeric(as.character(rundat[,response.var])) > 0),
+                     length(rundat$nWazeAccident[train.dat$nWazeAccident>0]) )
+  
+  colnames(Nobs) = c("N", "No EDT", "EDT present", "Waze accident present")
+  predtab <- table(test.dat.use[,response.var], rf.pred)
+  
+  # pROC::roc - response, predictor
+  model_auc <- pROC::auc(train.dat[testrows,response.var], rf.prob[,colnames(rf.prob)=="1"])
+  
+  model_auc <- pROC::auc(test.dat.use[,response.var], rf.prob[,colnames(rf.prob)=="1"])
+  
+  plot(pROC::roc(test.dat.use[,response.var], rf.prob[,colnames(rf.prob)=="1"]),
+       main = paste0("Model ", model.no),
+       grid=c(0.1, 0.2))
+  legend("bottomright", legend = round(model_auc, 4), title = "AUC", inset = 0.1)
+  
+  dev.print(device = jpeg, file = paste0("AUC_", model.no, ".jpg"), width = 500, height = 500)
+  
+  # AUC::roc - predictions, labels
+  # plot(model_auc2 <- AUC::roc(rf.out$votes[,"1"], factor(1*(rf.out$y==1))),
+  #      main = paste0("Model ", model.no))
+  # plot(AUC::roc(rf.out$votes[,"0"], factor(1*(rf.out$y==0))),
+  #      add = T, col = "red")
+  # AUC::auc(model_auc2)
+
+  out.df <- data.frame(test.dat.use[, c("GRID_ID", "day", "hour", response.var)], rf.pred, rf.04.prob)
+  out.df$day <- as.numeric(out.df$day)
+  names(out.df)[4:7] <- c("Obs", "Pred", "Prob.NoCrash", "Prob.Crash")
+  out.df = data.frame(out.df,
+                      TN = out.df$Obs == 0 &  out.df$Pred == 0,
+                      FP = out.df$Obs == 0 &  out.df$Pred == 1,
+                      FN = out.df$Obs == 1 &  out.df$Pred == 0,
+                      TP = out.df$Obs == 1 &  out.df$Pred == 1)
+
+  # plotting probabilities. Nearly all values 
+  plot(density(out.df[,"Prob.NoCrash"]), col = "red")
+  lines(density(out.df[,"Prob.Crash"]), col = "blue")
+  
+  #using pROC as before
+  plot(pROC::roc(out.df$Obs, out.df$Prob.Crash, auc = TRUE))
+  
+  (model_auc <- pROC::auc(out.df$Obs, out.df$Prob.Crash))
+  
+  # Output is list of three elements: Nobs data frame, predtab table, binary model diagnotics table, and mean squared error
+  list(Nobs, predtab, diag = bin.mod.diagnostics(predtab), 
+       mse = mean(as.numeric(as.character(test.dat.use[,response.var])) - 
+                    as.numeric(as.character(rf.pred)))^2,
+       runtime = timediff
+       , auc = model_auc
+  ) 
+
+
 varImpPlot(rf.04) # variable imporatance: mean decrease in Gini impurity for this predictor across all trees.  
+
+varImpPlot(rf.out) # variable imporatance: mean decrease in Gini impurity for this predictor across all trees.  
+
 
 save(list = c("rf.04",
               "rf.04.pred",

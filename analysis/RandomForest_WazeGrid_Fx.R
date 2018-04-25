@@ -92,8 +92,8 @@ do.rf <- function(train.dat, omits, response.var = "MatchEDT_buffer_Acc", model.
   cat(round(timediff,2), attr(timediff, "unit"), "to fit model", model.no, "\n")
   # End RF in parallel
   
-  rf.pred <- predict(rf.out, test.dat.use[fitvars])
-  rf.prob <- predict(rf.out, test.dat.use[fitvars], type = "prob")
+  rf.pred <- predict(rf.out, test.dat.use[fitvars], cutoff = c(0.8, 0.2))
+  rf.prob <- predict(rf.out, test.dat.use[fitvars], type = "prob", cutoff = c(0.8, 0.2))
 
   Nobs <- data.frame(nrow(rundat),
                  sum(as.numeric(as.character(rundat[,response.var])) == 0),
@@ -101,15 +101,28 @@ do.rf <- function(train.dat, omits, response.var = "MatchEDT_buffer_Acc", model.
                  length(rundat$nWazeAccident[train.dat$nWazeAccident>0]) )
   
   colnames(Nobs) = c("N", "No EDT", "EDT present", "Waze accident present")
+  
   predtab <- table(test.dat.use[,response.var], rf.pred)
+  
+  reference.vec <- test.dat.use[,response.var]
+  levels(reference.vec) = c("NoCrash", "Crash")
+  levels(rf.pred) = c("NoCrash","Crash")
+  
+  reference.vec <-as.factor(as.character(reference.vec))
+  rf.pred <-as.factor(as.character(rf.pred))
+  
+  (predtab <- table(rf.pred, reference.vec, 
+                    dnn = c("Predicted","Observed"))) 
+  bin.mod.diagnostics(predtab)
   
   # pROC::roc - response, predictor
   model_auc <- pROC::auc(test.dat.use[,response.var], rf.prob[,colnames(rf.prob)=="1"])
 
   plot(pROC::roc(test.dat.use[,response.var], rf.prob[,colnames(rf.prob)=="1"]),
       main = paste0("Model ", model.no),
-      grid=c(0.1, 0.2))
-  legend("bottomright", legend = round(model_auc, 4), title = "AUC", inset = 0.1)
+      grid=c(0.1, 0.2),
+      ylim = c(0, 1), xlim = c(1, 0))
+  legend("bottomright", legend = round(model_auc, 4), title = "AUC", inset = 0.25)
 
   dev.print(device = jpeg, file = paste0("AUC_", model.no, ".jpg"), width = 500, height = 500)
 
@@ -121,21 +134,20 @@ do.rf <- function(train.dat, omits, response.var = "MatchEDT_buffer_Acc", model.
   # AUC::auc(model_auc2)
    
   # save output predictions. Will need to re-work for non-binary outcomes
-  if(is.null(test.dat)) { userows = testrows } else { userows = 1:nrow(test.dat.use) }# use testrows if 70/30 or all rows if separate train and test dat
   
-  out.df <- data.frame(test.dat.use[userows, c("GRID_ID", "day", "hour", response.var)], rf.pred)
+  out.df <- data.frame(test.dat.use[, c("GRID_ID", "day", "hour", response.var)], rf.pred, rf.prob)
   out.df$day <- as.numeric(out.df$day)
-  names(out.df)[4:5] <- c("Obs", "Pred")
+  names(out.df)[4:7] <- c("Obs", "Pred", "Prob.Noncrash", "Prob.Crash")
   out.df = data.frame(out.df,
-                      TN = out.df$Obs == 0 &  out.df$Pred == 0,
-                      FP = out.df$Obs == 0 &  out.df$Pred == 1,
-                      FN = out.df$Obs == 1 &  out.df$Pred == 0,
-                      TP = out.df$Obs == 1 &  out.df$Pred == 1)
+                      TN = out.df$Obs == 0 &  out.df$Pred == "NoCrash",
+                      FP = out.df$Obs == 0 &  out.df$Pred == "Crash",
+                      FN = out.df$Obs == 1 &  out.df$Pred == "NoCrash",
+                      TP = out.df$Obs == 1 &  out.df$Pred == "Crash")
   write.csv(out.df,
             file = paste(model.no, "RandomForest_pred.csv", sep = "_"),
             row.names = F)
   
-  savelist = c("rf.out", "rf.pred", "out.df") 
+  savelist = c("rf.out", "rf.pred", "rf.prob", "out.df") 
   if(is.null(test.dat)) savelist = c(savelist, "testrows", "trainrows")
   if(!is.null(thin.dat)) savelist = c(savelist, "test.dat.use")
      
@@ -146,9 +158,9 @@ do.rf <- function(train.dat, omits, response.var = "MatchEDT_buffer_Acc", model.
   # Output is list of three elements: Nobs data frame, predtab table, binary model diagnotics table, and mean squared error
   list(Nobs, predtab, diag = bin.mod.diagnostics(predtab), 
        mse = mean(as.numeric(as.character(test.dat.use[,response.var])) - 
-                as.numeric(as.character(rf.pred)))^2,
-       runtime = timediff
-       , auc = model_auc
+                as.numeric(rf.prob[,"1"]))^2,
+       runtime = timediff,
+       auc = model_auc
   ) 
   
 } # end do.rf function

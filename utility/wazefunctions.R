@@ -173,19 +173,20 @@ showobjsize <- function(units = "Mb", limit = 100) {
   print(sizes[order(sizes$size, decreasing = T)[1:printlim],])
 }
 
-# Print diagnotstics from a confusion matrix
-# given a 2x2 table where columns are observed negative and postive, and rows are predicted negative and positive:
+# Print diagnotstics from a confusion matrix.
+# RF function give observed as rows, predicted as columns. More common in observed as columns, predicted as rows. Here following caret::confusionMatrix
+# given a 2x2 table where columns are observed postive, and rows are predicted negative and positive:
 # |: ---------------------------- Observed ------:|
-# |: ----------------------:|:Negative:|:Positive:|
-# |: Predicted  :|:Negative:|   TN     |    FN    |
-# |:            :|:Positive:|   FP     |    TP    |
+# |: ----------------------:|:Positive:|:Negative:|
+# |: Predicted  :|:Positive:|   TP     |    FP    |
+# |:            :|:Negative:|   FN     |    TN    |
 
 bin.mod.diagnostics <- function(predtab){
 
   accuracy = (predtab[1,1] + predtab[2,2] )/ sum(predtab) # true positives and true negatives divided by all observations
-  precision = (predtab[2,2] )/ sum(predtab[2,]) # true positives divided by all predicted positives
-  recall = (predtab[2,2] )/ sum(predtab[,2]) # true positives divided by all observed positives
-  false.positive.rate = (predtab[2,1] )/ sum(predtab[,1]) # false positives divided by all observed negatives
+  precision = (predtab[1,1] )/ sum(predtab[1,]) # true positives divided by all predicted positives
+  recall = (predtab[1,1] )/ sum(predtab[,1]) # true positives divided by all observed positives
+  false.positive.rate = (predtab[1,2] )/ sum(predtab[,2]) # false positives divided by all observed negatives
 
   round(t(data.frame(accuracy, precision, recall, false.positive.rate)), 4)  
 }
