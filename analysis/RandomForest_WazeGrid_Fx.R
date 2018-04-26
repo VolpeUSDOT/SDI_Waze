@@ -149,7 +149,7 @@ do.rf <- function(train.dat, omits, response.var = "MatchEDT_buffer_Acc", model.
        mse = mean(as.numeric(as.character(test.dat.use[,response.var])) - 
                 as.numeric(rf.prob[,"1"]))^2,
        runtime = timediff,
-       auc = model_auc
+       auc = as.numeric(model_auc) # do not save complete output
   ) 
   
 } # end do.rf function

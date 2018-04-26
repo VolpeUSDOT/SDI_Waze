@@ -82,9 +82,9 @@ Here we use three criteria, each of which can also be applied to the regularized
 tabl <- "
  |          |        |       OBSERVED     |
  |----------|--------|:-------:|:--------:| 
- |          |        |Negative | Positive |
- |<b>PREDICTED |Negative|   TN    |    FN |
- |          |Positive|   FP    |    TP    |
+ |          |        | Positive|  Negative|
+ |<b>PREDICTED |Positive|   TP    |    FP |
+ |          |Negative|   FN    |    TN    |
 "
 pander::pander(tabl, style = "rmarkdown")
 ```
@@ -106,16 +106,16 @@ False positives (FP) can be considered Type I errors, and false negatives (FN) c
 
 **2. Mean Squared Error**
 
-For binary and continuous models, mean squared error is simply the mean squared residual between observed and estimated values.  
+For binary and continuous models, mean squared error is simply the mean squared difference between observed and estimated values (the residual error).  
 
 **3. Area under Reciever-Operator Characteristic Curve (AUROC, ROC curve)**
 
 For a binary model, we can additionally calculate one other quantity:
 
   - *Specificity* = TN / TN + FP
-  + True negatives divided by all observed negatives, also called the true negative rate.
+  + True negatives divided by all observed negatives, also called the true negative rate. For the SDI Waze analysis, most observations are "0", meaning no EDT crashes occurred, so much of the model performance is driven by accurately predicting these "0" values.
 
-Balancing between high specificity (where false positives are avoided) and high sensitivity (where false negatives are avoided) is an important decision point in evaluating a model. High sensitivity (i.e., recall or true positive rate) with high specificity (low false positive rate) is ideal. Plotting the false positive rate versus the true positive rate allows a visualization of this balance, and is known the 'receiver-operator characteristic (ROC) curve'. The larger the area under the ROC curve, the more high specificity is maximized with low loss of sensitivity. An area of 0.5 is equivalent to flipping a coin; and area of 1 is perfect estimation, with no false positives or false negatives. 
+Balancing between high specificity (where false positives are avoided) and high sensitivity (where false negatives are avoided) is an important decision point in evaluating a model. High sensitivity (i.e., recall or true positive rate) with high specificity (low false positive rate) is ideal. Plotting the false positive rate versus the true positive rate allows a visualization of this balance, and is known the 'receiver-operator characteristic (ROC) curve'. The larger the area under the ROC curve, the more high specificity is maximized with low loss of sensitivity. An area of 0.5 is equivalent to flipping a coin; and area of 1 is perfect estimation, with no false positives or false negatives. As a rule of thumb, areas of 0.6 or greater are generally considered to represent useful classification models; areas of 0.9 or greater are cons
 
 ```{r roc, echo=FALSE, fig.cap="ROC curves, [CC BY-SA 3.0 Wikimedia](https://commons.wikimedia.org/w/index.php?curid=44059691)", out.width = '50%'}
 knitr::include_graphics("ROC_curves.png")
@@ -130,14 +130,25 @@ knitr::include_graphics("ROC_curves.png")
 We tested three options, and and selected 1 mile grid size for all future work. Models at the larger spatial grain (4 square mile hexagonal grid cells) or smaller spatial grain (0.5 square mile hexagonal grid cells) performed relatively similar. There was a small performance gain at the 0.5 mile grain size in some cases. however, run time was substantially longer for data preparation (including approximately **36** hours of computational time per month of data to prepare weather variables at 0.5 mile grid size, compared to approximately **6** hours for a similar process for 1 mile grid cells), and substantially longer for model fitting (xx vs. xx), with 66,220 grid cells at 0.5 square miles versus 33,184 grid cells at 1 square miles.
 
 ```{r phase1spatial, echo = F}
-load(file.path(localdir, "Outputs_up_to_17"))
+if(!exists("keyoutputs1")) {
+  load(file.path(localdir, "Outputs_up_to_17"))
+  keyoutputs1 <- keyoutputs
+  rm(keyoutputs)
+  # simplifying the auc value, don't need complete output
+  # for(i in 1:length(keyoutputs)){
+  #   keyoutputs[[i]]$auc <- as.numeric(keyoutputs[[i]]$auc)
+  # }
+  # save(list = "keyoutputs", file = file.path(localdir, "Outputs_up_to_17"))
+}
+
+
 
 # pairs to compare: 01, 04, 06 - April
 # 03, 05, 07 - April+May, test on June
 
 Diag.frame <- vector()
 for(i in c("01", "04", "06")){
-  Diag.frame <- rbind(Diag.frame, c(keyoutputs[[i]][[3]]))
+  Diag.frame <- rbind(Diag.frame, c(keyoutputs1[[i]][[3]]))
  }
 
 colnames(Diag.frame)[1:4] = c("Accuracy", "Precision", "Recall", "False Positive Rate")
@@ -151,7 +162,7 @@ kable(Diag.frame,
 
 Diag.frame <- vector()
 for(i in c("03", "05", "07")){
-  Diag.frame <- rbind(Diag.frame, c(keyoutputs[[i]][[3]]))
+  Diag.frame <- rbind(Diag.frame, c(keyoutputs1[[i]][[3]]))
  }
 
 colnames(Diag.frame)[1:4] = c("Accuracy", "Precision", "Recall", "False Positive Rate")
@@ -194,14 +205,12 @@ What we learned from this testing is the following:
 Some improvements with some new data features. Expand testing in next phase
 Something about neighbors?
 
-```{r keyoutputsummary1}
-load(file.path(localdir, "Outputs_up_to_17"))
-
-# Summary from keyoutputs ----
+```{r keyoutputs1ummary1}
+# Summary from keyoutputs1 ----
 Nobs.frame <- vector()
 
-for(i in 1:length(keyoutputs)){
-  Nobs.frame <- rbind(Nobs.frame, c(Model = i, keyoutputs[[i]][[1]]))
+for(i in 1:length(keyoutputs1)){
+  Nobs.frame <- rbind(Nobs.frame, c(Model = i, keyoutputs1[[i]][[1]]))
  }
 
 datatable(Nobs.frame, filter = 'top',
@@ -217,13 +226,18 @@ datatable(Nobs.frame, filter = 'top',
 ```{r Diagframe1}
 Diag.frame <- vector()
 
-for(i in 1:length(keyoutputs)){
-  Diag.frame <- rbind(Diag.frame, c(Model = i, keyoutputs[[i]][[3]]))
+for(i in 1:length(keyoutputs1)){
+  Diag.frame <- rbind(Diag.frame, c(Model = i, 
+                                    100*keyoutputs1[[i]][[3]],
+                                    Runtime = paste(round(keyoutputs1[[i]]$runtime, 1), attr(keyoutputs1[[i]]$runtime, "unit")),
+                                    AUC = round(keyoutputs1[[i]]$auc, 4),
+                                    MSE = round(keyoutputs1[[i]]$mse, 8)
+                                    )
+                      )
  }
 
 colnames(Diag.frame)[2:5] = c("Accuracy", "Precision", "Recall", "False Positive Rate")
 Diag.frame[,1] = as.factor(Diag.frame[,1])
-Diag.frame[,2:5] = Diag.frame[,2:5]*100
 
 datatable(Diag.frame, filter = 'top',
           caption = "Phase 1 model diagnostics. Best values are highlighed in green.",
@@ -235,10 +249,12 @@ datatable(Diag.frame, filter = 'top',
           formatStyle(2, background = styleEqual(max(Diag.frame[,2]), 'lightgreen'))%>%
           formatStyle(3, background = styleEqual(max(Diag.frame[,3]), 'lightgreen'))%>%
           formatStyle(4, background = styleEqual(max(Diag.frame[,4]), 'lightgreen'))%>%
-          formatStyle(5, background = styleEqual(min(Diag.frame[,5]), 'lightgreen'))
+          formatStyle(5, background = styleEqual(min(Diag.frame[,5]), 'lightgreen'))%>%
+          formatStyle(7, background = styleEqual(max(Diag.frame[,7]), 'lightgreen'))%>%
+          formatStyle(8, background = styleEqual(min(Diag.frame[,8]), 'lightgreen'))
 ```
 
-```{r m01-03}
+```{r m01-03, eval=F}
 modelno = "16"
 
 if(ONLOCAL) {load(file.path(outputdir1, paste("Model", modelno, "RandomForest_Output_04.RData", sep= "_")))} else {s3load(object = file.path(outputdir, paste("Model", modelno, "RandomForest_Output.RData", sep= "_")), bucket = waze.bucket)}
@@ -261,6 +277,52 @@ modelno = "03"
 - Expand all models to six months (April to September 70/30 training test split)
 - Start with base models below (A then B then C)
 - Run and document tests in markdown file and run with updated RF functions
+
+
+```{r Diagframe2}
+if(ONLOCAL) {  localdir <- outputdir2 } 
+
+if(!exists("keyoutputs2")) { 
+  load(file.path(localdir, "Output_to_45a"))
+  keyoutputs2 <- keyoutputs
+  rm(keyoutputs) 
+  #  simplifying the auc value, don't need complete output
+  # for(i in 1:length(keyoutputs)){
+  #   keyoutputs[[i]]$auc <- as.numeric(keyoutputs[[i]]$auc)
+  # }
+  # save(list = "keyoutputs", file = file.path(localdir, "Output_to_45a"))
+  # 
+  }
+
+Diag.frame <- vector()
+
+for(i in 1:length(keyoutputs2)){
+  Diag.frame <- rbind(Diag.frame, c(Model = names(keyoutputs2)[i], 
+                                    100*keyoutputs2[[i]][[3]],
+                                    Runtime = paste(round(keyoutputs2[[i]]$runtime, 1), attr(keyoutputs2[[i]]$runtime, "unit")),
+                                    AUC = round(keyoutputs2[[i]]$auc, 4),
+                                    MSE = round(keyoutputs2[[i]]$mse, 8)
+                                    )
+                      )
+ }
+
+colnames(Diag.frame)[2:5] = c("Accuracy", "Precision", "Recall", "False Positive Rate")
+#Diag.frame[,1] = as.factor(Diag.frame[,1])
+
+datatable(Diag.frame, filter = 'top',
+          caption = "Phase 2 model diagnostics. Best values are highlighed in green.",
+          rownames = T,
+          options = list(dom = "tip",
+                         order = list(list(1, 'desc')),
+                         pageLength = 5)
+          ) %>% formatCurrency(2:5, currency = "", digits = 2) %>%
+          formatStyle(2, background = styleEqual(max(Diag.frame[,2]), 'lightgreen'))%>%
+          formatStyle(3, background = styleEqual(max(Diag.frame[,3]), 'lightgreen'))%>%
+          formatStyle(4, background = styleEqual(max(Diag.frame[,4]), 'lightgreen'))%>%
+          formatStyle(5, background = styleEqual(min(Diag.frame[,5]), 'lightgreen'))%>%
+          formatStyle(7, background = styleEqual(max(Diag.frame[,7]), 'lightgreen'))%>%
+          formatStyle(8, background = styleEqual(min(Diag.frame[,8]), 'lightgreen'))
+```
 
 
 ## Set A: All Waze 

@@ -262,20 +262,20 @@ div.tocify {
 <tr class="odd">
 <td></td>
 <td></td>
-<td align="center">Negative</td>
 <td align="center">Positive</td>
+<td align="center">Negative</td>
 </tr>
 <tr class="even">
 <td><b>PREDICTED</td>
-<td>Negative</td>
-<td align="center">TN</td>
-<td align="center">FN</td>
+<td>Positive</td>
+<td align="center">TP</td>
+<td align="center">FP</td>
 </tr>
 <tr class="odd">
 <td></td>
-<td>Positive</td>
-<td align="center">FP</td>
-<td align="center">TP</td>
+<td>Negative</td>
+<td align="center">FN</td>
+<td align="center">TN</td>
 </tr>
 </tbody>
 </table>
@@ -299,14 +299,14 @@ div.tocify {
 </ul></li>
 </ul>
 <p><strong>2. Mean Squared Error</strong></p>
-<p>For binary and continuous models, mean squared error is simply the mean squared residual between observed and estimated values.</p>
+<p>For binary and continuous models, mean squared error is simply the mean squared difference between observed and estimated values (the residual error).</p>
 <p><strong>3. Area under Reciever-Operator Characteristic Curve (AUROC, ROC curve)</strong></p>
 <p>For a binary model, we can additionally calculate one other quantity:</p>
 <ul>
 <li><em>Specificity</em> = TN / TN + FP</li>
-<li>True negatives divided by all observed negatives, also called the true negative rate.</li>
+<li>True negatives divided by all observed negatives, also called the true negative rate. For the SDI Waze analysis, most observations are “0”, meaning no EDT crashes occurred, so much of the model performance is driven by accurately predicting these “0” values.</li>
 </ul>
-<p>Balancing between high specificity (where false positives are avoided) and high sensitivity (where false negatives are avoided) is an important decision point in evaluating a model. High sensitivity (i.e., recall or true positive rate) with high specificity (low false positive rate) is ideal. Plotting the false positive rate versus the true positive rate allows a visualization of this balance, and is known the ‘receiver-operator characteristic (ROC) curve’. The larger the area under the ROC curve, the more high specificity is maximized with low loss of sensitivity. An area of 0.5 is equivalent to flipping a coin; and area of 1 is perfect estimation, with no false positives or false negatives.</p>
+<p>Balancing between high specificity (where false positives are avoided) and high sensitivity (where false negatives are avoided) is an important decision point in evaluating a model. High sensitivity (i.e., recall or true positive rate) with high specificity (low false positive rate) is ideal. Plotting the false positive rate versus the true positive rate allows a visualization of this balance, and is known the ‘receiver-operator characteristic (ROC) curve’. The larger the area under the ROC curve, the more high specificity is maximized with low loss of sensitivity. An area of 0.5 is equivalent to flipping a coin; and area of 1 is perfect estimation, with no false positives or false negatives. As a rule of thumb, areas of 0.6 or greater are generally considered to represent useful classification models; areas of 0.9 or greater are cons</p>
 <div class="figure">
 <img src="data:image/png;base64,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" alt="ROC curves, [CC BY-SA 3.0 Wikimedia](https://commons.wikimedia.org/w/index.php?curid=44059691)" width="50%" />
 <p class="caption">
@@ -333,24 +333,24 @@ ROC curves, <a href="https://commons.wikimedia.org/w/index.php?curid=44059691">C
 <tbody>
 <tr class="odd">
 <td align="left">Model 01 - 1 mile</td>
-<td align="right">98.55</td>
-<td align="right">41.89</td>
-<td align="right">70.23</td>
-<td align="right">1.13</td>
+<td align="right">98.37</td>
+<td align="right">55.53</td>
+<td align="right">65.66</td>
+<td align="right">1.01</td>
 </tr>
 <tr class="even">
 <td align="left">Model 04 - 4 mile</td>
-<td align="right">97.97</td>
-<td align="right">45.22</td>
-<td align="right">69.04</td>
-<td align="right">1.51</td>
+<td align="right">97.57</td>
+<td align="right">56.39</td>
+<td align="right">67.16</td>
+<td align="right">1.53</td>
 </tr>
 <tr class="odd">
 <td align="left">Model 06 - 0.5 mile</td>
-<td align="right">98.69</td>
-<td align="right">42.37</td>
-<td align="right">70.13</td>
-<td align="right">1.01</td>
+<td align="right">98.48</td>
+<td align="right">56.45</td>
+<td align="right">64.42</td>
+<td align="right">0.90</td>
 </tr>
 </tbody>
 </table>
@@ -368,24 +368,24 @@ ROC curves, <a href="https://commons.wikimedia.org/w/index.php?curid=44059691">C
 <tbody>
 <tr class="odd">
 <td align="left">Model 03 - 1 mile</td>
-<td align="right">98.58</td>
-<td align="right">42.72</td>
-<td align="right">65.73</td>
-<td align="right">1.04</td>
+<td align="right">98.40</td>
+<td align="right">54.17</td>
+<td align="right">66.88</td>
+<td align="right">1.03</td>
 </tr>
 <tr class="even">
 <td align="left">Model 05 - 4 mile</td>
-<td align="right">97.96</td>
-<td align="right">44.73</td>
-<td align="right">65.93</td>
-<td align="right">1.46</td>
+<td align="right">97.72</td>
+<td align="right">54.94</td>
+<td align="right">68.52</td>
+<td align="right">1.50</td>
 </tr>
 <tr class="odd">
 <td align="left">Model 07 - 0.5 mile</td>
-<td align="right">98.73</td>
-<td align="right">42.73</td>
-<td align="right">64.80</td>
-<td align="right">0.91</td>
+<td align="right">98.57</td>
+<td align="right">53.77</td>
+<td align="right">67.03</td>
+<td align="right">0.92</td>
 </tr>
 </tbody>
 </table>
@@ -423,338 +423,10 @@ ROC curves, <a href="https://commons.wikimedia.org/w/index.php?curid=44059691">C
 <li><p>Run future models on April-Sept (6 months) with 70/30 training/test split</p></li>
 </ul>
 <p>Some improvements with some new data features. Expand testing in next phase Something about neighbors?</p>
-<div id="htmlwidget-30e17f301b436f1457b3" style="width:100%;height:auto;" class="datatables html-widget"></div>
-<script type="application/json" data-for="htmlwidget-30e17f301b436f1457b3">{"x":{"filter":"top","filterHTML":"<tr>\n  <td style=\"vertical-align: top;\">\n    <div class=\"form-group has-feedback\" style=\"margin-bottom: auto;\">\n      <input type=\"search\" placeholder=\"All\" class=\"form-control\" style=\"width: 100%;\"/>\n      <span class=\"glyphicon glyphicon-remove-circle form-control-feedback\"><\/span>\n    <\/div>\n  <\/td>\n  <td style=\"vertical-align: top;\">\n    <div class=\"form-group has-feedback\" style=\"margin-bottom: auto;\">\n      <input type=\"search\" placeholder=\"All\" class=\"form-control\" style=\"width: 100%;\"/>\n      <span class=\"glyphicon glyphicon-remove-circle form-control-feedback\"><\/span>\n    <\/div>\n  <\/td>\n  <td style=\"vertical-align: top;\">\n    <div class=\"form-group has-feedback\" style=\"margin-bottom: auto;\">\n      <input type=\"search\" placeholder=\"All\" class=\"form-control\" style=\"width: 100%;\"/>\n      <span class=\"glyphicon glyphicon-remove-circle form-control-feedback\"><\/span>\n    <\/div>\n  <\/td>\n  <td style=\"vertical-align: top;\">\n    <div class=\"form-group has-feedback\" style=\"margin-bottom: auto;\">\n      <input type=\"search\" placeholder=\"All\" class=\"form-control\" style=\"width: 100%;\"/>\n      <span class=\"glyphicon glyphicon-remove-circle form-control-feedback\"><\/span>\n    <\/div>\n  <\/td>\n  <td style=\"vertical-align: top;\">\n    <div class=\"form-group has-feedback\" style=\"margin-bottom: auto;\">\n      <input type=\"search\" placeholder=\"All\" class=\"form-control\" style=\"width: 100%;\"/>\n      <span class=\"glyphicon glyphicon-remove-circle form-control-feedback\"><\/span>\n    <\/div>\n  <\/td>\n<\/tr>","caption":"<caption>Phase 1 model inputs. N: total rows of input training data; No EDT = number rows without EDT crashes; EDT present: number of rows with EDT crashes; Waze accident present: Number of rows at least one `WazeAccident` present<\/caption>","data":[[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17],[221410,463063,661520,142669,426189,255282,769783,221410,661520,142669,426189,221410,661520,212346,640546,212346,640546],[217239,454030,648690,138630,414029,250929,756433,217237,648690,138587,414029,217211,648690,208203,627767,208160,627767],[4171,9033,12830,4039,12160,4353,13350,4173,12830,4082,12160,4199,12830,4143,12779,4186,12779],[17241,36075,36075,15777,32993,17853,37325,17241,36075,15777,32993,17241,36075,16957,35638,16957,35638]],"container":"<table class=\"display\">\n  <thead>\n    <tr>\n      <th>Model<\/th>\n      <th>N<\/th>\n      <th>No EDT<\/th>\n      <th>EDT present<\/th>\n      <th>Waze accident present<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>","options":{"dom":"tip","pageLength":5,"order":[],"autoWidth":false,"orderClasses":false,"orderCellsTop":true,"lengthMenu":[5,10,25,50,100],"rowCallback":"function(row, data) {\nDTWidget.formatCurrency(this, row, data, 1, '', 0, 3, ',', '.', true);\nDTWidget.formatCurrency(this, row, data, 2, '', 0, 3, ',', '.', true);\nDTWidget.formatCurrency(this, row, data, 3, '', 0, 3, ',', '.', true);\nDTWidget.formatCurrency(this, row, data, 4, '', 0, 3, ',', '.', true);\n}"}},"evals":["options.rowCallback"],"jsHooks":[]}</script>
-<div id="htmlwidget-d3fccd7c7feb3623c7ad" style="width:100%;height:auto;" class="datatables html-widget"></div>
-<script type="application/json" data-for="htmlwidget-d3fccd7c7feb3623c7ad">{"x":{"filter":"top","filterHTML":"<tr>\n  <td data-type=\"number\" style=\"vertical-align: top;\">\n    <div class=\"form-group has-feedback\" style=\"margin-bottom: auto;\">\n      <input type=\"search\" placeholder=\"All\" class=\"form-control\" style=\"width: 100%;\"/>\n      <span class=\"glyphicon glyphicon-remove-circle form-control-feedback\"><\/span>\n    <\/div>\n    <div style=\"display: none; position: absolute; width: 200px;\">\n      <div data-min=\"1\" data-max=\"17\"><\/div>\n      <span style=\"float: left;\"><\/span>\n      <span style=\"float: right;\"><\/span>\n    <\/div>\n  <\/td>\n  <td data-type=\"number\" style=\"vertical-align: top;\">\n    <div class=\"form-group has-feedback\" style=\"margin-bottom: auto;\">\n      <input type=\"search\" placeholder=\"All\" class=\"form-control\" style=\"width: 100%;\"/>\n      <span class=\"glyphicon glyphicon-remove-circle form-control-feedback\"><\/span>\n    <\/div>\n    <div style=\"display: none; position: absolute; width: 200px;\">\n      <div data-min=\"97.96\" data-max=\"98.73\" data-scale=\"14\"><\/div>\n      <span style=\"float: left;\"><\/span>\n      <span style=\"float: right;\"><\/span>\n    <\/div>\n  <\/td>\n  <td data-type=\"number\" style=\"vertical-align: top;\">\n    <div class=\"form-group has-feedback\" style=\"margin-bottom: auto;\">\n      <input type=\"search\" placeholder=\"All\" class=\"form-control\" style=\"width: 100%;\"/>\n      <span class=\"glyphicon glyphicon-remove-circle form-control-feedback\"><\/span>\n    <\/div>\n    <div style=\"display: none; position: absolute; width: 200px;\">\n      <div data-min=\"38.09\" data-max=\"45.22\" data-scale=\"15\"><\/div>\n      <span style=\"float: left;\"><\/span>\n      <span style=\"float: right;\"><\/span>\n    <\/div>\n  <\/td>\n  <td data-type=\"number\" style=\"vertical-align: top;\">\n    <div class=\"form-group has-feedback\" style=\"margin-bottom: auto;\">\n      <input type=\"search\" placeholder=\"All\" class=\"form-control\" style=\"width: 100%;\"/>\n      <span class=\"glyphicon glyphicon-remove-circle form-control-feedback\"><\/span>\n    <\/div>\n    <div style=\"display: none; position: absolute; width: 200px;\">\n      <div data-min=\"64.8\" data-max=\"73.39\" data-scale=\"14\"><\/div>\n      <span style=\"float: left;\"><\/span>\n      <span style=\"float: right;\"><\/span>\n    <\/div>\n  <\/td>\n  <td data-type=\"number\" style=\"vertical-align: top;\">\n    <div class=\"form-group has-feedback\" style=\"margin-bottom: auto;\">\n      <input type=\"search\" placeholder=\"All\" class=\"form-control\" style=\"width: 100%;\"/>\n      <span class=\"glyphicon glyphicon-remove-circle form-control-feedback\"><\/span>\n    <\/div>\n    <div style=\"display: none; position: absolute; width: 200px;\">\n      <div data-min=\"0.91\" data-max=\"1.51\" data-scale=\"15\"><\/div>\n      <span style=\"float: left;\"><\/span>\n      <span style=\"float: right;\"><\/span>\n    <\/div>\n  <\/td>\n<\/tr>","caption":"<caption>Phase 1 model diagnostics. Best values are highlighed in green.<\/caption>","data":[[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17],[98.55,98.53,98.58,97.97,97.96,98.69,98.73,98.54,98.58,98,97.96,98.5,98.58,98.47,98.57,98.53,98.54],[41.89,44.01,42.72,45.22,44.73,42.37,42.73,40.07,41.75,43.69,43.51,39.42,40.92,40.7,41.01,38.54,38.09],[70.23,67.68,65.73,69.04,65.93,70.13,64.8,71.02,66.41,68.79,66.62,67.82,67.11,70.34,67.95,73.39,68.14],[1.13,1.08,1.04,1.51,1.46,1.01,0.91,1.16,1.05,1.51,1.5,1.16,1.07,1.2,1.09,1.21,1.14]],"container":"<table class=\"display\">\n  <thead>\n    <tr>\n      <th>Model<\/th>\n      <th>Accuracy<\/th>\n      <th>Precision<\/th>\n      <th>Recall<\/th>\n      <th>False Positive Rate<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>","options":{"dom":"tip","order":[[1,"desc"]],"pageLength":5,"columnDefs":[{"className":"dt-right","targets":[0,1,2,3,4]}],"autoWidth":false,"orderClasses":false,"orderCellsTop":true,"lengthMenu":[5,10,25,50,100],"rowCallback":"function(row, data) {\nvar value=data[4]; $(this.api().cell(row, 4).node()).css({'background':value == '0.91' ? 'lightgreen' : ''});\nvar value=data[3]; $(this.api().cell(row, 3).node()).css({'background':value == '73.39' ? 'lightgreen' : ''});\nvar value=data[2]; $(this.api().cell(row, 2).node()).css({'background':value == '45.22' ? 'lightgreen' : ''});\nvar value=data[1]; $(this.api().cell(row, 1).node()).css({'background':value == '98.73' ? 'lightgreen' : ''});\nDTWidget.formatCurrency(this, row, data, 1, '', 2, 3, ',', '.', true);\nDTWidget.formatCurrency(this, row, data, 2, '', 2, 3, ',', '.', true);\nDTWidget.formatCurrency(this, row, data, 3, '', 2, 3, ',', '.', true);\nDTWidget.formatCurrency(this, row, data, 4, '', 2, 3, ',', '.', true);\n}"}},"evals":["options.rowCallback"],"jsHooks":[]}</script>
-<pre><code>## randomForest(formula = wazeAccformula, data = w.04[trainrows, 
-##     ], ntree = ntree)</code></pre>
-<table>
-<thead>
-<tr class="header">
-<th></th>
-<th align="right">x</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td>nWazeAccidentMajor</td>
-<td align="right">1413.895</td>
-</tr>
-<tr class="even">
-<td>nWazeAccidentMinor</td>
-<td align="right">943.080</td>
-</tr>
-<tr class="odd">
-<td>nWazeJam</td>
-<td align="right">276.986</td>
-</tr>
-<tr class="even">
-<td>medMagVar</td>
-<td align="right">239.687</td>
-</tr>
-<tr class="odd">
-<td>DayOfWeek</td>
-<td align="right">229.739</td>
-</tr>
-<tr class="even">
-<td>wx</td>
-<td align="right">213.087</td>
-</tr>
-<tr class="odd">
-<td>hour</td>
-<td align="right">192.560</td>
-</tr>
-<tr class="even">
-<td>medLastRepRate</td>
-<td align="right">183.095</td>
-</tr>
-<tr class="odd">
-<td>nWazeWeatherOrHazard</td>
-<td align="right">136.931</td>
-</tr>
-<tr class="even">
-<td>medLastReliab</td>
-<td align="right">132.812</td>
-</tr>
-<tr class="odd">
-<td>nMagVar240to360</td>
-<td align="right">130.271</td>
-</tr>
-<tr class="even">
-<td>medLastConf</td>
-<td align="right">111.480</td>
-</tr>
-<tr class="odd">
-<td>F_SYSTEM_V_5</td>
-<td align="right">110.885</td>
-</tr>
-<tr class="even">
-<td>RAC_SUM_CE01</td>
-<td align="right">109.963</td>
-</tr>
-<tr class="odd">
-<td>F_SYSTEM_V_4</td>
-<td align="right">109.665</td>
-</tr>
-<tr class="even">
-<td>RAC_SUM_CD01</td>
-<td align="right">109.583</td>
-</tr>
-<tr class="odd">
-<td>WAC_SUM_CE01</td>
-<td align="right">109.443</td>
-</tr>
-<tr class="even">
-<td>RAC_SUM_CA01</td>
-<td align="right">105.361</td>
-</tr>
-<tr class="odd">
-<td>WAC_SUM_CA01</td>
-<td align="right">103.741</td>
-</tr>
-<tr class="even">
-<td>WAC_SUM_CS01</td>
-<td align="right">103.579</td>
-</tr>
-<tr class="odd">
-<td>WAC_SUM_CD04</td>
-<td align="right">102.794</td>
-</tr>
-<tr class="even">
-<td>RAC_SUM_CE02</td>
-<td align="right">102.735</td>
-</tr>
-<tr class="odd">
-<td>RAC_SUM_CS01</td>
-<td align="right">102.721</td>
-</tr>
-<tr class="even">
-<td>WAC_SUM_CE03</td>
-<td align="right">102.499</td>
-</tr>
-<tr class="odd">
-<td>WAC_SUM_CE02</td>
-<td align="right">102.409</td>
-</tr>
-<tr class="even">
-<td>WAC_SUM_CS02</td>
-<td align="right">102.156</td>
-</tr>
-<tr class="odd">
-<td>RAC_SUM_CD04</td>
-<td align="right">101.533</td>
-</tr>
-<tr class="even">
-<td>RAC_SUM_CS02</td>
-<td align="right">101.464</td>
-</tr>
-<tr class="odd">
-<td>RAC_SUM_CE03</td>
-<td align="right">101.256</td>
-</tr>
-<tr class="even">
-<td>WAC_SUM_CD01</td>
-<td align="right">99.727</td>
-</tr>
-<tr class="odd">
-<td>RAC_SUM_CD02</td>
-<td align="right">99.207</td>
-</tr>
-<tr class="even">
-<td>RAC_SUM_CA03</td>
-<td align="right">97.892</td>
-</tr>
-<tr class="odd">
-<td>WAC_SUM_CA03</td>
-<td align="right">97.763</td>
-</tr>
-<tr class="even">
-<td>WAC_SUM_CD03</td>
-<td align="right">96.675</td>
-</tr>
-<tr class="odd">
-<td>RAC_SUM_CD03</td>
-<td align="right">96.169</td>
-</tr>
-<tr class="even">
-<td>RAC_SUM_CA02</td>
-<td align="right">94.550</td>
-</tr>
-<tr class="odd">
-<td>WAC_SUM_CA02</td>
-<td align="right">93.915</td>
-</tr>
-<tr class="even">
-<td>F_SYSTEM_V_3</td>
-<td align="right">93.671</td>
-</tr>
-<tr class="odd">
-<td>WAC_SUM_C000</td>
-<td align="right">91.853</td>
-</tr>
-<tr class="even">
-<td>RAC_SUM_C000</td>
-<td align="right">91.085</td>
-</tr>
-<tr class="odd">
-<td>nMagVar180to240</td>
-<td align="right">90.877</td>
-</tr>
-<tr class="even">
-<td>nMagVar90to180</td>
-<td align="right">86.604</td>
-</tr>
-<tr class="odd">
-<td>nWazeJamHeavy</td>
-<td align="right">85.310</td>
-</tr>
-<tr class="even">
-<td>nMagVar30to60</td>
-<td align="right">84.292</td>
-</tr>
-<tr class="odd">
-<td>F_SYSTEM_V_1</td>
-<td align="right">78.897</td>
-</tr>
-<tr class="even">
-<td>nWazeJamStandStill</td>
-<td align="right">68.032</td>
-</tr>
-<tr class="odd">
-<td>nHazardOnShoulder</td>
-<td align="right">59.160</td>
-</tr>
-<tr class="even">
-<td>F_SYSTEM_V_2</td>
-<td align="right">58.974</td>
-</tr>
-<tr class="odd">
-<td>nWazeHazardCarStoppedShoulder</td>
-<td align="right">56.403</td>
-</tr>
-<tr class="even">
-<td>nWazeJamModerate</td>
-<td align="right">47.947</td>
-</tr>
-<tr class="odd">
-<td>nHazardOnRoad</td>
-<td align="right">46.108</td>
-</tr>
-<tr class="even">
-<td>nWazeAcc_SW</td>
-<td align="right">36.820</td>
-</tr>
-<tr class="odd">
-<td>nWazeAcc_S</td>
-<td align="right">34.462</td>
-</tr>
-<tr class="even">
-<td>nWazeAcc_N</td>
-<td align="right">34.256</td>
-</tr>
-<tr class="odd">
-<td>nWazeAcc_SE</td>
-<td align="right">31.626</td>
-</tr>
-<tr class="even">
-<td>nWazeAcc_NE</td>
-<td align="right">29.733</td>
-</tr>
-<tr class="odd">
-<td>nWazeAcc_NW</td>
-<td align="right">29.256</td>
-</tr>
-<tr class="even">
-<td>nWazeHazardCarStoppedRoad</td>
-<td align="right">27.441</td>
-</tr>
-<tr class="odd">
-<td>nWazeHazardObjectOnRoad</td>
-<td align="right">17.810</td>
-</tr>
-<tr class="even">
-<td>nWazeHazardConstruction</td>
-<td align="right">16.655</td>
-</tr>
-<tr class="odd">
-<td>nWazeHazardPotholeOnRoad</td>
-<td align="right">13.862</td>
-</tr>
-<tr class="even">
-<td>nWazeRoadClosed</td>
-<td align="right">12.949</td>
-</tr>
-<tr class="odd">
-<td>nHazardWeather</td>
-<td align="right">6.970</td>
-</tr>
-<tr class="even">
-<td>nWazeWeatherFog</td>
-<td align="right">4.658</td>
-</tr>
-<tr class="odd">
-<td>nWazeHazardRoadKillOnRoad</td>
-<td align="right">2.749</td>
-</tr>
-<tr class="even">
-<td>nWazeWeatherFlood</td>
-<td align="right">2.466</td>
-</tr>
-<tr class="odd">
-<td>nWazeHazardIceRoad</td>
-<td align="right">0.379</td>
-</tr>
-<tr class="even">
-<td>nMagVar330to30</td>
-<td align="right">0.000</td>
-</tr>
-<tr class="odd">
-<td>WAC_SUM_CD02</td>
-<td align="right">0.000</td>
-</tr>
-<tr class="even">
-<td>WAC_SUM_CFA01</td>
-<td align="right">0.000</td>
-</tr>
-<tr class="odd">
-<td>WAC_SUM_CFA02</td>
-<td align="right">0.000</td>
-</tr>
-<tr class="even">
-<td>WAC_SUM_CFA03</td>
-<td align="right">0.000</td>
-</tr>
-<tr class="odd">
-<td>WAC_SUM_CFA04</td>
-<td align="right">0.000</td>
-</tr>
-<tr class="even">
-<td>WAC_SUM_CFA05</td>
-<td align="right">0.000</td>
-</tr>
-<tr class="odd">
-<td>WAC_SUM_CFS01</td>
-<td align="right">0.000</td>
-</tr>
-<tr class="even">
-<td>WAC_SUM_CFS02</td>
-<td align="right">0.000</td>
-</tr>
-<tr class="odd">
-<td>WAC_SUM_CFS03</td>
-<td align="right">0.000</td>
-</tr>
-<tr class="even">
-<td>WAC_SUM_CFS04</td>
-<td align="right">0.000</td>
-</tr>
-<tr class="odd">
-<td>WAC_SUM_CFS05</td>
-<td align="right">0.000</td>
-</tr>
-</tbody>
-</table>
+<div id="htmlwidget-33a8ceeea26e91050103" style="width:100%;height:auto;" class="datatables html-widget"></div>
+<script type="application/json" data-for="htmlwidget-33a8ceeea26e91050103">{"x":{"filter":"top","filterHTML":"<tr>\n  <td style=\"vertical-align: top;\">\n    <div class=\"form-group has-feedback\" style=\"margin-bottom: auto;\">\n      <input type=\"search\" placeholder=\"All\" class=\"form-control\" style=\"width: 100%;\"/>\n      <span class=\"glyphicon glyphicon-remove-circle form-control-feedback\"><\/span>\n    <\/div>\n  <\/td>\n  <td style=\"vertical-align: top;\">\n    <div class=\"form-group has-feedback\" style=\"margin-bottom: auto;\">\n      <input type=\"search\" placeholder=\"All\" class=\"form-control\" style=\"width: 100%;\"/>\n      <span class=\"glyphicon glyphicon-remove-circle form-control-feedback\"><\/span>\n    <\/div>\n  <\/td>\n  <td style=\"vertical-align: top;\">\n    <div class=\"form-group has-feedback\" style=\"margin-bottom: auto;\">\n      <input type=\"search\" placeholder=\"All\" class=\"form-control\" style=\"width: 100%;\"/>\n      <span class=\"glyphicon glyphicon-remove-circle form-control-feedback\"><\/span>\n    <\/div>\n  <\/td>\n  <td style=\"vertical-align: top;\">\n    <div class=\"form-group has-feedback\" style=\"margin-bottom: auto;\">\n      <input type=\"search\" placeholder=\"All\" class=\"form-control\" style=\"width: 100%;\"/>\n      <span class=\"glyphicon glyphicon-remove-circle form-control-feedback\"><\/span>\n    <\/div>\n  <\/td>\n  <td style=\"vertical-align: top;\">\n    <div class=\"form-group has-feedback\" style=\"margin-bottom: auto;\">\n      <input type=\"search\" placeholder=\"All\" class=\"form-control\" style=\"width: 100%;\"/>\n      <span class=\"glyphicon glyphicon-remove-circle form-control-feedback\"><\/span>\n    <\/div>\n  <\/td>\n<\/tr>","caption":"<caption>Phase 1 model inputs. N: total rows of input training data; No EDT = number rows without EDT crashes; EDT present: number of rows with EDT crashes; Waze accident present: Number of rows at least one `WazeAccident` present<\/caption>","data":[[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17],[221410,463063,661520,142669,426189,255282,769783,221410,661520,142669,426189,221410,661520,212346,640546,212346,640546],[217202,454071,648690,138732,414029,250990,756433,217289,648690,138701,414029,217209,648690,208128,627767,208131,627767],[4208,8992,12830,3937,12160,4292,13350,4121,12830,3968,12160,4201,12830,4218,12779,4215,12779],[17241,36075,36075,15777,32993,17853,37325,17241,36075,15777,32993,17241,36075,16957,35638,16957,35638]],"container":"<table class=\"display\">\n  <thead>\n    <tr>\n      <th>Model<\/th>\n      <th>N<\/th>\n      <th>No EDT<\/th>\n      <th>EDT present<\/th>\n      <th>Waze accident present<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>","options":{"dom":"tip","pageLength":5,"order":[],"autoWidth":false,"orderClasses":false,"orderCellsTop":true,"lengthMenu":[5,10,25,50,100],"rowCallback":"function(row, data) {\nDTWidget.formatCurrency(this, row, data, 1, '', 0, 3, ',', '.', true);\nDTWidget.formatCurrency(this, row, data, 2, '', 0, 3, ',', '.', true);\nDTWidget.formatCurrency(this, row, data, 3, '', 0, 3, ',', '.', true);\nDTWidget.formatCurrency(this, row, data, 4, '', 0, 3, ',', '.', true);\n}"}},"evals":["options.rowCallback"],"jsHooks":[]}</script>
+<div id="htmlwidget-4d640594a3c83090891b" style="width:100%;height:auto;" class="datatables html-widget"></div>
+<script type="application/json" data-for="htmlwidget-4d640594a3c83090891b">{"x":{"filter":"top","filterHTML":"<tr>\n  <td data-type=\"character\" style=\"vertical-align: top;\">\n    <div class=\"form-group has-feedback\" style=\"margin-bottom: auto;\">\n      <input type=\"search\" placeholder=\"All\" class=\"form-control\" style=\"width: 100%;\"/>\n      <span class=\"glyphicon glyphicon-remove-circle form-control-feedback\"><\/span>\n    <\/div>\n  <\/td>\n  <td data-type=\"character\" style=\"vertical-align: top;\">\n    <div class=\"form-group has-feedback\" style=\"margin-bottom: auto;\">\n      <input type=\"search\" placeholder=\"All\" class=\"form-control\" style=\"width: 100%;\"/>\n      <span class=\"glyphicon glyphicon-remove-circle form-control-feedback\"><\/span>\n    <\/div>\n  <\/td>\n  <td data-type=\"character\" style=\"vertical-align: top;\">\n    <div class=\"form-group has-feedback\" style=\"margin-bottom: auto;\">\n      <input type=\"search\" placeholder=\"All\" class=\"form-control\" style=\"width: 100%;\"/>\n      <span class=\"glyphicon glyphicon-remove-circle form-control-feedback\"><\/span>\n    <\/div>\n  <\/td>\n  <td data-type=\"character\" style=\"vertical-align: top;\">\n    <div class=\"form-group has-feedback\" style=\"margin-bottom: auto;\">\n      <input type=\"search\" placeholder=\"All\" class=\"form-control\" style=\"width: 100%;\"/>\n      <span class=\"glyphicon glyphicon-remove-circle form-control-feedback\"><\/span>\n    <\/div>\n  <\/td>\n  <td data-type=\"character\" style=\"vertical-align: top;\">\n    <div class=\"form-group has-feedback\" style=\"margin-bottom: auto;\">\n      <input type=\"search\" placeholder=\"All\" class=\"form-control\" style=\"width: 100%;\"/>\n      <span class=\"glyphicon glyphicon-remove-circle form-control-feedback\"><\/span>\n    <\/div>\n  <\/td>\n  <td data-type=\"character\" style=\"vertical-align: top;\">\n    <div class=\"form-group has-feedback\" style=\"margin-bottom: auto;\">\n      <input type=\"search\" placeholder=\"All\" class=\"form-control\" style=\"width: 100%;\"/>\n      <span class=\"glyphicon glyphicon-remove-circle form-control-feedback\"><\/span>\n    <\/div>\n  <\/td>\n  <td data-type=\"character\" style=\"vertical-align: top;\">\n    <div class=\"form-group has-feedback\" style=\"margin-bottom: auto;\">\n      <input type=\"search\" placeholder=\"All\" class=\"form-control\" style=\"width: 100%;\"/>\n      <span class=\"glyphicon glyphicon-remove-circle form-control-feedback\"><\/span>\n    <\/div>\n  <\/td>\n  <td data-type=\"character\" style=\"vertical-align: top;\">\n    <div class=\"form-group has-feedback\" style=\"margin-bottom: auto;\">\n      <input type=\"search\" placeholder=\"All\" class=\"form-control\" style=\"width: 100%;\"/>\n      <span class=\"glyphicon glyphicon-remove-circle form-control-feedback\"><\/span>\n    <\/div>\n  <\/td>\n<\/tr>","caption":"<caption>Phase 1 model diagnostics. Best values are highlighed in green.<\/caption>","data":[["1","10","11","12","13","14","15","16","17","2","3","4","5","6","7","8","9"],["98.37","98.37","98.4","97.57","97.72","98.48","98.57","98.34","98.38","97.5","97.68","98.34","98.4","98.36","98.35","98.33","98.33"],["55.53","56.54","54.17","56.39","54.94","56.45","53.77","56.71","53.74","54.5","54.21","54.67","54.25","55.49","53.55","54.75","53.21"],["65.66","69.02","66.88","67.16","68.52","64.42","67.03","66.45","68.85","68.6","70.49","68.98","68.22","73.09","70.35","75.66","71.78"],["1.01","1.05","1.03","1.53","1.5","0.9","0.92","1.02","1.08","1.66","1.59","1.1","1.05","1.14","1.13","1.22","1.17"],["2.2 mins","5.2 mins","7.6 mins","1.2 mins","4.6 mins","2.6 mins","8.7 mins","3.2 mins","11 mins","1.7 mins","7.1 mins","3.4 mins","12 mins","3.8 mins","13.1 mins","4.8 mins","18.1 mins"],["0.9905","0.9907","0.9895","0.9856","0.9874","0.9908","0.99","0.9907","0.9905","0.987","0.9879","0.991","0.9909","0.9917","0.9912","0.9917","0.9916"],["1.801e-05","1.82e-05","1.368e-05","4.723e-05","2.446e-05","2.263e-05","1.037e-05","3.046e-05","1.25e-05","3.68e-05","2.343e-05","1.876e-05","1.486e-05","1.682e-05","1.37e-05","1.686e-05","1.465e-05"]],"container":"<table class=\"display\">\n  <thead>\n    <tr>\n      <th>Model<\/th>\n      <th>Accuracy<\/th>\n      <th>Precision<\/th>\n      <th>Recall<\/th>\n      <th>False Positive Rate<\/th>\n      <th>Runtime<\/th>\n      <th>AUC<\/th>\n      <th>MSE<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>","options":{"dom":"tip","order":[[1,"desc"]],"pageLength":5,"autoWidth":false,"orderClasses":false,"orderCellsTop":true,"lengthMenu":[5,10,25,50,100],"rowCallback":"function(row, data) {\nvar value=data[7]; $(this.api().cell(row, 7).node()).css({'background':value == '1.037e-05' ? 'lightgreen' : ''});\nvar value=data[6]; $(this.api().cell(row, 6).node()).css({'background':value == '0.9917' ? 'lightgreen' : ''});\nvar value=data[4]; $(this.api().cell(row, 4).node()).css({'background':value == '0.9' ? 'lightgreen' : ''});\nvar value=data[3]; $(this.api().cell(row, 3).node()).css({'background':value == '75.66' ? 'lightgreen' : ''});\nvar value=data[2]; $(this.api().cell(row, 2).node()).css({'background':value == '56.71' ? 'lightgreen' : ''});\nvar value=data[1]; $(this.api().cell(row, 1).node()).css({'background':value == '98.57' ? 'lightgreen' : ''});\nDTWidget.formatCurrency(this, row, data, 1, '', 2, 3, ',', '.', true);\nDTWidget.formatCurrency(this, row, data, 2, '', 2, 3, ',', '.', true);\nDTWidget.formatCurrency(this, row, data, 3, '', 2, 3, ',', '.', true);\nDTWidget.formatCurrency(this, row, data, 4, '', 2, 3, ',', '.', true);\n}"}},"evals":["options.rowCallback"],"jsHooks":[]}</script>
 </div>
 </div>
 <div id="phase-2-model-testing" class="section level1">
@@ -764,6 +436,8 @@ ROC curves, <a href="https://commons.wikimedia.org/w/index.php?curid=44059691">C
 <li>Start with base models below (A then B then C)</li>
 <li>Run and document tests in markdown file and run with updated RF functions</li>
 </ul>
+<div id="htmlwidget-1bf55c0132c30bc4d546" style="width:100%;height:auto;" class="datatables html-widget"></div>
+<script type="application/json" data-for="htmlwidget-1bf55c0132c30bc4d546">{"x":{"filter":"top","filterHTML":"<tr>\n  <td data-type=\"character\" style=\"vertical-align: top;\">\n    <div class=\"form-group has-feedback\" style=\"margin-bottom: auto;\">\n      <input type=\"search\" placeholder=\"All\" class=\"form-control\" style=\"width: 100%;\"/>\n      <span class=\"glyphicon glyphicon-remove-circle form-control-feedback\"><\/span>\n    <\/div>\n  <\/td>\n  <td data-type=\"character\" style=\"vertical-align: top;\">\n    <div class=\"form-group has-feedback\" style=\"margin-bottom: auto;\">\n      <input type=\"search\" placeholder=\"All\" class=\"form-control\" style=\"width: 100%;\"/>\n      <span class=\"glyphicon glyphicon-remove-circle form-control-feedback\"><\/span>\n    <\/div>\n  <\/td>\n  <td data-type=\"character\" style=\"vertical-align: top;\">\n    <div class=\"form-group has-feedback\" style=\"margin-bottom: auto;\">\n      <input type=\"search\" placeholder=\"All\" class=\"form-control\" style=\"width: 100%;\"/>\n      <span class=\"glyphicon glyphicon-remove-circle form-control-feedback\"><\/span>\n    <\/div>\n  <\/td>\n  <td data-type=\"character\" style=\"vertical-align: top;\">\n    <div class=\"form-group has-feedback\" style=\"margin-bottom: auto;\">\n      <input type=\"search\" placeholder=\"All\" class=\"form-control\" style=\"width: 100%;\"/>\n      <span class=\"glyphicon glyphicon-remove-circle form-control-feedback\"><\/span>\n    <\/div>\n  <\/td>\n  <td data-type=\"character\" style=\"vertical-align: top;\">\n    <div class=\"form-group has-feedback\" style=\"margin-bottom: auto;\">\n      <input type=\"search\" placeholder=\"All\" class=\"form-control\" style=\"width: 100%;\"/>\n      <span class=\"glyphicon glyphicon-remove-circle form-control-feedback\"><\/span>\n    <\/div>\n  <\/td>\n  <td data-type=\"character\" style=\"vertical-align: top;\">\n    <div class=\"form-group has-feedback\" style=\"margin-bottom: auto;\">\n      <input type=\"search\" placeholder=\"All\" class=\"form-control\" style=\"width: 100%;\"/>\n      <span class=\"glyphicon glyphicon-remove-circle form-control-feedback\"><\/span>\n    <\/div>\n  <\/td>\n  <td data-type=\"character\" style=\"vertical-align: top;\">\n    <div class=\"form-group has-feedback\" style=\"margin-bottom: auto;\">\n      <input type=\"search\" placeholder=\"All\" class=\"form-control\" style=\"width: 100%;\"/>\n      <span class=\"glyphicon glyphicon-remove-circle form-control-feedback\"><\/span>\n    <\/div>\n  <\/td>\n  <td data-type=\"character\" style=\"vertical-align: top;\">\n    <div class=\"form-group has-feedback\" style=\"margin-bottom: auto;\">\n      <input type=\"search\" placeholder=\"All\" class=\"form-control\" style=\"width: 100%;\"/>\n      <span class=\"glyphicon glyphicon-remove-circle form-control-feedback\"><\/span>\n    <\/div>\n  <\/td>\n<\/tr>","caption":"<caption>Phase 2 model diagnostics. Best values are highlighed in green.<\/caption>","data":[["18","19","20","21","22","23","24","25","26","27","28","29","33","34","35","36","37","38","39"],["98.42","98.13","98.06","98.09","98.05","98.06","98.01","98.02","97.99","97.98","98","98.02","98.07","98.06","98.1","98.1","98.09","98.05","98.09"],["56.54","55.6","54.69","54.33","53.91","53.4","52.82","52.88","51.96","52.09","52.85","51.82","55.68","54.98","55.7","55.76","55.11","55.61","55.38"],["52.67","56.97","57.32","66.46","66.81","68.4","59.22","68.35","60.46","60.94","66.47","66.87","49.83","53.24","51.37","51.19","56.17","52.51","55.22"],["0.74","0.98","1.04","1.22","1.26","1.3","1.15","1.33","1.2","1.22","1.3","1.32","0.87","0.95","0.89","0.88","1","0.93","0.97"],["11 mins","6.2 mins","5.9 mins","8.1 mins","11 mins","14.2 mins","2 mins","7.5 mins","2.3 mins","2.2 mins","3.6 mins","5.4 mins","14.1 mins","28.7 mins","15.4 mins","14.8 mins","17.9 mins","22.1 mins","39 mins"],["0.9552","0.9784","0.9823","0.9885","0.9887","0.9893","0.9847","0.989","0.9855","0.9872","0.9879","0.9872","0.9143","0.9231","0.9156","0.9198","0.9283","0.9271","0.9348"],["3.682e-05","3.984e-05","3.843e-05","2.457e-05","2.703e-05","2.402e-05","3.95e-05","2.331e-05","3.452e-05","3.449e-05","2.592e-05","2.298e-05","8.072e-05","7.492e-05","7.178e-05","7.017e-05","6.15e-05","8.208e-05","8.406e-05"]],"container":"<table class=\"display\">\n  <thead>\n    <tr>\n      <th>Model<\/th>\n      <th>Accuracy<\/th>\n      <th>Precision<\/th>\n      <th>Recall<\/th>\n      <th>False Positive Rate<\/th>\n      <th>Runtime<\/th>\n      <th>AUC<\/th>\n      <th>MSE<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>","options":{"dom":"tip","order":[[1,"desc"]],"pageLength":5,"autoWidth":false,"orderClasses":false,"orderCellsTop":true,"lengthMenu":[5,10,25,50,100],"rowCallback":"function(row, data) {\nvar value=data[7]; $(this.api().cell(row, 7).node()).css({'background':value == '2.298e-05' ? 'lightgreen' : ''});\nvar value=data[6]; $(this.api().cell(row, 6).node()).css({'background':value == '0.9893' ? 'lightgreen' : ''});\nvar value=data[4]; $(this.api().cell(row, 4).node()).css({'background':value == '0.74' ? 'lightgreen' : ''});\nvar value=data[3]; $(this.api().cell(row, 3).node()).css({'background':value == '68.4' ? 'lightgreen' : ''});\nvar value=data[2]; $(this.api().cell(row, 2).node()).css({'background':value == '56.54' ? 'lightgreen' : ''});\nvar value=data[1]; $(this.api().cell(row, 1).node()).css({'background':value == '98.42' ? 'lightgreen' : ''});\nDTWidget.formatCurrency(this, row, data, 1, '', 2, 3, ',', '.', true);\nDTWidget.formatCurrency(this, row, data, 2, '', 2, 3, ',', '.', true);\nDTWidget.formatCurrency(this, row, data, 3, '', 2, 3, ',', '.', true);\nDTWidget.formatCurrency(this, row, data, 4, '', 2, 3, ',', '.', true);\n}"}},"evals":["options.rowCallback"],"jsHooks":[]}</script>
 <div id="set-a-all-waze" class="section level2">
 <h2>Set A: All Waze</h2>
 <ul>
