@@ -23,7 +23,7 @@ knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
 
 HEXSIZE = "1"
 
-ONLOCAL = T
+ONLOCAL = F
 
 if(ONLOCAL){
   codeloc = "~/git/SDI_Waze"
@@ -52,12 +52,15 @@ library(DT)
 # install.packages(c("kableExtra","randomForest","aws.s3","tidyverse","pander","DT"), dep = T)
 
 knitr::opts_knit$set(root.dir = localdir)
-# setwd(localdir)
+
 # read utility functions
 source(file.path(codeloc, 'utility/wazefunctions.R'))
 
-# read random forest function
+# read random forest functions
 source(file.path(codeloc, "analysis/RandomForest_WazeGrid_Fx.R"))
+
+models <- read.csv(file.path(localdir, "Model_Descriptions.csv"))
+
 ```
 
 # Random Forest Overview
@@ -74,7 +77,7 @@ There are multiple criteria for evaluating classification and regression models.
 
 Here we use three criteria, each of which can also be applied to the regularized regression models in the next phase:
 
-**1. Diagnostics from a confusion matrix**
+### 1. Diagnostics from a confusion matrix
 
   For binary classification models, it is possible to create a 2x2 table where columns are observed negative and positive, and rows are predicted negative and positive. This is know as a *confusion matrix*, and shows four quantities to represent model performance:
 
@@ -104,30 +107,29 @@ False positives (FP) can be considered Type I errors, and false negatives (FN) c
     + False positives divided by all observed negatives. A low value indicates that there are relatively few false positives compared to all observed absences of EDT crashes.
 
 
-**2. Mean Squared Error**
+### 2. Mean Squared Error
 
 For binary and continuous models, mean squared error is simply the mean squared difference between observed and estimated values (the residual error).  
 
-**3. Area under Reciever-Operator Characteristic Curve (AUROC, ROC curve)**
+### 3. Area under Reciever-Operator Characteristic Curve (AUROC, ROC curve)
 
 For a binary model, we can additionally calculate one other quantity:
 
   - *Specificity* = TN / TN + FP
-  + True negatives divided by all observed negatives, also called the true negative rate. For the SDI Waze analysis, most observations are "0", meaning no EDT crashes occurred, so much of the model performance is driven by accurately predicting these "0" values.
+  + True negatives divided by all observed negatives, also called the true negative rate. For the SDI Waze analysis, most observations are "0", meaning no EDT crashes occurred, so much of the model performance is driven by accurately predicting these "0" (no crash) values.
 
-Balancing between high specificity (where false positives are avoided) and high sensitivity (where false negatives are avoided) is an important decision point in evaluating a model. High sensitivity (i.e., recall or true positive rate) with high specificity (low false positive rate) is ideal. Plotting the false positive rate versus the true positive rate allows a visualization of this balance, and is known the 'receiver-operator characteristic (ROC) curve'. The larger the area under the ROC curve, the more high specificity is maximized with low loss of sensitivity. An area of 0.5 is equivalent to flipping a coin; and area of 1 is perfect estimation, with no false positives or false negatives. As a rule of thumb, areas of 0.6 or greater are generally considered to represent useful classification models; areas of 0.9 or greater are cons
+Balancing between high specificity (where false positives are avoided) and high sensitivity (where false negatives are avoided) is an important decision point in evaluating a model. High sensitivity (i.e., recall or true positive rate) with high specificity (low false positive rate) is ideal. Plotting the false positive rate versus the true positive rate allows a visualization of this balance, and is known the 'receiver-operator characteristic (ROC) curve'. The larger the area under the ROC curve, the more high specificity is maximized with low loss of sensitivity. An area of 0.5 is equivalent to flipping a coin; and area of 1 is perfect estimation, with no false positives or false negatives. As a rule of thumb, areas of 0.6 or greater are generally considered to represent useful classification models; areas of 0.9 or greater are considered to represent very good classification models
 
 ```{r roc, echo=FALSE, fig.cap="ROC curves, [CC BY-SA 3.0 Wikimedia](https://commons.wikimedia.org/w/index.php?curid=44059691)", out.width = '50%'}
 knitr::include_graphics("ROC_curves.png")
 ```
-
 
 # Phase 1 model testing
 
        
 
 ### Spatial grain
-We tested three options, and and selected 1 mile grid size for all future work. Models at the larger spatial grain (4 square mile hexagonal grid cells) or smaller spatial grain (0.5 square mile hexagonal grid cells) performed relatively similar. There was a small performance gain at the 0.5 mile grain size in some cases. however, run time was substantially longer for data preparation (including approximately **36** hours of computational time per month of data to prepare weather variables at 0.5 mile grid size, compared to approximately **6** hours for a similar process for 1 mile grid cells), and substantially longer for model fitting (xx vs. xx), with 66,220 grid cells at 0.5 square miles versus 33,184 grid cells at 1 square miles.
+We tested three options, and and selected 1 mile grid size for all future work. Models at the larger spatial grain (4 square mile hexagonal grid cells) or smaller spatial grain (0.5 square mile hexagonal grid cells) performed relatively similar. There was a small performance gain at the 0.5 mile grain size in some cases. however, run time was substantially longer for data preparation (including approximately 36 hours of computational time per month of data to prepare weather variables at 0.5 mile grid size, compared to approximately 6 hours for a similar process for 1 mile grid cells), and substantially longer for model fitting (xx vs. xx), with 66,220 grid cells at 0.5 square miles versus 33,184 grid cells at 1 square miles.
 
 ```{r phase1spatial, echo = F}
 if(!exists("keyoutputs1")) {
@@ -140,8 +142,6 @@ if(!exists("keyoutputs1")) {
   # }
   # save(list = "keyoutputs", file = file.path(localdir, "Outputs_up_to_17"))
 }
-
-
 
 # pairs to compare: 01, 04, 06 - April
 # 03, 05, 07 - April+May, test on June
@@ -286,12 +286,11 @@ if(!exists("keyoutputs2")) {
   load(file.path(localdir, "Output_to_45a"))
   keyoutputs2 <- keyoutputs
   rm(keyoutputs) 
-  #  simplifying the auc value, don't need complete output
-  # for(i in 1:length(keyoutputs)){
-  #   keyoutputs[[i]]$auc <- as.numeric(keyoutputs[[i]]$auc)
-  # }
-  # save(list = "keyoutputs", file = file.path(localdir, "Output_to_45a"))
-  # 
+#   simplifying the auc value, don't need complete output
+#   for(i in 1:length(keyoutputs)){
+#     keyoutputs[[i]]$auc <- as.numeric(keyoutputs[[i]]$auc)
+#   }
+#   save(list = "keyoutputs", file = file.path(localdir, "Output_to_45a"))
   }
 
 Diag.frame <- vector()

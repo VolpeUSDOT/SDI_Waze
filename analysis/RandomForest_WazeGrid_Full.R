@@ -53,6 +53,8 @@ for(mo in do.months){
 
 avail.cores = parallel::detectCores()
 
+if(avail.cores > 8) avail.cores = 10 # Limit usage to 10 cores if on r4.4xlarge instance
+
 rf.inputs = list(ntree.use = avail.cores * 50, avail.cores = avail.cores, mtry = 10, maxnodes = 1000, nodesize = 100)
 
 keyoutputs = redo_outputs = list() # to store model diagnostics
@@ -580,6 +582,8 @@ if(!REASSESS){
   keyoutputs[[modelno]] = do.rf(train.dat = w.04_09, 
                               omits, response.var = "MatchEDT_buffer_Acc", 
                               model.no = modelno, rf.inputs = rf.inputs) 
+  save("keyoutputs", file = paste0("Output_to_", modelno))
+  
 } else {
   redo_outputs[[modelno]] = reassess.rf(train.dat = w.04_09, 
                                       omits, response.var = "MatchEDT_buffer_Acc", 

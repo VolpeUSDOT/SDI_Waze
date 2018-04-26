@@ -156,7 +156,6 @@ do.rf <- function(train.dat, omits, response.var = "MatchEDT_buffer_Acc", model.
 
 
 
-
 # # Model 01
 # # Test arguments
 # # Variables to test. Use Waze only predictors, and omit grid ID and day as predictors as well. Here also omitting precipitation and neighboring grid cells
@@ -216,7 +215,7 @@ reassess.rf <- function(train.dat, omits, response.var = "MatchEDT_buffer_Acc", 
   Nobs <- data.frame(nrow(rundat),
                      sum(as.numeric(as.character(rundat[,response.var])) == 0),
                      sum(as.numeric(as.character(rundat[,response.var])) > 0),
-                     length(rundat$nWazeAccident[train.dat$nWazeAccident>0]) )
+                     length(rundat$nWazeAccident[train.dat$nWazeAccident > 0]) )
   
   colnames(Nobs) = c("N", "No EDT", "EDT present", "Waze accident present")
   
@@ -279,7 +278,7 @@ reassess.rf <- function(train.dat, omits, response.var = "MatchEDT_buffer_Acc", 
        mse = mean(as.numeric(as.character(test.dat.use[,response.var])) - 
                     as.numeric(rf.prob[,"1"]))^2,
       
-       auc = model_auc
+       auc = as.numeric(model_auc)
   ) 
   
 } # end reassss.rf function
