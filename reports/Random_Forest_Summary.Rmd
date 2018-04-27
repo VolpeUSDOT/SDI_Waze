@@ -59,7 +59,7 @@ source(file.path(codeloc, 'utility/wazefunctions.R'))
 # read random forest functions
 source(file.path(codeloc, "analysis/RandomForest_WazeGrid_Fx.R"))
 
-models <- read.csv(file.path(localdir, "Model_Descriptions.csv"))
+models <- read.csv(file.path(localdir, "Model_Descriptions.csv")) # Source: \\vntscex.local\DFS\Projects\PROJ-OR02A2\SDI\Model_Output
 
 ```
 
@@ -109,7 +109,7 @@ False positives (FP) can be considered Type I errors, and false negatives (FN) c
 
 ### 2. Mean Squared Error
 
-For binary and continuous models, mean squared error is simply the mean squared difference between observed and estimated values (the residual error).  
+Mean squared error is simply the mean squared difference between observed and estimated values (the residual error). This value is more relevant for models of continuous predictors (number of EDT crashes, rather than presence of EDT crashes).
 
 ### 3. Area under Reciever-Operator Characteristic Curve (AUROC, ROC curve)
 
@@ -118,7 +118,8 @@ For a binary model, we can additionally calculate one other quantity:
   - *Specificity* = TN / TN + FP
   + True negatives divided by all observed negatives, also called the true negative rate. For the SDI Waze analysis, most observations are "0", meaning no EDT crashes occurred, so much of the model performance is driven by accurately predicting these "0" (no crash) values.
 
-Balancing between high specificity (where false positives are avoided) and high sensitivity (where false negatives are avoided) is an important decision point in evaluating a model. High sensitivity (i.e., recall or true positive rate) with high specificity (low false positive rate) is ideal. Plotting the false positive rate versus the true positive rate allows a visualization of this balance, and is known the 'receiver-operator characteristic (ROC) curve'. The larger the area under the ROC curve, the more high specificity is maximized with low loss of sensitivity. An area of 0.5 is equivalent to flipping a coin; and area of 1 is perfect estimation, with no false positives or false negatives. As a rule of thumb, areas of 0.6 or greater are generally considered to represent useful classification models; areas of 0.9 or greater are considered to represent very good classification models
+Balancing between high specificity (where false positives are avoided) and high sensitivity (where false negatives are avoided) is an important decision point in evaluating a model. High sensitivity (i.e., recall or true positive rate) with high specificity (low false positive rate) is ideal. Plotting the false positive rate versus the true positive rate allows a visualization of this balance, and is known the 'receiver-operator characteristic (ROC) curve'. The larger the area under the ROC curve, the more high specificity is maximized with low loss of sensitivity. An area of 0.5 is equivalent to flipping a coin; and area of 1 is perfect estimation, with no false positives or false negatives. As a rule of thumb, areas of 0.6 or greater are generally considered to represent useful classification models; areas of 0.9 or greater are considered to represent very good classification models.
+
 
 ```{r roc, echo=FALSE, fig.cap="ROC curves, [CC BY-SA 3.0 Wikimedia](https://commons.wikimedia.org/w/index.php?curid=44059691)", out.width = '50%'}
 knitr::include_graphics("ROC_curves.png")
@@ -126,10 +127,21 @@ knitr::include_graphics("ROC_curves.png")
 
 # Phase 1 model testing
 
-       
+### Input data
+In developing these models, it is important to keep in mind the goal is to estimate EDT-level crashes when and where no EDT data are present. For model development, two approaches to training and testing of the models can be used: split the observed data (where EDT data are available) into random subsets of training and test data, or develop models using all available data for one time period, and test the model on a new time period where EDT data are available. 
+
+For Phase 1, we took the following approaches for Waze and EDT data from Maryland:
+
+- April 2017 data, 70/30 split between training and test data
+- April + May 2017, 70/30 split between training and test data
+- April + May 2017, complete data used, test on June 2017
+
+For most of the predictor combinations used, we focus on the first and third approaches. The first is a relatively small scale model, while the third is a more realistic model, where the model works to estimate EDT crashes for an entire month of data not used in the training set.       
 
 ### Spatial grain
-We tested three options, and and selected 1 mile grid size for all future work. Models at the larger spatial grain (4 square mile hexagonal grid cells) or smaller spatial grain (0.5 square mile hexagonal grid cells) performed relatively similar. There was a small performance gain at the 0.5 mile grain size in some cases. however, run time was substantially longer for data preparation (including approximately 36 hours of computational time per month of data to prepare weather variables at 0.5 mile grid size, compared to approximately 6 hours for a similar process for 1 mile grid cells), and substantially longer for model fitting (xx vs. xx), with 66,220 grid cells at 0.5 square miles versus 33,184 grid cells at 1 square miles.
+We tested three options, and selected 1 mile grid size for subsequent work. Models at the larger spatial grain (4 square mile hexagonal grid cells) performed slightly worse than 1 mile grid cells, while the smaller spatial grain (0.5 square mile hexagonal grid cells) performed slightly better in most metrics. The small performance gain at the 0.5 mile grain size in some cases comes at the cost of substantially longer run time for data preparation (including approximately 36 hours of computational time per month of data to prepare weather variables at 0.5 mile grid size, compared to approximately 6 hours for a similar process for 1 mile grid cells), and 50% longer for model fitting, with 66,220 grid cells at 0.5 square miles versus 33,184 grid cells at 1 square miles. When training models over multiple states, for multiple months of data, such performance differences could be barriers to success. The subsequent models all use 1 square mile grid cells, but we will revisit the potential gain from a smaller spatial resolution.
+
+Note that of the evaluation metrics, AUC was very high for nearly all models. This is driven by the high accuracy of these models, especially in estimating the true zeros (times and locations where no EDT crash occurred).
 
 ```{r phase1spatial, echo = F}
 if(!exists("keyoutputs1")) {
@@ -148,51 +160,105 @@ if(!exists("keyoutputs1")) {
 
 Diag.frame <- vector()
 for(i in c("01", "04", "06")){
-  Diag.frame <- rbind(Diag.frame, c(keyoutputs1[[i]][[3]]))
+  Diag.frame <- rbind(Diag.frame, c(keyoutputs1[[i]]$diag, round(keyoutputs1[[i]]$auc, 4)))
  }
 
-colnames(Diag.frame)[1:4] = c("Accuracy", "Precision", "Recall", "False Positive Rate")
+colnames(Diag.frame)[1:5] = c("Accuracy", "Precision", "Recall", "False Positive Rate", "AUC")
 Diag.frame[,1:4] = Diag.frame[,1:4]*100
 
 rownames(Diag.frame) = c("Model 01 - 1 mile", "Model 04 - 4 mile", "Model 06 - 0.5 mile")
 kable(Diag.frame, 
-          caption = "Phase 1 model diagnostics for April 2017",
+          caption = "Phase 1 model diagnostics for April 2017, Maryland.",
           rownames = "Model")
 
 
 Diag.frame <- vector()
 for(i in c("03", "05", "07")){
-  Diag.frame <- rbind(Diag.frame, c(keyoutputs1[[i]][[3]]))
+  Diag.frame <- rbind(Diag.frame, c(keyoutputs1[[i]]$diag, round(keyoutputs1[[i]]$auc, 4)))
  }
 
-colnames(Diag.frame)[1:4] = c("Accuracy", "Precision", "Recall", "False Positive Rate")
+colnames(Diag.frame)[1:5] = c("Accuracy", "Precision", "Recall", "False Positive Rate", "AUC")
 Diag.frame[,1:4] = Diag.frame[,1:4]*100
 
 rownames(Diag.frame) = c("Model 03 - 1 mile", "Model 05 - 4 mile", "Model 07 - 0.5 mile")
 kable(Diag.frame, 
-          caption = "Phase 1 model diagnostics for April + May, test on June",
+          caption = "Phase 1 model diagnostics for April + May, test on June, Maryland.",
           rownames = "Model")
 
 ```   
 
 ### Time windows
-Deferred: Using with 1 hr aggregations for all models
-4hr windows would require new aggregation in GridAggregation.R
-
- - 1 hr
- - 4 hr
+We considered, but deferred, analysis of different time windows. The models described here all use 1 hr aggregations of Waze event counts and EDT crashes. 4hr windows would require new aggregation process.
 
 ### Neighbors
-Grid cells 
+One approach to addressing spatial dependence is to consider the counts of Waze events in neighboring grid cells as additional predictors of an EDT-level crash occurring.
 
- - Without 
- - With
+Addition of neighbors drove minor increases in performance at both the one-month (April) and three month (April+May, test on June) data sets. Recall (minimization of false negatives) was higher when neighboring grid cells were included as predictors. Neighboring grid cells should be considered as useful additional predictors.
 
-### Model versions
+```{r phase1neighbors, echo = F}
+# pairs to compare: 01, 08 - April
+Diag.frame <- vector()
+for(i in c("01", "08")){
+  Diag.frame <- rbind(Diag.frame, c(keyoutputs1[[i]]$diag, round(keyoutputs1[[i]]$auc, 4)))
+ }
 
-- April, 70/30 split between training and test data
-- April + May, 70/30 split between training and test data
-- April + May, complete data used, test on June
+colnames(Diag.frame)[1:5] = c("Accuracy", "Precision", "Recall", "False Positive Rate", "AUC")
+Diag.frame[,1:4] = Diag.frame[,1:4]*100
+rownames(Diag.frame) = c("Model 01 - 1 mile", "Model 08 - 1 mile, Neighbors")
+kable(Diag.frame, 
+          caption = "Phase 1 model diagnostics for April 2017, Maryland, with neighboring grid cells as predictors.",
+          rownames = "Model")
+
+# 03, 09 - April+May, test on June
+Diag.frame <- vector()
+for(i in c("03", "09")){
+  Diag.frame <- rbind(Diag.frame, c(keyoutputs1[[i]]$diag, round(keyoutputs1[[i]]$auc, 4)))
+ }
+colnames(Diag.frame)[1:5] = c("Accuracy", "Precision", "Recall", "False Positive Rate", "AUC")
+Diag.frame[,1:4] = Diag.frame[,1:4]*100
+rownames(Diag.frame) = c("Model 03 - 1 mile", "Model 09 - 1 mile, Neighbors")
+kable(Diag.frame, 
+          caption = "Phase 1 model diagnostics for April + May, test on June, Maryland.",
+          rownames = "Model")
+```   
+
+### Additional data
+
+Additional data included in Phase 1 were the following:
+
+- Weather
+- Road functional class
+- Economic data from LODES
+
+Adding these additional data increased the recall, overall accuracy, and AUC, at the cost of slightly higher false positive rates. Interestingly, the addition of weather appeared to mostly increase precision (minimizing false positives).
+
+```{r phase1addl, echo = F}
+# pairs to compare: 12, 14, 16 - April
+Diag.frame <- vector()
+for(i in c("08","12", "14", "16")){
+  Diag.frame <- rbind(Diag.frame, c(keyoutputs1[[i]]$diag, round(keyoutputs1[[i]]$auc, 4)))
+ }
+
+colnames(Diag.frame)[1:5] = c("Accuracy", "Precision", "Recall", "False Positive Rate", "AUC")
+Diag.frame[,1:4] = Diag.frame[,1:4]*100
+rownames(Diag.frame) = c("Model 08 - 1 mile, Neighbors", "Model 12 - Weather", "Model 14 - Weather, Roads", "Model 16 - Weather, Roads, Jobs")
+kable(Diag.frame, 
+          caption = "Phase 1 model diagnostics for April 2017, Maryland, with neighboring grid cells as predictors.",
+          rownames = "Model")
+
+# 09, 13, 15, 17  - April+May, test on June
+Diag.frame <- vector()
+for(i in c("09", "13", "15", "17")){
+  Diag.frame <- rbind(Diag.frame, c(keyoutputs1[[i]]$diag, round(keyoutputs1[[i]]$auc, 4)))
+ }
+colnames(Diag.frame)[1:5] = c("Accuracy", "Precision", "Recall", "False Positive Rate", "AUC")
+Diag.frame[,1:4] = Diag.frame[,1:4]*100
+rownames(Diag.frame) =c("Model 09 - 1 mile, Neighbors", "Model 13 - Weather", "Model 15 - Weather, Roads", "Model 17 - Weather, Roads, Jobs")
+kable(Diag.frame, 
+          caption = "Phase 1 model diagnostics for April + May, test on June, Maryland.",
+          rownames = "Model")
+```   
+
 
 ## General summary 
 What we learned from this testing is the following:
@@ -400,3 +466,19 @@ nHazardOnRoad, nHazardOnShoulder, nHazardWeather
 - 45 Run best combination of each base model (A, B, and C) on buffer counts vs grid cell counts 
 - 46 Pick best and test removing EDT only rows
 - 47 Pick best and test removing road closure only rows
+
+# Appendix: Model definitions
+
+The following models were tested:
+
+```{r modeldefinitions}
+models.use <- models[c("Set", "Model.Number","Short.Name", "Data","Additional.Data","Neighbors","MagVar..Rating")]
+
+
+datatable(models.use,
+          filter = 'top',
+          caption = "Random forest model descriptions.",
+          rownames = F,
+          options = list(dom = "ftip",
+                         pageLength = 10))
+```
