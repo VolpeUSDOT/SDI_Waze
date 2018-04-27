@@ -15,7 +15,7 @@ codeloc <- "~/SDI_Waze"
 HEXSIZE = c("1", "4", "05")[1] # Change the value in the bracket to use 1, 4, or 0.5 sq mi hexagon grids
 do.months = c("04","05","06","07","08","09")
 
-REASSESS = T # re-assess model fit and diagnostics using reassess.rf instead of do.rf
+REASSESS = F # re-assess model fit and diagnostics using reassess.rf instead of do.rf
 
 inputdir <- paste0("WazeEDT_Agg", HEXSIZE, "mile_Rdata_Input")
 outputdir <- paste0("WazeEDT_Agg", HEXSIZE, "mile_RandForest_Output")
@@ -51,9 +51,21 @@ for(mo in do.months){
   prep.hex(file.path(inputdir, paste0("WazeTimeEdtHexWx_", mo, "_", HEXSIZE, "_mi.RData")), month = mo)
 }
 
+# Add FARS, AADT, HPMS, jobs
+na.action = "fill0"
+for(w in c("w.04", "w.05", "w.06", "w.07","w.08", "w.09")){
+  append.hex(hexname = w, data.to.add = "FARS_MD_2012_2016_sum_annual", na.action = na.action)
+  append.hex(hexname = w, data.to.add = "hexagons_1mi_routes_AADT_total_sum", na.action = na.action)
+  append.hex(hexname = w, data.to.add = "hexagons_1mi_routes_sum", na.action = na.action)
+  append.hex(hexname = w, data.to.add = "hexagons_1mi_bg_lodes_sum", na.action = na.action)
+  append.hex(hexname = w, data.to.add = "hexagons_1mi_bg_rac_sum", na.action = na.action)
+  }
+  
+w.04_09 <- rbind(w.04, w.05, w.06, w.07, w.08, w.09)
+
 avail.cores = parallel::detectCores()
 
-if(avail.cores > 8) avail.cores = 12 # Limit usage to 12 cores if on r4.4xlarge instance
+if(avail.cores > 8) avail.cores = 10 # Limit usage below max if on r4.4xlarge instance
 
 rf.inputs = list(ntree.use = avail.cores * 50, avail.cores = avail.cores, mtry = 10, maxnodes = 1000, nodesize = 100)
 
@@ -81,15 +93,18 @@ response.var = "MatchEDT_buffer_Acc"
 # 23 Add all together
 starttime = Sys.time()
 
-omits = c(alwaysomit, 
+omits = c(alwaysomit,
           "wx",
+          c("CRASH_SUM", "FATALS_SUM"), # FARS variables, 
+          grep("F_SYSTEM", names(w.04), value = T), # road class
+          c("MEAN_AADT", "SUM_AADT"), # AADT
+          grep("WAC", names(w.04), value = T), # Jobs workplace
+          grep("RAC", names(w.04), value = T), # Jobs residential
           grep("MagVar", names(w.04), value = T), # direction of travel
           grep("medLast", names(w.04), value = T), # report rating, reliability, confidence
           grep("nWazeAcc_", names(w.04), value = T), # neighboring accidents
           grep("nWazeJam_", names(w.04), value = T) # neighboring jams
-          )
-
-w.04_09 <- rbind(w.04, w.05, w.06, w.07, w.08, w.09)
+)
 
 modelno = "18"
 
@@ -110,11 +125,19 @@ redo_outputs[[modelno]] = reassess.rf(train.dat = w.04_09,
 # 19, add FARS
 modelno = "19"
 
-for(w in c("w.04", "w.05", "w.06", "w.07","w.08", "w.09")){
-  append.hex(hexname = w, data.to.add = "FARS_MD_2012_2016_sum_annual")
-}
+omits = c(alwaysomit,
+          "wx",
+          #c("CRASH_SUM", "FATALS_SUM"), # FARS variables, 
+          grep("F_SYSTEM", names(w.04), value = T), # road class
+          c("MEAN_AADT", "SUM_AADT"), # AADT
+          grep("WAC", names(w.04), value = T), # Jobs workplace
+          grep("RAC", names(w.04), value = T), # Jobs residential
+          grep("MagVar", names(w.04), value = T), # direction of travel
+          grep("medLast", names(w.04), value = T), # report rating, reliability, confidence
+          grep("nWazeAcc_", names(w.04), value = T), # neighboring accidents
+          grep("nWazeJam_", names(w.04), value = T) # neighboring jams
+)
 
-w.04_09 <- rbind(w.04, w.05, w.06, w.07, w.08, w.09)
 
 if(!REASSESS){
   keyoutputs[[modelno]] = do.rf(train.dat = w.04_09, 
@@ -131,13 +154,18 @@ redo_outputs[[modelno]] = reassess.rf(train.dat = w.04_09,
 # 20 Add Weather only
 modelno = "20"
 
-omits = c(alwaysomit, 
-          c("CRASH_SUM", "FATALS_SUM"), # FARS variables, added in 19
+omits = c(alwaysomit,
+          #"wx",
+          c("CRASH_SUM", "FATALS_SUM"), # FARS variables, 
+          grep("F_SYSTEM", names(w.04), value = T), # road class
+          c("MEAN_AADT", "SUM_AADT"), # AADT
+          grep("WAC", names(w.04), value = T), # Jobs workplace
+          grep("RAC", names(w.04), value = T), # Jobs residential
           grep("MagVar", names(w.04), value = T), # direction of travel
           grep("medLast", names(w.04), value = T), # report rating, reliability, confidence
           grep("nWazeAcc_", names(w.04), value = T), # neighboring accidents
           grep("nWazeJam_", names(w.04), value = T) # neighboring jams
-          )
+)
 
 if(!REASSESS){
 
@@ -155,23 +183,19 @@ redo_outputs[[modelno]] = reassess.rf(train.dat = w.04_09,
 # 21 Add road class, AADT only
 modelno = "21"
 
-for(w in c("w.04", "w.05", "w.06", "w.07","w.08", "w.09")){
-  append.hex(hexname = w, data.to.add = "hexagons_1mi_routes_AADT_total_sum")
-  append.hex(hexname = w, data.to.add = "hexagons_1mi_routes_sum")
-  }
-
-w.04_09 <- rbind(w.04, w.05, w.06, w.07, w.08, w.09)
-
-omits = c(alwaysomit, 
-          c("CRASH_SUM", "FATALS_SUM"), # FARS variables, added in 19
+omits = c(alwaysomit,
           "wx",
-          grep("WAC", names(w.04), value = T), # jobs workplace
-          grep("RAC", names(w.04), value = T), # jobs residence
+          c("CRASH_SUM", "FATALS_SUM"), # FARS variables, 
+#          grep("F_SYSTEM", names(w.04), value = T), # road class
+#          c("MEAN_AADT", "SUM_AADT"), # AADT
+          grep("WAC", names(w.04), value = T), # Jobs workplace
+          grep("RAC", names(w.04), value = T), # Jobs residential
           grep("MagVar", names(w.04), value = T), # direction of travel
           grep("medLast", names(w.04), value = T), # report rating, reliability, confidence
           grep("nWazeAcc_", names(w.04), value = T), # neighboring accidents
           grep("nWazeJam_", names(w.04), value = T) # neighboring jams
 )
+
 
 if(!REASSESS){
   keyoutputs[[modelno]] = do.rf(train.dat = w.04_09, 
@@ -186,18 +210,13 @@ redo_outputs[[modelno]] = reassess.rf(train.dat = w.04_09,
 # 22 Add jobs only
 modelno = "22"
 
-for(w in c("w.04", "w.05", "w.06", "w.07","w.08", "w.09")){
-  append.hex(hexname = w, data.to.add = "hexagons_1mi_bg_lodes_sum")
-  append.hex(hexname = w, data.to.add = "hexagons_1mi_bg_rac_sum")
-}
-
-w.04_09 <- rbind(w.04, w.05, w.06, w.07, w.08, w.09)
-
-omits = c(alwaysomit, 
-          c("CRASH_SUM", "FATALS_SUM"), # FARS variables, added in 19
+omits = c(alwaysomit,
+          "wx",
+          c("CRASH_SUM", "FATALS_SUM"), # FARS variables, 
           grep("F_SYSTEM", names(w.04), value = T), # road class
           c("MEAN_AADT", "SUM_AADT"), # AADT
-          "wx",
+#          grep("WAC", names(w.04), value = T), # Jobs workplace
+#          grep("RAC", names(w.04), value = T), # Jobs residential
           grep("MagVar", names(w.04), value = T), # direction of travel
           grep("medLast", names(w.04), value = T), # report rating, reliability, confidence
           grep("nWazeAcc_", names(w.04), value = T), # neighboring accidents
@@ -217,7 +236,13 @@ if(!REASSESS){
 # 23 Add all together
 modelno = "23"
 
-omits = c(alwaysomit, 
+omits = c(alwaysomit,
+#          "wx",
+#          c("CRASH_SUM", "FATALS_SUM"), # FARS variables, 
+#          grep("F_SYSTEM", names(w.04), value = T), # road class
+#          c("MEAN_AADT", "SUM_AADT"), # AADT
+#          grep("WAC", names(w.04), value = T), # Jobs workplace
+#          grep("RAC", names(w.04), value = T), # Jobs residential
           grep("MagVar", names(w.04), value = T), # direction of travel
           grep("medLast", names(w.04), value = T), # report rating, reliability, confidence
           grep("nWazeAcc_", names(w.04), value = T), # neighboring accidents
@@ -267,12 +292,17 @@ modelno = "25"
 
 omits = c(alwaysomit, alert_subtypes,
           "wx",
-          c("CRASH_SUM", "FATALS_SUM"), # FARS variables, added in 19
+          c("CRASH_SUM", "FATALS_SUM"), # FARS variables, 
           grep("F_SYSTEM", names(w.04), value = T), # road class
           c("MEAN_AADT", "SUM_AADT"), # AADT
           grep("WAC", names(w.04), value = T), # Jobs workplace
           grep("RAC", names(w.04), value = T) # Jobs residential
-          )
+#          grep("MagVar", names(w.04), value = T), # direction of travel
+#          grep("medLast", names(w.04), value = T), # report rating, reliability, confidence
+#          grep("nWazeAcc_", names(w.04), value = T), # neighboring accidents
+#          grep("nWazeJam_", names(w.04), value = T) # neighboring jams
+)
+
 
 if(!REASSESS){
   keyoutputs[[modelno]] = do.rf(train.dat = w.04_09, omits, response.var = "MatchEDT_buffer_Acc",  
@@ -288,6 +318,7 @@ modelno = "26"
 
 omits = c(alwaysomit, alert_subtypes,
           "wx",
+#          c("CRASH_SUM", "FATALS_SUM"), # FARS variables, added in 19
           grep("F_SYSTEM", names(w.04), value = T), # road class
           c("MEAN_AADT", "SUM_AADT"), # AADT
           grep("WAC", names(w.04), value = T), # Jobs workplace
@@ -296,7 +327,8 @@ omits = c(alwaysomit, alert_subtypes,
           grep("medLast", names(w.04), value = T), # report rating, reliability, confidence
           grep("nWazeAcc_", names(w.04), value = T), # neighboring accidents
           grep("nWazeJam_", names(w.04), value = T) # neighboring jams
-          )
+)
+
 
 if(!REASSESS){
   keyoutputs[[modelno]] = do.rf(train.dat = w.04_09, omits, response.var = "MatchEDT_buffer_Acc",  
@@ -336,7 +368,7 @@ if(!REASSESS){
 modelno = "28"
 
 omits = c(alwaysomit, alert_subtypes,
-          #"wx",
+          "wx",
           c("CRASH_SUM", "FATALS_SUM"), # FARS variables, added in 19
           #grep("F_SYSTEM", names(w.04), value = T), # road class
           #c("MEAN_AADT", "SUM_AADT"), # AADT

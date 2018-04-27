@@ -256,8 +256,9 @@ modelno = "03"
 ```
 
 
-
 # Phase 2 model testing
+
+
 - Expand all models to six months (April to September 70/30 training test split)
 - Start with base models below (A then B then C)
 - Run and document tests in markdown file and run with updated RF functions
@@ -267,8 +268,11 @@ modelno = "03"
 if(ONLOCAL) {  localdir <- outputdir2 } 
 
 if(!exists("keyoutputs2")) { 
+  load(file.path(localdir, "Reassess_Output_to_45c"))
   load(file.path(localdir, "Output_to_45a"))
-  keyoutputs2 <- keyoutputs
+
+  keyoutputs2 <- redo_outputs
+  keyoutputs2.old <- keyoutputs
   rm(keyoutputs) 
 #   simplifying the auc value, don't need complete output
 #   for(i in 1:length(keyoutputs)){
@@ -327,12 +331,6 @@ nHazardOnRoad, nHazardOnShoulder, nHazardWeather
 - 40 Pick best and test removing EDT only rows
 - 41 Pick best and test removing road closure only rows
 
-```{r m33}
-
-```
-
-```{r m34}
-```
 
 
 

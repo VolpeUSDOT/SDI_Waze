@@ -298,7 +298,7 @@ for(mo in c("04","05","06")){
 }
 
 for(w in c("w.04", "w.05", "w.06")){
-  append.hex(hexname = w, data.to.add = "hexagons_1mi_routes_sum")
+  append.hex(hexname = w, data.to.add = "hexagons_1mi_routes_sum", na.action = "fill0")
 }
 
 omits = c(alwaysomit)
@@ -332,17 +332,17 @@ for(mo in c("04","05","06")){
 
 # Add road functional class characteristics
 for(w in c("w.04", "w.05", "w.06")){
-  append.hex(hexname = w, data.to.add = "hexagons_1mi_routes_sum")
+  append.hex(hexname = w, data.to.add = "hexagons_1mi_routes_sum", na.action = "fill0")
 }
 
 # Add workplace area characteristics
 for(w in c("w.04", "w.05", "w.06")){
-  append.hex(hexname = w, data.to.add = "hexagons_1mi_bg_lodes_sum")
+  append.hex(hexname = w, data.to.add = "hexagons_1mi_bg_lodes_sum", na.action = "fill0")
 }
 
 # Add residence area characteristics
 for(w in c("w.04", "w.05", "w.06")){
-  append.hex(hexname = w, data.to.add = "hexagons_1mi_bg_rac_sum")
+  append.hex(hexname = w, data.to.add = "hexagons_1mi_bg_rac_sum", na.action = "fill0")
 }
 
 # Look at NA for road data (using na.action = "keep" in append.hex above)
