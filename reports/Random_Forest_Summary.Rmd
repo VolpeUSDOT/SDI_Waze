@@ -1,16 +1,8 @@
 ---
-title: ""
+title: ''
 output:
   html_document:
     df_print: paged
-    toc: yes
-    toc_depth: 2
-    toc_float:
-      collapsed: no
-      smooth_scroll: no
-  html_notebook:
-    df_print: paged
-    self_contained: yes
     toc: yes
     toc_depth: 2
     toc_float:
@@ -158,30 +150,20 @@ if(!exists("keyoutputs1")) {
 # pairs to compare: 01, 04, 06 - April
 # 03, 05, 07 - April+May, test on June
 
-Diag.frame <- vector()
-for(i in c("01", "04", "06")){
-  Diag.frame <- rbind(Diag.frame, c(keyoutputs1[[i]]$diag, round(keyoutputs1[[i]]$auc, 4)))
- }
+tabl <- vector()
+for(i in c("01", "04", "06")){ tabl <- rbind(tabl, c(100*keyoutputs1[[i]]$diag, round(keyoutputs1[[i]]$auc, 4)))}
 
-colnames(Diag.frame)[1:5] = c("Accuracy", "Precision", "Recall", "False Positive Rate", "AUC")
-Diag.frame[,1:4] = Diag.frame[,1:4]*100
+colnames(tabl)[1:5] = c("Accuracy", "Precision", "Recall", "False Positive Rate", "AUC")
 
-rownames(Diag.frame) = c("Model 01 - 1 mile", "Model 04 - 4 mile", "Model 06 - 0.5 mile")
-kable(Diag.frame, 
-          caption = "Phase 1 model diagnostics for April 2017, Maryland.",
-          rownames = "Model")
+rownames(tabl) = c("Model 01 - 1 mile", "Model 04 - 4 mile", "Model 06 - 0.5 mile")
+kable(tabl, caption = "Phase 1 model diagnostics for April 2017, Maryland.", rownames = "Model")
 
+tabl <- vector()
+for(i in c("03", "05", "07")){ tabl <- rbind(tabl, c(100*keyoutputs1[[i]]$diag, round(keyoutputs1[[i]]$auc, 4)))}
 
-Diag.frame <- vector()
-for(i in c("03", "05", "07")){
-  Diag.frame <- rbind(Diag.frame, c(keyoutputs1[[i]]$diag, round(keyoutputs1[[i]]$auc, 4)))
- }
-
-colnames(Diag.frame)[1:5] = c("Accuracy", "Precision", "Recall", "False Positive Rate", "AUC")
-Diag.frame[,1:4] = Diag.frame[,1:4]*100
-
-rownames(Diag.frame) = c("Model 03 - 1 mile", "Model 05 - 4 mile", "Model 07 - 0.5 mile")
-kable(Diag.frame, 
+colnames(tabl)[1:5] = c("Accuracy", "Precision", "Recall", "False Positive Rate", "AUC")
+rownames(tabl) = c("Model 03 - 1 mile", "Model 05 - 4 mile", "Model 07 - 0.5 mile")
+kable(tabl, 
           caption = "Phase 1 model diagnostics for April + May, test on June, Maryland.",
           rownames = "Model")
 
@@ -197,27 +179,21 @@ Addition of neighbors drove minor increases in performance at both the one-month
 
 ```{r phase1neighbors, echo = F}
 # pairs to compare: 01, 08 - April
-Diag.frame <- vector()
-for(i in c("01", "08")){
-  Diag.frame <- rbind(Diag.frame, c(keyoutputs1[[i]]$diag, round(keyoutputs1[[i]]$auc, 4)))
- }
+tabl <- vector()
+for(i in c("01", "08")){ tabl <- rbind(tabl, c(100*keyoutputs1[[i]]$diag, round(keyoutputs1[[i]]$auc, 4)))}
 
-colnames(Diag.frame)[1:5] = c("Accuracy", "Precision", "Recall", "False Positive Rate", "AUC")
-Diag.frame[,1:4] = Diag.frame[,1:4]*100
-rownames(Diag.frame) = c("Model 01 - 1 mile", "Model 08 - 1 mile, Neighbors")
-kable(Diag.frame, 
+colnames(tabl)[1:5] = c("Accuracy", "Precision", "Recall", "False Positive Rate", "AUC")
+rownames(tabl) = c("Model 01 - 1 mile", "Model 08 - 1 mile, Neighbors")
+kable(tabl, 
           caption = "Phase 1 model diagnostics for April 2017, Maryland, with neighboring grid cells as predictors.",
           rownames = "Model")
 
 # 03, 09 - April+May, test on June
-Diag.frame <- vector()
-for(i in c("03", "09")){
-  Diag.frame <- rbind(Diag.frame, c(keyoutputs1[[i]]$diag, round(keyoutputs1[[i]]$auc, 4)))
- }
-colnames(Diag.frame)[1:5] = c("Accuracy", "Precision", "Recall", "False Positive Rate", "AUC")
-Diag.frame[,1:4] = Diag.frame[,1:4]*100
-rownames(Diag.frame) = c("Model 03 - 1 mile", "Model 09 - 1 mile, Neighbors")
-kable(Diag.frame, 
+tabl <- vector()
+for(i in c("03", "09")){ tabl <- rbind(tabl, c(100*keyoutputs1[[i]]$diag, round(keyoutputs1[[i]]$auc, 4)))}
+colnames(tabl)[1:5] = c("Accuracy", "Precision", "Recall", "False Positive Rate", "AUC")
+rownames(tabl) = c("Model 03 - 1 mile", "Model 09 - 1 mile, Neighbors")
+kable(tabl, 
           caption = "Phase 1 model diagnostics for April + May, test on June, Maryland.",
           rownames = "Model")
 ```   
@@ -226,99 +202,41 @@ kable(Diag.frame,
 
 Additional data included in Phase 1 were the following:
 
-- Weather
-- Road functional class
-- Economic data from LODES
+- Weather: Reflectivity from the [NEXRAD](https://www.ncdc.noaa.gov/data-access/radar-data/nexrad) radar network, pulled hourly and merged with gridded data.
+- Road functional class: Miles of roads of each functional class, from [HPMS](https://www.fhwa.dot.gov/policyinformation/hpms.cfm).
+- Economic data from [Longidtinal Employer-Household Dynamics](https://lehd.ces.census.gov/) data set: Number of jobs, and number of workers, for firms of different ages and sizes.
 
 Adding these additional data increased the recall, overall accuracy, and AUC, at the cost of slightly higher false positive rates. Interestingly, the addition of weather appeared to mostly increase precision (minimizing false positives).
 
 ```{r phase1addl, echo = F}
 # pairs to compare: 12, 14, 16 - April
-Diag.frame <- vector()
-for(i in c("08","12", "14", "16")){
-  Diag.frame <- rbind(Diag.frame, c(keyoutputs1[[i]]$diag, round(keyoutputs1[[i]]$auc, 4)))
- }
+tabl <- vector()
+for(i in c("08","12", "14", "16")){ tabl <- rbind(tabl, c(100*keyoutputs1[[i]]$diag, round(keyoutputs1[[i]]$auc, 4)))}
 
-colnames(Diag.frame)[1:5] = c("Accuracy", "Precision", "Recall", "False Positive Rate", "AUC")
-Diag.frame[,1:4] = Diag.frame[,1:4]*100
-rownames(Diag.frame) = c("Model 08 - 1 mile, Neighbors", "Model 12 - Weather", "Model 14 - Weather, Roads", "Model 16 - Weather, Roads, Jobs")
-kable(Diag.frame, 
-          caption = "Phase 1 model diagnostics for April 2017, Maryland, with neighboring grid cells as predictors.",
-          rownames = "Model")
+colnames(tabl)[1:5] = c("Accuracy", "Precision", "Recall", "False Positive Rate", "AUC")
+rownames(tabl) = c("Model 08 - 1 mile, Neighbors", "Model 12 - Weather", "Model 14 - Weather, Roads", "Model 16 - Weather, Roads, Jobs")
+kable(tabl, caption = "Phase 1 model diagnostics for April 2017, Maryland, with supplemental weather, road functional class, and economic data.", rownames = "Model")
 
 # 09, 13, 15, 17  - April+May, test on June
-Diag.frame <- vector()
-for(i in c("09", "13", "15", "17")){
-  Diag.frame <- rbind(Diag.frame, c(keyoutputs1[[i]]$diag, round(keyoutputs1[[i]]$auc, 4)))
- }
-colnames(Diag.frame)[1:5] = c("Accuracy", "Precision", "Recall", "False Positive Rate", "AUC")
-Diag.frame[,1:4] = Diag.frame[,1:4]*100
-rownames(Diag.frame) =c("Model 09 - 1 mile, Neighbors", "Model 13 - Weather", "Model 15 - Weather, Roads", "Model 17 - Weather, Roads, Jobs")
-kable(Diag.frame, 
-          caption = "Phase 1 model diagnostics for April + May, test on June, Maryland.",
-          rownames = "Model")
+tabl <- vector()
+for(i in c("09", "13", "15", "17")){ tabl <- rbind(tabl, c(100*keyoutputs1[[i]]$diag, round(keyoutputs1[[i]]$auc, 4))) }
+colnames(tabl)[1:5] = c("Accuracy", "Precision", "Recall", "False Positive Rate", "AUC")
+rownames(tabl) = c("Model 09 - 1 mile, Neighbors", "Model 13 - Weather", "Model 15 - Weather, Roads", "Model 17 - Weather, Roads, Jobs")
+kable(tabl, caption = "Phase 1 model diagnostics for April + May, test on June, Maryland, with supplemental weather, road functional class, and economic data.", rownames = "Model")
 ```   
 
 
 ## General summary 
 What we learned from this testing is the following:
 
-- 1mi grid size is best. There was 
+- All models showed very high accuracy and excellent performance according to ROC curves. 
+- Even a single month of data presents a rich source of information for building an accurate EDT crash estimation model. For the Maryland data, going to longer time frames and testing on novel data (training on April + May, testing on June) showed similar overall model performance as the more simple single month of data (April only).
+- 1 mi grid size is most practical, although there is some gain from the smaller grid size. That performance gain needs to be weighed against the higher computational resources needed for data aggregation and modeling.
+- Neighboring grid cells added some additional predictive power.
+- Additional data improved different aspects of the model: using the larger April + May data, weather data reduced false positives, while road functional class and jobs data reduced false negatives.
 
-- Adding more months of data does not really improve model: focus on adding data features
-- Run future models on April-Sept (6 months) with 70/30 training/test split
 
-Some improvements with some new data features. Expand testing in next phase
-Something about neighbors?
 
-```{r keyoutputs1ummary1}
-# Summary from keyoutputs1 ----
-Nobs.frame <- vector()
-
-for(i in 1:length(keyoutputs1)){
-  Nobs.frame <- rbind(Nobs.frame, c(Model = i, keyoutputs1[[i]][[1]]))
- }
-
-datatable(Nobs.frame, filter = 'top',
-          caption = "Phase 1 model inputs. N: total rows of input training data; No EDT = number rows without EDT crashes; EDT present: number of rows with EDT crashes; Waze accident present: Number of rows at least one `WazeAccident` present",
-          rownames = T,
-          options = list(dom = "tip",
-                         #order = list(list(1, 'desc')),
-                         pageLength = 5)
-          ) %>% formatCurrency(2:5, currency = "", digits = 0)
-
-```
-
-```{r Diagframe1}
-Diag.frame <- vector()
-
-for(i in 1:length(keyoutputs1)){
-  Diag.frame <- rbind(Diag.frame, c(Model = i, 
-                                    100*keyoutputs1[[i]][[3]],
-                                    Runtime = paste(round(keyoutputs1[[i]]$runtime, 1), attr(keyoutputs1[[i]]$runtime, "unit")),
-                                    AUC = round(keyoutputs1[[i]]$auc, 4),
-                                    MSE = round(keyoutputs1[[i]]$mse, 8)
-                                    )
-                      )
- }
-
-colnames(Diag.frame)[2:5] = c("Accuracy", "Precision", "Recall", "False Positive Rate")
-Diag.frame[,1] = as.factor(Diag.frame[,1])
-
-datatable(Diag.frame, filter = 'top',
-          caption = "Phase 1 model diagnostics. Best values are highlighed in green.",
-          rownames = T,
-          options = list(dom = "tip",
-                         order = list(list(1, 'desc')),
-                         pageLength = 5)
-          ) %>% formatCurrency(2:5, currency = "", digits = 2) %>%
-          formatStyle(2, background = styleEqual(max(Diag.frame[,2]), 'lightgreen'))%>%
-          formatStyle(3, background = styleEqual(max(Diag.frame[,3]), 'lightgreen'))%>%
-          formatStyle(4, background = styleEqual(max(Diag.frame[,4]), 'lightgreen'))%>%
-          formatStyle(5, background = styleEqual(min(Diag.frame[,5]), 'lightgreen'))%>%
-          formatStyle(7, background = styleEqual(max(Diag.frame[,7]), 'lightgreen'))%>%
-          formatStyle(8, background = styleEqual(min(Diag.frame[,8]), 'lightgreen'))
-```
 
 ```{r m01-03, eval=F}
 modelno = "16"
@@ -345,7 +263,7 @@ modelno = "03"
 - Run and document tests in markdown file and run with updated RF functions
 
 
-```{r Diagframe2}
+```{r Diagframe2a}
 if(ONLOCAL) {  localdir <- outputdir2 } 
 
 if(!exists("keyoutputs2")) { 
@@ -359,34 +277,6 @@ if(!exists("keyoutputs2")) {
 #   save(list = "keyoutputs", file = file.path(localdir, "Output_to_45a"))
   }
 
-Diag.frame <- vector()
-
-for(i in 1:length(keyoutputs2)){
-  Diag.frame <- rbind(Diag.frame, c(Model = names(keyoutputs2)[i], 
-                                    100*keyoutputs2[[i]][[3]],
-                                    Runtime = paste(round(keyoutputs2[[i]]$runtime, 1), attr(keyoutputs2[[i]]$runtime, "unit")),
-                                    AUC = round(keyoutputs2[[i]]$auc, 4),
-                                    MSE = round(keyoutputs2[[i]]$mse, 8)
-                                    )
-                      )
- }
-
-colnames(Diag.frame)[2:5] = c("Accuracy", "Precision", "Recall", "False Positive Rate")
-#Diag.frame[,1] = as.factor(Diag.frame[,1])
-
-datatable(Diag.frame, filter = 'top',
-          caption = "Phase 2 model diagnostics. Best values are highlighed in green.",
-          rownames = T,
-          options = list(dom = "tip",
-                         order = list(list(1, 'desc')),
-                         pageLength = 5)
-          ) %>% formatCurrency(2:5, currency = "", digits = 2) %>%
-          formatStyle(2, background = styleEqual(max(Diag.frame[,2]), 'lightgreen'))%>%
-          formatStyle(3, background = styleEqual(max(Diag.frame[,3]), 'lightgreen'))%>%
-          formatStyle(4, background = styleEqual(max(Diag.frame[,4]), 'lightgreen'))%>%
-          formatStyle(5, background = styleEqual(min(Diag.frame[,5]), 'lightgreen'))%>%
-          formatStyle(7, background = styleEqual(max(Diag.frame[,7]), 'lightgreen'))%>%
-          formatStyle(8, background = styleEqual(min(Diag.frame[,8]), 'lightgreen'))
 ```
 
 
@@ -424,15 +314,6 @@ kable(round(rf.out$importance[order(rf.out$importance, decreasing = T),], 3))
 - 31 Pick best and test removing EDT only rows
 - 32 Pick best and test removing road closure only rows
 
-```{r m24}
-
-```
-
-```{r m25}
-
-```
-
-
 ## C. SubtypeCounts
 
 - 33 Base: nWazeAccidentMajor, nWazeAccidentMinor, nWazeJamModerate, nWazeJamHeavy, nWazeJamStandStill,
@@ -467,7 +348,9 @@ nHazardOnRoad, nHazardOnShoulder, nHazardWeather
 - 46 Pick best and test removing EDT only rows
 - 47 Pick best and test removing road closure only rows
 
-# Appendix: Model definitions
+# Appendix
+
+## Model definitions
 
 The following models were tested:
 
@@ -481,4 +364,102 @@ datatable(models.use,
           rownames = F,
           options = list(dom = "ftip",
                          pageLength = 10))
+```
+
+## Phase 1 Model peformance details
+
+```{r keyoutputsummary1}
+# Summary from keyoutputs1 ----
+Nobs.frame <- vector()
+
+for(i in 1:length(keyoutputs1)){
+  Nobs.frame <- rbind(Nobs.frame, c(Model = names(keyoutputs1)[i], keyoutputs1[[i]][[1]]))
+ }
+
+datatable(Nobs.frame, filter = 'top',
+          caption = "Phase 1 model inputs. N: total rows of input training data; No EDT = number rows without EDT crashes; EDT present: number of rows with EDT crashes; Waze accident present: Number of rows at least one `WazeAccident` present",
+          rownames = T,
+          options = list(dom = "tip",
+                         #order = list(list(1, 'desc')),
+                         pageLength = 5)
+          ) %>% formatCurrency(2:5, currency = "", digits = 0)
+
+```
+
+```{r Diagframe1}
+tabl <- vector()
+
+for(i in 1:length(keyoutputs1)){
+  tabl <- rbind(tabl, c(Model = names(keyoutputs1)[i], 
+                                    100*keyoutputs1[[i]][[3]],
+                                    Runtime = paste(round(keyoutputs1[[i]]$runtime, 1), attr(keyoutputs1[[i]]$runtime, "unit")),
+                                    AUC = round(keyoutputs1[[i]]$auc, 4),
+                                    MSE = round(keyoutputs1[[i]]$mse, 8)
+                                    )
+                      )
+ }
+
+colnames(tabl)[2:5] = c("Accuracy", "Precision", "Recall", "False Positive Rate")
+
+datatable(tabl, filter = 'top',
+          caption = "Phase 1 model diagnostics. Best values are highlighed in green.",
+          rownames = T,
+          options = list(dom = "tip",
+                         order = list(list(1, 'desc')),
+                         pageLength = 5)
+          ) %>% formatCurrency(2:5, currency = "", digits = 2) %>%
+          formatStyle(2, background = styleEqual(max(tabl[,2]), 'lightgreen'))%>%
+          formatStyle(3, background = styleEqual(max(tabl[,3]), 'lightgreen'))%>%
+          formatStyle(4, background = styleEqual(max(tabl[,4]), 'lightgreen'))%>%
+          formatStyle(5, background = styleEqual(min(tabl[,5]), 'lightgreen'))%>%
+          formatStyle(7, background = styleEqual(max(tabl[,7]), 'lightgreen'))%>%
+          formatStyle(8, background = styleEqual(min(tabl[,8]), 'lightgreen'))
+```
+
+## Phase 2 Model peformance details
+
+
+```{r keyoutputsummary2}
+Nobs.frame <- vector()
+
+for(i in 1:length(keyoutputs2)){
+  Nobs.frame <- rbind(Nobs.frame, c(Model = names(keyoutputs2)[i], keyoutputs2[[i]][[1]]))
+ }
+
+datatable(Nobs.frame, filter = 'top',
+          caption = "Phase 2 model inputs. N: total rows of input training data; No EDT = number rows without EDT crashes; EDT present: number of rows with EDT crashes; Waze accident present: Number of rows at least one `WazeAccident` present",
+          rownames = T,
+          options = list(dom = "tip",
+                         pageLength = 5)
+          ) %>% formatCurrency(2:5, currency = "", digits = 0)
+
+```
+
+```{r Diagframe2}
+tabl <- vector()
+for(i in 1:length(keyoutputs2)){
+  tabl <- rbind(tabl, c(Model = names(keyoutputs2)[i], 
+                                    100*keyoutputs2[[i]][[3]],
+                                    Runtime = paste(round(keyoutputs2[[i]]$runtime, 1), attr(keyoutputs2[[i]]$runtime, "unit")),
+                                    AUC = round(keyoutputs2[[i]]$auc, 4),
+                                    MSE = round(keyoutputs2[[i]]$mse, 8)
+                                    )
+                      )
+ }
+
+colnames(tabl)[2:5] = c("Accuracy", "Precision", "Recall", "False Positive Rate")
+
+datatable(tabl, filter = 'top',
+          caption = "Phase 2 model diagnostics. Best values are highlighed in green.",
+          rownames = T,
+          options = list(dom = "tip",
+                         order = list(list(1, 'desc')),
+                         pageLength = 5)
+          ) %>% formatCurrency(2:5, currency = "", digits = 2) %>%
+          formatStyle(2, background = styleEqual(max(tabl[,2]), 'lightgreen'))%>%
+          formatStyle(3, background = styleEqual(max(tabl[,3]), 'lightgreen'))%>%
+          formatStyle(4, background = styleEqual(max(tabl[,4]), 'lightgreen'))%>%
+          formatStyle(5, background = styleEqual(min(tabl[,5]), 'lightgreen'))%>%
+          formatStyle(7, background = styleEqual(max(tabl[,7]), 'lightgreen'))%>%
+          formatStyle(8, background = styleEqual(min(tabl[,8]), 'lightgreen'))
 ```

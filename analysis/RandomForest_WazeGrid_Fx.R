@@ -182,14 +182,16 @@ do.rf <- function(train.dat, omits, response.var = "MatchEDT_buffer_Acc", model.
 # To do: validate using testrows and training rows from previous model runs
 
 reassess.rf <- function(train.dat, omits, response.var = "MatchEDT_buffer_Acc", model.no,
-                        test.dat = NULL, test.split = .30,
-                        thin.dat = NULL,
+                        test.dat = NULL,
                         rf.inputs = list(ntree.use = 500, avail.cores = 4, mtry = NULL, maxnodes = NULL, nodesize = 5),
                         cutoff = c(0.8, 0.2)){
 
-  if(!is.null(test.dat) & !missing(test.split)) stop("Specify either test.dat or test.split, but not both")
-  
   class(train.dat) <- "data.frame"
+
+  # Load fitted model
+  cat("Loading", model.no, "\n")
+  s3load(object = file.path(outputdir, paste("Model", model.no, "RandomForest_Output.RData", sep= "_")),
+         bucket = waze.bucket)  
   
   fitvars <- names(train.dat)[is.na(match(names(train.dat), omits))]
   
@@ -203,11 +205,6 @@ reassess.rf <- function(train.dat, omits, response.var = "MatchEDT_buffer_Acc", 
     test.dat.use = test.dat
     comb.dat <- rbind(train.dat, test.dat)
   }
-  
-  # Load fitted model
-  cat("Loading", model.no, "\n")
-  s3load(object = file.path(outputdir, paste("Model", model.no, "RandomForest_Output.RData", sep= "_")),
-         bucket = waze.bucket)  
   
   rf.pred <- predict(rf.out, test.dat.use[fitvars], cutoff = cutoff)
   rf.prob <- predict(rf.out, test.dat.use[fitvars], type = "prob", cutoff = cutoff)
@@ -261,18 +258,18 @@ reassess.rf <- function(train.dat, omits, response.var = "MatchEDT_buffer_Acc", 
                       FN = out.df$Obs == 1 &  out.df$Pred == "NoCrash",
                       TP = out.df$Obs == 1 &  out.df$Pred == "Crash")
   write.csv(out.df,
-            file = paste(model.no, "RandomForest_pred.csv", sep = "_"),
+            file = paste(model.no, "Reassess_RandomForest_pred.csv", sep = "_"),
             row.names = F)
   
   savelist = c("rf.out", "rf.pred", "rf.prob", "out.df") 
   if(is.null(test.dat)) savelist = c(savelist, "testrows", "trainrows")
-  if(!is.null(thin.dat)) savelist = c(savelist, "test.dat.use")
-  
+
   # Overwrite previous model outputs
   s3save(list = savelist,
          object = file.path(outputdir, paste("Model", model.no, "RandomForest_Output.RData", sep= "_")),
          bucket = waze.bucket)
   
+  rm(savelist) # just to be sure
   # Output is list of three elements: Nobs data frame, predtab table, binary model diagnotics table, and mean squared error
   list(Nobs, predtab, diag = bin.mod.diagnostics(predtab), 
        mse = mean(as.numeric(as.character(test.dat.use[,response.var])) - 

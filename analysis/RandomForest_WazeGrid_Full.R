@@ -15,7 +15,7 @@ codeloc <- "~/SDI_Waze"
 HEXSIZE = c("1", "4", "05")[1] # Change the value in the bracket to use 1, 4, or 0.5 sq mi hexagon grids
 do.months = c("04","05","06","07","08","09")
 
-REASSESS = F # re-assess model fit and diagnostics using reassess.rf instead of do.rf
+REASSESS = T # re-assess model fit and diagnostics using reassess.rf instead of do.rf
 
 inputdir <- paste0("WazeEDT_Agg", HEXSIZE, "mile_Rdata_Input")
 outputdir <- paste0("WazeEDT_Agg", HEXSIZE, "mile_RandForest_Output")
@@ -53,7 +53,7 @@ for(mo in do.months){
 
 avail.cores = parallel::detectCores()
 
-if(avail.cores > 8) avail.cores = 10 # Limit usage to 10 cores if on r4.4xlarge instance
+if(avail.cores > 8) avail.cores = 12 # Limit usage to 12 cores if on r4.4xlarge instance
 
 rf.inputs = list(ntree.use = avail.cores * 50, avail.cores = avail.cores, mtry = 10, maxnodes = 1000, nodesize = 100)
 
@@ -710,6 +710,8 @@ if(!REASSESS){
                                       omits, response.var = "MatchEDT_buffer_Acc", 
                                       model.no = modelno, rf.inputs = rf.inputs) 
   }
+
+save("redo_outputs", file = paste0("Reassess_Output_to_", modelno))
 
 
 timediff <- Sys.time() - starttime
