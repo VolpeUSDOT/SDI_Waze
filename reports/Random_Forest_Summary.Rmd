@@ -6,8 +6,8 @@ output:
     toc: yes
     toc_depth: 2
     toc_float:
-      collapsed: no
-      smooth_scroll: no
+      collapsed: yes
+      smooth_scroll: yes
 ---
 
 ```{r setup, include=FALSE, echo = FALSE}
@@ -117,7 +117,7 @@ Balancing between high specificity (where false positives are avoided) and high 
 knitr::include_graphics("ROC_curves.png")
 ```
 
-# Phase 1 model testing
+# Phase I model testing
 
 ### Input data
 In developing these models, it is important to keep in mind the goal is to estimate EDT-level crashes when and where no EDT data are present. For model development, two approaches to training and testing of the models can be used: split the observed data (where EDT data are available) into random subsets of training and test data, or develop models using all available data for one time period, and test the model on a new time period where EDT data are available. 
@@ -156,17 +156,41 @@ for(i in c("01", "04", "06")){ tabl <- rbind(tabl, c(100*keyoutputs1[[i]]$diag, 
 colnames(tabl)[1:5] = c("Accuracy", "Precision", "Recall", "False Positive Rate", "AUC")
 
 rownames(tabl) = c("Model 01 - 1 mile", "Model 04 - 4 mile", "Model 06 - 0.5 mile")
-kable(tabl, caption = "Phase 1 model diagnostics for April 2017, Maryland.", rownames = "Model")
+#kable(tabl, caption = "Phase 1 model diagnostics for April 2017, Maryland.", rownames = "Model")
+datatable(tabl, filter = 'top',
+          caption = "Phase 1 model diagnostics for April 2017, Maryland.",
+          rownames = T,
+          options = list(dom = "t",
+                         order = list(list(1, 'desc')),
+                         pageLength = 5)
+          ) %>% formatCurrency(2:4, currency = "", digits = 2) %>%
+          formatStyle(1, background = styleEqual(max(tabl[,1]), 'lightgreen'))%>%
+          formatStyle(2, background = styleEqual(max(tabl[,2]), 'lightgreen'))%>%
+          formatStyle(3, background = styleEqual(max(tabl[,3]), 'lightgreen'))%>%
+          formatStyle(4, background = styleEqual(min(tabl[,4]), 'lightgreen'))%>%
+          formatStyle(5, background = styleEqual(max(tabl[,5]), 'lightgreen'))
+
 
 tabl <- vector()
 for(i in c("03", "05", "07")){ tabl <- rbind(tabl, c(100*keyoutputs1[[i]]$diag, round(keyoutputs1[[i]]$auc, 4)))}
 
 colnames(tabl)[1:5] = c("Accuracy", "Precision", "Recall", "False Positive Rate", "AUC")
 rownames(tabl) = c("Model 03 - 1 mile", "Model 05 - 4 mile", "Model 07 - 0.5 mile")
-kable(tabl, 
-          caption = "Phase 1 model diagnostics for April + May, test on June, Maryland.",
-          rownames = "Model")
+# kable(tabl, 
+#           caption = "Phase 1 model diagnostics for April + May, test on June, Maryland.",
+#           rownames = "Model")
 
+datatable(tabl, filter = 'top',
+          caption = "Phase 1 model diagnostics for April + May, test on June, Maryland.",
+          rownames = T,
+          options = list(dom = "t",
+                         pageLength = 5)
+          ) %>% formatCurrency(2:4, currency = "", digits = 2) %>%
+          formatStyle(1, background = styleEqual(max(tabl[,1]), 'lightgreen'))%>%
+          formatStyle(2, background = styleEqual(max(tabl[,2]), 'lightgreen'))%>%
+          formatStyle(3, background = styleEqual(max(tabl[,3]), 'lightgreen'))%>%
+          formatStyle(4, background = styleEqual(min(tabl[,4]), 'lightgreen'))%>%
+          formatStyle(5, background = styleEqual(max(tabl[,5]), 'lightgreen'))
 ```   
 
 ### Time windows
@@ -184,18 +208,37 @@ for(i in c("01", "08")){ tabl <- rbind(tabl, c(100*keyoutputs1[[i]]$diag, round(
 
 colnames(tabl)[1:5] = c("Accuracy", "Precision", "Recall", "False Positive Rate", "AUC")
 rownames(tabl) = c("Model 01 - 1 mile", "Model 08 - 1 mile, Neighbors")
-kable(tabl, 
+
+datatable(tabl, filter = 'top',
           caption = "Phase 1 model diagnostics for April 2017, Maryland, with neighboring grid cells as predictors.",
-          rownames = "Model")
+          rownames = T,
+          options = list(dom = "t",
+                         pageLength = 5)
+          ) %>% formatCurrency(2:4, currency = "", digits = 2) %>%
+          formatStyle(1, background = styleEqual(max(tabl[,1]), 'lightgreen'))%>%
+          formatStyle(2, background = styleEqual(max(tabl[,2]), 'lightgreen'))%>%
+          formatStyle(3, background = styleEqual(max(tabl[,3]), 'lightgreen'))%>%
+          formatStyle(4, background = styleEqual(min(tabl[,4]), 'lightgreen'))%>%
+          formatStyle(5, background = styleEqual(max(tabl[,5]), 'lightgreen'))
 
 # 03, 09 - April+May, test on June
 tabl <- vector()
 for(i in c("03", "09")){ tabl <- rbind(tabl, c(100*keyoutputs1[[i]]$diag, round(keyoutputs1[[i]]$auc, 4)))}
 colnames(tabl)[1:5] = c("Accuracy", "Precision", "Recall", "False Positive Rate", "AUC")
 rownames(tabl) = c("Model 03 - 1 mile", "Model 09 - 1 mile, Neighbors")
-kable(tabl, 
-          caption = "Phase 1 model diagnostics for April + May, test on June, Maryland.",
-          rownames = "Model")
+
+datatable(tabl, filter = 'top',
+          caption = "Phase 1 model diagnostics for April-May, test on June 2017, Maryland, with neighboring grid cells as predictors.",
+          rownames = T,
+          options = list(dom = "t",
+                         pageLength = 5)
+          ) %>% formatCurrency(2:4, currency = "", digits = 2) %>%
+          formatStyle(1, background = styleEqual(max(tabl[,1]), 'lightgreen'))%>%
+          formatStyle(2, background = styleEqual(max(tabl[,2]), 'lightgreen'))%>%
+          formatStyle(3, background = styleEqual(max(tabl[,3]), 'lightgreen'))%>%
+          formatStyle(4, background = styleEqual(min(tabl[,4]), 'lightgreen'))%>%
+          formatStyle(5, background = styleEqual(max(tabl[,5]), 'lightgreen'))
+  
 ```   
 
 ### Additional data
@@ -206,7 +249,7 @@ Additional data included in Phase 1 were the following:
 - Road functional class: Miles of roads of each functional class, from [HPMS](https://www.fhwa.dot.gov/policyinformation/hpms.cfm).
 - Economic data from [Longidtinal Employer-Household Dynamics](https://lehd.ces.census.gov/) data set: Number of jobs, and number of workers, for firms of different ages and sizes.
 
-Adding these additional data increased the recall, overall accuracy, and AUC, at the cost of slightly higher false positive rates. Interestingly, the addition of weather appeared to mostly increase precision (minimizing false positives).
+Adding these additional data increased the recall, overall accuracy, and AUC, at the cost of slightly higher false positive rates. Interestingly, the addition of weather mostly increased precision (minimizing false positives), while the sum of miles by road functional class and jobs data increased recall (minimizing false negatives).
 
 ```{r phase1addl, echo = F}
 # pairs to compare: 12, 14, 16 - April
@@ -215,14 +258,36 @@ for(i in c("08","12", "14", "16")){ tabl <- rbind(tabl, c(100*keyoutputs1[[i]]$d
 
 colnames(tabl)[1:5] = c("Accuracy", "Precision", "Recall", "False Positive Rate", "AUC")
 rownames(tabl) = c("Model 08 - 1 mile, Neighbors", "Model 12 - Weather", "Model 14 - Weather, Roads", "Model 16 - Weather, Roads, Jobs")
-kable(tabl, caption = "Phase 1 model diagnostics for April 2017, Maryland, with supplemental weather, road functional class, and economic data.", rownames = "Model")
+#kable(tabl, caption = "Phase 1 model diagnostics for April 2017, Maryland, with supplemental weather, road functional class, and economic data.", rownames = "Model")
+datatable(tabl, filter = 'top',
+          caption = "Phase 1 model diagnostics for April 2017, Maryland, with supplemental weather, road functional class, and economic data.",
+          rownames = T,
+          options = list(dom = "t",
+                         pageLength = 5)
+          ) %>% formatCurrency(2:4, currency = "", digits = 2) %>%
+          formatStyle(1, background = styleEqual(max(tabl[,1]), 'lightgreen'))%>%
+          formatStyle(2, background = styleEqual(max(tabl[,2]), 'lightgreen'))%>%
+          formatStyle(3, background = styleEqual(max(tabl[,3]), 'lightgreen'))%>%
+          formatStyle(4, background = styleEqual(min(tabl[,4]), 'lightgreen'))%>%
+          formatStyle(5, background = styleEqual(max(tabl[,5]), 'lightgreen'))
 
 # 09, 13, 15, 17  - April+May, test on June
 tabl <- vector()
 for(i in c("09", "13", "15", "17")){ tabl <- rbind(tabl, c(100*keyoutputs1[[i]]$diag, round(keyoutputs1[[i]]$auc, 4))) }
 colnames(tabl)[1:5] = c("Accuracy", "Precision", "Recall", "False Positive Rate", "AUC")
 rownames(tabl) = c("Model 09 - 1 mile, Neighbors", "Model 13 - Weather", "Model 15 - Weather, Roads", "Model 17 - Weather, Roads, Jobs")
-kable(tabl, caption = "Phase 1 model diagnostics for April + May, test on June, Maryland, with supplemental weather, road functional class, and economic data.", rownames = "Model")
+# kable(tabl, caption = "Phase 1 model diagnostics for April + May, test on June, Maryland, with supplemental weather, road functional class, and economic data.", rownames = "Model")
+datatable(tabl, filter = 'top',
+          caption = "Phase 1 model diagnostics for April + May, test on June, Maryland, with supplemental weather, road functional class, and economic data.",
+          rownames = T,
+          options = list(dom = "t",
+                         pageLength = 5)
+          ) %>% formatCurrency(2:4, currency = "", digits = 2) %>%
+          formatStyle(1, background = styleEqual(max(tabl[,1]), 'lightgreen'))%>%
+          formatStyle(2, background = styleEqual(max(tabl[,2]), 'lightgreen'))%>%
+          formatStyle(3, background = styleEqual(max(tabl[,3]), 'lightgreen'))%>%
+          formatStyle(4, background = styleEqual(min(tabl[,4]), 'lightgreen'))%>%
+          formatStyle(5, background = styleEqual(max(tabl[,5]), 'lightgreen'))
 ```   
 
 
@@ -236,55 +301,46 @@ What we learned from this testing is the following:
 - Additional data improved different aspects of the model: using the larger April + May data, weather data reduced false positives, while road functional class and jobs data reduced false negatives.
 
 
-
-
-```{r m01-03, eval=F}
-modelno = "16"
+```{r bestphaseI, eval=T}
+modelno = "17"
 
 if(ONLOCAL) {load(file.path(outputdir1, paste("Model", modelno, "RandomForest_Output_04.RData", sep= "_")))} else {s3load(object = file.path(outputdir, paste("Model", modelno, "RandomForest_Output.RData", sep= "_")), bucket = waze.bucket)}
 
+imp.tab <- data.frame(round(rf.out$importance[order(rf.out$importance, decreasing = T)[1:15],], 2))
+colnames(imp.tab) = "Gini importance"
 
-rf.04$call
-kable(round(rf.04$importance[order(rf.04$importance, decreasing = T),], 3))
-
-
-modelno = "02"
-
-modelno = "03"
+kable(imp.tab, row.names = T,
+      caption = "Variance importance for the highest recall plot in phase I, Model 17. Top 15 of 74 predictors shown.") %>% 
+  kableExtra::kable_styling(bootstrap_options = "striped")
 
 
 ```
 
 
-# Phase 2 model testing
+# Phase II model testing
+
+In Phase II, we expand all models to all months of currently available EDT and Waze data, April to September 2017 for Maryland, to make more full use of the available data. We used a 70/30 split of training and test data across these months. 
+
+In addition to the weather, road functional class, and jobs data used as supplemental data in Phase I, in Phase II we added the following supplemental data to attempt to further improve the precision and recall:
+
+- Average annual daily traffic (AADT), by sum of the AADT in the roads in a grid cell, from HPMS
+- Fatal Accident Reporting System (FARS) counts of fatal accidents from 2012-2016 for each grid cell
+
+In addition, we considered correlated and nested variables, and devised a sequence of models to test to separate out the effects of Waze event types and sub-types. These models are organized in to "Sets" to facilitate comparison of how different combinations of predictors affect model performance.
 
 
-- Expand all models to six months (April to September 70/30 training test split)
-- Start with base models below (A then B then C)
-- Run and document tests in markdown file and run with updated RF functions
+
 
 
 ```{r Diagframe2a}
 if(ONLOCAL) {  localdir <- outputdir2 } 
-
-if(!exists("keyoutputs2")) { 
-  load(file.path(localdir, "Reassess_Output_to_45c"))
-  load(file.path(localdir, "Output_to_45a"))
-
-  keyoutputs2 <- redo_outputs
-  keyoutputs2.old <- keyoutputs
-  rm(keyoutputs) 
-#   simplifying the auc value, don't need complete output
-#   for(i in 1:length(keyoutputs)){
-#     keyoutputs[[i]]$auc <- as.numeric(keyoutputs[[i]]$auc)
-#   }
-#   save(list = "keyoutputs", file = file.path(localdir, "Output_to_45a"))
-  }
-
+load(file.path(localdir, "Output_to_39"))
 ```
 
 
-## Set A: All Waze 
+## A: All Waze 
+
+Set A consisted of the following models:
 
 - 18 Base: All Waze features from event type (but not the counts of all Waze events together)
 - 19 Add FARS only
@@ -293,20 +349,52 @@ if(!exists("keyoutputs2")) {
 - 22 Add jobs only
 - 23 Add all together
 
-Identify best combination and explore/visualize/document performance
+Supplemental data increased recall and overall model fit. With more additional data, the false positive rate slightly increased, illustrating the trade-off between minimizing false negatives and minimizing false positives. For the purpose of maximizing the number of correct estimates of EDT-level crashes, a model with high recall would be preferred, Model 23 in this case.
 
-```{r m18, eval = F}
-modelno = "18"
+The largest gain in predictive power came from adding AADT variables and road type.  
 
-s3load(object = file.path(outputdir, paste("Model", modelno, "RandomForest_Output.RData", sep= "_")), 
-       bucket = waze.bucket)
 
-rf.out$call
-kable(round(rf.out$importance[order(rf.out$importance, decreasing = T),], 3))
+```{r phase2A, echo = F}
+# pairs to compare: 18-23
+tabl <- vector()
+mods = as.character(18:23)
+for(i in mods){ tabl <- rbind(tabl, c(100*keyoutputs2[[i]]$diag, round(keyoutputs2[[i]]$auc, 4)))}
+
+colnames(tabl)[1:5] = c("Accuracy", "Precision", "Recall", "False Positive Rate", "AUC")
+rownames(tabl) = models[!is.na(match(models$Model.Number, mods)), "Short.Name"]
+#kable(tabl, caption = "Phase II model diagnostics for April-September 2017, Maryland, with supplemental data added sequentually and together.", rownames = "Model")
+datatable(tabl, filter = 'top',
+          caption = "Phase II, Set A model diagnostics for April-September 2017, Maryland, with supplemental data added sequentually and together.",
+          rownames = T,
+          options = list(dom = "t",
+                         pageLength = length(mods))
+          ) %>% formatCurrency(2:4, currency = "", digits = 2) %>%
+          formatStyle(1, background = styleEqual(max(tabl[,1]), 'lightgreen'))%>%
+          formatStyle(2, background = styleEqual(max(tabl[,2]), 'lightgreen'))%>%
+          formatStyle(3, background = styleEqual(max(tabl[,3]), 'lightgreen'))%>%
+          formatStyle(4, background = styleEqual(min(tabl[,4]), 'lightgreen'))%>%
+          formatStyle(5, background = styleEqual(max(tabl[,5]), 'lightgreen'))
+```
+
+```{r bestphaseIIA, eval=T}
+modelno = "23"
+
+s3load(object = file.path(paste(outputdir, "fill0", sep="_"), paste("Model", modelno, "RandomForest_Output.RData", sep= "_")), bucket = waze.bucket)
+
+imp.tab <- data.frame(round(rf.out$importance[order(rf.out$importance, decreasing = T)[1:15],], 2))
+colnames(imp.tab) = "Gini importance"
+
+kable(imp.tab, row.names = T,
+      caption = "Variance importance for the highest recall plot in phase II, Model 23. Top 15 of 58 predictors shown") %>% 
+  kableExtra::kable_styling(bootstrap_options = "striped")
+
+varImpPlot(rf.out, main = "Model 23 - April-Sept, highest recall")
 
 ```
 
 ## B: TypeCounts
+
+Set B consisted of the following models, focusing on Waze event types without the sub-types.
 
 - 24 Base: nWazeAccident, nWazeJam, nWazeWeatherOrHazard, nWazeRoadClosed
 - 25 Add other Waze only (confidence, reliability, magvar, neighbors)
@@ -318,6 +406,30 @@ kable(round(rf.out$importance[order(rf.out$importance, decreasing = T),], 3))
 - 31 Pick best and test removing EDT only rows
 - 32 Pick best and test removing road closure only rows
 
+Excluding sub-types did not decrease overall accuracy and model fit, compared to Set A models. As with Set A, adding supplemental data beyond the base set of predictors increased recall, and also increased precision. The best balance between recall and precision, as measured by AUC, came again from the model with all supplemental predictors added. Road functional class and AADT again were the predictors which drove the largest increase in recall. All models exhibited excellent accuracy and overall performance.
+
+```{r phase2B}
+# pairs to compare: 24-30
+tabl <- vector()
+mods = as.character(24:30)
+for(i in mods){ tabl <- rbind(tabl, c(100*keyoutputs2[[i]]$diag, round(keyoutputs2[[i]]$auc, 4)))}
+
+colnames(tabl)[1:5] = c("Accuracy", "Precision", "Recall", "False Positive Rate", "AUC")
+rownames(tabl) = models[!is.na(match(models$Model.Number, mods)), "Short.Name"]
+
+datatable(tabl, filter = 'top',
+          caption = "Phase II, Set B model diagnostics for April-September 2017, Maryland, with supplemental data added sequentually and together.",
+          rownames = T,
+          options = list(dom = "t",
+                         pageLength = length(mods))
+          ) %>% formatCurrency(2:4, currency = "", digits = 2) %>%
+          formatStyle(1, background = styleEqual(max(tabl[,1]), 'lightgreen'))%>%
+          formatStyle(2, background = styleEqual(max(tabl[,2]), 'lightgreen'))%>%
+          formatStyle(3, background = styleEqual(max(tabl[,3]), 'lightgreen'))%>%
+          formatStyle(4, background = styleEqual(min(tabl[,4]), 'lightgreen'))%>%
+          formatStyle(5, background = styleEqual(max(tabl[,5]), 'lightgreen'))
+```
+
 ## C. SubtypeCounts
 
 - 33 Base: nWazeAccidentMajor, nWazeAccidentMinor, nWazeJamModerate, nWazeJamHeavy, nWazeJamStandStill,
@@ -328,23 +440,38 @@ nHazardOnRoad, nHazardOnShoulder, nHazardWeather
 - 37 Add road class, AADT only
 - 38 Add jobs only
 - 39 Add all (but not Waze event sub-subtypes)
-- 40 Pick best and test removing EDT only rows
-- 41 Pick best and test removing road closure only rows
 
+Excluding Waze event types and only including sub-types drove a substantial degradation in model performance. Recall dropped substantially, and model fit was clearly lower than Set A or B models. Models should be constructed with either a combination of Waze types and sub-types, or just Waze event types.
 
+```{r phase2C}
+# pairs to compare: 33-39
+tabl <- vector()
+mods = as.character(33:39)
+for(i in mods){ tabl <- rbind(tabl, c(100*keyoutputs2[[i]]$diag, round(keyoutputs2[[i]]$auc, 4)))}
+
+colnames(tabl)[1:5] = c("Accuracy", "Precision", "Recall", "False Positive Rate", "AUC")
+rownames(tabl) = models[!is.na(match(models$Model.Number, mods)), "Short.Name"]
+datatable(tabl, filter = 'top',
+          caption = "Phase II, Set B model diagnostics for April-September 2017, Maryland, with supplemental data added sequentually and together.",
+          rownames = T,
+          options = list(dom = "t",
+                         pageLength = length(mods))
+          ) %>% formatCurrency(2:4, currency = "", digits = 2) %>%
+          formatStyle(1, background = styleEqual(max(tabl[,1]), 'lightgreen'))%>%
+          formatStyle(2, background = styleEqual(max(tabl[,2]), 'lightgreen'))%>%
+          formatStyle(3, background = styleEqual(max(tabl[,3]), 'lightgreen'))%>%
+          formatStyle(4, background = styleEqual(min(tabl[,4]), 'lightgreen'))%>%
+          formatStyle(5, background = styleEqual(max(tabl[,5]), 'lightgreen'))
+```
 
 
 ## D. EDT counts vs binary response:
 
-- 42 Run best combination of each base model (A, B, and C) on counts vs binary 
+- 42 Run best combination of each base model on counts vs binary 
 - 43 Pick best and test removing EDT only rows
 - 44 Pick best and test removing road closure only rows
 
-## E. Buffer vs grid cell counts for response variable
 
-- 45 Run best combination of each base model (A, B, and C) on buffer counts vs grid cell counts 
-- 46 Pick best and test removing EDT only rows
-- 47 Pick best and test removing road closure only rows
 
 # Appendix
 
@@ -456,7 +583,7 @@ datatable(tabl, filter = 'top',
           ) %>% formatCurrency(2:5, currency = "", digits = 2) %>%
           formatStyle(2, background = styleEqual(max(tabl[,2]), 'lightgreen'))%>%
           formatStyle(3, background = styleEqual(max(tabl[,3]), 'lightgreen'))%>%
-          formatStyle(4, background = styleEqual(max(tabl[,4]), 'lightgreen'))%>%
+          formatStyle(4, background = styleEqual(min(tabl[,4]), 'lightgreen'))%>%
           formatStyle(5, background = styleEqual(min(tabl[,5]), 'lightgreen'))%>%
           formatStyle(7, background = styleEqual(max(tabl[,7]), 'lightgreen'))%>%
           formatStyle(8, background = styleEqual(min(tabl[,8]), 'lightgreen'))

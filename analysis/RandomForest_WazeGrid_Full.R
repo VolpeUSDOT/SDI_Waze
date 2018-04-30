@@ -17,8 +17,10 @@ do.months = c("04","05","06","07","08","09")
 
 REASSESS = F # re-assess model fit and diagnostics using reassess.rf instead of do.rf
 
+RUNMODEL = c("31","32")
+
 inputdir <- paste0("WazeEDT_Agg", HEXSIZE, "mile_Rdata_Input")
-outputdir <- paste0("WazeEDT_Agg", HEXSIZE, "mile_RandForest_Output")
+outputdir <- paste0("WazeEDT_Agg", HEXSIZE, "mile_RandForest_Output_fill0")
 
 aws.signature::use_credentials()
 waze.bucket <- "ata-waze"
@@ -83,6 +85,8 @@ alert_subtypes = c("nHazardOnRoad", "nHazardOnShoulder" ,"nHazardWeather", "nWaz
 
 response.var = "MatchEDT_buffer_Acc"
 
+
+
 # A: All Waze ----
 
 # 18 Base: All Waze features from event type (but not the counts of all Waze events together)
@@ -97,7 +101,7 @@ omits = c(alwaysomit,
           "wx",
           c("CRASH_SUM", "FATALS_SUM"), # FARS variables, 
           grep("F_SYSTEM", names(w.04), value = T), # road class
-          c("MEAN_AADT", "SUM_AADT"), # AADT
+          c("MEAN_AADT", "SUM_AADT", "SUM_miles"), # AADT
           grep("WAC", names(w.04), value = T), # Jobs workplace
           grep("RAC", names(w.04), value = T), # Jobs residential
           grep("MagVar", names(w.04), value = T), # direction of travel
@@ -111,7 +115,7 @@ modelno = "18"
 if(!REASSESS){
   keyoutputs[[modelno]] = do.rf(train.dat = w.04_09, 
                                 omits, response.var = "MatchEDT_buffer_Acc", 
-                               # thin.dat = 0.8,
+                               # thin.dat = 0.01,
                                 model.no = modelno, rf.inputs = rf.inputs) 
   
   save("keyoutputs", file = paste0("Output_to_", modelno))
@@ -129,7 +133,7 @@ omits = c(alwaysomit,
           "wx",
           #c("CRASH_SUM", "FATALS_SUM"), # FARS variables, 
           grep("F_SYSTEM", names(w.04), value = T), # road class
-          c("MEAN_AADT", "SUM_AADT"), # AADT
+          c("MEAN_AADT", "SUM_AADT", "SUM_miles"), # AADT
           grep("WAC", names(w.04), value = T), # Jobs workplace
           grep("RAC", names(w.04), value = T), # Jobs residential
           grep("MagVar", names(w.04), value = T), # direction of travel
@@ -158,7 +162,7 @@ omits = c(alwaysomit,
           #"wx",
           c("CRASH_SUM", "FATALS_SUM"), # FARS variables, 
           grep("F_SYSTEM", names(w.04), value = T), # road class
-          c("MEAN_AADT", "SUM_AADT"), # AADT
+          c("MEAN_AADT", "SUM_AADT", " SUM_miles"), # AADT
           grep("WAC", names(w.04), value = T), # Jobs workplace
           grep("RAC", names(w.04), value = T), # Jobs residential
           grep("MagVar", names(w.04), value = T), # direction of travel
@@ -187,7 +191,7 @@ omits = c(alwaysomit,
           "wx",
           c("CRASH_SUM", "FATALS_SUM"), # FARS variables, 
 #          grep("F_SYSTEM", names(w.04), value = T), # road class
-#          c("MEAN_AADT", "SUM_AADT"), # AADT
+#          c("MEAN_AADT", "SUM_AADT", " SUM_miles"), # AADT
           grep("WAC", names(w.04), value = T), # Jobs workplace
           grep("RAC", names(w.04), value = T), # Jobs residential
           grep("MagVar", names(w.04), value = T), # direction of travel
@@ -214,7 +218,7 @@ omits = c(alwaysomit,
           "wx",
           c("CRASH_SUM", "FATALS_SUM"), # FARS variables, 
           grep("F_SYSTEM", names(w.04), value = T), # road class
-          c("MEAN_AADT", "SUM_AADT"), # AADT
+          c("MEAN_AADT", "SUM_AADT", " SUM_miles"), # AADT
 #          grep("WAC", names(w.04), value = T), # Jobs workplace
 #          grep("RAC", names(w.04), value = T), # Jobs residential
           grep("MagVar", names(w.04), value = T), # direction of travel
@@ -240,7 +244,7 @@ omits = c(alwaysomit,
 #          "wx",
 #          c("CRASH_SUM", "FATALS_SUM"), # FARS variables, 
 #          grep("F_SYSTEM", names(w.04), value = T), # road class
-#          c("MEAN_AADT", "SUM_AADT"), # AADT
+#          c("MEAN_AADT", "SUM_AADT", " SUM_miles"), # AADT
 #          grep("WAC", names(w.04), value = T), # Jobs workplace
 #          grep("RAC", names(w.04), value = T), # Jobs residential
           grep("MagVar", names(w.04), value = T), # direction of travel
@@ -268,7 +272,7 @@ omits = c(alwaysomit, alert_subtypes,
           "wx",
           c("CRASH_SUM", "FATALS_SUM"), # FARS variables, added in 19
           grep("F_SYSTEM", names(w.04), value = T), # road class
-          c("MEAN_AADT", "SUM_AADT"), # AADT
+          c("MEAN_AADT", "SUM_AADT", " SUM_miles"), # AADT
           grep("WAC", names(w.04), value = T), # Jobs workplace
           grep("RAC", names(w.04), value = T), # Jobs residential
           grep("MagVar", names(w.04), value = T), # direction of travel
@@ -294,7 +298,7 @@ omits = c(alwaysomit, alert_subtypes,
           "wx",
           c("CRASH_SUM", "FATALS_SUM"), # FARS variables, 
           grep("F_SYSTEM", names(w.04), value = T), # road class
-          c("MEAN_AADT", "SUM_AADT"), # AADT
+          c("MEAN_AADT", "SUM_AADT", " SUM_miles"), # AADT
           grep("WAC", names(w.04), value = T), # Jobs workplace
           grep("RAC", names(w.04), value = T) # Jobs residential
 #          grep("MagVar", names(w.04), value = T), # direction of travel
@@ -320,7 +324,7 @@ omits = c(alwaysomit, alert_subtypes,
           "wx",
 #          c("CRASH_SUM", "FATALS_SUM"), # FARS variables, added in 19
           grep("F_SYSTEM", names(w.04), value = T), # road class
-          c("MEAN_AADT", "SUM_AADT"), # AADT
+          c("MEAN_AADT", "SUM_AADT", " SUM_miles"), # AADT
           grep("WAC", names(w.04), value = T), # Jobs workplace
           grep("RAC", names(w.04), value = T), # Jobs residential
           grep("MagVar", names(w.04), value = T), # direction of travel
@@ -346,7 +350,7 @@ omits = c(alwaysomit, alert_subtypes,
           #"wx",
           c("CRASH_SUM", "FATALS_SUM"), # FARS variables, added in 19
           grep("F_SYSTEM", names(w.04), value = T), # road class
-          c("MEAN_AADT", "SUM_AADT"), # AADT
+          c("MEAN_AADT", "SUM_AADT", " SUM_miles"), # AADT
           grep("WAC", names(w.04), value = T), # Jobs workplace
           grep("RAC", names(w.04), value = T), # Jobs residential
           grep("MagVar", names(w.04), value = T), # direction of travel
@@ -371,7 +375,7 @@ omits = c(alwaysomit, alert_subtypes,
           "wx",
           c("CRASH_SUM", "FATALS_SUM"), # FARS variables, added in 19
           #grep("F_SYSTEM", names(w.04), value = T), # road class
-          #c("MEAN_AADT", "SUM_AADT"), # AADT
+          #c("MEAN_AADT", "SUM_AADT", " SUM_miles"), # AADT
           grep("WAC", names(w.04), value = T), # Jobs workplace
           grep("RAC", names(w.04), value = T), # Jobs residential
           grep("MagVar", names(w.04), value = T), # direction of travel
@@ -396,7 +400,7 @@ omits = c(alwaysomit, alert_subtypes,
           "wx",
           c("CRASH_SUM", "FATALS_SUM"), # FARS variables, added in 19
           grep("F_SYSTEM", names(w.04), value = T), # road class
-          c("MEAN_AADT", "SUM_AADT"), # AADT
+          c("MEAN_AADT", "SUM_AADT", " SUM_miles"), # AADT
           #grep("WAC", names(w.04), value = T), # Jobs workplace
           #grep("RAC", names(w.04), value = T), # Jobs residential
           grep("MagVar", names(w.04), value = T), # direction of travel
@@ -421,7 +425,7 @@ omits = c(alwaysomit, alert_subtypes
           #"wx",
           #c("CRASH_SUM", "FATALS_SUM"), # FARS variables, added in 19
           #grep("F_SYSTEM", names(w.04), value = T), # road class
-          #c("MEAN_AADT", "SUM_AADT"), # AADT
+          #c("MEAN_AADT", "SUM_AADT", " SUM_miles"), # AADT
           #grep("WAC", names(w.04), value = T), # Jobs workplace
           #grep("RAC", names(w.04), value = T), # Jobs residential
           #grep("MagVar", names(w.04), value = T), # direction of travel
@@ -430,9 +434,53 @@ omits = c(alwaysomit, alert_subtypes
           #grep("nWazeJam_", names(w.04), value = T) # neighboring jams
           )
 
+# manually changed to keyouputs2... change back when re-running
+
+if(!REASSESS){
+  keyoutputs2[[modelno]] = do.rf(train.dat = w.04_09, omits, response.var = "MatchEDT_buffer_Acc",  
+                                model.no = modelno, rf.inputs = rf.inputs) 
+  save("keyoutputs2", file = paste0("Output_to_", modelno))
+} else {
+  redo_outputs[[modelno]] = reassess.rf(train.dat = w.04_09, 
+                                        omits, response.var = "MatchEDT_buffer_Acc", 
+                                        model.no = modelno, rf.inputs = rf.inputs) 
+}
+
+
 # 31 Pick best and test removing EDT only rows
+# Use model 30 as base 
+
+modelno = "31"
+
+EDTonlyrows <- apply(w.04_09[c(alert_types, alert_subtypes)], 1, FUN = function(x) all(x == 0))
+summary(EDTonlyrows)
+
+if(!REASSESS){
+  keyoutputs2[[modelno]] = do.rf(train.dat = w.04_09[!EDTonlyrows,], omits, response.var = "MatchEDT_buffer_Acc",  
+                                 model.no = modelno, rf.inputs = rf.inputs) 
+  save("keyoutputs2", file = paste0("Output_to_", modelno))
+} else {
+  redo_outputs[[modelno]] = reassess.rf(train.dat = w.04_09[!EDTonlyrows,], 
+                                        omits, response.var = "MatchEDT_buffer_Acc", 
+                                        model.no = modelno, rf.inputs = rf.inputs) 
+}
 
 # 32 Pick best and test removing road closure only rows
+
+modelno = "32"
+
+Road.closure.onlyrows <- apply(w.04_09[c("nWazeRoadClosed","nWazeAccident","nWazeJam","nWazeWeatherOrHazard", alert_subtypes)], 1, FUN = function(x) all(x[2:21] == 0) & x[1] > 0)
+summary(Road.closure.onlyrows)
+
+if(!REASSESS){
+  keyoutputs2[[modelno]] = do.rf(train.dat = w.04_09[!Road.closure.onlyrows,], omits, response.var = "MatchEDT_buffer_Acc",  
+                                 model.no = modelno, rf.inputs = rf.inputs) 
+  save("keyoutputs2", file = paste0("Output_to_", modelno))
+} else {
+  redo_outputs[[modelno]] = reassess.rf(train.dat = w.04_09[!Road.closure.onlyrows,], 
+                                        omits, response.var = "MatchEDT_buffer_Acc", 
+                                        model.no = modelno, rf.inputs = rf.inputs) 
+}
 
 # C. SubtypeCounts ----
 
@@ -444,7 +492,7 @@ omits = c(alwaysomit, alert_types,
           "wx",
           c("CRASH_SUM", "FATALS_SUM"), # FARS variables, added in 19
           grep("F_SYSTEM", names(w.04), value = T), # road class
-          c("MEAN_AADT", "SUM_AADT"), # AADT
+          c("MEAN_AADT", "SUM_AADT", " SUM_miles"), # AADT
           grep("WAC", names(w.04), value = T), # Jobs workplace
           grep("RAC", names(w.04), value = T), # Jobs residential
           grep("MagVar", names(w.04), value = T), # direction of travel
@@ -471,7 +519,7 @@ omits = c(alwaysomit, alert_types,
           "wx",
           c("CRASH_SUM", "FATALS_SUM"), # FARS variables, added in 19
           grep("F_SYSTEM", names(w.04), value = T), # road class
-          c("MEAN_AADT", "SUM_AADT"), # AADT
+          c("MEAN_AADT", "SUM_AADT", " SUM_miles"), # AADT
           grep("WAC", names(w.04), value = T), # Jobs workplace
           grep("RAC", names(w.04), value = T) # Jobs residential
           # grep("MagVar", names(w.04), value = T), # direction of travel
@@ -498,7 +546,7 @@ omits = c(alwaysomit, alert_types,
           "wx",
           #c("CRASH_SUM", "FATALS_SUM"), # FARS variables, added in 19
           grep("F_SYSTEM", names(w.04), value = T), # road class
-          c("MEAN_AADT", "SUM_AADT"), # AADT
+          c("MEAN_AADT", "SUM_AADT", " SUM_miles"), # AADT
           grep("WAC", names(w.04), value = T), # Jobs workplace
           grep("RAC", names(w.04), value = T), # Jobs residential
           grep("MagVar", names(w.04), value = T), # direction of travel
@@ -524,7 +572,7 @@ omits = c(alwaysomit, alert_types,
           # "wx",
           c("CRASH_SUM", "FATALS_SUM"), # FARS variables, added in 19
           grep("F_SYSTEM", names(w.04), value = T), # road class
-          c("MEAN_AADT", "SUM_AADT"), # AADT
+          c("MEAN_AADT", "SUM_AADT", " SUM_miles"), # AADT
           grep("WAC", names(w.04), value = T), # Jobs workplace
           grep("RAC", names(w.04), value = T), # Jobs residential
           grep("MagVar", names(w.04), value = T), # direction of travel
@@ -550,7 +598,7 @@ omits = c(alwaysomit, alert_types,
           "wx",
           c("CRASH_SUM", "FATALS_SUM"), # FARS variables, added in 19
           # grep("F_SYSTEM", names(w.04), value = T), # road class
-          # c("MEAN_AADT", "SUM_AADT"), # AADT
+          # c("MEAN_AADT", "SUM_AADT", " SUM_miles"), # AADT
           grep("WAC", names(w.04), value = T), # Jobs workplace
           grep("RAC", names(w.04), value = T), # Jobs residential
           grep("MagVar", names(w.04), value = T), # direction of travel
@@ -576,7 +624,7 @@ omits = c(alwaysomit, alert_types,
           "wx",
           c("CRASH_SUM", "FATALS_SUM"), # FARS variables, added in 19
           grep("F_SYSTEM", names(w.04), value = T), # road class
-          c("MEAN_AADT", "SUM_AADT"), # AADT
+          c("MEAN_AADT", "SUM_AADT", " SUM_miles"), # AADT
           # grep("WAC", names(w.04), value = T), # Jobs workplace
           # grep("RAC", names(w.04), value = T), # Jobs residential
           grep("MagVar", names(w.04), value = T), # direction of travel
@@ -601,7 +649,7 @@ omits = c(alwaysomit, alert_types
           # "wx",
           # c("CRASH_SUM", "FATALS_SUM"), # FARS variables, added in 19
           # grep("F_SYSTEM", names(w.04), value = T), # road class
-          # c("MEAN_AADT", "SUM_AADT"), # AADT
+          # c("MEAN_AADT", "SUM_AADT", " SUM_miles"), # AADT
           # grep("WAC", names(w.04), value = T), # Jobs workplace
           # grep("RAC", names(w.04), value = T), # Jobs residential
           # grep("MagVar", names(w.04), value = T), # direction of travel
@@ -644,7 +692,7 @@ omits = c(alwaysomit,
           "wx",
           c("CRASH_SUM", "FATALS_SUM"), # FARS variables, added in 19
           grep("F_SYSTEM", names(w.04), value = T), # road class
-          c("MEAN_AADT", "SUM_AADT"), # AADT
+          c("MEAN_AADT", "SUM_AADT", " SUM_miles"), # AADT
           grep("WAC", names(w.04), value = T), # Jobs workplace
           grep("RAC", names(w.04), value = T), # Jobs residential
           grep("MagVar", names(w.04), value = T), # direction of travel
@@ -670,7 +718,7 @@ omits = c(alwaysomit,
           "wx",
           c("CRASH_SUM", "FATALS_SUM"), # FARS variables, added in 19
           grep("F_SYSTEM", names(w.04), value = T), # road class
-          c("MEAN_AADT", "SUM_AADT"), # AADT
+          c("MEAN_AADT", "SUM_AADT", " SUM_miles"), # AADT
           grep("WAC", names(w.04), value = T), # Jobs workplace
           grep("RAC", names(w.04), value = T), # Jobs residential
           grep("MagVar", names(w.04), value = T), # direction of travel
@@ -696,7 +744,7 @@ omits = c(alwaysomit, alert_subtypes,
           "wx",
           c("CRASH_SUM", "FATALS_SUM"), # FARS variables, added in 19
           grep("F_SYSTEM", names(w.04), value = T), # road class
-          c("MEAN_AADT", "SUM_AADT"), # AADT
+          c("MEAN_AADT", "SUM_AADT", " SUM_miles"), # AADT
           grep("WAC", names(w.04), value = T), # Jobs workplace
           grep("RAC", names(w.04), value = T), # Jobs residential
           grep("MagVar", names(w.04), value = T), # direction of travel
@@ -722,8 +770,7 @@ omits = c(alwaysomit, alert_types,
           "wx",
           c("CRASH_SUM", "FATALS_SUM"), # FARS variables, added in 19
           grep("F_SYSTEM", names(w.04), value = T), # road class
-          c("MEAN_AADT", "SUM_AADT"), # AADT
-          grep("WAC", names(w.04), value = T), # Jobs workplace
+          c("MEAN_AADT", "SUM_AADT", " SUM_miles"), # AADT
           grep("RAC", names(w.04), value = T), # Jobs residential
           grep("MagVar", names(w.04), value = T), # direction of travel
           grep("medLast", names(w.04), value = T), # report rating, reliability, confidence

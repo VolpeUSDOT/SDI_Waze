@@ -28,7 +28,7 @@ codeloc <- "~/SDI_Waze"
 # Set grid size:
 HEXSIZE = c("1", "4", "05")[1] # Change the value in the bracket to use 1, 4, or 0.5 sq mi hexagon grids
 inputdir <- paste0("WazeEDT_Agg", HEXSIZE, "mile_Rdata_Input")
-outputdir <- paste0("WazeEDT_Agg", HEXSIZE, "mile_RandForest_Output")
+outputdir <- paste0("WazeEDT_Agg", HEXSIZE, "mile_RandForest_Output_fill0")
 
 do.months = c("04", "05", "06")
 

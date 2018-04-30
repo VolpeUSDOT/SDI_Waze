@@ -25,6 +25,7 @@ require(pROC)
 do.rf <- function(train.dat, omits, response.var = "MatchEDT_buffer_Acc", model.no,
                   test.dat = NULL, test.split = .30,
                   thin.dat = NULL,
+                  cutoff = c(0.8, 0.2),
                   rf.inputs = list(ntree.use = 500, avail.cores = 4, mtry = NULL, maxnodes = NULL, nodesize = 5)){
   
   if(!is.null(test.dat) & !missing(test.split)) stop("Specify either test.dat or test.split, but not both")
@@ -81,8 +82,8 @@ do.rf <- function(train.dat, omits, response.var = "MatchEDT_buffer_Acc", model.
   cat(round(timediff,2), attr(timediff, "unit"), "to fit model", model.no, "\n")
   # End RF in parallel
   
-  rf.pred <- predict(rf.out, test.dat.use[fitvars], cutoff = c(0.8, 0.2))
-  rf.prob <- predict(rf.out, test.dat.use[fitvars], type = "prob", cutoff = c(0.8, 0.2))
+  rf.pred <- predict(rf.out, test.dat.use[fitvars], cutoff = cutoff)
+  rf.prob <- predict(rf.out, test.dat.use[fitvars], type = "prob", cutoff = cutoff)
 
   Nobs <- data.frame(nrow(rundat),
                  sum(as.numeric(as.character(rundat[,response.var])) == 0),
@@ -107,14 +108,15 @@ do.rf <- function(train.dat, omits, response.var = "MatchEDT_buffer_Acc", model.
   # pROC::roc - response, predictor
   model_auc <- pROC::auc(test.dat.use[,response.var], rf.prob[,colnames(rf.prob)=="1"])
 
+  pdf(file = paste0("AUC_", model.no, ".pdf"), width = 6, height = 6)
   plot(pROC::roc(test.dat.use[,response.var], rf.prob[,colnames(rf.prob)=="1"]),
-      main = paste0("Model ", model.no),
-      grid=c(0.1, 0.2),
-      ylim = c(0, 1), xlim = c(1, 0))
+       main = paste0("Model ", model.no),
+       grid=c(0.1, 0.2),
+       ylim = c(0, 1), xlim = c(1, 0))
   legend("bottomright", legend = round(model_auc, 4), title = "AUC", inset = 0.25)
-
-  dev.print(device = jpeg, file = paste0("AUC_", model.no, ".jpg"), width = 500, height = 500)
-
+  
+  #dev.print(device = jpeg, file = paste0("AUC_", model.no, ".jpg"), width = 500, height = 500)
+  dev.off()
   # AUC::roc - predictions, labels
   # plot(model_auc2 <- AUC::roc(rf.out$votes[,"1"], factor(1*(rf.out$y==1))),
   #      main = paste0("Model ", model.no))
@@ -232,13 +234,15 @@ reassess.rf <- function(train.dat, omits, response.var = "MatchEDT_buffer_Acc", 
   # pROC::roc - response, predictor
   model_auc <- pROC::auc(test.dat.use[,response.var], rf.prob[,colnames(rf.prob)=="1"])
   
+  pdf(file = paste0("AUC_", model.no, ".pdf"), width = 6, height = 6)
   plot(pROC::roc(test.dat.use[,response.var], rf.prob[,colnames(rf.prob)=="1"]),
        main = paste0("Model ", model.no),
        grid=c(0.1, 0.2),
        ylim = c(0, 1), xlim = c(1, 0))
   legend("bottomright", legend = round(model_auc, 4), title = "AUC", inset = 0.25)
   
-  dev.print(device = jpeg, file = paste0("AUC_", model.no, ".jpg"), width = 500, height = 500)
+  #dev.print(device = jpeg, file = paste0("AUC_", model.no, ".jpg"), width = 500, height = 500)
+  dev.off()
   
   # AUC::roc - predictions, labels
   # plot(model_auc2 <- AUC::roc(rf.out$votes[,"1"], factor(1*(rf.out$y==1))),
@@ -264,9 +268,9 @@ reassess.rf <- function(train.dat, omits, response.var = "MatchEDT_buffer_Acc", 
   savelist = c("rf.out", "rf.pred", "rf.prob", "out.df") 
   if(is.null(test.dat)) savelist = c(savelist, "testrows", "trainrows")
 
-  # Overwrite previous model outputs
+  # Write to reassess directory
   s3save(list = savelist,
-         object = file.path(outputdir, paste("Model", model.no, "RandomForest_Output.RData", sep= "_")),
+         object = file.path(outputdir, "Reassess", paste("Model", model.no, "RandomForest_Output.RData", sep= "_")),
          bucket = waze.bucket)
   
   rm(savelist) # just to be sure
