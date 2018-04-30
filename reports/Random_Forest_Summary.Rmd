@@ -140,11 +140,6 @@ if(!exists("keyoutputs1")) {
   load(file.path(localdir, "Outputs_up_to_17"))
   keyoutputs1 <- keyoutputs
   rm(keyoutputs)
-  # simplifying the auc value, don't need complete output
-  # for(i in 1:length(keyoutputs)){
-  #   keyoutputs[[i]]$auc <- as.numeric(keyoutputs[[i]]$auc)
-  # }
-  # save(list = "keyoutputs", file = file.path(localdir, "Outputs_up_to_17"))
 }
 
 # pairs to compare: 01, 04, 06 - April
@@ -155,7 +150,7 @@ for(i in c("01", "04", "06")){ tabl <- rbind(tabl, c(100*keyoutputs1[[i]]$diag, 
 
 colnames(tabl)[1:5] = c("Accuracy", "Precision", "Recall", "False Positive Rate", "AUC")
 
-rownames(tabl) = c("Model 01 - 1 mile", "Model 04 - 4 mile", "Model 06 - 0.5 mile")
+rownames(tabl) = c("01 - 1 mile", "04 - 4 mile", "06 - 0.5 mile")
 #kable(tabl, caption = "Phase 1 model diagnostics for April 2017, Maryland.", rownames = "Model")
 datatable(tabl, filter = 'top',
           caption = "Phase 1 model diagnostics for April 2017, Maryland.",
@@ -175,10 +170,7 @@ tabl <- vector()
 for(i in c("03", "05", "07")){ tabl <- rbind(tabl, c(100*keyoutputs1[[i]]$diag, round(keyoutputs1[[i]]$auc, 4)))}
 
 colnames(tabl)[1:5] = c("Accuracy", "Precision", "Recall", "False Positive Rate", "AUC")
-rownames(tabl) = c("Model 03 - 1 mile", "Model 05 - 4 mile", "Model 07 - 0.5 mile")
-# kable(tabl, 
-#           caption = "Phase 1 model diagnostics for April + May, test on June, Maryland.",
-#           rownames = "Model")
+rownames(tabl) = c("03 - 1 mile", "05 - 4 mile", "07 - 0.5 mile")
 
 datatable(tabl, filter = 'top',
           caption = "Phase 1 model diagnostics for April + May, test on June, Maryland.",
@@ -207,7 +199,7 @@ tabl <- vector()
 for(i in c("01", "08")){ tabl <- rbind(tabl, c(100*keyoutputs1[[i]]$diag, round(keyoutputs1[[i]]$auc, 4)))}
 
 colnames(tabl)[1:5] = c("Accuracy", "Precision", "Recall", "False Positive Rate", "AUC")
-rownames(tabl) = c("Model 01 - 1 mile", "Model 08 - 1 mile, Neighbors")
+rownames(tabl) = c("01 - 1 mile", "08 - 1 mile, Neighbors")
 
 datatable(tabl, filter = 'top',
           caption = "Phase 1 model diagnostics for April 2017, Maryland, with neighboring grid cells as predictors.",
@@ -225,7 +217,7 @@ datatable(tabl, filter = 'top',
 tabl <- vector()
 for(i in c("03", "09")){ tabl <- rbind(tabl, c(100*keyoutputs1[[i]]$diag, round(keyoutputs1[[i]]$auc, 4)))}
 colnames(tabl)[1:5] = c("Accuracy", "Precision", "Recall", "False Positive Rate", "AUC")
-rownames(tabl) = c("Model 03 - 1 mile", "Model 09 - 1 mile, Neighbors")
+rownames(tabl) = c("03 - 1 mile", "09 - 1 mile, Neighbors")
 
 datatable(tabl, filter = 'top',
           caption = "Phase 1 model diagnostics for April-May, test on June 2017, Maryland, with neighboring grid cells as predictors.",
@@ -257,8 +249,7 @@ tabl <- vector()
 for(i in c("08","12", "14", "16")){ tabl <- rbind(tabl, c(100*keyoutputs1[[i]]$diag, round(keyoutputs1[[i]]$auc, 4)))}
 
 colnames(tabl)[1:5] = c("Accuracy", "Precision", "Recall", "False Positive Rate", "AUC")
-rownames(tabl) = c("Model 08 - 1 mile, Neighbors", "Model 12 - Weather", "Model 14 - Weather, Roads", "Model 16 - Weather, Roads, Jobs")
-#kable(tabl, caption = "Phase 1 model diagnostics for April 2017, Maryland, with supplemental weather, road functional class, and economic data.", rownames = "Model")
+rownames(tabl) = c("08 - 1 mile, Neighbors", "12 - Weather", "14 - Weather, Roads", "16 - Weather, Roads, Jobs")
 datatable(tabl, filter = 'top',
           caption = "Phase 1 model diagnostics for April 2017, Maryland, with supplemental weather, road functional class, and economic data.",
           rownames = T,
@@ -275,8 +266,7 @@ datatable(tabl, filter = 'top',
 tabl <- vector()
 for(i in c("09", "13", "15", "17")){ tabl <- rbind(tabl, c(100*keyoutputs1[[i]]$diag, round(keyoutputs1[[i]]$auc, 4))) }
 colnames(tabl)[1:5] = c("Accuracy", "Precision", "Recall", "False Positive Rate", "AUC")
-rownames(tabl) = c("Model 09 - 1 mile, Neighbors", "Model 13 - Weather", "Model 15 - Weather, Roads", "Model 17 - Weather, Roads, Jobs")
-# kable(tabl, caption = "Phase 1 model diagnostics for April + May, test on June, Maryland, with supplemental weather, road functional class, and economic data.", rownames = "Model")
+rownames(tabl) = c("09 - 1 mile, Neighbors", "13 - Weather", "15 - Weather, Roads", "17 - Weather, Roads, Jobs")
 datatable(tabl, filter = 'top',
           caption = "Phase 1 model diagnostics for April + May, test on June, Maryland, with supplemental weather, road functional class, and economic data.",
           rownames = T,
@@ -334,7 +324,7 @@ In addition, we considered correlated and nested variables, and devised a sequen
 
 ```{r Diagframe2a}
 if(ONLOCAL) {  localdir <- outputdir2 } 
-load(file.path(localdir, "Output_to_39"))
+load(file.path(localdir, "Output_to_32"))
 ```
 
 
@@ -403,15 +393,15 @@ Set B consisted of the following models, focusing on Waze event types without th
 - 28 Add road class, AADT only
 - 29 Add jobs only
 - 30 Add all (but not Waze event subtypes or sub-subtypes)
-- 31 Pick best and test removing EDT only rows
-- 32 Pick best and test removing road closure only rows
+- 31 Test removing EDT only rows from model 30
+- 32 Test removing road closure only rows from model 30
 
 Excluding sub-types did not decrease overall accuracy and model fit, compared to Set A models. As with Set A, adding supplemental data beyond the base set of predictors increased recall, and also increased precision. The best balance between recall and precision, as measured by AUC, came again from the model with all supplemental predictors added. Road functional class and AADT again were the predictors which drove the largest increase in recall. All models exhibited excellent accuracy and overall performance.
 
 ```{r phase2B}
 # pairs to compare: 24-30
 tabl <- vector()
-mods = as.character(24:30)
+mods = as.character(24:32)
 for(i in mods){ tabl <- rbind(tabl, c(100*keyoutputs2[[i]]$diag, round(keyoutputs2[[i]]$auc, 4)))}
 
 colnames(tabl)[1:5] = c("Accuracy", "Precision", "Recall", "False Positive Rate", "AUC")
@@ -429,6 +419,10 @@ datatable(tabl, filter = 'top',
           formatStyle(4, background = styleEqual(min(tabl[,4]), 'lightgreen'))%>%
           formatStyle(5, background = styleEqual(max(tabl[,5]), 'lightgreen'))
 ```
+
+Approximately 1.5% of the data includes times and locations where only EDT values, but no Waze accidents, were present. These account for 30,875 of the 2,003,391 observations for the April-September data. Omitting these observations had a negligable effect on the overall model performace, with minor increase in recall and decrease in precision, leading to an overall minor decrease in AUC. 
+
+An even smaller quanity of data included times and locations where only Waze road closure events were reported, 2,892 of the total observations (0.1%). Omitting these interestingly lead to the highest recall of this set of model, but the best balance between recall and precision was still acheived with Model 30, including those observations.
 
 ## C. SubtypeCounts
 
@@ -527,18 +521,19 @@ for(i in 1:length(keyoutputs1)){
 colnames(tabl)[2:5] = c("Accuracy", "Precision", "Recall", "False Positive Rate")
 
 datatable(tabl, filter = 'top',
-          caption = "Phase 1 model diagnostics. Best values are highlighed in green.",
+          caption = "Phase 1 model diagnostics. Best values are highlighed in green, worst in khaki.",
           rownames = T,
           options = list(dom = "tip",
                          order = list(list(1, 'desc')),
                          pageLength = 5)
           ) %>% formatCurrency(2:5, currency = "", digits = 2) %>%
-          formatStyle(2, background = styleEqual(max(tabl[,2]), 'lightgreen'))%>%
-          formatStyle(3, background = styleEqual(max(tabl[,3]), 'lightgreen'))%>%
-          formatStyle(4, background = styleEqual(max(tabl[,4]), 'lightgreen'))%>%
-          formatStyle(5, background = styleEqual(min(tabl[,5]), 'lightgreen'))%>%
-          formatStyle(7, background = styleEqual(max(tabl[,7]), 'lightgreen'))%>%
-          formatStyle(8, background = styleEqual(min(tabl[,8]), 'lightgreen'))
+          formatStyle(2, background = styleEqual(range(tabl[,2]), c('khaki','lightgreen')))%>%
+          formatStyle(3, background = styleEqual(range(tabl[,3]), c('khaki','lightgreen')))%>%
+          formatStyle(4, background = styleEqual(range(tabl[,4]), c('khaki','lightgreen')))%>%
+          formatStyle(5, background = styleEqual(range(tabl[,5]), c('lightgreen','khaki')))%>%
+          formatStyle(7, background = styleEqual(range(tabl[,7]), c('khaki','lightgreen')))%>%
+          formatStyle(8, background = styleEqual(range(tabl[,8]), c('lightgreen','khaki')))
+
 ```
 
 ## Phase 2 Model peformance details
@@ -575,16 +570,16 @@ for(i in 1:length(keyoutputs2)){
 colnames(tabl)[2:5] = c("Accuracy", "Precision", "Recall", "False Positive Rate")
 
 datatable(tabl, filter = 'top',
-          caption = "Phase 2 model diagnostics. Best values are highlighed in green.",
+          caption = "Phase 2 model diagnostics. Best values are highlighed in green, worst in khaki.",
           rownames = T,
           options = list(dom = "tip",
                          order = list(list(1, 'desc')),
                          pageLength = 5)
           ) %>% formatCurrency(2:5, currency = "", digits = 2) %>%
-          formatStyle(2, background = styleEqual(max(tabl[,2]), 'lightgreen'))%>%
-          formatStyle(3, background = styleEqual(max(tabl[,3]), 'lightgreen'))%>%
-          formatStyle(4, background = styleEqual(min(tabl[,4]), 'lightgreen'))%>%
-          formatStyle(5, background = styleEqual(min(tabl[,5]), 'lightgreen'))%>%
-          formatStyle(7, background = styleEqual(max(tabl[,7]), 'lightgreen'))%>%
-          formatStyle(8, background = styleEqual(min(tabl[,8]), 'lightgreen'))
+          formatStyle(2, background = styleEqual(range(tabl[,2]), c('khaki','lightgreen')))%>%
+          formatStyle(3, background = styleEqual(range(tabl[,3]), c('khaki','lightgreen')))%>%
+          formatStyle(4, background = styleEqual(range(tabl[,4]), c('khaki','lightgreen')))%>%
+          formatStyle(5, background = styleEqual(range(tabl[,5]), c('lightgreen','khaki')))%>%
+          formatStyle(7, background = styleEqual(range(tabl[,7]), c('khaki','lightgreen')))%>%
+          formatStyle(8, background = styleEqual(range(tabl[,8]), c('lightgreen','khaki')))
 ```

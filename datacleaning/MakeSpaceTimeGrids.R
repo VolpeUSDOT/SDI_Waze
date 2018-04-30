@@ -8,10 +8,14 @@
 library(tidyverse)
 library(lubridate)
 library(utils)
+library(doParallel)
+library(foreach)
 
 #Set parameters for data to process
 HEXSIZE = c("1", "4", "05")[1] # Change the value in the bracket to use 1, 4, or 0.5 sq mi hexagon grids
+ONLOCAL = F
 
+if(ONLOCAL){
 ##Set file paths - remove for cloud pipeline
 #Flynn drive
 codedir <- "~/git/SDI_Waze" 
@@ -20,6 +24,17 @@ wazedir <- "W:/SDI Pilot Projects/Waze/"
 volpewazedir <- "//vntscex.local/DFS/Projects/PROJ-OR02A2/SDI/"
 outputdir <- paste0("W:/SDI Pilot Projects/Waze/MASTER Data Files/Waze Aggregated/HexagonWazeEDT/",
                     "WazeEDT Agg",HEXSIZE,"mile Rdata Input")
+} else {
+  
+  codedir <- "~/SDI_Waze" 
+  wazemonthdir <- "~/agg_in"
+  wazedir <- "~/workingdata"
+  volpewazedir <- "~/workingdata"
+  outputdir <- file.path("~/workingdata",
+                      paste("WazeEDT_Agg",HEXSIZE,"mile_Rdata_Input", sep = "_"))
+  
+}
+
 
 # #Sudderth drive
 # #NEED TO CONNECT TO VPN AND CLICK ON "S" DRIVE IN FILE EXPLORER FIRST
@@ -40,10 +55,24 @@ avail.months = unique(substr(dir(wazemonthdir)[grep("^merged.waze.edt", dir(waze
 
 todo.months = avail.months[c(2:7)]
 
-temp.outputdir = tempdir()# for temporary storage 
+if(ONLOCAL) { temp.outputdir = tempdir() # for temporary storage 
+} else {
+  temp.outputdir = "~/agg_out"
+}
 starttime <- Sys.time()
 
-for(j in todo.months){ # j="04"
+cl <- makeCluster(parallel::detectCores()) # make a cluster of all available cores
+registerDoParallel(cl)
+
+writeLines(c(""), "log.txt")    
+
+foreach(j = todo.months, .packages = c("dplyr", "lubridate", "utils")) %dopar% {
+  
+  sink("log.txt", append=TRUE)
+  
+  cat(paste(Sys.time()), j, "\n")                                                           
+                                                           
+# for(j in todo.months){ # j="04"
   
   load(file.path(wazemonthdir, paste0("merged.waze.edt.", j,"_", HEXSIZE, "mi","_MD.RData"))) # includes both waze (link.waze.edt) and edt (edt.df) data, with grid for central and neighboring cells
   
@@ -97,8 +126,10 @@ for(j in todo.months){ # j="04"
   cat("Completed", j, "\n")
   } # End SpaceTimeGrid loop ----
 
+stopCluster(cl)
 
 
-movefiles(dir(temp.outputdir)[grep("Hex", dir(temp.outputdir))], temp.outputdir, outputdir)
+if(ONLOCAL) movefiles(dir(temp.outputdir)[grep("Hex", dir(temp.outputdir))], temp.outputdir, outputdir)
+
 
   

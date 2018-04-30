@@ -53,6 +53,18 @@ for(mo in do.months){
   prep.hex(file.path(inputdir, paste0("WazeTimeEdtHexWx_", mo, "_", HEXSIZE, "_mi.RData")), month = mo)
 }
 
+# Plot to check grid IDs
+CHECKPLOT = F
+if(CHECKPLOT){
+  grid_shp <- rgdal::readOGR(localdir, "MD_hexagons_1mi_newExtent_neighbors")
+  
+  w.g <- match(w.04$GRID_ID, grid_shp$GRID_ID)
+  w.g <- w.g[!is.na(w.g)]
+  gs <- grid_shp[w.g,]
+  
+  plot(gs, add = T, col = "red")
+}
+
 # Add FARS, AADT, HPMS, jobs
 na.action = "fill0"
 for(w in c("w.04", "w.05", "w.06", "w.07","w.08", "w.09")){
@@ -669,7 +681,7 @@ if(!REASSESS){
                                       omits, response.var = "MatchEDT_buffer_Acc", 
                                       model.no = modelno, rf.inputs = rf.inputs) 
 }
-# 40 Pick best and test removing EDT only rows
+# 40 Pick best and test removing EDT only rows - skipped, these are clearly worse models
 
 # 41 Pick best and test removing road closure only rows
 
@@ -680,115 +692,136 @@ if(!REASSESS){
 # 43 Pick best and test removing EDT only rows
 # 44 Pick best and test removing road closure only rows
 
+modelno = "42a"
+
+# Based on model 23
+omits = c(alwaysomit,
+          #          "wx",
+          #          c("CRASH_SUM", "FATALS_SUM"), # FARS variables, 
+          #          grep("F_SYSTEM", names(w.04), value = T), # road class
+          #          c("MEAN_AADT", "SUM_AADT", " SUM_miles"), # AADT
+          #          grep("WAC", names(w.04), value = T), # Jobs workplace
+          #          grep("RAC", names(w.04), value = T), # Jobs residential
+          grep("MagVar", names(w.04), value = T), # direction of travel
+          grep("medLast", names(w.04), value = T), # report rating, reliability, confidence
+          grep("nWazeAcc_", names(w.04), value = T), # neighboring accidents
+          grep("nWazeJam_", names(w.04), value = T) # neighboring jams
+)
+
+if(!REASSESS){
+  keyoutputs[[modelno]] = do.rf(train.dat = w.04_09, 
+                                omits, response.var = "nMatchEDT_buffer_Acc", 
+                                model.no = modelno, rf.inputs = rf.inputs) 
+  save("keyoutputs", file = paste0("Output_to_", modelno))
+} else {
+  redo_outputs[[modelno]] = reassess.rf(train.dat = w.04_09, 
+                                        omits, response.var = "nMatchEDT_buffer_Acc", 
+                                        model.no = modelno, rf.inputs = rf.inputs) 
+}
+
+
+modelno = "43a"
+
+# Based on model 23, without EDT-only rows
+
+if(!REASSESS){
+  keyoutputs[[modelno]] = do.rf(train.dat = w.04_09[!EDTonlyrows,], 
+                                omits, response.var = "nMatchEDT_buffer_Acc", 
+                                model.no = modelno, rf.inputs = rf.inputs) 
+  save("keyoutputs", file = paste0("Output_to_", modelno))
+} else {
+  redo_outputs[[modelno]] = reassess.rf(train.dat = w.04_09[!EDTonlyrows,], 
+                                        omits, response.var = "nMatchEDT_buffer_Acc", 
+                                        model.no = modelno, rf.inputs = rf.inputs) 
+}
+
+
+modelno = "44a"
+
+# Based on model 23, without road closure-only rows
+
+if(!REASSESS){
+  keyoutputs[[modelno]] = do.rf(train.dat = w.04_09[!Road.closure.onlyrows,], 
+                                omits, response.var = "nMatchEDT_buffer_Acc", 
+                                model.no = modelno, rf.inputs = rf.inputs) 
+  save("keyoutputs", file = paste0("Output_to_", modelno))
+} else {
+  redo_outputs[[modelno]] = reassess.rf(train.dat = w.04_09[!Road.closure.onlyrows,], 
+                                        omits, response.var = "nMatchEDT_buffer_Acc", 
+                                        model.no = modelno, rf.inputs = rf.inputs) 
+}
+
+
+modelno = "42b"
+
+# Based on model 30
+omits = c(alwaysomit, alert_subtypes
+          #"wx",
+          #c("CRASH_SUM", "FATALS_SUM"), # FARS variables, added in 19
+          #grep("F_SYSTEM", names(w.04), value = T), # road class
+          #c("MEAN_AADT", "SUM_AADT", " SUM_miles"), # AADT
+          #grep("WAC", names(w.04), value = T), # Jobs workplace
+          #grep("RAC", names(w.04), value = T), # Jobs residential
+          #grep("MagVar", names(w.04), value = T), # direction of travel
+          #grep("medLast", names(w.04), value = T), # report rating, reliability, confidence
+          #grep("nWazeAcc_", names(w.04), value = T), # neighboring accidents
+          #grep("nWazeJam_", names(w.04), value = T) # neighboring jams
+)
+
+
+if(!REASSESS){
+  keyoutputs[[modelno]] = do.rf(train.dat = w.04_09, 
+                                omits, response.var = "nMatchEDT_buffer_Acc", 
+                                model.no = modelno, rf.inputs = rf.inputs) 
+  save("keyoutputs", file = paste0("Output_to_", modelno))
+} else {
+  redo_outputs[[modelno]] = reassess.rf(train.dat = w.04_09, 
+                                        omits, response.var = "nMatchEDT_buffer_Acc", 
+                                        model.no = modelno, rf.inputs = rf.inputs) 
+}
+
+
+modelno = "43b"
+
+# Based on model 30, without EDT-only rows
+
+if(!REASSESS){
+  keyoutputs[[modelno]] = do.rf(train.dat = w.04_09[!EDTonlyrows,], 
+                                omits, response.var = "nMatchEDT_buffer_Acc", 
+                                model.no = modelno, rf.inputs = rf.inputs) 
+  save("keyoutputs", file = paste0("Output_to_", modelno))
+} else {
+  redo_outputs[[modelno]] = reassess.rf(train.dat = w.04_09[!EDTonlyrows,], 
+                                        omits, response.var = "nMatchEDT_buffer_Acc", 
+                                        model.no = modelno, rf.inputs = rf.inputs) 
+}
+
+
+modelno = "44b"
+
+# Based on model 30, without road closure-only rows
+
+if(!REASSESS){
+  keyoutputs[[modelno]] = do.rf(train.dat = w.04_09[!Road.closure.onlyrows,], 
+                                omits, response.var = "nMatchEDT_buffer_Acc", 
+                                model.no = modelno, rf.inputs = rf.inputs) 
+  save("keyoutputs", file = paste0("Output_to_", modelno))
+} else {
+  redo_outputs[[modelno]] = reassess.rf(train.dat = w.04_09[!Road.closure.onlyrows,], 
+                                        omits, response.var = "nMatchEDT_buffer_Acc", 
+                                        model.no = modelno, rf.inputs = rf.inputs) 
+}
+
+
 # E. Buffer vs grid cell counts for response variable ----
 
 # 45 Run best combination of each base model (A, B, and C) on buffer counts vs grid cell counts
 # 46 Pick best and test removing EDT only rows
 # 47 Pick best and test removing road closure only rows
 
-modelno = "45a"
-
-omits = c(alwaysomit, 
-          "wx",
-          c("CRASH_SUM", "FATALS_SUM"), # FARS variables, added in 19
-          grep("F_SYSTEM", names(w.04), value = T), # road class
-          c("MEAN_AADT", "SUM_AADT", " SUM_miles"), # AADT
-          grep("WAC", names(w.04), value = T), # Jobs workplace
-          grep("RAC", names(w.04), value = T), # Jobs residential
-          grep("MagVar", names(w.04), value = T), # direction of travel
-          grep("medLast", names(w.04), value = T), # report rating, reliability, confidence
-          grep("nWazeAcc_", names(w.04), value = T), # neighboring accidents
-          grep("nWazeJam_", names(w.04), value = T) # neighboring jams
-)
-
-if(!REASSESS){
-  keyoutputs[[modelno]] = do.rf(train.dat = w.04_09, 
-                              omits, response.var = "nMatchEDT_buffer_Acc", 
-                              model.no = modelno, rf.inputs = rf.inputs) 
-  save("keyoutputs", file = paste0("Output_to_", modelno))
-} else {
-  redo_outputs[[modelno]] = reassess.rf(train.dat = w.04_09, 
-                                      omits, response.var = "MatchEDT_buffer_Acc", 
-                                      model.no = modelno, rf.inputs = rf.inputs) 
-}
-
-modelno = "45a"
-
-omits = c(alwaysomit, 
-          "wx",
-          c("CRASH_SUM", "FATALS_SUM"), # FARS variables, added in 19
-          grep("F_SYSTEM", names(w.04), value = T), # road class
-          c("MEAN_AADT", "SUM_AADT", " SUM_miles"), # AADT
-          grep("WAC", names(w.04), value = T), # Jobs workplace
-          grep("RAC", names(w.04), value = T), # Jobs residential
-          grep("MagVar", names(w.04), value = T), # direction of travel
-          grep("medLast", names(w.04), value = T), # report rating, reliability, confidence
-          grep("nWazeAcc_", names(w.04), value = T), # neighboring accidents
-          grep("nWazeJam_", names(w.04), value = T) # neighboring jams
-)
-
-if(!REASSESS){
-  keyoutputs[[modelno]] = do.rf(train.dat = w.04_09, 
-                              omits, response.var = "nMatchEDT_buffer_Acc", 
-                              model.no = modelno, rf.inputs = rf.inputs) 
-  save("keyoutputs", file = paste0("Output_to_", modelno))
-  } else {
-  redo_outputs[[modelno]] = reassess.rf(train.dat = w.04_09, 
-                                      omits, response.var = "MatchEDT_buffer_Acc", 
-                                      model.no = modelno, rf.inputs = rf.inputs) 
-  }
-
-modelno = "45b"
-
-omits = c(alwaysomit, alert_subtypes, 
-          "wx",
-          c("CRASH_SUM", "FATALS_SUM"), # FARS variables, added in 19
-          grep("F_SYSTEM", names(w.04), value = T), # road class
-          c("MEAN_AADT", "SUM_AADT", " SUM_miles"), # AADT
-          grep("WAC", names(w.04), value = T), # Jobs workplace
-          grep("RAC", names(w.04), value = T), # Jobs residential
-          grep("MagVar", names(w.04), value = T), # direction of travel
-          grep("medLast", names(w.04), value = T), # report rating, reliability, confidence
-          grep("nWazeAcc_", names(w.04), value = T), # neighboring accidents
-          grep("nWazeJam_", names(w.04), value = T) # neighboring jams
-)
-
-if(!REASSESS){
-  keyoutputs[[modelno]] = do.rf(train.dat = w.04_09, 
-                              omits, response.var = "nMatchEDT_buffer_Acc", 
-                              model.no = modelno, rf.inputs = rf.inputs) 
-  save("keyoutputs", file = paste0("Output_to_", modelno))
-  } else {
-    redo_outputs[[modelno]] = reassess.rf(train.dat = w.04_09, 
-                                      omits, response.var = "MatchEDT_buffer_Acc", 
-                                      model.no = modelno, rf.inputs = rf.inputs)
-  }
-
-modelno = "45c"
-
-omits = c(alwaysomit, alert_types,
-          "wx",
-          c("CRASH_SUM", "FATALS_SUM"), # FARS variables, added in 19
-          grep("F_SYSTEM", names(w.04), value = T), # road class
-          c("MEAN_AADT", "SUM_AADT", " SUM_miles"), # AADT
-          grep("RAC", names(w.04), value = T), # Jobs residential
-          grep("MagVar", names(w.04), value = T), # direction of travel
-          grep("medLast", names(w.04), value = T), # report rating, reliability, confidence
-          grep("nWazeAcc_", names(w.04), value = T), # neighboring accidents
-          grep("nWazeJam_", names(w.04), value = T) # neighboring jams
-)
-
-if(!REASSESS){
-  keyoutputs[[modelno]] = do.rf(train.dat = w.04_09, 
-                              omits, response.var = "nMatchEDT_buffer_Acc", 
-                              model.no = modelno, rf.inputs = rf.inputs)
-  save("keyoutputs", file = paste0("Output_to_", modelno))
-  
-  } else {
-    redo_outputs[[modelno]] = reassess.rf(train.dat = w.04_09, 
-                                      omits, response.var = "MatchEDT_buffer_Acc", 
-                                      model.no = modelno, rf.inputs = rf.inputs) 
-  }
+# modelno = "45a"
+# 
+# modelno = "45b"
 
 save("redo_outputs", file = paste0("Reassess_Output_to_", modelno))
 
