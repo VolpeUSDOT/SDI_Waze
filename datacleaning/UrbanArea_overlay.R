@@ -28,7 +28,8 @@ source(file.path(codedir, "utility/wazefunctions.R")) # for movefiles
 
 setwd(wazedir)
 
-TEST = T # Change to F to run for all available months, T for only a subset of months
+TEST = F      # Change to F to run for all available months, T for only a subset of months
+CHECKPLOT = F # Make plots for each stage, to make sure of spatial overlay
 
 # Read in spatial data ----
 
@@ -41,10 +42,10 @@ ua <- readOGR(file.path(wazedir, "Working Documents/Census Files"), layer = "cb_
 # Read in county shapefile
 co <- readOGR(file.path(wazedir, "Working Documents/Census Files"), layer = "cb_2015_us_county_500k")
 
-HEXSIZE = c("1", "4", "05")[1] # Change the value in the bracket to use 4 sq mi or 0.5 sq mi
+HEXSIZE = c("1", "4", "05")[3] # Change the value in the bracket to use 4 sq mi or 0.5 sq mi
 
 # Read in hexagon shapefile. This is a rectangular surface of 1 sq mi area hexagons, 
-hex <- readOGR(file.path(volpewazedir, "Data/MD_hexagons_shapefiles"), layer = paste0("MD_hexagons_", HEXSIZE, "mi_newExtent_neighbors"))
+hex <- readOGR(file.path(volpewazedir, "Data/MD_hexagons_shapefiles"), layer = paste0("MD_hexagons_", HEXSIZE, "mi_newExtent_newGRIDID"))
 
 # match coordinate reference system of hexagons to Urban Areas and counties
 # proj4string(hex)
@@ -66,7 +67,7 @@ waze.monthly <- dir(file.path(wazedir, "MASTER Data Files/Waze Aggregated/month_
 avail.edt.months <- substr(edt.monthly[grep("CrashFact_edited.RData", edt.monthly)],
                            start = 6, stop = 7)
 avail.waze.months <- unique(substr(waze.monthly[grep("MD_buffered__", waze.monthly)],
-                           start = 19, stop = 20))
+                                   start = 19, stop = 20))
 
 shared.avail.months = c(avail.edt.months, avail.waze.months)[duplicated(c(avail.edt.months, avail.waze.months))]
 
@@ -86,26 +87,31 @@ for(i in shared.avail.months){
   
   # Waze: Comes from aggregated monthly Waze events, clipped to a 0.5 mile buffer around MD, for each month 2017. All the waze files share the same object name, d
   load(file.path(wazedir, paste0("MASTER Data Files/Waze Aggregated/month_MD_clipped/MD_buffered__2017-", i, ".RData")))
-
+  
   link <- read.csv(file.path(wazedir, paste0("MASTER Data Files/Waze Aggregated/month_MD_clipped/EDT_Waze_link_2017-", i, "_MD.csv")))
-
+  
   # Make sure EDT data is just for the month of interest
   edt.working <- edt.working[!is.na(edt.working$CrashDate_Local),]
   edt.working <- edt.working[edt.working$CrashDate_Local < 
                                paste0("2017-", formatC(as.numeric(i)+1, width = 2, flag = "0"), "-01 00:00:00 EDT") & 
-      edt.working$CrashDate_Local > paste0("2017-", i,"-01 00:00:00 EDT"),] 
+                               edt.working$CrashDate_Local > paste0("2017-", i,"-01 00:00:00 EDT"),] 
+  
   
   # Add "M" code to the table to show matches if we merge in full datasets
   match <- rep("M", nrow(link))
   link <- mutate(link, match) 
   
   # <><><><><><><><><><><><><><><><><><><><>
-  # Urban area overlay ----
-  
   # Overlay points in polygons
   # Use over() from sp to join these to the census polygon. Points in Polygons, pip
   
   proj4string(d) <- proj4string(edt.working) <- proj4string(ua) 
+  
+  # First clip EDT to state 
+  EDT.co <- over(edt.working, md.co["COUNTYFP"])
+  edt.working <- edt.working[!is.na(EDT.co$COUNTYFP),] # drop 33 points in April 2017 MD of 9308
+  # <><><><><><><><><><><><><><><><><><><><>
+  # Urban area overlay ----
   
   waze_ua_pip <- over(d, ua[,c("NAME10","UATYP10")]) # Match a urban area name and type to each row in d. 
   edt_ua_pip <- over(edt.working, ua[,c("NAME10","UATYP10")]) # Match a urban area name and type to each row in edt.working. 
@@ -115,10 +121,6 @@ for(i in shared.avail.months){
   
   edt.working@data <- data.frame(edt.working@data, edt_ua_pip)
   names(edt.working@data)[(length(edt.working@data)-1):length(edt.working@data)] <- c("EDT_UA_Name", "EDT_UA_Type")
-  
-  # # lat/longs should be extremely close. Use EDT as the 'center' for each given row.
-  # with(ew[complete.cases(ew[,c('lat','GPSLat')]),], cor(lat, GPSLat))
-  # with(ew[complete.cases(ew[,c('lon','GPSLong_New')]),], cor(lon, GPSLong_New))
   
   # <><><><><><><><><><><><><><><><><><><><>
   # Hexagon overlay
@@ -130,6 +132,13 @@ for(i in shared.avail.months){
   
   edt.working@data <- data.frame(edt.working@data, edt_hex_pip)
   
+  # Check:
+  if(CHECKPLOT){  
+    plot(d)
+    points(edt.working, col = "red")
+    plot(md.co, add = T, col = alpha("grey80", 0.1))
+    dev.print(jpeg, file = file.path(volpewazedir, paste0("Figures/Checking_EDT_Waze_UAoverlay_", i, ".jpg")), width = 500, height = 500)
+  }
   # <><><><><><><><><><><><><><><><><><><><>
   # Merge and save EDT-Waze
   # <><><><><><><><><><><><><><><><><><><><>
@@ -173,7 +182,10 @@ for(i in shared.avail.months){
   
   save(list=c("link.waze.edt", "edt.df"), file = file.path(temp.outputdir, paste0("merged.waze.edt.", i,"_", HEXSIZE, "mi_MD.RData")))
   
-  
+  if(CHECKPLOT) { 
+    points(link.waze.edt$lon, link.waze.edt$lat, col = "blue"); 
+    dev.print(jpeg, file = file.path(volpewazedir, paste0("Figures/Checking2_EDT_Waze_UAoverlay_", i, ".jpg")), width = 500, height = 500) 
+  }  
 } # End month loop ----
 
 # move files out of temporary output directory to shared drive. This function will move only files with the pattern 'merged' in the file name, from the tempdir to the outputdir. Files are deleted after copying. Temporary directories are additionaly deleted automatically on restart.
