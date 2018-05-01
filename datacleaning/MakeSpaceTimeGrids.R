@@ -12,7 +12,7 @@ library(doParallel)
 library(foreach)
 
 #Set parameters for data to process
-HEXSIZE = c("1", "4", "05")[1] # Change the value in the bracket to use 1, 4, or 0.5 sq mi hexagon grids
+HEXSIZE = c("1", "4", "05")[3] # Change the value in the bracket to use 1, 4, or 0.5 sq mi hexagon grids
 ONLOCAL = F
 
 if(ONLOCAL){

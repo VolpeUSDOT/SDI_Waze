@@ -6,17 +6,17 @@
 # <><><><><><><><><><><><><><><><><><><><>
 # Setup ----
 library(tidyverse)
-library(sp)
-library(maps) # for mapping base layers
-library(mapproj) # for coord_map()
-library(rgdal) # for readOGR(), needed for reading in ArcM shapefiles
 library(lubridate)
 library(utils)
+library(doParallel)
+library(foreach)
 
 #Set parameters for data to process
-HEXSIZE = c("1", "4", "05")[3] # Change the value in the bracket to use 1, 4, or 0.5 sq mi hexagon grids
+HEXSIZE = c("1", "4", "05")#[1] # Change the value in the bracket to use 1, 4, or 0.5 sq mi hexagon grids
+ONLOCAL = F
 
-
+if(ONLOCAL){
+  
 #Flynn drive
 codedir <- "~/git/SDI_Waze" 
 wazemonthdir <- "W:/SDI Pilot Projects/Waze/MASTER Data Files/Waze Aggregated/month_MD_clipped"
@@ -33,6 +33,13 @@ volpewazedir <- "//vntscex.local/DFS/Projects/PROJ-OR02A2/SDI/"
 outputdir <- paste0("S:/SDI Pilot Projects/Waze/MASTER Data Files/Waze Aggregated/HexagonWazeEDT/",
                     "WazeEDT Agg",HEXSIZE,"mile Rdata Input")
 
+} else {
+  codedir <- "~/SDI_Waze" 
+  wazemonthdir <- "~/agg_in"
+  wazedir <- "~/workingdata"
+  volpewazedir <- "~/workingdata"
+  outputdir <- "~/agg_out"
+}
 
 source(file.path(codedir, "utility/wazefunctions.R")) # for movefiles() function
 setwd(wazedir)
@@ -42,13 +49,27 @@ avail.months = unique(substr(dir(wazemonthdir)[grep("^merged.waze.edt", dir(waze
                       start = 17,
                       stop = 18))
 
-temp.outputdir = tempdir()# for temporary storage 
+if(ONLOCAL) { temp.outputdir = tempdir() # for temporary storage 
+} else {
+  temp.outputdir = "~/agg_out"
+}
 
-todo.months = avail.months[c(5:7)]
+todo.months = avail.months[c(2:7)]
 
-for(j in todo.months){ #j = "04"
+cl <- makeCluster(parallel::detectCores()) # make a cluster of all available cores
+registerDoParallel(cl)
+
+for(SIZE in HEXSIZE){ # Start hex size loop
+
+writeLines(c(""), paste0(SIZE, "_log.txt"))    
+
+foreach(j = todo.months, .packages = c("dplyr", "lubridate", "utils")) %dopar% {
   
-  load(file.path(wazemonthdir, paste0("merged.waze.edt.", j,"_",HEXSIZE,"mi","_MD.RData"))) # includes both waze (link.waze.edt) and edt (edt.df) data, with grid for central and neighboring cells
+  sink(paste0(SIZE, "_log.txt"), append=TRUE)
+  
+  cat(paste(Sys.time()), j, "\n")                                                           
+  
+  load(file.path(wazemonthdir, paste0("merged.waze.edt.", j,"_",SIZE,"mi","_MD.RData"))) # includes both waze (link.waze.edt) and edt (edt.df) data, with grid for central and neighboring cells
   
   # format(object.size(link.waze.edt), "Mb"); format(object.size(edt.df), "Mb")
   # EDT time needs to be POSIXct, not POSIXlt. ct: seconds since beginning of 1970 in UTC. lt is a list of vectors representing seconds, min, hours, day, year. ct is better for analysis, while lt is more human-readable.
@@ -58,7 +79,7 @@ for(j in todo.months){ #j = "04"
   # <><><><><><><><><><><><><><><><><><><><>
   
   #Read in the data frame of all Grid IDs by day of year and time of day in each month of data (subet to all grid IDs with Waze OR EDT data)
-  load(file.path(paste(outputdir, "/WazeHexTimeList_", j,"_",HEXSIZE,"mi",".RData",sep="")))
+  load(file.path(paste(outputdir, "/WazeHexTimeList_", j,"_",SIZE,"mi",".RData",sep="")))
   
   # aggregate: new data frame will have one row per cell, per hour, per day.
   # Response variable column: count of unique EDT events matching Waze events in this cell, within this time window. 
@@ -230,11 +251,14 @@ for(j in todo.months){ #j = "04"
   hextimeChar <- paste(wazeTime.edt.hexAll$day,wazeTime.edt.hexAll$hour,sep=":")
   wazeTime.edt.hexAll$hextime <- strptime(hextimeChar, "%j:%H", tz=)
 
-  save(list="wazeTime.edt.hexAll", file = paste(temp.outputdir, "/WazeTimeEdtHexAll_", j,"_",HEXSIZE,"mi",".RData",sep=""))
+  save(list="wazeTime.edt.hexAll", file = paste(temp.outputdir, "/WazeTimeEdtHexAll_", j,"_",SIZE,"mi",".RData",sep=""))
 
 } # End month aggregation loop ----
 
-movefiles(dir(temp.outputdir)[grep("Hex", dir(temp.outputdir))], temp.outputdir, outputdir)
+if(ONLOCAL) { movefiles(dir(temp.outputdir)[grep("Hex", dir(temp.outputdir))], temp.outputdir, outputdir) }
 
+}
+
+stopCluster(cl)
 ##########################################################################################################
 ##########################################################################################################
