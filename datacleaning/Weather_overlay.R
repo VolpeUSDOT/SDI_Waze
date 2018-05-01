@@ -4,9 +4,6 @@
 
 # <><><><><><><><><><><><><><><><><><><><>
 # Setup ----
-library(maps)
-library(maptools)
-library(sp)
 library(rgdal)
 library(rgeos)
 library(raster)
@@ -16,15 +13,14 @@ library(aws.s3)
 library(tidyverse)
 
 # Set hexagon size
-HEXSIZE = c("1", "4", "05")[3] # Change the value in the bracket to use 1, 4, or 0.5 sq mi hexagon grids
+HEXSIZE = c("1", "4", "05") #[1] Change the value in the bracket to use 1, 4, or 0.5 sq mi hexagon grids
 
 runmonths = c("04", "05", "06", "07", "08", "09") 
-BYPOLY = F # leave as F for looping over files rather than over polygons within a file
 
 # Updating to run on ATA
 codedir <- "~/SDI_Waze" 
 waze.bucket <- "ata-waze"
-inputdir <- paste0("WazeEDT_Agg", HEXSIZE, "mile_Rdata_Input")
+inputdir <- "WazeEDT_RData_Input"
 outputdir <- inputdir # write out to the same subfolder in this S3 bucket.
 localdir <- "/home/dflynn-volpe/workingdata" # location on this instance to hold working data files that can be s3loaded. *Need full path, cannot abbreviate to ~/woringdata, for readOGR*
 
@@ -54,122 +50,175 @@ if(length(dir(localdir)[grep(paste0("2017-", runmonths[length(runmonths)], "-30"
   system(s3transfer)
 }
 
-# Hexagons:
-hex <- readOGR(localdir, layer = paste0("MD_hexagons_", HEXSIZE, "mi_newExtent_neighbors"))
 
-# Read in county shapefile, and match all projections. See http://rspatial.org/spatial/rst/6-crs.html
-
-md_buff <- readOGR(localdir, layer = "MD_buffered")
-
-hex <- spTransform(hex, proj4string(md_buff)) # identical(crs(hex), crs(md_buff))
-
-# Clip hex to MD 
-hex.md.int <- gIntersects(md_buff, hex, byid = T) # Problem with using md.co: introduces duplicate grid IDs at county boundaries.
-hex.md <- hex[hex.md.int[,1],]
-
-# Set up cluster
-cl <- makeCluster(parallel::detectCores()) # make a cluster of all available cores
-registerDoParallel(cl)
-
-# Start month loop ----
-# Big loop, over months. Process weather data inside this loop.
-starttime <- Sys.time()
-
-for(mo in runmonths){ 
+for(SIZE in HEXSIZE){
   
-  # Waze - aggregated. s3load directly, not saving file to instance
-  s3load(object = file.path(inputdir, paste0("WazeTimeEdtHexAll_", mo, "_", HEXSIZE, "mi.RData")), bucket = waze.bucket)
+  # Hexagons:
+  hex <- readOGR(localdir, layer = paste0("MD_hexagons_", SIZE, "mi_newExtent_newGRIDID"))
   
-  # Weather - localdir for now, copied above from S3 bucket (still good to edit NEXRAD script to save directly to S3)
-  weatherdir <- localdir
+  # Read in county shapefile, and match all projections. See http://rspatial.org/spatial/rst/6-crs.html
   
-  # Get grid values for hex polygons with extract(). S.l.o.w.. Parallized; consider resampling. Also consider rasterizing the poloygons and using getValues instead of extract: https://gis.stackexchange.com/questions/130522/increasing-speed-of-crop-mask-extract-raster-by-many-polygons-in-r/188834, see BYPOLY below. Also possibly faster to compile hourly to a monthly GRD and read a brick.
-
-  # Parallize by file:----
-  # Get list of weather tifs for this month
-  mo.wx <- dir(weatherdir)[grep(paste0("2017-", mo), dir(weatherdir))]
+  md_buff <- readOGR(localdir, layer = "MD_buffered")
   
-  wx.cb <- foreach(i = 1:length(mo.wx), .combine = rbind, .packages = "raster") %dopar% {
+  hex <- spTransform(hex, proj4string(md_buff)) # identical(crs(hex), crs(md_buff))
+  
+  # Clip hex to MD 
+  hex.md.int <- gIntersects(md_buff, hex, byid = T) # Problem with using md.co: introduces duplicate grid IDs at county boundaries.
+  hex.md <- hex[hex.md.int[,1],]
+  # plot(hex.md)
+  
+  # Set up cluster
+  avail.cores <- parallel::detectCores()
+  if(avail.cores > 8 & length(runmonths) < 12) avail.cores = length(runmonths) # limit to runmonths if on r4.4xlarge
+  cl <- makeCluster(avail.cores) 
+  registerDoParallel(cl)
+  
+  # Start month loop ----
+  # Big loop, over months. Process weather data inside this loop.
+  starttime <- Sys.time()
+  
+  writeLines(c(""), paste0(SIZE, "_log.txt"))    
+  
+  foreach(mo = runmonths, .packages = c("raster", "dplyr", "aws.s3", "rgdal", "tidyr")) %dopar% {
+  
+    sink(paste0(SIZE, "_log.txt"), append=TRUE)
     
-    # Get the hour and day for this file
-    if(nchar(mo.wx[i]) == 21){
-      day <- strptime(substr(mo.wx[i], 1, 13), "%Y-%m-%d-%H") 
-    } else {
-      day <- strptime(substr(mo.wx[i], 1, 12), "%Y-%m-%d-%H") 
+    cat(paste(Sys.time()), mo, "\n")                                                           
+    
+    # Waze - aggregated. s3load directly, not saving file to instance
+    s3load(object = file.path(inputdir, paste0("WazeTimeEdtHexAll_", mo, "_", SIZE, "mi.RData")), bucket = waze.bucket)
+    
+    # Weather - localdir for now, copied above from S3 bucket (still good to edit NEXRAD script to save directly to S3)
+    weatherdir <- localdir
+    
+    # Get grid values for hex polygons with extract(). Now working with RasterBrick instead of individual layers
+    
+    # Get list of weather tifs for this month
+    mo.wx <- dir(weatherdir)[grep(paste0("2017-", mo), dir(weatherdir))]
+    
+    # Get the month, day and hour for each file
+    tif_time <- vector()
+    for(i in mo.wx){
+      if(nchar(i) == 21){
+        day <- strptime(substr(i, 1, 13), "%Y-%m-%d-%H") 
+      } else {
+        day <- strptime(substr(i, 1, 12), "%Y-%m-%d-%H") 
+      }
+      yr <- format(day, "%Y") # Numeric year value 
+      mo <- format(day, "%m")
+      dy <- format(day, "%j") # Numeric day value
+      dy.mo <- format(day, "%d")
+      hr <- format(day, "%H") # Numeric hour value 
+      tif_time <- rbind(tif_time, c(filename =i, year = yr, mo = mo, jday = dy, day = dy.mo, hour = hr))
     }
-    yr <- format(day, "%Y") # Numeric year value 
-    dy <- format(day, "%j") # Numeric day value
-    hr <- format(day, "%H") # Numeric hour value 
+    tif_time <- as.data.frame(tif_time)
     
-    # read in weather data from GeoTIFF. Reads in as class RasterLayer, with dimensions and resolution set from the write-out procecure. Comes with a coordiante reference system (CRS) as well, in wx@crs
-    wx <- raster(file.path(weatherdir, mo.wx[i]))
-    wx <- projectRaster(wx, crs = proj4string(md_buff))
+    files.to.stack = mo.wx[tif_time$mo == mo]
     
-    # Crop the raster to the hex.md layer
-    w2 <- crop(wx, extent(hex.md)) # very fast, only rectangular cropping but actually makes it smaller. 
-
-    hex.wx <- extract(w2, hex.md, 
+    stack.wx <- stack(x = file.path(weatherdir, files.to.stack)) # keeps on disk
+    brick.wx <- brick(stack.wx) # reads in memory. Slower to set up, faster to work with
+    
+    wx.b <- projectRaster(brick.wx, crs = proj4string(md_buff))
+    
+    w2.b <- crop(wx.b, extent(hex.md)) 
+  
+    hex.wx <- raster::extract(w2.b, hex.md, 
                       fun = max, na.rm = T, # summarize by taking the MAX value for the cells that intersect with this polygon
                       df = T) # return results as a data frame
     
-    wx.mo <- data.frame(GRID_ID = hex.md$GRID_ID, year = yr, day = dy, hour = hr, wx = hex.wx[,2])
-    wx.mo$wx[wx.mo$wx == -Inf] = NA
-    wx.mo
-  } # end foreach loop over files within month
-  
-  assign(paste0("wx.mo.", mo), wx.cb) # create object for the combined output of this month
-  
-  # Read from previous: s3load( paste0("additional_data/weather/", mo, "_", HEXSIZE, "_mi.RData"), bucket = waze.bucket); wx.cb = wx.mo.06 # Manually update month
-  
-  wte <- wazeTime.edt.hexAll
-  wte$hextime <- as.character(wte$hextime)
-  wte$year <- "2017" # update after fixing Grid_aggregate to include year
-  wte$hour <- as.character(wte$hour)
-  wx.cb$hour <- as.character(wx.cb$hour)
-  wte$day <- as.character(wte$day)
-  wx.cb$day <- as.character(wx.cb$day)
-  wte$GRID_ID <- as.character(wte$GRID_ID)
-  wx.cb$GRID_ID <- as.character(wx.cb$GRID_ID)
-  wx.cb$year <- as.character(wx.cb$year)
-  
-  # Collapse wx to only unique grid ID x day x hour combinations (not a problem with new code)
-  wx.cb <- wx.cb[!duplicated(with(wx.cb, paste(GRID_ID, year, day, hour))),]
-  
-  WazeTime.edt.wx <- left_join(wte, wx.cb,
-                               by = c("GRID_ID", "day", "hour", "year")
-                               )
-
-  # Separately save wx and Grid aggregated files
-  s3save(list = paste0("wx.mo.", mo), 
-         object = paste0("additional_data/weather/", mo, "_", HEXSIZE, "_mi.RData"),
-         bucket = waze.bucket
-  )
-  
-  s3save(list = "WazeTime.edt.wx", 
-         object = file.path(outputdir, paste0("WazeTimeEdtHexWx_", mo, "_", HEXSIZE, "_mi.RData")),
-         bucket = waze.bucket
-          )
-  
-  timediff <- Sys.time() - starttime
-  cat(mo, "complete", round(timediff, 2), attr(timediff, "units"), "elapsed \n")       
-} # end month loop
-
-                  
-stopCluster(cl) # stop the cluster when done
-
-
-if(BYPOLY){
-  poly.list <- hex.md@polygons
-  
-  # Parallize by polygon. Reduces time by ~ Alternative is to continue using extract, and parallize by file
-  system.time(hex.wx.fe <- foreach(i = 1:length(poly.list), .combine = rbind, .packages = "raster") %dopar% {
-    single = hex.md[i,]
-    cl1 = crop(wx, extent(single))
-    cl2 = rasterize(single, cl1, mask = T)
-    ext = getValues(cl2)
+    # Reshape to long
+    wx.mo <-  hex.wx %>% 
+      gather(key = filename,
+             value = wx,
+             colnames(hex.wx)[2]:colnames(hex.wx)[ncol(hex.wx)])
     
-    } 
-  )
+    names(wx.mo)[1] = "GRID_ID"
+    
+    tif_time$filename <- sub(".tif", "", make.names(tif_time$filename)) # to match colnames used in hex.wx.b
+    
+    wx.mo2 <- left_join(wx.mo, tif_time, by = "filename")    
+    
+    wx.mo2$wx[wx.mo2$wx == -Inf] = NA
+    
+    assign(paste0("wx.mo.", mo), wx.mo2) # create object for the combined output of this month
+    
+    # Read from previous: s3load( paste0("additional_data/weather/", mo, "_", SIZE, "_mi.RData"), bucket = waze.bucket); wx.cb = wx.mo.06 # Manually update month
+    
+    wte <- wazeTime.edt.hexAll
+    wte$hextime <- as.character(wte$hextime)
+    wte$year <- "2017" # update after fixing Grid_aggregate to include year
+    wte$hour <- as.character(wte$hour)
+    wx.mo2$hour <- as.character(wx.mo2$hour)
+    wte$day <- as.character(wte$day)
+    wx.mo2$day <- as.character(wx.mo2$day)
+    wte$GRID_ID <- as.character(wte$GRID_ID)
+    wx.mo2$GRID_ID <- as.character(wx.mo2$GRID_ID)
+    wx.mo2$year <- as.character(wx.mo2$year)
+    
+    # Make sure no duplicates exist by grid ID, year, day, and hour
+    stopifnot(all(!duplicated(with(wx.mo2, paste(GRID_ID, year, day, hour)))))
+    
+    WazeTime.edt.wx <- left_join(wte, wx.mo2[c("GRID_ID", "day", "hour", "year", "wx")],
+                                 by = c("GRID_ID", "day", "hour", "year")
+                                 )
   
-  # w2 <- mask(wx, md.co) # slow, and does not speed up the extraction process, only sets masked values to NA.  
-} # end by polygon 
+    # Separately save wx and Grid aggregated files
+    s3save(list = paste0("wx.mo.", mo), 
+           object = paste0("additional_data/weather/", mo, "_", SIZE, "_mi.RData"),
+           bucket = waze.bucket
+    )
+    
+    s3save(list = "WazeTime.edt.wx", 
+           object = file.path(outputdir, paste0("WazeTimeEdtHexWx_", mo, "_", SIZE, "_mi.RData")),
+           bucket = waze.bucket
+            )
+    
+    timediff <- Sys.time() - starttime
+    cat(mo, "complete", round(timediff, 2), attr(timediff, "units"), "elapsed \n")       
+  } # end month foreach loop
+  
+                    
+  stopCluster(cl) # stop the cluster when done
+
+  timediff <- Sys.time() - starttime
+  cat(SIZE, "complete", round(timediff, 2), attr(timediff, "units"), "elapsed \n") 
+  
+} # end hexsize loop
+
+# Check with plots
+
+CHECKPLOT = F
+
+library(rgdal)
+
+gdaldir = "/home/dflynn-volpe/workingdata/" # Requires full path, no alias
+
+if(CHECKPLOT){  
+  
+  co <- rgdal::readOGR(gdaldir, layer = "cb_2015_us_county_500k")
+  
+  # maryland FIPS = 24
+  md.co <- co[co$STATEFP == 24,]
+  
+  pdf("Checking_Wx_overlay_newID.pdf", width = 11, height = 8)
+  for(SIZE in HEXSIZE){
+    # Read in hexagon shapefile. This is a rectangular surface of 1 sq mi area hexagons, 
+    hex <- rgdal::readOGR(gdaldir, layer = paste0("MD_hexagons_", SIZE, "mi_newExtent_newGRIDID"))
+    
+    hex2 <- spTransform(hex, proj4string(md.co))
+    plot(hex2)
+    plot(md.co, add = T, col = "red")
+    
+    s3load(object = file.path(outputdir, paste0("WazeTimeEdtHexWx_", mo, "_", SIZE, "_mi.RData")),
+           bucket = waze.bucket)
+    
+    class(WazeTime.edt.wx) <- "data.frame"
+    
+    # Join back to hex2, just check unique grid IDs for plotting
+    w.t <- WazeTime.edt.wx[!duplicated(WazeTime.edt.wx$GRID_ID),]
+    
+    h.w <- hex2[hex2$GRID_ID %in% w.t$GRID_ID,]
+    plot(h.w, col = "blue", add = T)
+  }
+  dev.off()
+}

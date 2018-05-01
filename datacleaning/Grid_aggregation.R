@@ -262,3 +262,40 @@ if(ONLOCAL) { movefiles(dir(temp.outputdir)[grep("Hex", dir(temp.outputdir))], t
 stopCluster(cl)
 ##########################################################################################################
 ##########################################################################################################
+
+# Check with plots
+
+CHECKPLOT = T
+
+library(rgdal)
+
+gdaldir = "/home/dflynn-volpe/workingdata/" # Requires full path, no alias
+
+if(CHECKPLOT){  
+  
+  co <- rgdal::readOGR(gdaldir, layer = "cb_2015_us_county_500k")
+  
+  # maryland FIPS = 24
+  md.co <- co[co$STATEFP == 24,]
+  
+  pdf("Checking_Grid_agg_newID.pdf", width = 11, height = 8)
+  for(SIZE in HEXSIZE){
+  # Read in hexagon shapefile. This is a rectangular surface of 1 sq mi area hexagons, 
+  hex <- rgdal::readOGR(gdaldir, layer = paste0("MD_hexagons_", SIZE, "mi_newExtent_newGRIDID"))
+  
+  hex2 <- spTransform(hex, proj4string(md.co))
+  plot(hex2)
+  plot(md.co, add = T, col = "red")
+  
+  load(paste0(temp.outputdir, "/WazeTimeEdtHexAll_04_", SIZE,"mi",".RData"))
+  
+  class(wazeTime.edt.hexAll) <- "data.frame"
+  
+  # Join back to hex2, just check unique grid IDs for plotting
+  w.t <- wazeTime.edt.hexAll[!duplicated(wazeTime.edt.hexAll$GRID_ID),]
+  
+  h.w <- hex2[hex2$GRID_ID %in% w.t$GRID_ID,]
+  plot(h.w, col = "blue", add = T)
+  }
+  dev.off()
+}
