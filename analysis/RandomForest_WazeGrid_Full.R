@@ -17,9 +17,7 @@ do.months = c("04","05","06","07","08","09")
 
 REASSESS = F # re-assess model fit and diagnostics using reassess.rf instead of do.rf
 
-RUNMODEL = c("31","32")
-
-inputdir <- paste0("WazeEDT_Agg", HEXSIZE, "mile_Rdata_Input")
+inputdir <- "WazeEDT_RData_Input"
 outputdir <- paste0("WazeEDT_Agg", HEXSIZE, "mile_RandForest_Output_fill0")
 
 aws.signature::use_credentials()

@@ -27,8 +27,8 @@ codeloc <- "~/SDI_Waze"
 
 # Set grid size:
 HEXSIZE = c("1", "4", "05")[1] # Change the value in the bracket to use 1, 4, or 0.5 sq mi hexagon grids
-inputdir <- paste0("WazeEDT_Agg", HEXSIZE, "mile_Rdata_Input")
-outputdir <- paste0("WazeEDT_Agg", HEXSIZE, "mile_RandForest_Output_fill0")
+inputdir <- "WazeEDT_RData_Input"
+outputdir <- paste0("WazeEDT_Agg", HEXSIZE, "mile_RandForest_Output")
 
 do.months = c("04", "05", "06")
 
@@ -129,7 +129,7 @@ rm(w.04, w.05, w.06); gc()
 # note file names is WazeTimeEdtHexAll, as weather data not prepped yet for 4 mi hexagons
 
 HEXSIZE = "4"
-inputdir <- paste0("WazeEDT_Agg", HEXSIZE, "mile_Rdata_Input")
+inputdir <- "WazeEDT_RData_Input"
 outputdir <- paste0("WazeEDT_Agg", HEXSIZE, "mile_RandForest_Output")
 
 for(mo in c("04","05","06")){
@@ -167,11 +167,11 @@ rm(w.04, w.05, w.06); gc()
 # Model 06: April, 0.5 mi ----
 # note file names is WazeTimeEdtHexAll, as weather data not prepped yet for 4 mi hexagons
 HEXSIZE = "05"
-inputdir <- paste0("WazeEDT_Agg", HEXSIZE, "mile_Rdata_Input")
+inputdir <- "WazeEDT_RData_Input"
 outputdir <- paste0("WazeEDT_Agg", HEXSIZE, "mile_RandForest_Output")
 
 for(mo in c("04","05","06")){
-  prep.hex(file.path(inputdir, paste0("WazeTimeEdtHexAll_", mo,"_", HEXSIZE, "mi.RData")), month = mo)
+  prep.hex(file.path(inputdir, paste0("WazeTimeEdtHexWx_", mo,"_", HEXSIZE, "mi.RData")), month = mo)
 }
 
 modelno = "06"
@@ -192,7 +192,7 @@ rm(w.04, w.05, w.06); gc()
 
 # Model 08: April, 1 mi, neighbors ----
 HEXSIZE = "1"
-inputdir <- paste0("WazeEDT_Agg", HEXSIZE, "mile_Rdata_Input")
+inputdir <- "WazeEDT_RData_Input"
 outputdir <- paste0("WazeEDT_Agg", HEXSIZE, "mile_RandForest_Output")
 
 for(mo in c("04","05","06")){
@@ -226,7 +226,7 @@ rm(w.04, w.05, w.06); gc()
 # Model 10: April, 4 mi, neighbors ----
 # note file names is WazeTimeEdtHexAll, as weather data not prepped yet for 4 mi hexagons
 HEXSIZE = "4"
-inputdir <- paste0("WazeEDT_Agg", HEXSIZE, "mile_Rdata_Input")
+inputdir <- "WazeEDT_RData_Input"
 outputdir <- paste0("WazeEDT_Agg", HEXSIZE, "mile_RandForest_Output")
 
 for(mo in c("04","05","06")){
@@ -253,7 +253,7 @@ rm(w.04, w.05, w.06); gc()
 
 # Model 12: April, 1 mi, neighbors, wx ----
 HEXSIZE = "1"
-inputdir <- paste0("WazeEDT_Agg", HEXSIZE, "mile_Rdata_Input")
+inputdir <- "WazeEDT_RData_Input"
 outputdir <- paste0("WazeEDT_Agg", HEXSIZE, "mile_RandForest_Output")
 
 for(mo in c("04","05","06")){
@@ -290,7 +290,7 @@ rm(w.04, w.05, w.06);gc()
 modelno = "14"
 
 HEXSIZE = "1"
-inputdir <- paste0("WazeEDT_Agg", HEXSIZE, "mile_Rdata_Input")
+inputdir <- "WazeEDT_RData_Input"
 outputdir <- paste0("WazeEDT_Agg", HEXSIZE, "mile_RandForest_Output")
 
 for(mo in c("04","05","06")){
@@ -323,7 +323,7 @@ rm( w.04, w.05, w.06)
 modelno = "16"
 
 HEXSIZE = "1"
-inputdir <- paste0("WazeEDT_Agg", HEXSIZE, "mile_Rdata_Input")
+inputdir <- "WazeEDT_RData_Input"
 outputdir <- paste0("WazeEDT_Agg", HEXSIZE, "mile_RandForest_Output")
 
 for(mo in c("04","05","06")){

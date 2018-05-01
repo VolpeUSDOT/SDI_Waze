@@ -200,7 +200,9 @@ if(CHECKPLOT){
   # maryland FIPS = 24
   md.co <- co[co$STATEFP == 24,]
   
-  pdf("Checking_Wx_overlay_newID.pdf", width = 11, height = 8)
+  mo = "09"
+  
+  pdf(paste0("Checking_Wx_overlay_newID_", mo,".pdf"), width = 11, height = 8)
   for(SIZE in HEXSIZE){
     # Read in hexagon shapefile. This is a rectangular surface of 1 sq mi area hexagons, 
     hex <- rgdal::readOGR(gdaldir, layer = paste0("MD_hexagons_", SIZE, "mi_newExtent_newGRIDID"))

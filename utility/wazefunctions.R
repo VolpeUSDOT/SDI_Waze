@@ -248,7 +248,7 @@ prep.hex <- function(hexname, month, s3 = T, bucket = waze.bucket){
 # 3. rgdal and tidyverse libraries are loaded
 # 4. The data files to add are unzipped files in the localdir (i.e., they have already been copied over from the S3 bucket, and are sitting on the instance)
 
-append.hex <- function(hexname, data.to.add, na.action = c("omit", "keep", "fill0")){
+append.hex <- function(hexname, data.to.add, na.action = c("omit", "keep", "fill0"), IDprefix = "1"){
   # hexname: string of data frame names in working memory like "w.04"
   # data.to.add: string of unzipped file set in the localdir, like "hexagons_1mi_routes_sum", "hexagons_1mi_bg_rac_sum", "hexagons_1mi_bg_lodes_sum"
   # na.action: what to do if missing any values; applies this action across the whole data frame, not just the appended data
@@ -316,6 +316,11 @@ append.hex <- function(hexname, data.to.add, na.action = c("omit", "keep", "fill
     
   }
   
+  # Match with new grid ID 
+  if(sum(dd$GRID_ID %in% w$GRID_ID) == 0 & substr(dd$GRID_ID[1], 1, 1)=="A"){
+    cat("Appending", IDprefix, "to GRID_ID \n")
+    dd$GRID_ID <- paste0(IDprefix, dd$GRID_ID)
+  }
   
   w2 <- left_join(w, dd, by = "GRID_ID")
   # Consider assigning 0 to NA values after joining; e.g. no road info available, give 0 miles
