@@ -6,14 +6,14 @@
 TESTCONN = F # Set to T to test connection 
 
 library(RPostgreSQL)
-
-
+library(DBI) # to test
+library(pool)
+library(RPostgres) # to test
 # Specify username and password manually, once:
 if(Sys.getenv("sdc_waze_username")==""){
   cat("Please enter SDC Waze username and password manually, in the console, the first time accessing the Redshift database, using: \n Sys.setenv('sdc_waze_username' = <see email from SDC Administrator>) \n Sys.setenv('sdc_waze_password' = <see email from SDC Administrator>)")
 
 }
-
 
 redshift_host <- "prod-dot-sdc-redshift-cluster.cctxatvt4w6t.us-east-1.redshift.amazonaws.com"
 redshift_port <- "5439"
@@ -21,9 +21,9 @@ redshift_user <- Sys.getenv("sdc_waze_username")
 redshift_password <- Sys.getenv("sdc_waze_password")
 redshift_db <- "dot_sdc_redshift_db"
 
-drv <- dbDriver("PostgreSQL")
+#drv <- dbDriver("PostgreSQL")
 conn <- dbConnect(
-  drv,
+  RPostgres::Postgres(),
   host=redshift_host,
   port=redshift_port,
   user=redshift_user,
@@ -42,7 +42,7 @@ alert_query_MD <- "SELECT * FROM alert
                     WHERE state='MD' 
                     AND pub_utc_timestamp BETWEEN to_timestamp('2017-04-01 00:00:00','YYYY-MM-DD HH24:MI:SS') 
                                           AND     to_timestamp('2017-04-30 23:59:59','YYYY-MM-DD HH24:MI:SS')
-                    LIMIT 50000
+                    LIMIT 5000
                       " # end query
 
 results <- dbGetQuery(conn, alert_query_MD)
@@ -73,5 +73,7 @@ alert_query_MD <- "SELECT * FROM alert
                   LIMIT 5"
 results <- dbGetQuery(conn, alert_query_MD)
 
+dbClearResult(results)
+dbDisconnect(conn)
 
 }
