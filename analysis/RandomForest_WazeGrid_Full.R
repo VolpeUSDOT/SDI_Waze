@@ -18,7 +18,7 @@ do.months = c("04","05","06","07","08","09")
 REASSESS = F # re-assess model fit and diagnostics using reassess.rf instead of do.rf
 
 inputdir <- "WazeEDT_RData_Input"
-outputdir <- paste0("WazeEDT_Agg", HEXSIZE, "mile_RandForest_Output_fill0")
+outputdir <- paste0("WazeEDT_Agg", HEXSIZE, "mile_RandForest_Output")
 
 aws.signature::use_credentials()
 waze.bucket <- "ata-waze"
@@ -54,13 +54,13 @@ for(mo in do.months){
 # Plot to check grid IDs
 CHECKPLOT = F
 if(CHECKPLOT){
-  grid_shp <- rgdal::readOGR(localdir, "MD_hexagons_1mi_newExtent_neighbors")
+  grid_shp <- rgdal::readOGR(localdir, "MD_hexagons_1mi_newExtent_newGRIDID")
   
   w.g <- match(w.04$GRID_ID, grid_shp$GRID_ID)
   w.g <- w.g[!is.na(w.g)]
   gs <- grid_shp[w.g,]
   
-  plot(gs, add = T, col = "red")
+  plot(gs, col = "red")
 }
 
 # Add FARS, AADT, HPMS, jobs
@@ -444,12 +444,10 @@ omits = c(alwaysomit, alert_subtypes
           #grep("nWazeJam_", names(w.04), value = T) # neighboring jams
           )
 
-# manually changed to keyouputs2... change back when re-running
-
 if(!REASSESS){
-  keyoutputs2[[modelno]] = do.rf(train.dat = w.04_09, omits, response.var = "MatchEDT_buffer_Acc",  
+  keyoutputs[[modelno]] = do.rf(train.dat = w.04_09, omits, response.var = "MatchEDT_buffer_Acc",  
                                 model.no = modelno, rf.inputs = rf.inputs) 
-  save("keyoutputs2", file = paste0("Output_to_", modelno))
+  save("keyoutputs", file = paste0("Output_to_", modelno))
 } else {
   redo_outputs[[modelno]] = reassess.rf(train.dat = w.04_09, 
                                         omits, response.var = "MatchEDT_buffer_Acc", 
@@ -466,11 +464,11 @@ EDTonlyrows <- apply(w.04_09[c(alert_types, alert_subtypes)], 1, FUN = function(
 summary(EDTonlyrows)
 
 if(!REASSESS){
-  keyoutputs2[[modelno]] = do.rf(train.dat = w.04_09[!EDTonlyrows,], omits, response.var = "MatchEDT_buffer_Acc",  
+  keyoutputs[[modelno]] = do.rf(train.dat = w.04_09[!EDTonlyrows,], omits, response.var = "MatchEDT_buffer_Acc",  
                                  model.no = modelno, rf.inputs = rf.inputs) 
-  save("keyoutputs2", file = paste0("Output_to_", modelno))
+  save("keyoutputs", file = paste0("Output_to_", modelno))
 } else {
-  redo_outputs[[modelno]] = reassess.rf(train.dat = w.04_09[!EDTonlyrows,], 
+    redo_outputs[[modelno]] = reassess.rf(train.dat = w.04_09[!EDTonlyrows,], 
                                         omits, response.var = "MatchEDT_buffer_Acc", 
                                         model.no = modelno, rf.inputs = rf.inputs) 
 }
@@ -483,11 +481,11 @@ Road.closure.onlyrows <- apply(w.04_09[c("nWazeRoadClosed","nWazeAccident","nWaz
 summary(Road.closure.onlyrows)
 
 if(!REASSESS){
-  keyoutputs2[[modelno]] = do.rf(train.dat = w.04_09[!Road.closure.onlyrows,], omits, response.var = "MatchEDT_buffer_Acc",  
+  keyoutputs[[modelno]] = do.rf(train.dat = w.04_09[!Road.closure.onlyrows,], omits, response.var = "MatchEDT_buffer_Acc",  
                                  model.no = modelno, rf.inputs = rf.inputs) 
-  save("keyoutputs2", file = paste0("Output_to_", modelno))
+  save("keyoutputs", file = paste0("Output_to_", modelno))
 } else {
-  redo_outputs[[modelno]] = reassess.rf(train.dat = w.04_09[!Road.closure.onlyrows,], 
+    redo_outputs[[modelno]] = reassess.rf(train.dat = w.04_09[!Road.closure.onlyrows,], 
                                         omits, response.var = "MatchEDT_buffer_Acc", 
                                         model.no = modelno, rf.inputs = rf.inputs) 
 }
@@ -712,7 +710,7 @@ if(!REASSESS){
                                 model.no = modelno, rf.inputs = rf.inputs) 
   save("keyoutputs", file = paste0("Output_to_", modelno))
 } else {
-  redo_outputs[[modelno]] = reassess.rf(train.dat = w.04_09, 
+  keyoutputs[[modelno]] = reassess.rf(train.dat = w.04_09, 
                                         omits, response.var = "nMatchEDT_buffer_Acc", 
                                         model.no = modelno, rf.inputs = rf.inputs) 
 }
@@ -728,7 +726,7 @@ if(!REASSESS){
                                 model.no = modelno, rf.inputs = rf.inputs) 
   save("keyoutputs", file = paste0("Output_to_", modelno))
 } else {
-  redo_outputs[[modelno]] = reassess.rf(train.dat = w.04_09[!EDTonlyrows,], 
+  keyoutputs[[modelno]] = reassess.rf(train.dat = w.04_09[!EDTonlyrows,], 
                                         omits, response.var = "nMatchEDT_buffer_Acc", 
                                         model.no = modelno, rf.inputs = rf.inputs) 
 }
@@ -744,7 +742,7 @@ if(!REASSESS){
                                 model.no = modelno, rf.inputs = rf.inputs) 
   save("keyoutputs", file = paste0("Output_to_", modelno))
 } else {
-  redo_outputs[[modelno]] = reassess.rf(train.dat = w.04_09[!Road.closure.onlyrows,], 
+  keyoutputs[[modelno]] = reassess.rf(train.dat = w.04_09[!Road.closure.onlyrows,], 
                                         omits, response.var = "nMatchEDT_buffer_Acc", 
                                         model.no = modelno, rf.inputs = rf.inputs) 
 }
@@ -773,7 +771,7 @@ if(!REASSESS){
                                 model.no = modelno, rf.inputs = rf.inputs) 
   save("keyoutputs", file = paste0("Output_to_", modelno))
 } else {
-  redo_outputs[[modelno]] = reassess.rf(train.dat = w.04_09, 
+  keyoutputs[[modelno]] = reassess.rf(train.dat = w.04_09, 
                                         omits, response.var = "nMatchEDT_buffer_Acc", 
                                         model.no = modelno, rf.inputs = rf.inputs) 
 }
@@ -789,7 +787,7 @@ if(!REASSESS){
                                 model.no = modelno, rf.inputs = rf.inputs) 
   save("keyoutputs", file = paste0("Output_to_", modelno))
 } else {
-  redo_outputs[[modelno]] = reassess.rf(train.dat = w.04_09[!EDTonlyrows,], 
+  keyoutputs[[modelno]] = reassess.rf(train.dat = w.04_09[!EDTonlyrows,], 
                                         omits, response.var = "nMatchEDT_buffer_Acc", 
                                         model.no = modelno, rf.inputs = rf.inputs) 
 }
@@ -805,7 +803,7 @@ if(!REASSESS){
                                 model.no = modelno, rf.inputs = rf.inputs) 
   save("keyoutputs", file = paste0("Output_to_", modelno))
 } else {
-  redo_outputs[[modelno]] = reassess.rf(train.dat = w.04_09[!Road.closure.onlyrows,], 
+  keyoutputs[[modelno]] = reassess.rf(train.dat = w.04_09[!Road.closure.onlyrows,], 
                                         omits, response.var = "nMatchEDT_buffer_Acc", 
                                         model.no = modelno, rf.inputs = rf.inputs) 
 }
@@ -821,8 +819,23 @@ if(!REASSESS){
 # 
 # modelno = "45b"
 
-save("redo_outputs", file = paste0("Reassess_Output_to_", modelno))
+if(REASSESS) save("keyoutputs", file = paste0("Reassess_Output_to_", modelno))
 
 
 timediff <- Sys.time() - starttime
 cat(round(timediff, 2), attr(timediff, "units"), "to complete script")
+
+BONUS = F
+
+if(BONUS){
+# output for visualization
+w.out.for.viz <- w.04_09[c("GRID_ID", "day","hour","DayOfWeek","nMatchEDT_buffer_Acc","MatchEDT_buffer_Acc",
+               "nWazeAccident","nWazeAccidentMajor","nWazeAccidentMinor")]
+dim(w.out.for.viz)
+
+write.csv(w.out.for.viz, file = "Waze_04-09_GridCounts.csv", row.names = F)
+
+# some summary values showing counts of predicted and observed EDT and Waze counts
+
+
+}

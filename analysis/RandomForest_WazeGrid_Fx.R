@@ -137,7 +137,7 @@ do.rf <- function(train.dat, omits, response.var = "MatchEDT_buffer_Acc", model.
   if(class(rundat[,response.var])=="numeric"){
     rf.prob <- predict(rf.out, test.dat.use[fitvars])
 
-    rf.pred <- cut(rf.prob, breaks = c(-1, cutoff[2], 1), include.lowest = T, labels = c("NonCrash","Crash"))
+    rf.pred <- cut(rf.prob, breaks = c(-100, cutoff[2], 100), include.lowest = T, labels = c("NoCrash","Crash"))
 
     out.df <- data.frame(test.dat.use[, c("GRID_ID", "day", "hour", response.var)], rf.pred, rf.prob)
     out.df$day <- as.numeric(out.df$day)
@@ -165,7 +165,7 @@ do.rf <- function(train.dat, omits, response.var = "MatchEDT_buffer_Acc", model.
   
   # Output is list of three elements: Nobs data frame, predtab table, binary model diagnotics table, and mean squared error
   if(class(rundat[,response.var])=="factor"){
-    list(Nobs, predtab, diag = bin.mod.diagnostics(predtab), 
+  outlist =  list(Nobs, predtab, diag = bin.mod.diagnostics(predtab), 
          mse = mean(as.numeric(as.character(test.dat.use[,response.var])) - 
                       as.numeric(rf.prob[,"1"]))^2,
          runtime = timediff,
@@ -173,13 +173,13 @@ do.rf <- function(train.dat, omits, response.var = "MatchEDT_buffer_Acc", model.
     ) 
   }    
   if(class(rundat[,response.var])=="numeric"){
-    list(Nobs, 
+  outlist =  list(Nobs, 
          mse = mean(as.numeric(as.character(test.dat.use[,response.var])) - 
                       as.numeric(rf.prob))^2,
          runtime = timediff
     )
   }
-  
+  outlist
 } # end do.rf function
 
 
@@ -234,79 +234,98 @@ reassess.rf <- function(train.dat, omits, response.var = "MatchEDT_buffer_Acc", 
     comb.dat <- rbind(train.dat, test.dat)
   }
   
-  rf.pred <- predict(rf.out, test.dat.use[fitvars], cutoff = cutoff)
-  rf.prob <- predict(rf.out, test.dat.use[fitvars], type = "prob", cutoff = cutoff)
-  
   Nobs <- data.frame(nrow(rundat),
                      sum(as.numeric(as.character(rundat[,response.var])) == 0),
                      sum(as.numeric(as.character(rundat[,response.var])) > 0),
-                     length(rundat$nWazeAccident[train.dat$nWazeAccident > 0]) )
+                     length(rundat$nWazeAccident[train.dat$nWazeAccident>0]) )
   
   colnames(Nobs) = c("N", "No EDT", "EDT present", "Waze accident present")
   
-  predtab <- table(test.dat.use[,response.var], rf.pred)
+  # Begin if factor response variable  
+  if(class(rundat[,response.var])=="factor"){
+    rf.pred <- predict(rf.out, test.dat.use[fitvars], cutoff = cutoff)
+    rf.prob <- predict(rf.out, test.dat.use[fitvars], type = "prob", cutoff = cutoff)
+    
+    predtab <- table(test.dat.use[,response.var], rf.pred)
+    
+    reference.vec <- test.dat.use[,response.var]
+    levels(reference.vec) = c("NoCrash", "Crash")
+    levels(rf.pred) = c("NoCrash","Crash")
+    
+    reference.vec <-as.factor(as.character(reference.vec))
+    rf.pred <-as.factor(as.character(rf.pred))
+    
+    (predtab <- table(rf.pred, reference.vec, 
+                      dnn = c("Predicted","Observed"))) 
+    bin.mod.diagnostics(predtab)
+    
+    # pROC::roc - response, predictor
+    model_auc <- pROC::auc(test.dat.use[,response.var], rf.prob[,colnames(rf.prob)=="1"])
+    
+    pdf(file = paste0("AUC_", model.no, ".pdf"), width = 6, height = 6)
+    plot(pROC::roc(test.dat.use[,response.var], rf.prob[,colnames(rf.prob)=="1"]),
+         main = paste0("Model ", model.no),
+         grid=c(0.1, 0.2),
+         ylim = c(0, 1), xlim = c(1, 0))
+    legend("bottomright", legend = round(model_auc, 4), title = "AUC", inset = 0.25)
+    
+    #dev.print(device = jpeg, file = paste0("AUC_", model.no, ".jpg"), width = 500, height = 500)
+    dev.off()
+    
+    out.df <- data.frame(test.dat.use[, c("GRID_ID", "day", "hour", response.var)], rf.pred, rf.prob)
+    out.df$day <- as.numeric(out.df$day)
+    names(out.df)[4:7] <- c("Obs", "Pred", "Prob.Noncrash", "Prob.Crash")
+    out.df = data.frame(out.df,
+                        TN = out.df$Obs == 0 &  out.df$Pred == "NoCrash",
+                        FP = out.df$Obs == 0 &  out.df$Pred == "Crash",
+                        FN = out.df$Obs == 1 &  out.df$Pred == "NoCrash",
+                        TP = out.df$Obs == 1 &  out.df$Pred == "Crash")
+    
+    } # end if factor response variable
   
-  reference.vec <- test.dat.use[,response.var]
-  levels(reference.vec) = c("NoCrash", "Crash")
-  levels(rf.pred) = c("NoCrash","Crash")
+  # Begin if continuous response variable  
+  if(class(rundat[,response.var])=="numeric"){
+    rf.prob <- predict(rf.out, test.dat.use[fitvars])
+    
+    rf.pred <- cut(rf.prob, breaks = c(-100, cutoff[2], 100), include.lowest = T, labels = c("NoCrash","Crash"))
+    
+    out.df <- data.frame(test.dat.use[, c("GRID_ID", "day", "hour", response.var)], rf.pred, rf.prob)
+    out.df$day <- as.numeric(out.df$day)
+    names(out.df)[4:6] <- c("Obs", "Pred", "Prob.Crash")
+    out.df = data.frame(out.df,
+                        TN = out.df$Obs == 0 &  out.df$Pred == "NoCrash",
+                        FP = out.df$Obs == 0 &  out.df$Pred == "Crash",
+                        FN = out.df$Obs == 1 &  out.df$Pred == "NoCrash",
+                        TP = out.df$Obs == 1 &  out.df$Pred == "Crash")
+    
+    
+  } # end if continuous response variable
   
-  reference.vec <-as.factor(as.character(reference.vec))
-  rf.pred <-as.factor(as.character(rf.pred))
-  
-  (predtab <- table(rf.pred, reference.vec, 
-                    dnn = c("Predicted","Observed"))) 
-  bin.mod.diagnostics(predtab)
-  
-  # pROC::roc - response, predictor
-  model_auc <- pROC::auc(test.dat.use[,response.var], rf.prob[,colnames(rf.prob)=="1"])
-  
-  pdf(file = paste0("AUC_", model.no, ".pdf"), width = 6, height = 6)
-  plot(pROC::roc(test.dat.use[,response.var], rf.prob[,colnames(rf.prob)=="1"]),
-       main = paste0("Model ", model.no),
-       grid=c(0.1, 0.2),
-       ylim = c(0, 1), xlim = c(1, 0))
-  legend("bottomright", legend = round(model_auc, 4), title = "AUC", inset = 0.25)
-  
-  #dev.print(device = jpeg, file = paste0("AUC_", model.no, ".jpg"), width = 500, height = 500)
-  dev.off()
-  
-  # AUC::roc - predictions, labels
-  # plot(model_auc2 <- AUC::roc(rf.out$votes[,"1"], factor(1*(rf.out$y==1))),
-  #      main = paste0("Model ", model.no))
-  # plot(AUC::roc(rf.out$votes[,"0"], factor(1*(rf.out$y==0))),
-  #      add = T, col = "red")
-  # AUC::auc(model_auc2)
-  
-  # save output predictions. Will need to re-work for non-binary outcomes
-  
-  out.df <- data.frame(test.dat.use[, c("GRID_ID", "day", "hour", response.var)], rf.pred, rf.prob)
-  out.df$day <- as.numeric(out.df$day)
-  names(out.df)[4:7] <- c("Obs", "Pred", "Prob.Noncrash", "Prob.Crash")
-  out.df = data.frame(out.df,
-                      TN = out.df$Obs == 0 &  out.df$Pred == "NoCrash",
-                      FP = out.df$Obs == 0 &  out.df$Pred == "Crash",
-                      FN = out.df$Obs == 1 &  out.df$Pred == "NoCrash",
-                      TP = out.df$Obs == 1 &  out.df$Pred == "Crash")
   write.csv(out.df,
-            file = paste(model.no, "Reassess_RandomForest_pred.csv", sep = "_"),
+            file = paste(model.no, "RandomForest_pred.csv", sep = "_"),
             row.names = F)
   
   savelist = c("rf.out", "rf.pred", "rf.prob", "out.df") 
   if(is.null(test.dat)) savelist = c(savelist, "testrows", "trainrows")
 
-  # Write to reassess directory
   s3save(list = savelist,
-         object = file.path(outputdir, "Reassess", paste("Model", model.no, "RandomForest_Output.RData", sep= "_")),
+         object = file.path(outputdir, paste("Model", model.no, "RandomForest_Output.RData", sep= "_")),
          bucket = waze.bucket)
   
-  rm(savelist) # just to be sure
   # Output is list of three elements: Nobs data frame, predtab table, binary model diagnotics table, and mean squared error
-  list(Nobs, predtab, diag = bin.mod.diagnostics(predtab), 
-       mse = mean(as.numeric(as.character(test.dat.use[,response.var])) - 
-                    as.numeric(rf.prob[,"1"]))^2,
-      
-       auc = as.numeric(model_auc)
-  ) 
-  
+  if(class(rundat[,response.var])=="factor"){
+    outlist =  list(Nobs, predtab, diag = bin.mod.diagnostics(predtab), 
+                    mse = mean(as.numeric(as.character(test.dat.use[,response.var])) - 
+                                 as.numeric(rf.prob[,"1"]))^2,
+                    auc = as.numeric(model_auc) # do not save complete output
+    ) 
+  }    
+  if(class(rundat[,response.var])=="numeric"){
+    outlist =  list(Nobs, 
+                    mse = mean(as.numeric(as.character(test.dat.use[,response.var])) - 
+                                 as.numeric(rf.prob))^2
+                    )
+  }
+  outlist
 } # end reassss.rf function
 

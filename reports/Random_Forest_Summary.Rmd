@@ -113,7 +113,7 @@ For a binary model, we can additionally calculate one other quantity:
 Balancing between high specificity (where false positives are avoided) and high sensitivity (where false negatives are avoided) is an important decision point in evaluating a model. High sensitivity (i.e., recall or true positive rate) with high specificity (low false positive rate) is ideal. Plotting the false positive rate versus the true positive rate allows a visualization of this balance, and is known the 'receiver-operator characteristic (ROC) curve'. The larger the area under the ROC curve, the more high specificity is maximized with low loss of sensitivity. An area of 0.5 is equivalent to flipping a coin; and area of 1 is perfect estimation, with no false positives or false negatives. As a rule of thumb, areas of 0.6 or greater are generally considered to represent useful classification models; areas of 0.9 or greater are considered to represent very good classification models.
 
 
-```{r roc, echo=FALSE, fig.cap="ROC curves, [CC BY-SA 3.0 Wikimedia](https://commons.wikimedia.org/w/index.php?curid=44059691)", out.width = '50%'}
+```{r roc, echo=FALSE, fig.cap="ROC curves, [CC BY-SA 3.0 Wikimedia](https://commons.wikimedia.org/w/index.php?curid=44059691)", out.width = '50%', , fig.align='center'}
 knitr::include_graphics("ROC_curves.png")
 ```
 
@@ -150,13 +150,13 @@ for(i in c("01", "04", "06")){ tabl <- rbind(tabl, c(100*keyoutputs1[[i]]$diag, 
 
 colnames(tabl)[1:5] = c("Accuracy", "Precision", "Recall", "False Positive Rate", "AUC")
 
-rownames(tabl) = c("01 - 1 mile", "04 - 4 mile", "06 - 0.5 mile")
+rownames(tabl) = c("01 - 1 mile    ", "04 - 4 mile    ", "06 - 0.5 mile    ")
 #kable(tabl, caption = "Phase 1 model diagnostics for April 2017, Maryland.", rownames = "Model")
 datatable(tabl, filter = 'top',
           caption = "Phase 1 model diagnostics for April 2017, Maryland.",
           rownames = T,
           options = list(dom = "t",
-                         order = list(list(1, 'desc')),
+                         order = list(list(5, 'desc')),
                          pageLength = 5)
           ) %>% formatCurrency(2:4, currency = "", digits = 2) %>%
           formatStyle(1, background = styleEqual(max(tabl[,1]), 'lightgreen'))%>%
@@ -170,12 +170,13 @@ tabl <- vector()
 for(i in c("03", "05", "07")){ tabl <- rbind(tabl, c(100*keyoutputs1[[i]]$diag, round(keyoutputs1[[i]]$auc, 4)))}
 
 colnames(tabl)[1:5] = c("Accuracy", "Precision", "Recall", "False Positive Rate", "AUC")
-rownames(tabl) = c("03 - 1 mile", "05 - 4 mile", "07 - 0.5 mile")
+rownames(tabl) = c("03 - \n 1 mile   ", "05 - \n 4 mile  ", "07 - \n 0.5 mile  ")
 
 datatable(tabl, filter = 'top',
           caption = "Phase 1 model diagnostics for April + May, test on June, Maryland.",
           rownames = T,
           options = list(dom = "t",
+                         order = list(list(5, 'desc')),
                          pageLength = 5)
           ) %>% formatCurrency(2:4, currency = "", digits = 2) %>%
           formatStyle(1, background = styleEqual(max(tabl[,1]), 'lightgreen'))%>%
@@ -205,6 +206,7 @@ datatable(tabl, filter = 'top',
           caption = "Phase 1 model diagnostics for April 2017, Maryland, with neighboring grid cells as predictors.",
           rownames = T,
           options = list(dom = "t",
+                         order = list(list(5, 'desc')),
                          pageLength = 5)
           ) %>% formatCurrency(2:4, currency = "", digits = 2) %>%
           formatStyle(1, background = styleEqual(max(tabl[,1]), 'lightgreen'))%>%
@@ -223,6 +225,7 @@ datatable(tabl, filter = 'top',
           caption = "Phase 1 model diagnostics for April-May, test on June 2017, Maryland, with neighboring grid cells as predictors.",
           rownames = T,
           options = list(dom = "t",
+                         order = list(list(5, 'desc')),
                          pageLength = 5)
           ) %>% formatCurrency(2:4, currency = "", digits = 2) %>%
           formatStyle(1, background = styleEqual(max(tabl[,1]), 'lightgreen'))%>%
@@ -254,6 +257,7 @@ datatable(tabl, filter = 'top',
           caption = "Phase 1 model diagnostics for April 2017, Maryland, with supplemental weather, road functional class, and economic data.",
           rownames = T,
           options = list(dom = "t",
+                         order = list(list(5, 'desc')),
                          pageLength = 5)
           ) %>% formatCurrency(2:4, currency = "", digits = 2) %>%
           formatStyle(1, background = styleEqual(max(tabl[,1]), 'lightgreen'))%>%
@@ -271,6 +275,7 @@ datatable(tabl, filter = 'top',
           caption = "Phase 1 model diagnostics for April + May, test on June, Maryland, with supplemental weather, road functional class, and economic data.",
           rownames = T,
           options = list(dom = "t",
+                         order = list(list(5, 'desc')),
                          pageLength = 5)
           ) %>% formatCurrency(2:4, currency = "", digits = 2) %>%
           formatStyle(1, background = styleEqual(max(tabl[,1]), 'lightgreen'))%>%
@@ -280,6 +285,26 @@ datatable(tabl, filter = 'top',
           formatStyle(5, background = styleEqual(max(tabl[,5]), 'lightgreen'))
 ```   
 
+The best model of this set, Model 17, had the following variables of greatest importance:
+
+```{r bestphaseI, eval=T, fig.height=6, fig.width=6, fig.align='center'}
+modelno = "17"
+
+if(ONLOCAL) {load(file.path(outputdir1, paste("Model", modelno, "RandomForest_Output_04.RData", sep= "_")))} else {s3load(object = file.path(outputdir, paste("Model", modelno, "RandomForest_Output.RData", sep= "_")), bucket = waze.bucket)}
+
+imp.tab <- data.frame(round(rf.out$importance[order(rf.out$importance, decreasing = T)[1:15],], 2))
+colnames(imp.tab) = "Gini importance"
+
+# kable(imp.tab, row.names = T,
+#       caption = "Variance importance for the highest recall plot in phase I, Model 17. Top 15 of 74 predictors shown.") %>% 
+#   kableExtra::kable_styling(bootstrap_options = "striped")
+
+varImpPlot(rf.out,
+           main = "Model 17 Variable Importance",
+           n.var = 15, 
+           cex = 0.9)
+
+```
 
 ## General summary 
 What we learned from this testing is the following:
@@ -291,20 +316,7 @@ What we learned from this testing is the following:
 - Additional data improved different aspects of the model: using the larger April + May data, weather data reduced false positives, while road functional class and jobs data reduced false negatives.
 
 
-```{r bestphaseI, eval=T}
-modelno = "17"
 
-if(ONLOCAL) {load(file.path(outputdir1, paste("Model", modelno, "RandomForest_Output_04.RData", sep= "_")))} else {s3load(object = file.path(outputdir, paste("Model", modelno, "RandomForest_Output.RData", sep= "_")), bucket = waze.bucket)}
-
-imp.tab <- data.frame(round(rf.out$importance[order(rf.out$importance, decreasing = T)[1:15],], 2))
-colnames(imp.tab) = "Gini importance"
-
-kable(imp.tab, row.names = T,
-      caption = "Variance importance for the highest recall plot in phase I, Model 17. Top 15 of 74 predictors shown.") %>% 
-  kableExtra::kable_styling(bootstrap_options = "striped")
-
-
-```
 
 
 # Phase II model testing
@@ -324,7 +336,8 @@ In addition, we considered correlated and nested variables, and devised a sequen
 
 ```{r Diagframe2a}
 if(ONLOCAL) {  localdir <- outputdir2 } 
-load(file.path(localdir, "Output_to_32"))
+load(file.path(localdir, "Output_to_44b"))
+keyoutputs2 <- keyoutputs; rm(keyoutputs)
 ```
 
 
@@ -357,6 +370,7 @@ datatable(tabl, filter = 'top',
           caption = "Phase II, Set A model diagnostics for April-September 2017, Maryland, with supplemental data added sequentually and together.",
           rownames = T,
           options = list(dom = "t",
+                         order = list(list(5, 'desc')),
                          pageLength = length(mods))
           ) %>% formatCurrency(2:4, currency = "", digits = 2) %>%
           formatStyle(1, background = styleEqual(max(tabl[,1]), 'lightgreen'))%>%
@@ -366,19 +380,19 @@ datatable(tabl, filter = 'top',
           formatStyle(5, background = styleEqual(max(tabl[,5]), 'lightgreen'))
 ```
 
-```{r bestphaseIIA, eval=T}
+```{r bestphaseIIA, eval=T, fig.width=6,fig.height=6, fig.align='center'}
 modelno = "23"
 
 s3load(object = file.path(paste(outputdir, "fill0", sep="_"), paste("Model", modelno, "RandomForest_Output.RData", sep= "_")), bucket = waze.bucket)
 
 imp.tab <- data.frame(round(rf.out$importance[order(rf.out$importance, decreasing = T)[1:15],], 2))
 colnames(imp.tab) = "Gini importance"
+# 
+# kable(imp.tab, row.names = T,
+#       caption = "Variance importance for the highest recall plot in phase II, Model 23. Top 15 of 58 predictors shown") %>% 
+#   kableExtra::kable_styling(bootstrap_options = "striped")
 
-kable(imp.tab, row.names = T,
-      caption = "Variance importance for the highest recall plot in phase II, Model 23. Top 15 of 58 predictors shown") %>% 
-  kableExtra::kable_styling(bootstrap_options = "striped")
-
-varImpPlot(rf.out, main = "Model 23 - April-Sept, highest recall")
+varImpPlot(rf.out, main = "Model 23 - April-Sept", n.var = 15)
 
 ```
 
@@ -511,7 +525,7 @@ tabl <- vector()
 for(i in 1:length(keyoutputs1)){
   tabl <- rbind(tabl, c(Model = names(keyoutputs1)[i], 
                                     100*keyoutputs1[[i]][[3]],
-                                    Runtime = paste(round(keyoutputs1[[i]]$runtime, 1), attr(keyoutputs1[[i]]$runtime, "unit")),
+                                    #Runtime = paste(round(keyoutputs1[[i]]$runtime, 1), attr(keyoutputs1[[i]]$runtime, "unit")),
                                     AUC = round(keyoutputs1[[i]]$auc, 4),
                                     MSE = round(keyoutputs1[[i]]$mse, 8)
                                     )
@@ -531,8 +545,8 @@ datatable(tabl, filter = 'top',
           formatStyle(3, background = styleEqual(range(tabl[,3]), c('khaki','lightgreen')))%>%
           formatStyle(4, background = styleEqual(range(tabl[,4]), c('khaki','lightgreen')))%>%
           formatStyle(5, background = styleEqual(range(tabl[,5]), c('lightgreen','khaki')))%>%
-          formatStyle(7, background = styleEqual(range(tabl[,7]), c('khaki','lightgreen')))%>%
-          formatStyle(8, background = styleEqual(range(tabl[,8]), c('lightgreen','khaki')))
+          formatStyle(6, background = styleEqual(range(tabl[,6]), c('khaki','lightgreen')))%>%
+          formatStyle(7, background = styleEqual(range(tabl[,7]), c('lightgreen','khaki')))
 
 ```
 
@@ -556,13 +570,18 @@ datatable(Nobs.frame, filter = 'top',
 ```
 
 ```{r Diagframe2}
+continuousmods <- c("42a", "42b", "43a", "43b", "44a","44b")
+
+k2 <- keyoutputs2[is.na(match(names(keyoutputs2), continuousmods))]
+
 tabl <- vector()
-for(i in 1:length(keyoutputs2)){
-  tabl <- rbind(tabl, c(Model = names(keyoutputs2)[i], 
-                                    100*keyoutputs2[[i]][[3]],
-                                    Runtime = paste(round(keyoutputs2[[i]]$runtime, 1), attr(keyoutputs2[[i]]$runtime, "unit")),
-                                    AUC = round(keyoutputs2[[i]]$auc, 4),
-                                    MSE = round(keyoutputs2[[i]]$mse, 8)
+for(i in 1:length(k2)){
+  
+  tabl <- rbind(tabl, c(Model = names(k2)[i], 
+                                    100*k2[[i]][[3]],
+                                    #Runtime = paste(round(k2[[i]]$runtime, 1), attr(k2[[i]]$runtime, "unit")),
+                                    AUC = round(k2[[i]]$auc, 4),
+                                    MSE = round(k2[[i]]$mse, 8)
                                     )
                       )
  }
@@ -580,6 +599,6 @@ datatable(tabl, filter = 'top',
           formatStyle(3, background = styleEqual(range(tabl[,3]), c('khaki','lightgreen')))%>%
           formatStyle(4, background = styleEqual(range(tabl[,4]), c('khaki','lightgreen')))%>%
           formatStyle(5, background = styleEqual(range(tabl[,5]), c('lightgreen','khaki')))%>%
-          formatStyle(7, background = styleEqual(range(tabl[,7]), c('khaki','lightgreen')))%>%
-          formatStyle(8, background = styleEqual(range(tabl[,8]), c('lightgreen','khaki')))
+          formatStyle(6, background = styleEqual(range(tabl[,6]), c('khaki','lightgreen')))%>%
+          formatStyle(7, background = styleEqual(range(tabl[,7]), c('lightgreen','khaki')))
 ```

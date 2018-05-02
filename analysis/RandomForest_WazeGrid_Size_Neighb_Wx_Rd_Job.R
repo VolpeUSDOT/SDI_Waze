@@ -165,13 +165,12 @@ save("keyoutputs", file = paste0("Output_to_", modelno))
 rm(w.04, w.05, w.06); gc()
 
 # Model 06: April, 0.5 mi ----
-# note file names is WazeTimeEdtHexAll, as weather data not prepped yet for 4 mi hexagons
 HEXSIZE = "05"
 inputdir <- "WazeEDT_RData_Input"
 outputdir <- paste0("WazeEDT_Agg", HEXSIZE, "mile_RandForest_Output")
 
 for(mo in c("04","05","06")){
-  prep.hex(file.path(inputdir, paste0("WazeTimeEdtHexWx_", mo,"_", HEXSIZE, "mi.RData")), month = mo)
+  prep.hex(file.path(inputdir, paste0("WazeTimeEdtHexWx_", mo,"_", HEXSIZE, "_mi.RData")), month = mo)
 }
 
 modelno = "06"
