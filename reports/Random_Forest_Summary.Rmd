@@ -300,8 +300,8 @@ colnames(imp.tab) = "Gini importance"
 #   kableExtra::kable_styling(bootstrap_options = "striped")
 
 varImpPlot(rf.out,
-           main = "Model 17 Variable Importance",
-           n.var = 15, 
+           main = "Model 17 Variable Importance \n April+May, test on June",
+           n.var = 20, 
            cex = 0.9)
 
 ```
@@ -381,18 +381,18 @@ datatable(tabl, filter = 'top',
 ```
 
 ```{r bestphaseIIA, eval=T, fig.width=6,fig.height=6, fig.align='center'}
-modelno = "23"
+modelno = "33"
 
-s3load(object = file.path(paste(outputdir, "fill0", sep="_"), paste("Model", modelno, "RandomForest_Output.RData", sep= "_")), bucket = waze.bucket)
+s3load(object = file.path(paste(outputdir, sep="_"), paste("Model", modelno, "RandomForest_Output.RData", sep= "_")), bucket = waze.bucket)
 
 imp.tab <- data.frame(round(rf.out$importance[order(rf.out$importance, decreasing = T)[1:15],], 2))
 colnames(imp.tab) = "Gini importance"
 # 
 # kable(imp.tab, row.names = T,
-#       caption = "Variance importance for the highest recall plot in phase II, Model 23. Top 15 of 58 predictors shown") %>% 
+#       caption = "Variance importance for the highest recall plot in phase II, Model 33 Top 15 of 58 predictors shown") %>% 
 #   kableExtra::kable_styling(bootstrap_options = "striped")
 
-varImpPlot(rf.out, main = "Model 23 - April-Sept", n.var = 15)
+varImpPlot(rf.out, main = "Model 23 Variable Importance \n April-Sept", n.var = 15)
 
 ```
 
@@ -413,7 +413,7 @@ Set B consisted of the following models, focusing on Waze event types without th
 Excluding sub-types did not decrease overall accuracy and model fit, compared to Set A models. As with Set A, adding supplemental data beyond the base set of predictors increased recall, and also increased precision. The best balance between recall and precision, as measured by AUC, came again from the model with all supplemental predictors added. Road functional class and AADT again were the predictors which drove the largest increase in recall. All models exhibited excellent accuracy and overall performance.
 
 ```{r phase2B}
-# pairs to compare: 24-30
+# pairs to compare: 24-32
 tabl <- vector()
 mods = as.character(24:32)
 for(i in mods){ tabl <- rbind(tabl, c(100*keyoutputs2[[i]]$diag, round(keyoutputs2[[i]]$auc, 4)))}
@@ -434,9 +434,9 @@ datatable(tabl, filter = 'top',
           formatStyle(5, background = styleEqual(max(tabl[,5]), 'lightgreen'))
 ```
 
-Approximately 1.5% of the data includes times and locations where only EDT values, but no Waze accidents, were present. These account for 30,875 of the 2,003,391 observations for the April-September data. Omitting these observations had a negligable effect on the overall model performace, with minor increase in recall and decrease in precision, leading to an overall minor decrease in AUC. 
+Approximately 1.5% of the data includes times and locations where only EDT values, but no Waze accidents, were present. These account for 30,875 of the 2,003,391 observations for the April-September data. Omitting these observations had a negligible effect on the overall model performance, with minor increase in recall and decrease in precision, leading to an overall minor decrease in AUC. 
 
-An even smaller quanity of data included times and locations where only Waze road closure events were reported, 2,892 of the total observations (0.1%). Omitting these interestingly lead to the highest recall of this set of model, but the best balance between recall and precision was still acheived with Model 30, including those observations.
+An even smaller quantity of data included times and locations where only Waze road closure events were reported, 2,892 of the total observations (0.1%). Omitting these interestingly lead to the highest recall of this set of model, as well as the best balance between recall.
 
 ## C. SubtypeCounts
 
@@ -460,7 +460,7 @@ for(i in mods){ tabl <- rbind(tabl, c(100*keyoutputs2[[i]]$diag, round(keyoutput
 colnames(tabl)[1:5] = c("Accuracy", "Precision", "Recall", "False Positive Rate", "AUC")
 rownames(tabl) = models[!is.na(match(models$Model.Number, mods)), "Short.Name"]
 datatable(tabl, filter = 'top',
-          caption = "Phase II, Set B model diagnostics for April-September 2017, Maryland, with supplemental data added sequentually and together.",
+          caption = "Phase II, Set C model diagnostics for April-September 2017, Maryland, with supplemental data added sequentually and together.",
           rownames = T,
           options = list(dom = "t",
                          pageLength = length(mods))
@@ -479,7 +479,35 @@ datatable(tabl, filter = 'top',
 - 43 Pick best and test removing EDT only rows
 - 44 Pick best and test removing road closure only rows
 
+Most grid cells have only 0 or 1 EDT crash. However, a small number of grid cells in time have more than 1 crash, less than 0.15% of the total data. Therefore, we also investigated the use of a continuous response variable (counts of EDT crashes) rather than a binary response variable (presence of EDT crashes). 
 
+The continuous response version of the models can be compared by mean squared error (MSE), but not by the confusion matrix or AUC metrics, since it is not a classification approach. All of these are orders of magnitude smaller errors than the MSE for the binary classification approach, but caution needs to be used when comparing MSE for models using different data types. 
+
+Model 42a, based on Model 23, provided the minimum MSE. This model includes all Waze event types and subtypes, as well as all supplemental data, without removing any rows of EDT-only or road closure-only data.
+
+```{r, eval = F}
+pctEDTcounts <- table(w.04_09$nMatchEDT_buffer_Acc) / nrow(w.04_09) *100
+format(pctEDTcounts, scientific = F)
+```
+
+```{r phaseD}
+# pairs to compare: 42a-44b
+tabl <- vector()
+mods = c("42a", "43a", "44a", "42b", "43b", "44b")
+
+for(i in mods){ tabl <- rbind(tabl, c(keyoutputs2[[i]]$mse))}
+
+colnames(tabl)[1] = c("MSE")
+rownames(tabl) = models[!is.na(match(models$Model.Number, mods)), "Short.Name"]
+datatable(tabl, filter = 'top',
+          caption = "Phase II, Set D count model diagnostics for April-September 2017, Maryland.",
+          rownames = T,
+          options = list(dom = "t",
+                         pageLength = length(mods))
+          ) %>% formatSignif(1, digits = 4) %>%
+          formatStyle(1, background = styleEqual(min(tabl[,1]), 'lightgreen'))
+
+```
 
 # Appendix
 
@@ -585,6 +613,14 @@ for(i in 1:length(k2)){
                                     )
                       )
  }
+# 
+# for(i in continuousmods){
+#   
+#   tabl <- rbind(tabl, c(Model = i, rep(NA, 5), MSE = round(keyoutputs2[[i]]$mse, 10)
+#                                     )
+#                       )
+#  }
+
 
 colnames(tabl)[2:5] = c("Accuracy", "Precision", "Recall", "False Positive Rate")
 
