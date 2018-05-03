@@ -199,15 +199,15 @@ labs <- c("12 AM", "2 AM", "4 AM", "6 AM", "8 AM", "10 AM",
   "12 PM", "2 PM", "4 PM", "6 PM", "8 PM", "10 PM")
 
 ggplot(d2, aes(x= hour, y= Pct_Obs_Est, fill = TotalWazeAcc)) +
+  geom_line(aes(y = 100, x = 0:23), lwd = 1.5, col = "darkgreen") +
   geom_bar(stat="identity")+
   coord_polar()+
   ylim(c(0, 120)) + 
-  ylab("Percent of Observed EDT Crashes Estimated") +
+  ylab("") +
   xlab("Hour of Day") + 
+  scale_y_continuous(labels = "", breaks = 1) +
   scale_x_continuous(labels = labs,
-                     
                      breaks= seq(0, 23, 2)) +
-  
   ggtitle("Model 30: Estimated EDT crashes / observed \n By hour of day")
 
 write.csv(d2, "Obs_Est_EDT_Model_30.csv", row.names = F)
