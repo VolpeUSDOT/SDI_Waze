@@ -1,6 +1,8 @@
 ---
 title: "S3 Bucket integration"
-output: html_notebook
+output:
+  html_document:
+    df_print: paged
 ---
 
 Notes on how to share files with other members of the SDI Waze team:
@@ -10,6 +12,10 @@ Notes on how to share files with other members of the SDI Waze team:
 The SDI Waze team shared S3 bucket is at this location:
 ```
 s3://prod-sdc-sdi-911061262852-us-east-1-bucket
+```
+
+```{r, echo = F}
+knitr::opts_chunk$set(echo = T, eval = F)
 ```
 
 As a user in an RStudio session, this bucket may not be accessible using the aws.s3 package:
@@ -35,7 +41,7 @@ From RStudio session, save files to a tempory output location, like "tempout"
 
 1. Within the RStudio session, run the script `sdc_s3_out.sh`
 
-```{r}
+```{r, eval = F}
 output.loc <- "~/tempout"
 
 # assuming a data.frame 'results' exists, from connect_redshift_pgsql.R
@@ -119,4 +125,47 @@ dirtomake = paste0("Raw_", state)
 s3transfer = paste0("aws s3 cp s3://prod-sdc-sdi-911061262852-us-east-1-bucket/ ", file.path("s3://prod-sdc-sdi-911061262852-us-east-1-bucket/", dirtomake), " --recursive --include '*.RData'")
 system(s3transfer)
 ```
+
+Get uploaded EDT data into the working data directory on the EC2 instance, after uploading via portal.securedatacommons.com:
+
+```{r edtprep}
+teambucket <- "s3://prod-sdc-sdi-911061262852-us-east-1-bucket/"
+system(paste0("aws s3 ls ", teambucket))
+
+# Get national hex and EDT new grid ID shapefiles:
+system(paste0('aws s3 cp ', teambucket, ' ~/workingdata/ --include "shapefiles_*.zip"'))
+# not working... do individually
+
+system(paste0("aws s3 cp ", teambucket, "shapefiles_nationalHexagons.zip ~/workingdata/"))
+system(paste0("aws s3 cp ", teambucket, "shapefiles_newGRIDID.zip ~/workingdata/"))
+
+# EDT data
+system(paste0("aws s3 cp ", teambucket, "Maryland_april2017_to_present.csv ~/workingdata/EDT"))
+system(paste0("aws s3 cp ", teambucket, "EDTsubset_april2017_to_present.zip ~/workingdata/EDT"))
+
+```
+
+### Deleting files:
+Cannot delete fiels with `aws s3 rm`. Can only archive... to do
+
+```{r}
+# Can't pass wildcards still... copy and run in terminal
+system(paste0("aws s3 cp ", teambucket, " ", teambucket, "Archive --include '*.csv'"))
+
+paste0("aws s3 cp ", teambucket, " ", teambucket, "Archive --include '*.csv'")
+
+
+```
+
+
+### Moving files around in terminal
+
+Example, after saving a bunch of files to `~/`, move all of them to a new directory within `~/workingdata` then save to S3 bucket:
+
+```
+mkdir ~/workingdata/State_accident_counts/
+mv *_accidents_distinct.RData ~/workingdata/State_accident_counts/
+aws s3 cp ~/workingdata/State_accident_counts/ s3://prod-sdc-sdi-911061262852-us-east-1-bucket/CountyCounts/ --recursive --include "*"
+```
+
 

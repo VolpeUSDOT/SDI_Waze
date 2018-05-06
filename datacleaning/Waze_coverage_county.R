@@ -1,4 +1,4 @@
-# Waze coverage by county. Query Redshift database for one state at a time, overlay on county shapefile, summarize counts of Waze events by county, by day if possible 
+# Waze coverage by county. Query Redshift database for one state at a time, combine to one large data frame. Overlay on county shapefile, summarize counts of Waze events by county, by day. 
 library(tidyverse) 
 library(lubridate)
 library(rgdal)
@@ -14,10 +14,12 @@ codeloc <- "~/SDI_Waze"
 source(file.path(codeloc, 'utility/connect_redshift_pgsql.R'))
 # must dbDisconnect(conn) after every connection to prevent slowdowns
 
+# CA has four regions, CA, CA1, CA2, CA3. 
 states <- c(state.abb, paste0("CA", 1:3))
 
 ### Query parameters ----
 # Get year/month, year/month/day, and last day of month vectors to create the SQL queries
+# Originally set up for monthly queries; can consider now not limiting the time in the query
 yearmonths = c(
   paste(2017, formatC(3:12, width = 2, flag = "0"), sep="-"),
   paste(2018, formatC(1:4, width = 2, flag = "0"), sep="-")
@@ -61,9 +63,7 @@ stateresults[numconv] <- apply(stateresults[numconv], 2, function(x) as.numeric(
 
 save("stateresults", file = "All_State_accidents_distinct.RData")
 
-
 dbDisconnect(conn) #  disconnect to prevent leakage
-
 
 #### Spatial aggregation ----
 # read in county shapefiles
@@ -98,33 +98,36 @@ d2 <- d %>%
   group_by(STATEFP, COUNTYFP, yearday) %>%
   summarise(WazeAccidents = n(),
             WazeAccidents_Major = sum(sub_type == "ACCIDENT_MAJOR"),
-            WazeAccidents_Minor = sum(sub_type == "ACCIDENT_MINOR")) %>%
-  complete(STATEFP, COUNTYFP, yearday, 
-           fill = list(WazeAccidents = 0,
-                       WazeAccidents_Major = 0,
-                       WazeAccidents_Minor = 0))
+            WazeAccidents_Minor = sum(sub_type == "ACCIDENT_MINOR")) #%>%
+  # complete(STATEFP, COUNTYFP, yearday, 
+  #          fill = list(WazeAccidents = 0,
+  #                      WazeAccidents_Major = 0,
+  #                      WazeAccidents_Minor = 0))
 
 county.acc <- left_join(d2, co@data[c("COUNTYFP", "STATEFP","NAME", "ALAND","AWATER")], 
                 by = c("STATEFP", "COUNTYFP"))
 
-d2.nofill <- d %>%
-  group_by(STATEFP, COUNTYFP, yearday) %>%
-  summarise(WazeAccidents = n(),
-            WazeAccidents_Major = sum(sub_type == "ACCIDENT_MAJOR"),
-            WazeAccidents_Minor = sum(sub_type == "ACCIDENT_MINOR"))
+# d2.nofill <- d %>%
+#   group_by(STATEFP, COUNTYFP, yearday) %>%
+#   summarise(WazeAccidents = n(),
+#             WazeAccidents_Major = sum(sub_type == "ACCIDENT_MAJOR"),
+#             WazeAccidents_Minor = sum(sub_type == "ACCIDENT_MINOR"))
+# 
+# county.acc.nofill <- left_join(d2.nofill, co@data[c("COUNTYFP", "STATEFP","NAME", "ALAND","AWATER")], 
+#                         by = c("STATEFP", "COUNTYFP"))
 
-county.acc.nofill <- left_join(d2.nofill, co@data[c("COUNTYFP", "STATEFP","NAME", "ALAND","AWATER")], 
-                        by = c("STATEFP", "COUNTYFP"))
-
-save(list = c("county.acc", "county.acc.nofill"), file="~/tempout/Yearday_County_Waze_AccidentCounts.RData")
+save(list = c("county.acc"#, "county.acc.nofill"
+              ), file="~/tempout/Yearday_County_Waze_AccidentCounts.RData")
 
 system("aws s3 cp /home/daniel/tempout/Yearday_County_Waze_AccidentCounts.RData s3://prod-sdc-sdi-911061262852-us-east-1-bucket/CountyCounts/")
 
-# to do: spread across all possible year-day values in the sample, providing 0's
+system("aws s3 ls prod-sdc-sdi-911061262852-us-east-1-bucket/")
 
 
+# to do: spread across all possible year-day values in the sample, providing 0's, without consuming all the RAM using complete().
 
-# Test query by month vs entire timeframe
+
+# Old test query by month vs entire timeframe -----
 # 2.03 hr for RI. No accidents until October
 
 state = "RI"
@@ -164,7 +167,7 @@ save("stateresults", file = paste(state, "accidents.RData", sep="_"))
 dbDisconnect(conn) # Must disconnect to prevent leakage
 
 
-# State results, no loop ----
+# Old State results, no loop ----
 # 12 minutes only. much better not in a loop
 state = "RI"
 
@@ -227,3 +230,4 @@ state_name_query <- paste0("SELECT DISTINCT state
 # dbDisconnect(conn)
 
 
+s

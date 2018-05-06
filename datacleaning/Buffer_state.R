@@ -1,44 +1,60 @@
-# Buffer state polygon. Make a 0.5 mile buffer around Maryland to clip Waze events. Want 0.5 mile because that is the spatial range being used to associate EDT and Waze events.
-
+# Buffer state polygon. Make a 0.5 mile buffer around each state to clip Waze events. Want 0.5 mile because that is the spatial range being used to associate EDT and Waze events.
+# Adapted for SDC use
 
 
 # <><><><><><><><><><><><><><><><><><><><>
 # Setup ----
+# Check for package installations
+source(file.path(codeloc, 'utility/get_packages.R'))
+
 library(sp)
 library(maps) # for mapping base layers
 library(maptools) # readShapePoly() and others
 library(mapproj) # for coord_map()
 library(rgdal) # for readOGR(), needed for reading in ArcM shapefiles
 library(rgeos) # for gIntersection, to clip two shapefiles
-# Version 1: from .csv aggregations made by Lia ----
 
-wazedir <- "W:/SDI Pilot Projects/Waze/Working Documents"
+localdir <- "/home/daniel/workingdata/census" # full path for readOGR
 
-setwd(wazedir)
+setwd(localdir)
 
-# Read in county data from Census
-counties <- readOGR("Census Files", layer = "cb_2015_us_county_500k")
-md_counties <- counties[counties$STATEFP == 24,]
+# Read in county data from Census. In EPSG:4269.
+counties <- rgdal::readOGR(localdir, layer = "cb_2017_us_county_500k")
 
-# Make a union for whole state
-ids <- rep("MD", nrow(md_counties))
-md.u <- unionSpatialPolygons(md_counties, ids)
+# Project to Albers equal area, ESRI 102008
+proj <- showP4(showWKT("+init=epsg:102008"))
 
-# Width is in degrees. Conver to 0.5 mi
-testx <- SpatialPoints(data.frame(lon = c(-79), lat = c(39)))
-testy <- SpatialPoints(data.frame(lon = c(-78), lat = c(39)))
+counties <- spTransform(counties, CRS(proj))
 
-proj4string(testx) <- proj4string(testy) <- proj4string(md_counties)
+states = c("CT", "MD", "UT", "VA")
+# Relevant states now: CT 09, MD 24, UT 49, VA 51
+FIPS = data.frame(state = c("CT", "MD", "UT", "VA"),
+                  FIPS =  c("09", "24", "49", "51"),
+                  stringsAsFactors = F)
 
-spDists(testx, testy) # one degree distance in lat = 111.0069 miles. In Long = 86.6 miles.
-# Take the one which results in a larger buffer
-buffdist <- 1/86
+FIPS # manually confirm
 
-xx <- gBuffer(md.u, width =  buffdist)
-
-proj4string(xx) <- proj4string(md_counties)
-
-xx <- SpatialPolygonsDataFrame(xx, data = data.frame(MD = "MDbuff", row.names = 'buffer'))
-
-writeOGR(xx, dsn = "Census Files", layer = "MD_buffered", driver = 
-           "ESRI Shapefile")
+for(i in states){ # i = "CT"
+  
+  i_counties <- counties[counties$STATEFP == FIPS$FIPS[FIPS$state == i],]
+  
+  # Make a union for whole state
+  ids <- rep(i, nrow(i_counties))
+  i.u <- unionSpatialPolygons(i_counties, ids)
+  
+  
+  # Width is in degrees. Conver to 0.5 mi
+  buffdist <- 0.5 * 1609.344 # units are meters in shapefiles
+  
+  xx <- gBuffer(i.u, width =  buffdist)
+  
+  xx <- SpatialPolygonsDataFrame(xx, data = data.frame(State = paste0(i, "buff"), row.names = 'buffer'))
+  
+  plot(i_counties, main = paste("Buffer", i))
+  plot(xx, add = T, col = alpha("firebrick", 0.8))
+  plot(i.u, add = T, col = alpha("grey80", 0.8))
+  
+  writeOGR(xx, dsn = localdir, layer = paste0(i, "_buffered"), driver = 
+             "ESRI Shapefile")
+  
+}

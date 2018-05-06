@@ -1,14 +1,14 @@
-# Test of SDC Redshift connection, now using Postgre/SQL which does not rely on Java
+# Create connection to SDC Redshift, now using Postgre/SQL which does not rely on Java
 
 # additional detail from https://aws.amazon.com/blogs/big-data/connecting-r-with-amazon-redshift/
 # https://daniel-workspace.securedatacommons.com:8888
 # install.packages("RPostgreSQL", dep = T)
 TESTCONN = F # Set to T to test connection 
 
-library(RPostgreSQL)
-library(DBI) # to test
-library(pool)
-library(RPostgres) # to test
+#library(RPostgreSQL)
+library(DBI) 
+#library(pool) # consider this for pooled connections
+library(RPostgres) 
 # Specify username and password manually, once:
 if(Sys.getenv("sdc_waze_username")==""){
   cat("Please enter SDC Waze username and password manually, in the console, the first time accessing the Redshift database, using: \n Sys.setenv('sdc_waze_username' = <see email from SDC Administrator>) \n Sys.setenv('sdc_waze_password' = <see email from SDC Administrator>)")

@@ -1,118 +1,130 @@
 # Waze clip
-# Filtering Waze data for MD based on US Census Bureau polygon for the state
+# Filtering Waze data for each state based on 0.5 mile buffered US Census Bureau polygon for the state
 # Started 2017-11-29
-# Now working in SDC
+# Now working in SDC, as a call from ReduceWaze_SDC.R. This 
 
 # <><><><><><><><><><><><><><><><><><><><>
 # Setup ----
 
-state = "MD"
+# Values passsed from ReduceWaze_SDC.R:
+# states = vector of state abbreviations
+# teambucket = S3 bucket name
+# codeloc; functions from utilities/wazefunctions.R
+# output.loc = ~/tempout, place to store temporary files
+# localdir = /home/daniel/workingdata, full path to place for working data, including spatial layers
+# yearmonths, yearmonths.1, yearmonths.end
 
-# read functions
-codeloc <- "~/SDI_Waze"
-source(file.path(codeloc, 'utility/wazefunctions.R'))
-
-# Check for package installations
-source(file.path(codeloc, 'utility/get_packages.R'))
-
-# Location of SDC SDI Waze team S3 bucket. Monthly files live here
-teambucket <- "prod-sdc-sdi-911061262852-us-east-1-bucket"
-
-inputdir <- paste0("Raw_", state)
-outputdir <- paste0("Clip_", state) 
-localdir <- "/home/daniel/workingdata" # location on this instance to hold working data files that can be s3loaded. *Need full path, cannot abbreviate to ~/workingdata, for readOGR*
-if(length(grep(system(paste('mkdir', localdir))
+# system(paste0("aws s3 ls ", teambucket, "/MD/"))
 
 library(sp)
 library(maps) # for mapping base layers
-library(maptools) # readShapePoly() and others
-library(mapproj) # for coord_map()
 library(rgdal) # for readOGR(), needed for reading in ArcM shapefiles
 library(rgeos) # for gIntersection, to clip two shapefiles
 library(raster)
 
-BUFFER = TRUE # Set to false to use original md_counties shapefile, true for 0.5 mi buffered version
-
 setwd(localdir)
 
-# Read in county data from Census
-if(BUFFER){
-  md_counties <- readOGR("Census Files", layer = "MD_buffered")  
-  
-} else {
-  counties <- readOGR("Census Files", layer = "cb_2015_us_county_500k")
-  md_counties <- counties[counties$STATEFP == 24,]
-}
+# Spatial setup ----
 
-monthfiles <- dir(wazemonthdir)[grep("RData", dir(wazemonthdir))]
+BUFFER = TRUE # Set to false to use original counties shapefile, true for 0.5 mi buffered version
 
-# <><><><><><><><><><><><><><><><><><><><>
-# Start loop
-for(i in monthfiles){ # i = "MD__2017-04.RData"
+# Project to Albers equal area, ESRI 102008
+proj <- showP4(showWKT("+init=epsg:102008"))
+
+FIPS = data.frame(state = c("CT", "MD", "UT", "VA"),
+                  FIPS =  c("09", "24", "49", "51"),
+                  stringsAsFactors = F)
+
+# Start loop over states ----
+
+statefiles <- dir(localdir)[grep("RData", dir(localdir))]
+
+starttime <- Sys.time()
+
+for(i in states){ # i = "CT"
   
-  starttime <- Sys.time()
+  # Read in county data from Census
+  if(BUFFER){
+    i_counties <- readOGR("census", layer = paste0(i, "_buffered"))  
+  } else {
+    counties <- readOGR("census", layer = "cb_2017_us_county_500k")
+    counties <- spTransform(counties, CRS(proj))
+    i_counties <- counties[counties$STATEFP == FIPS$FIPS[FIPS$state == i],]
+  }
   
-  system.time(load(file.path(wazemonthdir, i))) # 3-4 min for July, up to 4x slower on VPN. 
-  # 25s to load 50 MB RData file on Volpe network; 5-8x slower on VPN
+  # ~ 1 min to read 3.4 Gb CT file
+  load(file.path(localdir, statefiles[grep(paste0(i, "_Raw_"), statefiles)]))
   
-  cat(i, " loaded \n")
-  
-  d <- mb # was abbreviated 'monthbind', use 'd' as before
+  cat(i, "loaded \n")
   
   # original file size in MB
-  orig.file.size <- round(file.info(file.path(wazemonthdir, i))$size/1000000, 2)
-  orig.nrow <- nrow(d)
+  orig.file.size <- round(file.info(file.path(localdir, statefiles[grep(paste0(i, "_Raw_"), statefiles)]))$size/1000000, 2)
+  orig.nrow <- nrow(results)
+  
   # <><><><><><><><><><><><><><><><><><><><>
   # Convert data into comparable classes
-  # Make the waze data into a SpatialPointsDataFrame for comparison with the state polygon.
+  # Make the rowname pointer for Waze data into a SpatialPoints object for comparison with the state polygon.
+  lon.lat <- data.frame(as.numeric(results$location_lon),
+                        as.numeric(results$location_lat))
+
+  dx <- SpatialPoints(coords = lon.lat, proj4string = CRS("+proj=longlat +datum=WGS84"))
   
-  # Discard unneeded columns. Discarding two date colums bc have pubMillis, will make a POSIX datetime column from this. For now, also dropping 'filename', revisit this.
-  dropcols <- match(c("V1","X", "X.1", "X.2", "X.3", "pubMillis_date", "date", "filename"), names(d))
-  d <- d[,is.na(match(1:ncol(d), dropcols))]
-  
-  d <- SpatialPointsDataFrame(d[c("lon","lat")], d)
+  if(!identical(proj4string(dx), proj4string(i_counties))){
+    dx <- spTransform(dx, CRS(proj4string(i_counties)))
+  }
   
   # Overlay points in polygons
-  
   # Use over() from sp to join these to the census polygon. Points in Polygons, pip
+  matchcol = ifelse(BUFFER, "State", "NAME")
   
-  proj4string(d) <- proj4string(md_counties) # !!! Assumes Waze lat long are in NAD83 datum; check this.
+  # State buffer name to each row in d. If NA, it is not in the polygon.
+  # could be parallelize by chunking the pointer d and then combining together
+  i_pip <- over(dx, i_counties[,matchcol]) 
   
-  matchcol = ifelse(BUFFER, "MD", "NAME")
+  # subset results for only points in state
+  r2 <- results[!is.na(i_pip[,matchcol]),]
   
-  md_pip <- over(d, md_counties[,matchcol]) # Match a county name to each row in d. If NA, it is not in Maryland.
+  d <- SpatialPointsDataFrame(coords = data.frame(as.numeric(r2$location_lon),
+                                                  as.numeric(r2$location_lat)),
+                              r2,
+                              proj4string = CRS("+proj=longlat +datum=WGS84"))
   
-  d@data <- data.frame(d@data, matchcol = as.character(md_pip[,matchcol]))
-  names(d@data)[length(d@data)] = matchcol
+  if(!identical(proj4string(d), proj4string(i_counties))){
+    d <- spTransform(d, CRS(proj4string(i_counties)))
+  }
   
-  dx <- d@data[!is.na(d@data[,matchcol]),] # Drop rows with no matching county name
-  
-  d <- SpatialPointsDataFrame(dx[c("lon","lat")], dx)
-  
+  # Check with plot
+  plot(i_counties, main = paste("Plotting original and clipped", i))
+  plot(dx[sample(1:length(dx), size = 10000),], add = T, col = alpha("firebrick", 0.3))
+  plot(d[sample(1:nrow(d), size = 10000),], add = T, col = alpha("midnightblue", 0.1))
+  dev.print(jpeg, file = paste0("Figures/Clip_plot_", i, ".jpeg"), width= 500, height = 500)
   # <><><><><><><><><><><><><><><><><><><><>
-  # Export
-  # Save as .csv, .RData, and ShapeFile
+  # Export as .RData
+  # Possibly save as .csv and ShapeFile; takes time and disk space, skip for now.
   
-  if(BUFFER) i <- sub("MD", "MD_buffered", i)
-  irda <- i
-  ishp <- sub("\\.RData", "", i)
-  icsv <- sub("RData", "csv", i)
+  fn = paste0(i, "_Clipped_events_to_", yearmonths[length(yearmonths)])
   
-  save(list = "d", file = file.path(outputdir_temp, irda) )
+  if(BUFFER) fn <- sub("_Clipped", "_Buffered_Clipped", fn)
+
+  save(list = "d", file = file.path(localdir, paste0(fn, ".RData")))
   
-  write.csv(d@data, file = file.path(outputdir_temp, icsv), row.names = F)
-  
-  #  writeOGR(obj=d, dsn=file.path(outputdir, ishp), driver="ESRI Shapefile")
+  # write.csv(d@data, file = file.path(localdir, paste0(fn, ".csv")), row.names = F)
+   
+  # writeOGR(obj = d, dsn = localdir, layer = fn, driver="ESRI Shapefile")
+   
   timediff <- round(Sys.time()-starttime, 2)
   cat(i, "complete \n", timediff, attr(timediff, "units"), "elapsed \n\n")
   
-  new.file.size <- round(file.info(file.path(outputdir_temp, i))$size/1000000, 2)
+  new.file.size <- round(file.info(file.path(localdir, paste0(fn, ".RData")))$size/1000000, 2)
   new.nrow <- nrow(d@data)
   
-  cat("File reduced from", orig.file.size, "MB to", new.file.size, "MB \n\n",
-      format(orig.nrow - new.nrow, big.mark =",)", 
+  cat(i, "file changed from", orig.file.size, "MB to", new.file.size, "MB \n\n",
+      format(orig.nrow - new.nrow, big.mark =","), 
              "rows of out-of-state data removed \n\n", rep("<>",20), "\n")
-      
-}
-
-filelist <- dir(outputdir_temp)[grep("[RData$|csv$]", dir(outputdir_temp))]
+  
+  # Copy to S3
+  system(paste("aws s3 cp",
+               file.path(localdir, paste0(fn, ".RData")),
+               file.path(teambucket, i, paste0(fn, ".RData"))))
+  
+} # end state loop
