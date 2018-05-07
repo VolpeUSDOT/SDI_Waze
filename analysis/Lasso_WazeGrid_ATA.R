@@ -12,7 +12,10 @@ library(speedglm)
 library(CORElearn)
 library(glmnet)
 library(foreach) 
-
+library(doParallel) # includes iterators and parallel
+library(aws.s3)
+library(tidyverse)
+library(rgdal)
 
 #Data prep
 codeloc <- "~/SDI_Waze" 
@@ -34,7 +37,7 @@ source(file.path(codeloc, 'utility/wazefunctions.R'))
 # read random forest function
 source(file.path(codeloc, "analysis/RandomForest_WazeGrid_Fx.R"))
 
-# check if already complted this transfer on this instance
+# check if already completed this transfer on this instance
 if(length(dir(localdir)[grep("shapefiles_funClass", dir(localdir))]) == 0){
   
   s3transfer = paste("aws s3 cp s3://ata-waze/MD_hexagon_shapefiles", localdir, "--recursive --include '*'")
@@ -82,7 +85,9 @@ avail.cores = parallel::detectCores()
 
 if(avail.cores > 8) avail.cores = 10 # Limit usage below max if on r4.4xlarge instance
 
-rf.inputs = list(ntree.use = avail.cores * 50, avail.cores = avail.cores, mtry = 10, maxnodes = 1000, nodesize = 100)
+#Set up model features from data frame
+
+lr.inputs = list(ntree.use = avail.cores * 50, avail.cores = avail.cores, mtry = 10, maxnodes = 1000, nodesize = 100)
 
 keyoutputs = redo_outputs = list() # to store model diagnostics
 
@@ -98,6 +103,7 @@ alert_subtypes = c("nHazardOnRoad", "nHazardOnShoulder" ,"nHazardWeather", "nWaz
 
 response.var = "MatchEDT_buffer_Acc"
 
+# Lasso analysis (ZINB)
 
 
 # A: All Waze ----
