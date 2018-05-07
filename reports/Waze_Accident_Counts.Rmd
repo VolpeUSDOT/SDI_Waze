@@ -1,0 +1,131 @@
+---
+title: "Waze Accident Counts"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = F, warning=F, message=F)
+setwd("//vntscex.local/DFS/Projects/PROJ-OR02A2/SDI")
+
+load("Data/CountyCounts/Yearday_County_Waze_AccidentCounts.RData")
+
+head(county.acc)
+
+library(tidyverse)
+library(lubridate)
+library(maps)
+library(plotly)
+
+fips <- maps::state.fips
+fips$fips <- as.factor(formatC(fips$fips, width = 2, flag = "0"))
+
+# count of accidents, by state and month. Looking for anomolies.
+co.day <- county.acc %>%
+            mutate(Date = ymd(yearday),
+                   Ym = format(Date, "%Y-%m"))
+
+
+
+state.mo <- co.day %>%
+  group_by(STATEFP, Ym) %>%
+  summarize(acc = sum(WazeAccidents))
+
+state.mo <- left_join(state.mo, fips, by = c("STATEFP" = "fips"))
+
+state.mo$usetext <- with(state.mo, paste(abb, "\n", Ym, "\n",  format(acc, big.mark = ",", digits = 0, scientific = F), "accidents"))
+```
+
+<!-- # Count of Waze accidents over time -->
+
+```{r, eval = F}
+state.mo$usetext.all <- with(state.mo, paste(abb, "\n", Ym, "\n",  format(acc, big.mark = ",", digits = 0, scientific = F), "accidents"))
+
+gp <- ggplot(state.mo,
+             aes(x = Ym, 
+                 y = acc)) + theme_bw()
+
+gp2 <- gp + geom_boxplot() + geom_line()
+#gp2
+
+ggplotly(gp2, tooltip = "Ym")
+
+```
+
+# Summary
+
+The following plots summarize counts of Waze accidents over time. The process in brief involved the following:
+
+- Querying the Waze data in Redshift on the Secure Data Commons (SDC) by state, for unique `alert_uuid` Waze accident events
+- Overlaying these data with geographic layers from the US Census Bureau to match to county and state
+- Aggregating sum of Waze accident reports by day and county; also by month and state
+
+# Count of Waze accidents by focal states with EDT available
+
+For four of the states with EDT data available since 2017, there is substantial variation over time in the number of Waze accidents reported. This issue has been brought to the attention of the SDC development team, and in the current sprint the count of Waze accident events in the data lake, in the curated data, and in the Redshift database will all be investigated. The large change from September 2017 is particularly noticeable. The low values in April 2018 partially result from the date of the query at then end of April 2018; the latest data at that time was from 2018-04-18.
+
+```{r, fig.width=8, fig.height = 5.5}
+
+# Show just states of interest
+
+gp.focal <- ggplot(state.mo %>% filter(abb %in% c("CT", "MD", "UT", "VA")),
+             aes(x = Ym, 
+                 y = acc,
+                 group = abb,
+                 text = usetext)) + theme_bw()
+
+gp.focal2 <- gp.focal + geom_line(aes(color = abb), 
+                                  alpha = 0.8,
+                                  size = 2) +
+  theme(axis.text.x = element_text(size=7, angle=45),
+        axis.text.y = element_text(size=7, angle=45)) +
+  ylab("Count of Waze accidents") +
+  xlab(" ")  + 
+  guides(color=guide_legend(title="State"))
+#gp.focal2
+
+ggplotly(gp.focal2, tooltip = "usetext") %>% layout(hovermode = 'x')
+
+```
+
+
+
+
+# Count of Waze accidents by other selected states
+
+For several other states, the same process shows even more dramatic variation over time. Before considering use of the Waze data as inputs for modeling EDT crashes, such discrepancies need to be resolved.
+
+```{r, fig.width=8, fig.height = 5.5}
+
+# Show just states of interest
+
+gp.2focal <- ggplot(state.mo %>% filter(abb %in% c("CA", "TX", "GA", "NY")),
+                   aes(x = Ym, 
+                       y = acc,
+                       group = abb,
+                       text = usetext)) + theme_bw()
+
+gp.2focal2 <- gp.2focal + geom_line(aes(color = abb), 
+                                  alpha = 0.8,
+                                  size = 2) +
+  theme(axis.text.x = element_text(size=7, angle=45),
+        axis.text.y = element_text(size=7, angle=45)) +
+  ylab("Count of Waze accidents") +
+  xlab(" ")  + 
+  guides(color=guide_legend(title="State"))
+
+#gp.2focal2
+
+ggplotly(gp.2focal2, tooltip = "usetext") %>% layout(hovermode = 'x')
+```
+
+
+
+
+
+
+
+
+
+
+
+
