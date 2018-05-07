@@ -7,205 +7,130 @@
 
 # use spDists from sp package to get distances from each EDT event to each Waze event. 
 # Produce a link table which has a two columns: EDT events and the Waze events which match them; repeat EDT event in the column for all matching Waze events.
+# modified for multiple states, on SDC
 
 # Setup ----
+codeloc <- "~/SDI_Waze"
+source(file.path(codeloc, 'utility/get_packages.R'))
+
 library(sp)
 library(tidyverse)
+library(rgdal)
 library(maps)
 
-# Code location
-mappeddriveloc <- "W:" #Flynn
-mappeddriveloc <- "S:" #Sudderth
+teambucket <- "s3://prod-sdc-sdi-911061262852-us-east-1-bucket"
 
+localdir <- "/home/daniel/workingdata" # full path for readOGR
 
-codeloc <- "~/git/SDI_Waze" #Flynn
-codeloc <- "~/GitHub/SDI_Waze" #Sudderth
+wazedir <- "~/tempout" # has State_Year-mo.RData files. Grab from S3 if necessary
+edtdir <- file.path(localdir, "EDT") # Unzip and rename with shortnames if necessary
 
-wazedir <- file.path(mappeddriveloc, "SDI Pilot Projects/Waze/MASTER Data Files/Waze Aggregated/month_MD_clipped")
-edtdir <- file.path(mappeddriveloc, "SDI Pilot Projects/Waze/MASTER Data Files/EDT_month")
-
-
-# load data - will load all files in month_MD_clipped directory on shared drive
-# source(file.path(codeloc, 'wazeloader.R'))
-
-setwd(wazedir)
+setwd(localdir)
 
 # read functions
 source(file.path(codeloc, 'utility/wazefunctions.R'))
 
-# Start loop over months ----
-wazemonthfiles <- dir(wazedir)[grep("MD_buffered__2017", dir(wazedir))]
-wazemonthfiles <- wazemonthfiles[grep("RData$", wazemonthfiles)]
-                               
-edtmonths <- unique(substr(dir(edtdir), 6, 7))
-wazemonths <- unique(substr(wazemonthfiles, 19, 20))
+# Set parameters: states, yearmonths, time zone and projection
+states = c("CT", "UT", "VA", "MD")
 
-months_shared <- edtmonths[edtmonths %in% wazemonths]
-# make sure months are actually shared 
-stopifnot(all(months_shared == wazemonths[wazemonths %in% edtmonths]))
+yearmonths = c(
+  paste(2017, formatC(4:12, width = 2, flag = "0"), sep="-"),
+  paste(2018, formatC(1:4, width = 2, flag = "0"), sep="-")
+)
 
-outputdir_temp <- tempdir()
-outputdir_final <- file.path(wazedir, "MASTER Data Files/EDT_month")
+# Time zone picker:
+tzs <- data.frame(states, 
+                  tz = c("US/Eastern",
+                    "US/Mountain",
+                    "US/Eastern",
+                    "US/Eastern"),
+                  stringsAsFactors = F)
 
-starttime_total <- Sys.time()
+# Project to Albers equal area conic 102008. Check comparision wiht USGS version, WKID: 102039
+proj <- showP4(showWKT("+init=epsg:102008"))
 
-for(i in months_shared){
-  starttime_month <- Sys.time()
+# Start loop over states ---
+
+for(i in states) { # i= "UT"
   
-  load(file.path(wazedir, paste0("MD_buffered__2017-", i, ".RData")))
-  load(file.path(edtdir, paste0("2017-", i, "_1_CrashFact_edited.RData")))
-
-  # Set projections
-  # d <- SpatialPointsDataFrame(d[c("lon", "lat")], d)  # from monthbind of Waze data, make sure it is a SPDF
-  edt <- get(paste("edt", i, sep = "_"))
+  # Start loop over months ----
+  wazemonthfiles <- dir(wazedir)[grep(i, dir(wazedir))]
+  wazemonthfiles <- wazemonthfiles[grep("RData$", wazemonthfiles)]
   
-  proj4string(d) <- proj4string(edt) <- c("+proj=longlat +datum=NAD83 +no_defs +ellps=GRS80 +towgs84=0,0,0")
+  # get EDT data for this state
+  e_i <- read.csv(file.path(edtdir, dir(edtdir)[grep(i, dir(edtdir))]),
+                  na.strings = c("NA", "NULL")) 
   
-  # <><><><><><><><><><><><><><><><><><><><><><><><>
-  link.all <- makelink(edt, d)
-  # <><><><><><><><><><><><><><><><><><><><><><><><>
+  # find rows with missing lat/long
+  # Discard rows with no lat long
+  cat(i, "EDT missing lat/long: \n", summary(is.na(e_i$GPSLat)))
+  e_i <- e_i[!is.na(e_i$GPSLat) & !is.na(e_i$GPSLong),]
+  cat(i, "EDT lat/long marked 777: \n", summary(e_i$GPSLat > 77 & e_i$GPSLong < -777))
+  e_i <- e_i[!e_i$GPSLat > 77 & !e_i$GPSLong < -777,]
+  
+  # Make sure just this state represented
+  e_i <- e_i[e_i$CrashState == state.name[state.abb == i],]
+  
+  use.tz <- tzs$tz[tzs$states == i]
+  
+  e_i$CrashDate_Local <- with(e_i,
+                              strptime(
+                                paste(substr(CrashDate, 1, 10),
+                                      HourofDay, MinuteofDay), format = "%Y-%m-%d %H %M", tz = use.tz)
+  )
   
   
-  write.csv(link.all, file.path(outputdir_temp, paste0("EDT_Waze_link_2017-", i, "_MD.csv")), row.names = F)
+  edtmonths <- sort(unique(format(e_i$CrashDate_Local, "%Y-%m")))
+  wazemonths <- sort(unique(substr(wazemonthfiles, 4, 10)))
   
-  timediff <- round(Sys.time()-starttime_month, 2)
-  cat(i, "complete \n", timediff, attr(timediff, "units"), "elapsed \n\n")
-
-  timediff.total <- round(Sys.time()-starttime_total, 2)
-  cat(timediff.total, attr(timediff.total, "units"), "elapsed in total \n", rep("<>", 20), "\n")
+  months_shared <- edtmonths[edtmonths %in% wazemonths]
+  # make sure months are actually shared 
+  stopifnot(all(months_shared == wazemonths[wazemonths %in% edtmonths]))
   
-}
+  starttime_total <- Sys.time()
+  
+  for(j in months_shared){ # j = "2018-04"
+    starttime_month <- Sys.time()
+    
+    load(file.path(wazedir, paste0(i, "_", j, ".RData")))
+    
+    # Make spatial and set projections
+    d <- SpatialPointsDataFrame(mb[c("lon", "lat")], mb, 
+                                proj4string = CRS("+proj=longlat +datum=WGS84"))  # from monthbind of Waze data, make sure it is a SPDF
+    
+    d <- spTransform(d, CRS(proj))
+    
+    if(class(e_i)=="data.frame"){
+    e_i <- SpatialPointsDataFrame(e_i[c("GPSLong", "GPSLat")], e_i, 
+                                proj4string = CRS("+proj=longlat +datum=WGS84"))  #  make sure EDT data is a SPDF
+    
+    e_i <-spTransform(e_i, CRS(proj))
+    }
+    
+    # Check with a plot:
+    plot(e_i, main = paste("EDT Waze overlay \n", i, j))
+    plot(d, add = T, col = "red")
+    dev.print(jpeg, file = paste0("Figures/Link_plot_", i, "_" , j, ".jpeg"), width= 500, height = 500)
+    
+    # <><><><><><><><><><><><><><><><><><><><><><><><>
+    link.all <- makelink(accfile = e_i, 
+                         incfile = d,
+                         acctimevar = "CrashDate_Local",
+                         inctimevar1 = "time",
+                         inctimevar2 = "last.pull.time",
+                         accidvar = "ID",
+                         incidvar = "alert_uuid")
+    # <><><><><><><><><><><><><><><><><><><><><><><><>
+    
+    write.csv(link.all, file.path(localdir, "Link", paste0("EDT_Waze_link_", j, "_", i, ".csv")), row.names = F)
+    
+    timediff <- round(Sys.time()-starttime_month, 2)
+    cat(j, "complete \n", timediff, attr(timediff, "units"), "elapsed \n\n")
+  
+    timediff.total <- round(Sys.time()-starttime_total, 2)
+    cat(timediff.total, attr(timediff.total, "units"), "elapsed in total \n", rep("<>", 20), "\n")
+    
+  } # end month loop
+  
+} # end state loop
 
-filelist <- dir(outputdir_temp)[grep("[RData$|csv$]", dir(outputdir_temp))]
-movefiles(filelist, outputdir_temp, outputdir_final)
-
-
-
-# Next up: making summary tables from the link table
-
-# EDT files with matching Waze events:
-length(unique(fivemi.link$id.edt))
-# out of
-nrow(edt)
-# and with this distribution of Waze matches
-hist(tapply(fivemi.link$uuid.waze, fivemi.link$id.edt, length))
-
-
-
-# linking Waze accidents to all Waze events, for April
-proj4string(d) <- c("+proj=longlat +datum=NAD83 +no_defs +ellps=GRS80 +towgs84=0,0,0")
-
-wazeacc <- d[d$type == "ACCIDENT",]
-
-
-
-
-# <><><><><><><><><><><><><><><><><><><><><><><><>
-link.waze.waze <- makelink(wazeacc, d,
-                           acctimevar = "time",
-                           inctimevar1 = "time",
-                           inctimevar2 = "last.pull.time",
-                           accidvar = "uuid",
-                           incidvar = "uuid")
-# <><><><><><><><><><><><><><><><><><><><><><><><>
-
-link.waze.waze2 <-  link.waze.waze[as.character(link.waze.waze[,1]) != as.character(link.waze.waze[,2]),]
-
-write.csv(link.waze.waze2, "Waze_Waze_link_April_MD.csv", row.names = F)
-
-
-
-
-# <><><><><><><><><><><><><><><><><><><><><><><><>
-link.edt.edt <- makelink(edt, edt,
-                           acctimevar = "CrashDate_Local",
-                           inctimevar1 = "CrashDate_Local",
-                           inctimevar2 = "CrashDate_Local",
-                           accidvar = "ID",
-                           incidvar = "ID")
-# <><><><><><><><><><><><><><><><><><><><><><><><>
-
-# remove self-matches
-
-link.edt.edt2 <-  link.edt.edt[link.edt.edt[,1] != link.edt.edt[,2],]
-
-write.csv(link.edt.edt2, "EDT_EDT_link_April_MD.csv", row.names = F)
-
-
-# old ----
-
-# map("state", "maryland")
-# points(i, pch = 21, cex = 2)
-# points(d[dist.i.5,][1:500,], pch = "+")
-
-# Tested loop below, now moved to wazefunctions.R as makelink()
-# linktable <- vector()
-# starttime <- Sys.time()
-# 
-# for(i in 1:nrow(edt)){ # i = 1
-#   ei = edt[i,]
-#   dist.i <- spDists(ei, d, longlat = T)*0.6213712 # spDists gives units in km, convert to miles
-#   dist.i.5 <- which(dist.i <= 0.5)
-#   
-#   # Spatially matching
-#   d.sp <- d[dist.i.5,]
-#   
-#   # Temporally matching
-#   d.t <- d.sp[d.sp$time > ei$CrashDate_Local-60*60 & d.sp$time <= ei$CrashDate_Local+60*60,] 
-#   
-#   id.edt <- rep(as.character(ei$ID), nrow(d.t))
-#   uuid.waze <- as.character(d.t$uuid)
-#   
-#   linktable <- rbind(linktable, data.frame(id.edt, uuid.waze))
-#   
-#   if(i %% 100 == 0) {
-#       timediff <- round(Sys.time()-starttime, 2)
-#       cat(i, "complete \n", timediff, attr(timediff, "units"), "elapsed \n", rep("<>",20), "\n")
-#       }
-# }
-
-
-# Old Erika code -- all moved to UrbanArea_overlay.R, just keeping here for reference
-# 
-# ###Some code for subsetting EDT and Waze data based on link table
-# #Subset EDT data to April
-# edt.april <- edt[edt$CrashDate_Local < "2017-05-01 00:00:00 EDT" & edt$CrashDate_Local > "2017-04-01 00:00:00 EDT",] 
-# edtfile <- edt.april
-# edt.april$CrashDate_Local
-# 
-# #Use link function to match April EDT and April Waze
-# link.5mi <- makelink(edt.april, d)
-# write.csv(link.5mi, "EDT_Waze_link_April_MD_5mi.csv", row.names = F)
-# 
-# #Add "M" code to the table to show matches if we merge in full datasets
-# match <- rep("M",nrow(link.5mi))
-# link.5mi <- mutate(link.5mi, match)
-# glimpse(link.5mi)
-# 
-# #Subset of Waze data that matches EDT
-# Waze.Match <- subset(d, (uuid %in% link.5mi$uuid.waze))
-# length(unique(Waze.Match$uuid)) #431
-# 
-# ##This merge doesn't work: non-unique matches detected. We want to keep non-unique matches
-# WazeLinked <- merge(Waze.Match, link.5mi, by.x = "uuid", by.y = "uuid.waze")
-# 
-# 
-# 
-# 
-# #Subset of Waze data that does not match (check to be sure is same as total length April Waze - number of unique match Waze)
-# length(unique(link.5mi$uuid.waze))
-# nrow(d)
-# Waze.NoMatch <- subset(d, !(uuid %in% link.5mi$uuid.waze))
-# nrow(Waze.NoMatch) #431/9921 or only 4.3% of Waze events match an EDT crash in space and time
-# 
-# #check total
-# nrow(Waze.NoMatch)+length(unique(link.5mi$uuid.waze)) #Matches total number 
-# 
-# # EDT files with matching Waze events:
-# length(unique(link.5mi$id.edt))
-# # out of
-# nrow(edt.april) #70/96 in April match a Waze event (72.9%)
-# 
-# # and with this distribution of Waze matches
-# hist(tapply(link.5mi$uuid.waze, link.5mi$id.edt, length))
-# 

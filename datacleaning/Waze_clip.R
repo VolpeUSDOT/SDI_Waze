@@ -78,11 +78,12 @@ for(i in states){ # i = "CT"
   matchcol = ifelse(BUFFER, "State", "NAME")
   
   # State buffer name to each row in d. If NA, it is not in the polygon.
-  # could be parallelize by chunking the pointer d and then combining together
+  # could be parallelized by chunking the pointer dx and then combining together
   i_pip <- over(dx, i_counties[,matchcol]) 
   
   # subset results for only points in state
   r2 <- results[!is.na(i_pip[,matchcol]),]
+  rm(results, i_pip, lon.lat); gc() # remove to save memory
   
   d <- SpatialPointsDataFrame(coords = data.frame(as.numeric(r2$location_lon),
                                                   as.numeric(r2$location_lat)),
@@ -98,6 +99,8 @@ for(i in states){ # i = "CT"
   plot(dx[sample(1:length(dx), size = 10000),], add = T, col = alpha("firebrick", 0.3))
   plot(d[sample(1:nrow(d), size = 10000),], add = T, col = alpha("midnightblue", 0.1))
   dev.print(jpeg, file = paste0("Figures/Clip_plot_", i, ".jpeg"), width= 500, height = 500)
+  
+  rm(i_counties, dx, r2)
   # <><><><><><><><><><><><><><><><><><><><>
   # Export as .RData
   # Possibly save as .csv and ShapeFile; takes time and disk space, skip for now.
@@ -126,5 +129,7 @@ for(i in states){ # i = "CT"
   system(paste("aws s3 cp",
                file.path(localdir, paste0(fn, ".RData")),
                file.path(teambucket, i, paste0(fn, ".RData"))))
+  
+  rm(d)
   
 } # end state loop

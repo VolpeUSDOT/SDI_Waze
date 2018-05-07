@@ -21,14 +21,14 @@ makelink <- function(accfile = edt.april, incfile = waze.april,
   linktable <- vector()
   
   starttime <- Sys.time()
-  writeLines("", paste0("waze_waze_log_", Sys.Date(), ".txt")) # to store messages
+  writeLines("", paste0("EDT_Waze_log_", j, "_", i, "_", Sys.Date(), ".txt")) # to store messages
   
   # Start of %dopar% loop
   linktable <- foreach(i=1:nrow(accfile), .combine = rbind, .packages = "sp") %dopar% {
     
     ei = accfile[i,]
     
-    dist.i <- spDists(ei, incfile, longlat = T)*0.6213712 # spDists gives units in km, convert to miles
+    dist.i <- spDists(ei, incfile)*0.0006213712 # spDists gives units in m for projected data, convert to miles
     dist.i.5 <- which(dist.i <= 0.5)
     
     # Spatially matching

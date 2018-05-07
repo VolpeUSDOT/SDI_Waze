@@ -1,5 +1,6 @@
 # Aggregates Waze files to monthly sets with unique UUIDs. 
 # Original 'ReduceWaze2.R' for working with daily .csv files, now directly reading from Redshift in SDC. Modified to query multiple states
+# This now calls Waze_clip.R to subset to buffered state polygons before making monthly files by unique alert_uuid.
 
 # Setup ----
 
@@ -30,6 +31,14 @@ source(file.path(codeloc, 'utility/connect_redshift_pgsql.R'))
 # Query parameters
 # states with available EDT data for model testing
 states = c("CT", "UT", "VA", "MD")
+
+# Time zone picker:
+tzs <- data.frame(states, 
+                  tz = c("US/Eastern",
+                         "US/Mountain",
+                         "US/Eastern",
+                         "US/Eastern"),
+                  stringsAsFactors = F)
 
 # <><><><><><><><><><><><><><><><><><><><><><><><>
 # Compiling by State ----
@@ -78,36 +87,47 @@ for(i in states){ # i = 1
  # ~ 1.6 h for MD, CT, UT, and VA. File size seems too small for non-MD states... VA especially. Check date range of actual data. May simply be consequence of rectangular 'state' definition by Waze.
 
 # Clip to state boundaries ----
-# Depends on *_Raw_events_to_lastyearmonth.RData being in localdir,
-# and *_buffered.shp (and associated files) being in localdir/census.
-# Will save *_Buffered_Clipped_events_to_lasyearmonth.RData in localdir and to S3
+  # ~ 2 h for these four states
+  # Depends on *_Raw_events_to_lastyearmonth.RData being in localdir,
+  # and *_buffered.shp (and associated files) being in localdir/census.
+  # Will save *_Buffered_Clipped_events_to_lasyearmonth.RData in localdir and to S3
 cliptime <- Sys.time()
 source(file.path(codeloc, "datacleaning/Waze_clip.R"))
-td <- Sys.time-cliptime
+td <- Sys.time()-cliptime
 cat("\n\n", round(td, 2), attr(td, "units"), "to complete all Waze_clip steps \n\n")
 
 
-
-
-  
 # Reduce to single UUID by state ----
 
 # First, loop over states again. Then parallel process the months. 
+# MD: > 11 Gb full spatial points data frame, saved after converting back to data.frame and removing unused columns, only 8.4 Gb. 
 
 starttime <- Sys.time()
   
 for(i in states){ # i = "UT"
-    
+  
+  # Pick out the right time zone for this state
+  use.tz <- tzs$tz[tzs$states == i]
+  
   # Get the data from the S3 bucket if needed (to do), saving to workingdata
-  load(file.path("~/workingdata", paste0(i, "_Raw_events_to_", yearmonths[length(yearmonths)],".RData")))
+  load(file.path("~/workingdata", paste0(i, "_Buffered_Clipped_events_to_", yearmonths[length(yearmonths)],".RData")))
   
   # Convert values to numeric
   numconv <- c("report_rating", "confidence", "reliability", "pub_millis", "location_lon", "location_lat", "magvar")
   
-  results[numconv] <- apply(results[numconv], 2, function(x) as.numeric(x))
+  # Drop from spatial data frame back to data frame for easier aggregation. Will need to re-project for linking. Also makes object size smaller.
+  d <- d@data
+  d[numconv] <- apply(d[numconv], 2, function(x) as.numeric(x))
   
   # Year-month for looping
-  ym <- format(results$pub_utc_timestamp, "%Y-%m")
+  ym <- format(d$pub_utc_timestamp, "%Y-%m")
+  
+  # Removed unneeded variables to save ram
+  dropvars = c("report_description", "pub_utc_epoch_week","jam_uuid", "num_thumbsup")
+  d <- d[,!names(d) %in% dropvars]
+
+  # Manual 'loop' for MD. Have to re-make ym and also re-load for each half. Work on this to optimize when dataframe d is some % of available RAM 
+  # d <- d[ym %in% yearmonths[8:13],];  ym <- format(d$pub_utc_timestamp, "%Y-%m"); gc()
   
   # Set up cluster. 
   avail.cores <- parallel::detectCores()
@@ -118,11 +138,11 @@ for(i in states){ # i = "UT"
 # Start parallel loop over yearmonths within state ----
 foreach(mo = unique(ym), .packages = c("dplyr", "tidyr")) %dopar% {
     # mo = "2018-04"
-    d <- results[ym == mo,]
+    dx <- d[ym == mo,]
     
-    # d.test = d[1:5000,]
+    # d.test = dx[1:5000,]
     
-    ll <- d %>%
+    ll <- dx %>%
       group_by(alert_uuid) %>%
       summarise(
         median.reportRating = median(report_rating),
@@ -136,7 +156,7 @@ foreach(mo = unique(ym), .packages = c("dplyr", "tidyr")) %dopar% {
       )
     
     # Additionally get confidence, reliability, report rating, and magvar for the most recent entry of this uuid. Can have fewer rows than part 1, ll.
-    ll2 <-  d %>% 
+    ll2 <-  dx %>% 
       group_by(alert_uuid) %>%
       filter(pub_millis == max(pub_millis, na.rm = T)) %>%
       summarize(
@@ -144,12 +164,11 @@ foreach(mo = unique(ym), .packages = c("dplyr", "tidyr")) %dopar% {
         last.confidence = median(confidence),
         last.reliability = median(reliability),
         magvar = median(magvar, na.rm = T)
-        
       )
     
     # part 3: get most frequent values for city, type, road_type, sub_type, and street. Fastest dplyr method is with slice(whic.max(n))
 
-    ll3 <- d %>%
+    ll3 <- dx %>%
       group_by(alert_uuid) %>%
       count(city, alert_type, sub_type, street, road_type) %>%
       slice(which.max(n)) 
@@ -159,8 +178,8 @@ foreach(mo = unique(ym), .packages = c("dplyr", "tidyr")) %dopar% {
     lx <- full_join(lx, ll3, by = 'alert_uuid')
     
     # Format and output  
-    time <- as.POSIXct(lx$pubMillis/1000, origin = "1970-01-01", tz="America/New_York") # Time zone will need to be correctly configured for other States.
-    last.pull.time <- as.POSIXct(lx$last.time/1000, origin = "1970-01-01", tz="America/New_York") 
+    time <- as.POSIXct(lx$pubMillis/1000, origin = "1970-01-01", tz= use.tz) 
+    last.pull.time <- as.POSIXct(lx$last.time/1000, origin = "1970-01-01", tz= use.tz) 
     
     mb <- data.frame(lx, time, last.pull.time)
     
@@ -172,8 +191,9 @@ foreach(mo = unique(ym), .packages = c("dplyr", "tidyr")) %dopar% {
          file = file.path(output.loc, paste0(filenamesave, ".RData")))
     
     # Space after cp and before s3 for proper formatting
-    system(paste0("aws s3 cp ", file.path(output.loc, paste0(filenamesave, ".RData")),
-                  " s3://prod-sdc-sdi-911061262852-us-east-1-bucket/", i))
+    system(paste("aws s3 cp", 
+                 file.path(output.loc, paste0(filenamesave, ".RData")),
+                 file.path(teambucket, i, paste0(filenamesave, ".RData"))))
     
     timediff <- Sys.time() - starttime
     
@@ -181,7 +201,8 @@ foreach(mo = unique(ym), .packages = c("dplyr", "tidyr")) %dopar% {
     
     cat(format(nrow(mb), big.mark = ","), "observations in aggregated data \n")
   } # end month foreach loop
-
+  
+  rm(d, ym)
   stopCluster(cl); gc()
   
   timediff <- round(Sys.time()-starttime, 2)
