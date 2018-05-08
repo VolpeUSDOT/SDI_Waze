@@ -63,9 +63,9 @@ for(i in states) { # i= "UT"
   
   # find rows with missing lat/long
   # Discard rows with no lat long
-  cat(i, "EDT missing lat/long: \n", summary(is.na(e_i$GPSLat)))
+  cat(i, "EDT missing lat/long: \n", summary(is.na(e_i$GPSLat)), "\n")
   e_i <- e_i[!is.na(e_i$GPSLat) & !is.na(e_i$GPSLong),]
-  cat(i, "EDT lat/long marked 777: \n", summary(e_i$GPSLat > 77 & e_i$GPSLong < -777))
+  cat(i, "EDT lat/long marked 777: \n", summary(e_i$GPSLat > 77 & e_i$GPSLong < -777), "\n")
   e_i <- e_i[!e_i$GPSLat > 77 & !e_i$GPSLong < -777,]
   
   # Make sure just this state represented
@@ -127,10 +127,12 @@ for(i in states) { # i= "UT"
     timediff <- round(Sys.time()-starttime_month, 2)
     cat(j, "complete \n", timediff, attr(timediff, "units"), "elapsed \n\n")
   
-    timediff.total <- round(Sys.time()-starttime_total, 2)
-    cat(timediff.total, attr(timediff.total, "units"), "elapsed in total \n", rep("<>", 20), "\n")
-    
+   
   } # end month loop
+  
+  timediff.total <- round(Sys.time()-starttime_total, 2)
+  cat(timediff.total, attr(timediff.total, "units"), "elapsed in total for", i, "\n", rep("<>", 20), "\n")
+  
   
 } # end state loop
 

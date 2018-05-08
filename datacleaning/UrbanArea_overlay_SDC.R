@@ -42,16 +42,22 @@ CHECKPLOT = F # Make plots for each stage, to make sure of spatial overlay
 # Read in urban/rural layer from Census
 # From: https://www.census.gov/geo/maps-data/data/cbf/cbf_ua.html
 # https://www2.census.gov/geo/pdfs/maps-data/data/tiger/tgrshprd13/TGRSHPrd13_TechDoc_A.pdf
+# Get from S3 if necessary
 
 ua <- readOGR(file.path(localdir, "census"), layer = "cb_2016_us_ua10_500k")
 
 # Read in county shapefile
-co <- readOGR(file.path(wazedir, "Working Documents/Census Files"), layer = "cb_2015_us_county_500k")
+co <- readOGR(file.path(localdir, "census"), layer = "cb_2017_us_county_500k")
 
-HEXSIZE = c("1", "4", "05")[3] # Change the value in the bracket to use 4 sq mi or 0.5 sq mi
+# Read in hexagon shapefile. This is a rectangular surface of 1 sq mi area hexagons, national
+hex <- readOGR(file.path(localdir, "Hex"), layer = "hexagons_1mi_lower48_neighbors")
 
-# Read in hexagon shapefile. This is a rectangular surface of 1 sq mi area hexagons, 
-hex <- readOGR(file.path(volpewazedir, "Data/MD_hexagons_shapefiles"), layer = paste0("MD_hexagons_", HEXSIZE, "mi_newExtent_newGRIDID"))
+# !!! Error: C stack usage  34724785 is too close to the limit
+# https://stackoverflow.com/questions/14719349/error-c-stack-usage-is-too-close-to-the-limit
+# default 8192, 8 Mb
+# change to 16 Mb:
+# system("ulimit -s 16384") # and then restart
+# R --slave -e 'Cstack_info()["size"]'
 
 # match coordinate reference system of hexagons to Urban Areas and counties
 # proj4string(hex)

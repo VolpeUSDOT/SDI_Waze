@@ -1,5 +1,5 @@
 # Aggregates Waze files to monthly sets with unique UUIDs. 
-# Original 'ReduceWaze2.R' for working with daily .csv files, now directly reading from Redshift in SDC. Modified to query multiple states
+# Reading from Redshift in SDC. Modified to query multiple states
 # This now calls Waze_clip.R to subset to buffered state polygons before making monthly files by unique alert_uuid.
 
 # Setup ----

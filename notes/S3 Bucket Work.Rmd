@@ -5,6 +5,11 @@ output:
     df_print: paged
 ---
 
+```{r setup, echo = F}
+library(tidyverse)
+library(DT)
+```
+
 Notes on how to share files with other members of the SDI Waze team:
 
 ### Writing to shared bucket
@@ -14,12 +19,94 @@ The SDI Waze team shared S3 bucket is at this location:
 s3://prod-sdc-sdi-911061262852-us-east-1-bucket
 ```
 
+Curated data 
+```
+
+aws s3 ls s3://prod-dot-sdc-curated-911061262852-us-east-1
+# for one state:
+
+aws s3 ls s3://prod-dot-sdc-curated-911061262852-us-east-1/waze/version=20171031/content/state=TX/table=alert/projection=redshift/year=2017/
+```
+
+Only one month available (December) for TX in older version of curated data
+
+```{r}
+cmd = "aws s3 ls s3://prod-dot-sdc-curated-911061262852-us-east-1/waze/version=20171031/content/state=TX/table=alert/projection=redshift/year=2017/"
+system(cmd)
+```
+
+```{r}
+cmd = "aws s3 ls s3://prod-dot-sdc-curated-911061262852-us-east-1/waze/version=20180331/content/state=TX/table=alert/projection=redshift/year=2017/"
+system(cmd)
+```
+
+
+```{r curatedavail2017}
+# Loop over states to find which ones have month directories:
+# can also try previous version, 20171031
+avail.mo = vector()
+use.states = c(state.abb, c("DC", "CA1", "CA2", "CA3"))
+find.months = formatC(1:12, width = 2, flag = "0")
+for(i in use.states){
+  cmd = paste0('aws s3 ls s3://prod-dot-sdc-curated-911061262852-us-east-1/waze/version=20180331/content/state=', i ,'/table=alert/projection=redshift/year=2017/')
+  mo_i <- system(cmd, intern = T)
+  avail.mo_i <- substr(mo_i, start =nchar(mo_i[1])-2, stop = nchar(mo_i[1])-1)
+  
+  avail.mo = rbind(avail.mo, c(i, find.months %in% avail.mo_i))
+}
+
+avail.mo <- as.data.frame(avail.mo)
+colnames(avail.mo) = c("State", find.months)
+DT::datatable(avail.mo) %>% formatStyle(2:13, background = styleEqual('TRUE', 'lightgreen'))
+```
+
+Look at the previous version of the database, from 2017-10-31:
+
+```{r curatedavail2017_previous}
+# Loop over states to find which ones have month directories:
+# can also try previous version, 20171031
+avail.mo = vector()
+use.states = c(state.abb, c("DC", "CA1", "CA2", "CA3"))
+find.months = formatC(1:12, width = 2, flag = "0")
+for(i in use.states){
+  cmd = paste0('aws s3 ls s3://prod-dot-sdc-curated-911061262852-us-east-1/waze/version=20171031/content/state=', i ,'/table=alert/projection=redshift/year=2017/')
+  mo_i <- system(cmd, intern = T)
+  avail.mo_i <- substr(mo_i, start =nchar(mo_i[1])-2, stop = nchar(mo_i[1])-1)
+  
+  avail.mo = rbind(avail.mo, c(i, find.months %in% avail.mo_i))
+}
+
+avail.mo <- as.data.frame(avail.mo)
+colnames(avail.mo) = c("State", find.months)
+datatable(avail.mo) %>% formatStyle(2:13, background = styleEqual('TRUE', 'lightgreen'))
+```
+
+Check 2018:
+
+```{r curatedavail2018}
+# Loop over states to find which ones have complete data before October:
+avail.mo = vector()
+use.states = c(state.abb, c("DC", "CA1", "CA2", "CA3"))
+find.months = formatC(1:12, width = 2, flag = "0")
+for(i in use.states){
+  cmd = paste0('aws s3 ls s3://prod-dot-sdc-curated-911061262852-us-east-1/waze/version=20180331/content/state=', i ,'/table=alert/projection=redshift/year=2018/')
+  mo_i <- system(cmd, intern = T)
+  avail.mo_i <- substr(mo_i, start =nchar(mo_i[1])-2, stop = nchar(mo_i[1])-1)
+  
+  avail.mo = rbind(avail.mo, c(i, find.months %in% avail.mo_i))
+}
+
+avail.mo <- as.data.frame(avail.mo)
+colnames(avail.mo) = c("State", find.months)
+DT::datatable(avail.mo) %>% formatStyle(2:13, background = styleEqual('TRUE', 'lightgreen'))
+```
+
 ```{r, echo = F}
 knitr::opts_chunk$set(echo = T, eval = F)
 ```
 
 As a user in an RStudio session, this bucket may not be accessible using the aws.s3 package:
-```{r s3connect_test} 
+```{r s3connect_test, eval } 
 library(aws.s3)
 
 teambucket <- "s3://prod-sdc-sdi-911061262852-us-east-1-bucket"
@@ -143,6 +230,11 @@ system(paste0("aws s3 cp ", teambucket, "shapefiles_newGRIDID.zip ~/workingdata/
 system(paste0("aws s3 cp ", teambucket, "Maryland_april2017_to_present.csv ~/workingdata/EDT"))
 system(paste0("aws s3 cp ", teambucket, "EDTsubset_april2017_to_present.zip ~/workingdata/EDT"))
 
+```
+
+Save output from EDT-Waze linking, from `~/workingdata/Link` to `Link` folder on teambucket:
+```{r}
+system(paste0("aws s3 cp ", "~/workingdata/Link/ ", teambucket, "Link/ --include '*' --recursive"))
 ```
 
 ### Deleting files:

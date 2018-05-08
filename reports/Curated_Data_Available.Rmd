@@ -1,0 +1,104 @@
+---
+title: "S3 Bucket integration"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r setup, echo = F, message = F, warning=F}
+library(tidyverse)
+library(DT)
+```
+
+
+# Curated data 
+
+Checking availability of months of data for states in SDC, looking at the curated data S3 bucket instead of Redshift.
+
+Building off of AWS CLI commands such as:
+
+```
+aws s3 ls s3://prod-dot-sdc-curated-911061262852-us-east-1/
+# for one state:
+
+aws s3 ls s3://prod-dot-sdc-curated-911061262852-us-east-1/waze/version=20171031/content/state=TX/table=alert/projection=redshift/year=2017/
+```
+
+Looking first at Texas, see that only one month available (December) for TX in older version of curated data:
+
+```{r}
+cmd = "aws s3 ls s3://prod-dot-sdc-curated-911061262852-us-east-1/waze/version=20171031/content/state=TX/table=alert/projection=redshift/year=2017/"
+system(cmd)
+```
+
+And only three months available in more recent version.
+
+```{r}
+cmd = "aws s3 ls s3://prod-dot-sdc-curated-911061262852-us-east-1/waze/version=20180331/content/state=TX/table=alert/projection=redshift/year=2017/"
+system(cmd)
+```
+
+## 2017
+
+Now looping across all 'states' in the curated data:
+
+```{r curatedavail2017, message = F, warning=F}
+# Loop over states to find which ones have month directories:
+# can also try previous version, 20171031
+avail.mo = vector()
+use.states = c(state.abb, c("DC", "CA1", "CA2", "CA3"))
+find.months = formatC(1:12, width = 2, flag = "0")
+for(i in use.states){
+  cmd = paste0('aws s3 ls s3://prod-dot-sdc-curated-911061262852-us-east-1/waze/version=20180331/content/state=', i ,'/table=alert/projection=redshift/year=2017/')
+  mo_i <- system(cmd, intern = T)
+  avail.mo_i <- substr(mo_i, start =nchar(mo_i[1])-2, stop = nchar(mo_i[1])-1)
+  
+  avail.mo = rbind(avail.mo, c(i, find.months %in% avail.mo_i))
+}
+
+avail.mo <- as.data.frame(avail.mo)
+colnames(avail.mo) = c("State", find.months)
+DT::datatable(avail.mo) %>% formatStyle(2:13, background = styleEqual('TRUE', 'lightgreen'))
+```
+
+Look at the previous version of the database, from 2017-10-31:
+
+```{r curatedavail2017_previous, message = F, warning=F}
+# Loop over states to find which ones have month directories:
+# can also try previous version, 20171031
+avail.mo = vector()
+use.states = c(state.abb, c("DC", "CA1", "CA2", "CA3"))
+find.months = formatC(1:12, width = 2, flag = "0")
+for(i in use.states){
+  cmd = paste0('aws s3 ls s3://prod-dot-sdc-curated-911061262852-us-east-1/waze/version=20171031/content/state=', i ,'/table=alert/projection=redshift/year=2017/')
+  mo_i <- system(cmd, intern = T)
+  avail.mo_i <- substr(mo_i, start =nchar(mo_i[1])-2, stop = nchar(mo_i[1])-1)
+  
+  avail.mo = rbind(avail.mo, c(i, find.months %in% avail.mo_i))
+}
+
+avail.mo <- as.data.frame(avail.mo)
+colnames(avail.mo) = c("State", find.months)
+datatable(avail.mo) %>% formatStyle(2:13, background = styleEqual('TRUE', 'lightgreen'))
+```
+
+## 2018
+
+```{r curatedavail2018, message = F, warning=F}
+# Loop over states to find which ones have complete data before October:
+avail.mo = vector()
+use.states = c(state.abb, c("DC", "CA1", "CA2", "CA3"))
+find.months = formatC(1:12, width = 2, flag = "0")
+for(i in use.states){
+  cmd = paste0('aws s3 ls s3://prod-dot-sdc-curated-911061262852-us-east-1/waze/version=20180331/content/state=', i ,'/table=alert/projection=redshift/year=2018/')
+  mo_i <- system(cmd, intern = T)
+  avail.mo_i <- substr(mo_i, start =nchar(mo_i[1])-2, stop = nchar(mo_i[1])-1)
+  
+  avail.mo = rbind(avail.mo, c(i, find.months %in% avail.mo_i))
+}
+
+avail.mo <- as.data.frame(avail.mo)
+colnames(avail.mo) = c("State", find.months)
+DT::datatable(avail.mo) %>% formatStyle(2:13, background = styleEqual('TRUE', 'lightgreen'))
+```
+

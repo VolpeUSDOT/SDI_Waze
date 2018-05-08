@@ -21,7 +21,7 @@ makelink <- function(accfile = edt.april, incfile = waze.april,
   linktable <- vector()
   
   starttime <- Sys.time()
-  writeLines("", paste0("EDT_Waze_log_", j, "_", i, "_", Sys.Date(), ".txt")) # to store messages
+  writeLines("", paste0("EDT_Waze_log_", i, "_", Sys.Date(), ".txt")) # to store messages by state i
   
   # Start of %dopar% loop
   linktable <- foreach(i=1:nrow(accfile), .combine = rbind, .packages = "sp") %dopar% {
@@ -44,12 +44,12 @@ makelink <- function(accfile = edt.april, incfile = waze.april,
     id.accident <- rep(as.character(ei[,accidvar]), nrow(d.t))
     id.incidents <- as.character(d.t[,incidvar])
     
-    if(i %% 5000 == 0) {
+    if(i %% 50000 == 0) {
       timediff <- round(Sys.time()-starttime, 2)
       cat(i, "complete \n", timediff, attr(timediff, "units"), "elapsed \n",
       "approx", round(as.numeric(timediff)/i * (nrow(accfile)-i), 2), attr(timediff, "units"), "remaining \n",
         rep("<>",20), "\n\n",
-       file = paste0("waze_waze_log_", Sys.Date(), ".txt"), append = T) }
+       file = paste0("EDT_Waze_log_", i, "_", Sys.Date(), ".txt"), append = T) }
 
     data.frame(id.accident, id.incidents) # rbind this output
   } # end %dopar% loop
