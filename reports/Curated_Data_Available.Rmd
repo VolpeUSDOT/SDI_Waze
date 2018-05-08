@@ -6,6 +6,7 @@ output:
 ---
 
 ```{r setup, echo = F, message = F, warning=F}
+knitr::knit
 library(tidyverse)
 library(DT)
 ```
@@ -26,16 +27,17 @@ aws s3 ls s3://prod-dot-sdc-curated-911061262852-us-east-1/waze/version=20171031
 
 Looking first at Texas, see that only one month available (December) for TX in older version of curated data:
 
-```{r}
+```{r echo=TRUE, message=TRUE, warning=TRUE}
 cmd = "aws s3 ls s3://prod-dot-sdc-curated-911061262852-us-east-1/waze/version=20171031/content/state=TX/table=alert/projection=redshift/year=2017/"
-system(cmd)
+print(system(cmd, intern = T))
+
 ```
 
 And only three months available in more recent version.
 
-```{r}
+```{r message=TRUE, warning=TRUE}
 cmd = "aws s3 ls s3://prod-dot-sdc-curated-911061262852-us-east-1/waze/version=20180331/content/state=TX/table=alert/projection=redshift/year=2017/"
-system(cmd)
+print(system(cmd, intern = T))
 ```
 
 ## 2017
