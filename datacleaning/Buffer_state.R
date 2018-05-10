@@ -5,6 +5,8 @@
 # <><><><><><><><><><><><><><><><><><><><>
 # Setup ----
 # Check for package installations
+
+codeloc <- "~/SDI_Waze"
 source(file.path(codeloc, 'utility/get_packages.R'))
 
 library(sp)
@@ -13,8 +15,8 @@ library(maptools) # readShapePoly() and others
 library(mapproj) # for coord_map()
 library(rgdal) # for readOGR(), needed for reading in ArcM shapefiles
 library(rgeos) # for gIntersection, to clip two shapefiles
-
-localdir <- "/home/daniel/workingdata/census" # full path for readOGR
+user <- paste0( "/home/", system("whoami", intern = TRUE))
+localdir <- paste0(user, "/workingdata/census") # full path for readOGR
 
 setwd(localdir)
 

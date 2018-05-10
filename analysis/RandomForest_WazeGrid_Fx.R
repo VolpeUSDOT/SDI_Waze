@@ -24,6 +24,7 @@ require(pROC)
 
 do.rf <- function(train.dat, omits, response.var = "MatchEDT_buffer_Acc", model.no,
                   test.dat = NULL, test.split = .30,
+                  split.by = NULL,
                   thin.dat = NULL,
                   cutoff = c(0.8, 0.2),
                   rf.inputs = list(ntree.use = 500, avail.cores = 4, mtry = NULL, maxnodes = NULL, nodesize = 5)){
@@ -47,11 +48,30 @@ do.rf <- function(train.dat, omits, response.var = "MatchEDT_buffer_Acc", model.
     }
   }
   
+  
   # 70:30 split or Separate training and test data
+  # Adding options to split by day or by week. Assumes column hextime is available and is a character vector in POSIX format
   if(is.null(test.dat)){
-    trainrows <- sort(sample(1:nrow(train.dat), size = nrow(train.dat)*(1-test.split), replace = F))
+    if(is.null(split.by)){
+      trainrows <- sort(sample(1:nrow(train.dat), size = nrow(train.dat)*(1-test.split), replace = F))
+    } else {
+    
+      if(split.by == "day"){
+        day.of.year.each <- format(strptime(train.dat$hextime, "%F %T"), "%j")
+        day.of.year <- unique(day.of.year.each)
+        train.days <- sample(day.of.year, size = length(day.of.year)*(1-test.split), replace = F)
+        trainrows <- c(1:nrow(train.dat))[day.of.year.each %in% train.days]
+      }
+      
+      if(split.by == "week"){
+        week.of.year.each <- format(strptime(train.dat$hextime, "%F %T"), "%U")
+        week.of.year <- unique(week.of.year.each)
+        train.weeks <- sample(week.of.year, size = length(week.of.year)*(1-test.split), replace = F)
+        trainrows <- c(1:nrow(train.dat))[week.of.year.each %in% train.weeks]
+      }
+    } # end if is.null split.by else
+    
     testrows <- (1:nrow(train.dat))[!1:nrow(train.dat) %in% trainrows]
-     
     rundat = train.dat[trainrows,]
     test.dat.use = train.dat[testrows,]
   } else {
@@ -60,7 +80,6 @@ do.rf <- function(train.dat, omits, response.var = "MatchEDT_buffer_Acc", model.
     test.dat.use = test.dat
     comb.dat <- rbind(train.dat, test.dat)
   }
-   
  
   # Start RF in parallel
   starttime = Sys.time()

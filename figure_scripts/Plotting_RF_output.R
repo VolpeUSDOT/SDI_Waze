@@ -60,13 +60,25 @@ w.grid <- w.04_09 %>%
             TotalEDTcrash = sum(nEDTMaxDamDisabling + nEDTMaxDamFunctional + nEDTMaxDamMinor + nEDTMaxDamNone + nEDTMaxDamNotReported + nEDTMaxDamUnknown)
   )
 
-#write.csv(w.grid, file.path(volpedrive, "WazeEDT_Grid_counts_04-09.csv"), row.names = F)
+#write.csv(w.grid, file = file.path(volpedrive, "WazeEDT_Grid_counts_04-09.csv"), row.names = F)
+
+# outputs supplemental variables by GRID_ID for Tableau work
+outputvars = c("GRID_ID",
+          c("CRASH_SUM", "FATALS_SUM"), # FARS variables, 
+          grep("F_SYSTEM", names(w.04), value = T), # road class
+          c("MEAN_AADT", "SUM_AADT", "SUM_miles"), # AADT
+          grep("WAC", names(w.04), value = T), # Jobs workplace
+          grep("RAC", names(w.04), value = T) # Jobs residential
+)
+
+# write.csv(w.04[!duplicated(w.04$GRID_ID), outputvars], file = "WazeEDT_Grid_Supplemental.csv", row.names = F)
 
 ### Visualize where/when doing well (on ATA)
 
 # grab a model, look at model 30 now
 
 setwd("~/workingdata/")
+
 
 
 
@@ -211,3 +223,4 @@ ggplot(d2, aes(x= hour, y= Pct_Obs_Est, fill = TotalWazeAcc)) +
   ggtitle("Model 30: Estimated EDT crashes / observed \n By hour of day")
 
 write.csv(d2, "Obs_Est_EDT_Model_30.csv", row.names = F)
+write.csv(dd, "All_Model_30.csv", row.names = F)

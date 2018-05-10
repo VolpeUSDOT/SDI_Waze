@@ -6,7 +6,7 @@
 
 # Check for package installations
 codeloc <- "~/SDI_Waze"
-source(file.path(codeloc, 'utility/get_packages.R'))
+source(file.path(codeloc, 'utility/get_packages.R')) #comment out unless needed for first setup, takes a long time to compile
 
 library(tidyverse) # tidyverse install on SDC may require additional steps, see Package Installation Notes.Rmd 
 # library(aws.s3)
@@ -19,14 +19,22 @@ teambucket <- "s3://prod-sdc-sdi-911061262852-us-east-1-bucket"
  
 # aws.s3::get_bucket(output.loc) # forbidden 403, as aws.s3 relies on credentials, which we are not using. see: aws.signature::locate_credentials()
 
-output.loc <- "~/tempout"
-localdir <- "/home/daniel/workingdata/" # full path for readOGR
+user <- paste0( "/home/", system("whoami", intern = TRUE)) #he user directory to use
+output.loc <- paste0(user, "/tempout")
+
+localdir <- paste0(user, "/workingdata/") # full path for readOGR
 
 # read functions
 source(file.path(codeloc, 'utility/wazefunctions.R'))
 
 # Make connection to Redshift. Requires packages DBI and RPostgres entering username and password if prompted:
+
 source(file.path(codeloc, 'utility/connect_redshift_pgsql.R'))
+
+## uncomment these lines and run with user redshift credentials filled in to resolve error if above line throws one.
+#Sys.setenv('sdc_waze_username' = <see email from SDC Administrator>) 
+#Sys.setenv('sdc_waze_password' = <see email from SDC Administrator>)
+
 
 # Query parameters
 # states with available EDT data for model testing
@@ -87,7 +95,7 @@ for(i in states){ # i = 1
  # ~ 1.6 h for MD, CT, UT, and VA. File size seems too small for non-MD states... VA especially. Check date range of actual data. May simply be consequence of rectangular 'state' definition by Waze.
 
 # Clip to state boundaries ----
-  # ~ 2 h for these four states
+  # ~ 2 h runtime for these four states
   # Depends on *_Raw_events_to_lastyearmonth.RData being in localdir,
   # and *_buffered.shp (and associated files) being in localdir/census.
   # Will save *_Buffered_Clipped_events_to_lasyearmonth.RData in localdir and to S3
