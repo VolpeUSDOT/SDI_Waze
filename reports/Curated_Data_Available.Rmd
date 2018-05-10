@@ -1,5 +1,5 @@
 ---
-title: "S3 Bucket integration"
+title: "Curated data coverage"
 output:
   html_document:
     df_print: paged
@@ -63,7 +63,7 @@ colnames(avail.mo) = c("State", find.months)
 DT::datatable(avail.mo) %>% formatStyle(2:13, background = styleEqual('TRUE', 'lightgreen'))
 ```
 
-Look at the previous version of the database, from 2017-10-31:
+### Look at the previous version of the database, from 2017-10-31:
 
 ```{r curatedavail2017_previous, message = F, warning=F}
 # Loop over states to find which ones have month directories:
@@ -87,7 +87,7 @@ datatable(avail.mo) %>% formatStyle(2:13, background = styleEqual('TRUE', 'light
 ## 2018
 
 ```{r curatedavail2018, message = F, warning=F}
-# Loop over states to find which ones have complete data before October:
+# Loop over states to find which ones have complete data in 2018:
 avail.mo = vector()
 use.states = c(state.abb, c("DC", "CA1", "CA2", "CA3"))
 find.months = formatC(1:12, width = 2, flag = "0")

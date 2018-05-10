@@ -50,14 +50,11 @@ ua <- readOGR(file.path(localdir, "census"), layer = "cb_2016_us_ua10_500k")
 co <- readOGR(file.path(localdir, "census"), layer = "cb_2017_us_county_500k")
 
 # Read in hexagon shapefile. This is a rectangular surface of 1 sq mi area hexagons, national
-hex <- readOGR(file.path(localdir, "Hex"), layer = "hexagons_1mi_lower48_neighbors")
-
-# !!! Error: C stack usage  34724785 is too close to the limit
+load("~/workingdata/Hex/hexagons_1mi_lower48_neighbors.RData")
+# hex <- readOGR(file.path(localdir, "Hex"), layer = "hexagons_1mi_lower48_neighbors")
+# Error: C stack usage  34724785 is too close to the limit
 # https://stackoverflow.com/questions/14719349/error-c-stack-usage-is-too-close-to-the-limit
-# default 8192, 8 Mb
-# change to 16 Mb:
-# system("ulimit -s 16384") # and then restart
-# R --slave -e 'Cstack_info()["size"]'
+# In terminal, ulimit -s 16384, then R readOGR, save as .RData. Producex 4.5 Gb .Rdata file.
 
 # match coordinate reference system of hexagons to Urban Areas and counties
 # proj4string(hex)
