@@ -83,13 +83,15 @@ w.04_09 <- rbind(w.04, w.05, w.06, w.07, w.08, w.09)
 
 avail.cores = parallel::detectCores()
 
-if(avail.cores > 8) avail.cores = 10 # Limit usage below max if on r4.4xlarge instance
+if(avail.cores > 4) avail.cores = 6 # Limit usage below max if on r4.4xlarge instance
 
 #Set up model features from data frame
 
+#Update
 lr.inputs = list(ntree.use = avail.cores * 50, avail.cores = avail.cores, mtry = 10, maxnodes = 1000, nodesize = 100)
 
 keyoutputs = redo_outputs = list() # to store model diagnostics
+##
 
 # Omit as predictors in this vector:
 alwaysomit = c(grep("GRID_ID", names(w.04), value = T), "day", "hextime", "year", "weekday", 
@@ -103,7 +105,7 @@ alert_subtypes = c("nHazardOnRoad", "nHazardOnShoulder" ,"nHazardWeather", "nWaz
 
 response.var = "MatchEDT_buffer_Acc"
 
-# Lasso analysis (ZINB)
+# Lasso analysis
 
 
 # A: All Waze ----
@@ -132,7 +134,7 @@ omits = c(alwaysomit,
 modelno = "18"
 
 if(!REASSESS){
-  keyoutputs[[modelno]] = do.rf(train.dat = w.04_09, 
+  keyoutputs[[modelno]] = do.lr(train.dat = w.04_09, 
                                 omits, response.var = "MatchEDT_buffer_Acc", 
                                 # thin.dat = 0.01,
                                 model.no = modelno, rf.inputs = rf.inputs) 
@@ -174,96 +176,6 @@ wazeAccformula <- reformulate(termlabels = fitvars[is.na(match(fitvars,
 w.04 <- w.04[w.04$DayOfWeek != 0 & !is.na(w.04$MatchEDT_buffer),]
 w.04$DayOfWeek <- as.factor(as.character(w.04$DayOfWeek))
 # will need to convert to dummy variables for lasso, cannot handle categorical input
-
-# Model 1: April, 70/30 ----
-
-trainrows <- sort(sample(1:nrow(w.04), size = nrow(w.04)*.7, replace = F))
-testrows <- (1:nrow(w.04))[!1:nrow(w.04) %in% trainrows]
- 
-X <- as.matrix(w.04[trainrows, fitvars])
-
-X = as(X, "sparseMatrix") # saves ~ 50% of the storage
-
-Y = as.matrix(w.04$MatchEDT_buffer[trainrows])
-
-starttime <- Sys.time()
-glmnet.fit <- glmnet(x = X,
-                     y = Y,
-                     family = "binomial")
-
-timediff <- round(Sys.time()-starttime, 2)
-cat("complete \n", timediff, attr(timediff, "units"), "elapsed \n\n")
-# 1 min with sparse matrix
-
-
-plot(glmnet.fit, label = T, xvar = "dev")
-
-# Cross-validation. Try both 'class' for misclassification rate an 'auc' for area under ROC.
-# Use this step to identify optimal lambda . Time- and CPU intensive, ~ 10 min for w.04
-# To do: make parallel, as in this example, or by simply specifying parallel = T
-# model_fit <- foreach(ii = seq_len(ncol(target))) %dopar% {
-#   cv.glmnet(x, target[,ii], family = "binomial", alpha = 0,
-#             type.measure = "auc", grouped = FALSE, standardize = FALSE,
-#             parallel = TRUE)
-# }
-
-starttime <- Sys.time()
-cv.fit <- cv.glmnet(x = X,
-                    y = Y,
-                    family = "binomial",
-                    type.measure = "class")
-
-timediff <- round(Sys.time()-starttime, 2)
-cat("complete \n", timediff, attr(timediff, "units"), "elapsed \n\n")
-plot(cv.fit) # to see the misclassification error by lambda.
-cv.fit$lambda.min; cv.fit$lambda.1se # 0.0002393555
-
-X.pred <- as(as.matrix(w.04[testrows, fitvars]), "sparseMatrix")
-
-glmnet.04.pred <- predict(glmnet.fit, 
-                      newx = X.pred,
-                      type = "class",
-                      s = cv.fit$lambda.1se)
-
-Nobs <- data.frame(t(c(nrow(w.04),
-               summary(w.04$MatchEDT_buffer),
-               length(w.04$nWazeAccident[w.04$nWazeAccident>0]) 
-               )))
-
-colnames(Nobs) = c("N", "No EDT", "EDT present", "Waze accident present")
-format(Nobs, big.mark = ",")
-
-(predtab <- table(w.04$MatchEDT_buffer[testrows], glmnet.04.pred)) 
-bin.mod.diagnostics(predtab)
-
-# save output predictions
-
-out.04 <- data.frame(w.04[testrows, c("GRID_ID", "day", "hour", "MatchEDT_buffer")], glmnet.04.pred)
-out.04$day <- as.numeric(out.04$day)
-names(out.04)[4:5] <- c("Obs", "Pred")
-
-out.04 = data.frame(out.04,
-                    TN = out.04$Obs == 0 &  out.04$Pred == 0,
-                    FP = out.04$Obs == 0 &  out.04$Pred == 1,
-                    FN = out.04$Obs == 1 &  out.04$Pred == 0,
-                    TP = out.04$Obs == 1 &  out.04$Pred == 1)
-write.csv(out.04,
-          file = "Lasso_pred_04.csv",
-          row.names = F)
-                    
-
-coefs <- coef(glmnet.fit, s = cv.fit$lambda.1se)
-OR <- data.frame(OR = exp(coefs[order(abs(coefs[,1]), decreasing = T),])) # Odds ratios of coefficients. EDT events occur about 0.027 of the time; this is 3x more likely with each additional Waze accident.
-
-
-save(list = c("glmnet.fit",
-              "cv.fit",
-              "testrows",
-              "trainrows",
-              "w.04",
-              "OR",
-              "out.04"),
-     file = "Lasso_Output_04.RData")
 
 # Model 2: April + May, 70/30 ----
 
@@ -346,81 +258,3 @@ save(list = c("glmnet.fit",
               "w.0405",
               "out.0405"),
      file = "Lasso_Output_0405.RData")
-
-
-# Model 3: April + May, predict June ----
-
-X <- as.matrix(w.0405[fitvars])
-
-X = as(X, "sparseMatrix") 
-
-Y = as.matrix(w.0405$MatchEDT_buffer)
-
-starttime <- Sys.time()
-glmnet.fit.06 <- glmnet(x = X,
-                     y = Y,
-                     family = "binomial")
-
-timediff <- round(Sys.time()-starttime, 2)
-cat("complete \n", timediff, attr(timediff, "units"), "elapsed \n\n")
-# X min 
-
-plot(glmnet.fit.06, label = T, xvar = "dev")
-
-# Cross-validation. 
-# Time: 
-starttime <- Sys.time()
-cv.fit.06 <- cv.glmnet(x = X,
-                    y = Y,
-                    family = "binomial",
-                    type.measure = "class",
-                    parallel = T)
-
-timediff <- round(Sys.time()-starttime, 2)
-cat("complete \n", timediff, attr(timediff, "units"), "elapsed \n\n")
-plot(cv.fit.06) # to see the misclassification error by lambda.
-cv.fit.06$lambda.min; cv.fit.06$lambda.1se # 
-
-X.pred <- as(as.matrix(w.06[fitvars]), "sparseMatrix")
-
-glmnet.06.pred <- predict(glmnet.fit.06, 
-                          newx = X.pred,
-                          type = "class",
-                          s = cv.fit.06$lambda.1se)
-
-
-(predtab <- table(w.06$MatchEDT_buffer, glmnet.06.pred)) 
-bin.mod.diagnostics(predtab)
-
-# save output predictions
-
-out.06 <- data.frame(w.06[c("GRID_ID", "day", "hour", "MatchEDT_buffer")], glmnet.06.pred)
-out.06$day <- as.numeric(out.06$day)
-names(out.06)[4:5] <- c("Obs", "Pred")
-
-out.06 = data.frame(out.06,
-                    TN = out.06$Obs == 0 &  out.06$Pred == 0,
-                    FP = out.06$Obs == 0 &  out.06$Pred == 1,
-                    FN = out.06$Obs == 1 &  out.06$Pred == 0,
-                    TP = out.06$Obs == 1 &  out.06$Pred == 1)
-write.csv(out.06,
-          file = "Lasso_pred_06.csv",
-          row.names = F)
-
-coefs <- coef(glmnet.fit.06, s = cv.fit.06$lambda.1se)
-(OR <- data.frame(OR = exp(coefs[order(abs(coefs[,1]), decreasing = T),])) ) # Odds ratios of coefficients. 
-
-save(list = c("glmnet.fit.06",
-              "cv.fit.06",
-              "OR",
-              "testrows",
-              "trainrows",
-              "w.06",
-              "out.06"),
-     file = "Lasso_Output_06.RData")
-
-
-
-# For Waze accidents only ----
-
-# to do... will need to resolve same issues as for RF work, namely do we subset for nWazeAccidents > 0 or just predict on MatchEDT_buffer_Acc.
