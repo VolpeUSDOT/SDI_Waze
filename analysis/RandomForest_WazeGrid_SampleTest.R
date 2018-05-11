@@ -248,7 +248,7 @@ nRareClass = min(table(rundat[,response.var]))
 modelno = "30_10"
 
 
-# Start RF in parallel
+# Start RF in parallel ( or skip to diagnostics below)
 starttime = Sys.time()
 
 cl <- makeCluster(rf.inputs$avail.cores, useXDR = F) 
@@ -297,8 +297,73 @@ timediff = Sys.time() - starttime
 cat(round(timediff,2), attr(timediff, "unit"), "to fit model", modelno, "\n")
 # End RF in parallel
 
-savelist = c("rf.30_10", "rf.30_05", "rf.30_01", "trainrows", "testrows") 
+
+# Diagnostics for these models ----
+# Load from previously run models if re-starting
+if(!exists("rf.30_10")){
+s3load(file.path(outputdir, "Stratification_test_RandomForest_Output.RData"),
+       bucket = waze.bucket)
+}
+##### Uncomment to re-set the list
+# keyoutputs_strata = list()
+#####
+
+for(model.no in c("rf.30_10", "rf.30_05", "rf.30_01")){
+  rf.out = get(model.no)
+  cutoff = c(.8, .2)#c(.5, .5)
+  
+  Nobs <- data.frame(nrow(rundat),
+                     sum(as.numeric(as.character(rundat[,response.var])) == 0),
+                     sum(as.numeric(as.character(rundat[,response.var])) > 0),
+                     length(rundat$nWazeAccident[train.dat$nWazeAccident>0]) )
+  
+  colnames(Nobs) = c("N", "No EDT", "EDT present", "Waze accident present")
+  
+  rf.pred <- predict(rf.out, test.dat.use[fitvars], cutoff = cutoff)
+  rf.prob <- predict(rf.out, test.dat.use[fitvars], type = "prob", cutoff = cutoff)
+  
+  predtab <- table(test.dat.use[,response.var], rf.pred)
+  
+  reference.vec <- test.dat.use[,response.var]
+  levels(reference.vec) = c("NoCrash", "Crash")
+  levels(rf.pred) = c("NoCrash","Crash")
+  
+  reference.vec <-as.factor(as.character(reference.vec))
+  rf.pred <-as.factor(as.character(rf.pred))
+  
+  (predtab <- table(rf.pred, reference.vec, 
+                    dnn = c("Predicted","Observed"))) 
+  bin.mod.diagnostics(predtab)
+  
+  # pROC::roc - response, predictor
+  (model_auc <- pROC::auc(test.dat.use[,response.var], rf.prob[,colnames(rf.prob)=="1"]))
+  
+  mod.cut = paste(model.no, paste(cutoff, collapse="-"))
+  
+  pdf(file = paste0("AUC_", mod.cut, ".pdf"), width = 6, height = 6)
+    plot(pROC::roc(test.dat.use[,response.var], rf.prob[,colnames(rf.prob)=="1"]),
+       main = paste0("Model ", model.no, "\n cutoff:", paste(cutoff, collapse = "-")),
+       grid=c(0.1, 0.2),
+       ylim = c(0, 1), xlim = c(1, 0))
+    legend("bottomright", legend = round(model_auc, 4), title = "AUC", inset = 0.25)
+    
+  dev.off()
+    
+  outlist =  list(Nobs, predtab, diag = bin.mod.diagnostics(predtab), 
+                  mse = mean(as.numeric(as.character(test.dat.use[,response.var])) - 
+                               as.numeric(rf.prob[,"1"]))^2,
+                  auc = as.numeric(model_auc) # do not save complete output
+  ) 
+  keyoutputs_strata[[mod.cut]] = outlist
+  cat(model.no, ". ")
+} # end diagnostics
+
+
+save("keyoutputs_strata", file = "Outputs_strata_test")
+
+savelist = c("rf.30_10", "rf.30_05", "rf.30_01", "trainrows", "testrows",
+             "keyoutputs_strata") 
 
 s3save(list = savelist,
-       object = file.path(outputdir, "Stratification_test_RandomForest_Output.RData"),
+       object = file.path(outputdir, "Stratification_test_RandomForest_Output+diagnostics.RData"),
        bucket = waze.bucket)

@@ -1,0 +1,160 @@
+---
+title: "Stratification for Imbalanced Data Summary"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE, warning=F, message=F}
+knitr::opts_chunk$set(echo = TRUE)
+  codeloc <- "~/SDI_Waze" 
+  inputdir <- paste0("WazeEDT_Agg1mile_Rdata_Input")
+  outputdir <- paste0("WazeEDT_Agg1mile_RandForest_Output")
+  aws.signature::use_credentials()
+  waze.bucket <- "ata-waze"
+  localdir <- "/home/dflynn-volpe/workingdata" 
+library(knitr)
+library(kableExtra)
+library(randomForest)
+library(aws.s3)
+library(tidyverse)
+library(plotly)
+library(DT)
+```
+
+```{r dataprep, echo=F, warning=F,message=F}
+do.months = c("04","05","06","07","08","09")
+# setwd(localdir)
+source(file.path(codeloc, 'utility/wazefunctions.R'))
+for(mo in do.months){
+  prep.hex(file.path(inputdir, paste0("WazeTimeEdtHexWx_", mo, "_1_mi.RData")), month = mo)}
+# Add FARS, AADT, HPMS, jobs
+na.action = "fill0"
+for(w in c("w.04", "w.05", "w.06", "w.07","w.08", "w.09")){
+  append.hex(hexname = w, data.to.add = "FARS_MD_2012_2016_sum_annual", na.action = na.action)
+  append.hex(hexname = w, data.to.add = "hexagons_1mi_routes_AADT_total_sum", na.action = na.action)
+  append.hex(hexname = w, data.to.add = "hexagons_1mi_routes_sum", na.action = na.action)
+  append.hex(hexname = w, data.to.add = "hexagons_1mi_bg_lodes_sum", na.action = na.action)
+  append.hex(hexname = w, data.to.add = "hexagons_1mi_bg_rac_sum", na.action = na.action)
+  }
+  
+w.04_09 <- rbind(w.04, w.05, w.06, w.07, w.08, w.09)
+
+```
+
+# Exploring imbalance
+
+Actual sample size imbalance:
+
+```{r showimbalance, echo = T}
+kable(w.04_09 %>% group_by(MatchEDT_buffer) %>% count(),  caption = "Count of EDT crash presence/absence over April-September 2017, Maryland")
+```
+
+Imbalance has a temporal component, with more Waze records and more matching EDT crashes occurring in commuting times. 
+```{r showimbalancehr}
+# long format using dplyr
+hr.1 <- w.04_09 %>%
+  group_by(hour, MatchEDT_buffer) %>%
+  summarise(n = n())  %>%
+  mutate(freq = round(100 * n / sum(n), 2))
+
+kable(hr.1, caption = "Percent of EDT crash presence/absence records by hour over April-September 2017, Maryland") 
+```
+
+Minimum and maximum imbalance are shown on the figure.
+
+```{r plotimbalance}
+hr.1$text <- paste("Hour:", hr.1$hour, "\n EDT crash:", hr.1$MatchEDT_buffer,
+                   "\n Frequency:", round(hr.1$freq, 2))
+
+gp <- ggplot(hr.1, aes(x = hour, 
+                       y = freq, 
+                       group = MatchEDT_buffer, 
+                       text = text)) +
+ # geom_point() +
+  ylab("Frequency") + xlab("Hour of Day") + theme_bw() + 
+  ggtitle("Class imbalance by time") +
+  geom_step(aes(color = MatchEDT_buffer), lwd = 2) 
+  
+# gp 
+
+maxval <- hr.1 %>% 
+  group_by(MatchEDT_buffer) %>% 
+  summarise(max.freq = max(freq), 
+            hr.max = hour[which(freq == max.freq)],
+            min.freq = min(freq),
+            hr.min= hour[which(freq == min.freq)])
+
+plot.freq = c(maxval$max.freq, maxval$min.freq) + c(-3, +3, -3, +3)
+
+gp2 <- gp + annotate("text", 
+              x = c(maxval$hr.max, maxval$hr.min), 
+              y = plot.freq, 
+              label = round(c(maxval$max.freq, maxval$min.freq), 2)) + 
+  guides(color=guide_legend(title="EDT crash class"))
+# gp2
+
+ggplotly(gp2, tooltip = "text") %>% layout(hovermode = 'x')
+```
+
+
+```{r stratatest}
+load(file.path(localdir, "Output_to_30_week"))
+load(file.path(localdir, "Outputs_strata_test"))
+
+
+tabl <- vector()
+mods = c(names(keyoutputs)[4], names(keyoutputs_strata))
+
+for(i in 1:length(mods)){ 
+  if(i == 1){
+    tabl <- rbind(tabl, c(100*keyoutputs[[mods[i]]]$diag, round(keyoutputs[[mods[i]]]$auc, 4)))
+  } else {
+   tabl <- rbind(tabl, c(100*keyoutputs_strata[[mods[i]]]$diag, round(as.numeric(keyoutputs_strata[[mods[i]]]$auc), 4)))
+  }
+  }
+
+tabl <- as.data.frame(tabl)
+colnames(tabl)[1:5] = c("Accuracy", "Precision", "Recall", "False Positive Rate", "AUC")
+tabl$cutoff = c(.2, .5, .5, .5, .2, .2, .2)
+tabl$sampling = c("None", "10:1", "5:1", "1:1", "10:1", "5:1", "1:1")
+rownames(tabl) = mods
+datatable(tabl, filter = 'top',
+          caption = "Testing stratification and cutoffs for Model 30",
+          rownames = T,
+          options = list(dom = "t",
+                         pageLength = length(mods))
+          ) %>% formatCurrency(2:4, currency = "", digits = 2) %>%
+          formatStyle(1, background = styleEqual(max(tabl[,1]), 'lightgreen'))%>%
+          formatStyle(2, background = styleEqual(max(tabl[,2]), 'lightgreen'))%>%
+          formatStyle(3, background = styleEqual(max(tabl[,3]), 'lightgreen'))%>%
+          formatStyle(4, background = styleEqual(min(tabl[,4]), 'lightgreen'))%>%
+          formatStyle(5, background = styleEqual(max(tabl[,5]), 'lightgreen'))
+```
+
+Variable importance:
+
+```{r mod30varImp, eval=T, fig.height=11, fig.width=10, fig.align='center'}
+s3load(object = file.path(outputdir, paste("Model_30_original_RandomForest_Output.RData", sep= "_")), bucket = waze.bucket)
+rf.out.og <- rf.out
+
+s3load(object = file.path(outputdir, "Stratification_test_RandomForest_Output.RData"), bucket = waze.bucket)
+
+par(mfrow=c(2,2), mar = c(5,3, 3, 1))
+varImpPlot(rf.out.og,
+           main = "Model 30 Variable Importance \n Original",
+           n.var = 15, 
+           cex = 0.6)
+varImpPlot(rf.30_10,
+           main = "Model 30 Variable Importance \n 10:1",
+           n.var = 15, 
+           cex = 0.6)
+varImpPlot(rf.30_05,
+           main = "Model 30 Variable Importance \n 5:1",
+           n.var = 15, 
+           cex = 0.6)
+varImpPlot(rf.30_01,
+           main = "Model 30 Variable Importance \n 1:1",
+           n.var = 15, 
+           cex = 0.6)
+```
