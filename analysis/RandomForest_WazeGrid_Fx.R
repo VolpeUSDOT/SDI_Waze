@@ -85,7 +85,7 @@ do.rf <- function(train.dat, omits, response.var = "MatchEDT_buffer_Acc", model.
   starttime = Sys.time()
   
   # make a cluster of all available cores
-  cl <- makeCluster(parallel::detectCores(), useXDR = F) 
+  cl <- makeCluster(rf.inputs$avail.cores, useXDR = F) 
   registerDoParallel(cl)
   
   rf.out <- foreach(ntree = rep(rf.inputs$ntree.use/rf.inputs$avail.cores, rf.inputs$avail.cores),

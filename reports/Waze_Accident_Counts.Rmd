@@ -83,7 +83,7 @@ gp.focal2 <- gp.focal + geom_line(aes(color = abb),
   guides(color=guide_legend(title="State"))
 #gp.focal2
 
-ggplotly(gp.focal2, tooltip = "usetext") %>% layout(hovermode = 'x')
+ggplotly(gp.focal2, tooltip = "usetext")
 
 ```
 
