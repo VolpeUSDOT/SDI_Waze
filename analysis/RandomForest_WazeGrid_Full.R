@@ -825,17 +825,4 @@ if(REASSESS) save("keyoutputs", file = paste0("Reassess_Output_to_", modelno))
 timediff <- Sys.time() - starttime
 cat(round(timediff, 2), attr(timediff, "units"), "to complete script")
 
-BONUS = F
 
-if(BONUS){
-# output for visualization
-w.out.for.viz <- w.04_09[c("GRID_ID", "day","hour","DayOfWeek","nMatchEDT_buffer_Acc","MatchEDT_buffer_Acc",
-               "nWazeAccident","nWazeAccidentMajor","nWazeAccidentMinor")]
-dim(w.out.for.viz)
-
-write.csv(w.out.for.viz, file = "Waze_04-09_GridCounts.csv", row.names = F)
-
-# some summary values showing counts of predicted and observed EDT and Waze counts
-
-
-}
