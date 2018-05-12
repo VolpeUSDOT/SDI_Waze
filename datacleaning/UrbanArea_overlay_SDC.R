@@ -1,6 +1,6 @@
 # Assigns urban area classifications and hexagonal grid IDs to Waze and EDT events
 # Merges the two files into a matched data frame and saves
-# Loops over all months of available data where both EDT and Waze files exist
+# Loops over all months of available data where both EDT and Waze files exist, for each state
 
 # <><><><><><><><><><><><><><><><><><><><>
 # Setup ----
@@ -13,9 +13,13 @@ library(tidyverse)
 library(sp)
 library(maps) # for mapping base layers
 library(rgdal) # for readOGR(), needed for reading in ArcM shapefiles
+library(foreach)
+library(doParallel)
 
 output.loc <- "~/tempout"
 localdir <- "/home/daniel/workingdata/" # full path for readOGR
+edtdir <- normalizePath(file.path(localdir, "EDT"))
+wazedir <- "~/tempout" # has State_Year-mo.RData files. Grab from S3 if necessary
 
 teambucket <- "s3://prod-sdc-sdi-911061262852-us-east-1-bucket"
 
@@ -32,10 +36,15 @@ tzs <- data.frame(states,
                   stringsAsFactors = F)
 
 
+# Project to Albers equal area conic 102008. Check comparision wiht USGS version, WKID: 102039
+proj <- showP4(showWKT("+init=epsg:102008"))
+# USGS version, used for producing hexagons: 
+proj.USGS <- "+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs +ellps=GRS80 +towgs84=0,0,0"
+
 setwd(localdir)
 
 TEST = F      # Change to F to run for all available months, T for only a subset of months
-CHECKPLOT = F # Make plots for each stage, to make sure of spatial overlay
+CHECKPLOT = T # Make plots for each stage, to make sure of spatial overlay
 
 # Read in spatial data ----
 
@@ -45,6 +54,7 @@ CHECKPLOT = F # Make plots for each stage, to make sure of spatial overlay
 # Get from S3 if necessary
 
 ua <- readOGR(file.path(localdir, "census"), layer = "cb_2016_us_ua10_500k")
+ua <- spTransform(ua, CRS(proj.USGS))
 
 # Read in county shapefile
 co <- readOGR(file.path(localdir, "census"), layer = "cb_2017_us_county_500k")
@@ -52,214 +62,172 @@ co <- readOGR(file.path(localdir, "census"), layer = "cb_2017_us_county_500k")
 # Read in hexagon shapefile. This is a rectangular surface of 1 sq mi area hexagons, national
 load("~/workingdata/Hex/hexagons_1mi_lower48_neighbors.RData")
 # hex <- readOGR(file.path(localdir, "Hex"), layer = "hexagons_1mi_lower48_neighbors")
-# Error: C stack usage  34724785 is too close to the limit
-# https://stackoverflow.com/questions/14719349/error-c-stack-usage-is-too-close-to-the-limit
 # In terminal, ulimit -s 16384, then R readOGR, save as .RData. Producex 4.5 Gb .Rdata file.
 
-# match coordinate reference system of hexagons to Urban Areas and counties
-# proj4string(hex)
-# proj4string(co)
+# apply coordinate reference system of hexagons (USGS version of Albers equal area) to Urban Areas and counties; can also use proj.USGS
+co <- spTransform(co, proj4string(hex))
 
-# maryland FIPS = 24
-md.co <- co[co$STATEFP == 24,]
-
-hex2 <- spTransform(hex, proj4string(md.co))
 # grid column names
-gridcols <- names(hex2)[grep("^GRID", names(hex2))]
+gridcols <- names(hex)[grep("^GRID", names(hex))]
 
-# EDT: See CrashFact in W:\SDI Pilot Projects\Volpe\2017_11_03\waze\input\edt\2016_01_to_2017_09_MD_and_IN.
-
-# files
-edt.monthly <- dir(file.path(wazedir, "MASTER Data Files/EDT_month/"))
-waze.monthly <- dir(file.path(wazedir, "MASTER Data Files/Waze Aggregated/month_MD_clipped/"))
-
-avail.edt.months <- substr(edt.monthly[grep("CrashFact_edited.RData", edt.monthly)],
-                           start = 6, stop = 7)
-avail.waze.months <- unique(substr(waze.monthly[grep("MD_buffered__", waze.monthly)],
-                                   start = 19, stop = 20))
-
-shared.avail.months = c(avail.edt.months, avail.waze.months)[duplicated(c(avail.edt.months, avail.waze.months))]
-
-if(TEST) shared.avail.months = c("04") # Change TEST to F to run for all available months
-
-# Start loop over months ----
-
-# Save files first to a local temporary directory, then move to the shared drive and delete local copies when complete, using movefiles() from utility/wazefunctions.R.
-temp.outputdir = tempdir() 
-
-
-for(i in shared.avail.months){
+# start state loop ----
+for(i in states){ # i = "UT"
   
-  load(file.path(wazedir, paste0("MASTER Data Files/EDT_month/2017-", i, "_1_CrashFact_edited.RData")))
-  # find the edt file for this month and assign to temporary working file name. Remove the month-named data frame
-  edt.working <- get(ls()[grep("edt_", ls())]); rm(list=ls()[grep("edt_", ls())])
+  co_i <- co[co$STATEFP == state.fips[state.fips$abb == i, "fips"][1],]
   
-  # Waze: Comes from aggregated monthly Waze events, clipped to a 0.5 mile buffer around MD, for each month 2017. All the waze files share the same object name, d
-  load(file.path(wazedir, paste0("MASTER Data Files/Waze Aggregated/month_MD_clipped/MD_buffered__2017-", i, ".RData")))
+  # Files -- need to add step to grab from S3 if not in these locations. Also change from tempout to a subdirectory in workingdata
+  e_i <- read.csv(file.path(edtdir, dir(edtdir)[grep(i, dir(edtdir))]),
+                    na.strings = c("NA", "NULL"))
   
-  link <- read.csv(file.path(wazedir, paste0("MASTER Data Files/Waze Aggregated/month_MD_clipped/EDT_Waze_link_2017-", i, "_MD.csv")))
+  # Prep EDT data for this state
+  e_i <- e_i[!is.na(e_i$GPSLat) & !is.na(e_i$GPSLong),]
+  e_i <- e_i[!e_i$GPSLat > 77 & !e_i$GPSLong < -777,]
+  e_i <- e_i[e_i$CrashState == state.name[state.abb == i],]
   
-  # Make sure EDT data is just for the month of interest
-  edt.working <- edt.working[!is.na(edt.working$CrashDate_Local),]
-  edt.working <- edt.working[edt.working$CrashDate_Local < 
-                               paste0("2017-", formatC(as.numeric(i)+1, width = 2, flag = "0"), "-01 00:00:00 EDT") & 
-                               edt.working$CrashDate_Local > paste0("2017-", i,"-01 00:00:00 EDT"),] 
+  use.tz <- tzs$tz[tzs$states == i]
+  
+  e_i$CrashDate_Local <- with(e_i,
+                              strptime(
+                                paste(substr(CrashDate, 1, 10),
+                                      HourofDay, MinuteofDay), format = "%Y-%m-%d %H %M", tz = use.tz)
+  )
   
   
-  # Add "M" code to the table to show matches if we merge in full datasets
-  match <- rep("M", nrow(link))
-  link <- mutate(link, match) 
+  edtmonths <- sort(unique(format(e_i$CrashDate_Local, "%Y-%m")))
   
-  # <><><><><><><><><><><><><><><><><><><><>
-  # Overlay points in polygons
-  # Use over() from sp to join these to the census polygon. Points in Polygons, pip
-  
-  proj4string(d) <- proj4string(edt.working) <- proj4string(ua) 
-  
-  # First clip EDT to state 
-  EDT.co <- over(edt.working, md.co["COUNTYFP"])
-  edt.working <- edt.working[!is.na(EDT.co$COUNTYFP),] # drop 33 points in April 2017 MD of 9308
-  # <><><><><><><><><><><><><><><><><><><><>
-  # Urban area overlay ----
-  
-  waze_ua_pip <- over(d, ua[,c("NAME10","UATYP10")]) # Match a urban area name and type to each row in d. 
-  edt_ua_pip <- over(edt.working, ua[,c("NAME10","UATYP10")]) # Match a urban area name and type to each row in edt.working. 
-  
-  d@data <- data.frame(d@data, waze_ua_pip)
-  names(d@data)[(length(d@data)-1):length(d@data)] <- c("Waze_UA_Name", "Waze_UA_Type")
-  
-  edt.working@data <- data.frame(edt.working@data, edt_ua_pip)
-  names(edt.working@data)[(length(edt.working@data)-1):length(edt.working@data)] <- c("EDT_UA_Name", "EDT_UA_Type")
-  
-  # <><><><><><><><><><><><><><><><><><><><>
-  # Hexagon overlay
-  
-  waze_hex_pip <- over(d, hex2[,gridcols]) # Match hexagon names to each row in d. 
-  edt_hex_pip <- over(edt.working, hex2[,gridcols]) # Match hexagon names to each row in edt.working. 
-  # add these columns to the data frame
-  d@data <- data.frame(d@data, waze_hex_pip)
-  
-  edt.working@data <- data.frame(edt.working@data, edt_hex_pip)
-  
-  # Check:
-  if(CHECKPLOT){  
-    plot(d)
-    points(edt.working, col = "red")
-    plot(md.co, add = T, col = alpha("grey80", 0.1))
-    dev.print(jpeg, file = file.path(volpewazedir, paste0("Figures/Checking_EDT_Waze_UAoverlay_", i, ".jpg")), width = 500, height = 500)
+  # project EDT
+  if(class(e_i)=="data.frame"){
+    e_i <- SpatialPointsDataFrame(e_i[c("GPSLong", "GPSLat")], e_i, 
+                                  proj4string = CRS("+proj=longlat +datum=WGS84"))  #  make sure EDT data is a SPDF
+    
+    e_i <-spTransform(e_i, CRS(proj.USGS))
   }
-  # <><><><><><><><><><><><><><><><><><><><>
-  # Merge and save EDT-Waze
-  # <><><><><><><><><><><><><><><><><><><><>
   
-  # Save Waze data as dataframe
-  waze.df <- d@data 
-  # names(waze.df)
+  # Names of files for state i, in a directory with all clipped, buffered, unique uuid events by month.
+  wazemonthfiles <- dir(wazedir)[grep(i, dir(wazedir))]
+  wazemonthfiles <- wazemonthfiles[grep("RData$", wazemonthfiles)]
+  wazemonths <- sort(unique(substr(wazemonthfiles, 4, 10)))
   
-  # Save EDT data as dataframe
-  edt.df <- edt.working@data 
-  # names(edt.df)
+  months_shared <- edtmonths[edtmonths %in% wazemonths]
+  # make sure months are actually shared 
+  stopifnot(all(months_shared == wazemonths[wazemonths %in% edtmonths]))
   
-  # before carrying out the join, rename the EDT grid cell columns 
-  names(edt.df)[grep("^GRID", names(edt.df))] <- paste(names(edt.df)[grep("^GRID", names(edt.df))], "edt", sep = ".")
+  # Start loop over months ----
+  avail.cores <- parallel::detectCores()
+  if(avail.cores > length(months_shared)) avail.cores = length(months_shared) # use only cores necessary
+  cl <- makeCluster(avail.cores) 
+  registerDoParallel(cl)
   
-  # Join Waze data to link table (full join)
-  link.waze <- full_join(link, waze.df, by=c("id.incidents"="uuid"))
-  
-  # Add W code to match column to indicate only Waze data
-  link.waze$match <- ifelse(is.na(link.waze$match), 'W', link.waze$match)
-  
-  # Join EDT data to Waze-link table (full join)
-  # *** Potential improvement for data storage: at this step, make a selection of only those columns which will be useful from EDT (do not include all 0 columns or columns not useful for the model) ***
-  
-  edt.df$CrashDate_Local <- as.character(edt.df$CrashDate_Local) # will need to convert back to POSIX
-  link.waze.edt <- full_join(link.waze, edt.df, by = c("id.accident"="ID")) 
-  
-  #Add E code to match column to indicate only EDT data
-  link.waze.edt$match <- ifelse(is.na(link.waze.edt$match), 'E', link.waze.edt$match)
-  # table(link.waze.edt$match)
-  
-  # Convert CrashDate_Local back to POSIX
-  link.waze.edt$CrashDate_Local <- strptime(link.waze.edt$CrashDate_Local, "%Y-%m-%d %H:%M:%S", tz = "America/New_York")
-  
-  # rename ID variables for compatibility with existing code
-  names(link.waze.edt)[grep("id.incident", names(link.waze.edt))] = "uuid.waze"
-  names(link.waze.edt)[grep("id.accident", names(link.waze.edt))] = "ID"
-  
-  # save the merged file as CSV and RData versions, to temporary output directory 
-  write.csv(link.waze.edt, file=file.path(temp.outputdir, paste0("merged.waze.edt.", i,"_", HEXSIZE, "mi_MD.csv")), row.names = F)
-  
-  save(list=c("link.waze.edt", "edt.df"), file = file.path(temp.outputdir, paste0("merged.waze.edt.", i,"_", HEXSIZE, "mi_MD.RData")))
-  
-  if(CHECKPLOT) { 
-    points(link.waze.edt$lon, link.waze.edt$lat, col = "blue"); 
-    dev.print(jpeg, file = file.path(volpewazedir, paste0("Figures/Checking2_EDT_Waze_UAoverlay_", i, ".jpg")), width = 500, height = 500) 
-  }  
-} # End month loop ----
+  # Start parallel loop over yearmonths within state ----
+  foreach(mo = months_shared, .packages = c("dplyr", "tidyr","sp","rgdal")) %dopar% {
+    # mo = "2018-04" 
+    
+    # Waze: Comes from aggregated monthly Waze events, clipped to a 0.5 mile buffer around state i, for each month.  All the waze files share the same object name, mb
+    load(file.path(wazedir, wazemonthfiles[grep(mo, wazemonthfiles)]))
+    if(class(mb)=="data.frame"){
+      mb <- SpatialPointsDataFrame(mb[c("lon", "lat")], mb, 
+                                    proj4string = CRS("+proj=longlat +datum=WGS84"))  #  make sure Waze data is a SPDF
+      
+      mb <-spTransform(mb, CRS(proj.USGS))
+    }
+    
+    link <- read.csv(file.path(localdir, "Link", paste0("EDT_Waze_link_", mo,"_", i, ".csv")))
+    
+    # Add "M" code to the table to show matches if we merge in full datasets
+    match <- rep("M", nrow(link))
+    link <- mutate(link, match) 
+    
+    # <><><><><><><><><><><><><><><><><><><><>
+    # Overlay points in polygons
+    # Use over() from sp to join these to the census polygon. Points in Polygons, pip
+    
+    # First clip EDT to state 
+    EDT.co <- over(e_i, co_i["COUNTYFP"])
+    e_i<- e_i[!is.na(EDT.co$COUNTYFP),] 
+    # <><><><><><><><><><><><><><><><><><><><>
+    # Urban area overlay ----
+    
+    waze_ua_pip <- over(mb, ua[,c("NAME10","UATYP10")]) # Match a urban area name and type to each row in mb. 
+    edt_ua_pip <- over(e_i, ua[,c("NAME10","UATYP10")]) # Match a urban area name and type to each row in e_i. 
+    
+    mb@data <- data.frame(mb@data, waze_ua_pip)
+    names(mb@data)[(length(mb@data)-1):length(mb@data)] <- c("Waze_UA_Name", "Waze_UA_Type")
+    
+    e_i@data <- data.frame(e_i@data, edt_ua_pip)
+    names(e_i@data)[(length(e_i@data)-1):length(e_i@data)] <- c("EDT_UA_Name", "EDT_UA_Type")
+    
+    # <><><><><><><><><><><><><><><><><><><><>
+    # Hexagon overlay
+    
+    waze_hex_pip <- over(mb, hex[,gridcols]) # Match hexagon names to each row in mb. 
+    edt_hex_pip <- over(e_i, hex[,gridcols]) # Match hexagon names to each row in e_i. 
+    # add these columns to the data frame
+    mb@data <- data.frame(mb@data, waze_hex_pip)
+    
+    e_i@data <- data.frame(e_i@data, edt_hex_pip)
+    
+    # Check:
+    if(CHECKPLOT){ 
+      jpeg(file = file.path(volpewazedir, paste0("Figures/Checking_EDT_Waze_UAoverlay_",mo, "_", i, ".jpg")), width = 500, height = 500) 
+      plot(mb, main = paste("Pre-linking EDT and Waze", mo, i))
+      points(e_i, col = alpha("red", 0.2))
+      plot(co_i, add = T, col = alpha("grey80", 0.1))
+      dev.off()
+    }
+    # <><><><><><><><><><><><><><><><><><><><>
+    # Merge and save EDT-Waze
+    # <><><><><><><><><><><><><><><><><><><><>
+    
+    # Save Waze data as dataframe
+    waze.df <- mb@data 
+    # names(waze.df)
+    
+    # Save EDT data as dataframe
+    edt.df <- e_i@data 
+    # names(edt.df)
+    
+    # before carrying out the join, rename the EDT grid cell columns 
+    names(edt.df)[grep("^GRID", names(edt.df))] <- paste(names(edt.df)[grep("^GRID", names(edt.df))], "edt", sep = ".")
+    
+    # Join Waze data to link table (full join)
+    link.waze <- full_join(link, waze.df, by=c("id.incidents"="alert_uuid"))
+    
+    # Add W code to match column to indicate only Waze data
+    link.waze$match <- ifelse(is.na(link.waze$match), 'W', link.waze$match)
+    
+    # Join EDT data to Waze-link table (full join)
+    # *** Potential improvement for data storage: at this step, make a selection of only those columns which will be useful from EDT (do not include all 0 columns or columns not useful for the model) ***
+    
+    edt.df$CrashDate_Local <- as.character(edt.df$CrashDate_Local) # will need to convert back to POSIX
+    link.waze.edt <- full_join(link.waze, edt.df, by = c("id.accident"="ID")) 
+    
+    #Add E code to match column to indicate only EDT data
+    link.waze.edt$match <- ifelse(is.na(link.waze.edt$match), 'E', link.waze.edt$match)
+    # table(link.waze.edt$match)
+    
+    # Convert CrashDate_Local back to POSIX
+    link.waze.edt$CrashDate_Local <- strptime(link.waze.edt$CrashDate_Local, "%Y-%m-%mb %H:%M:%S", tz = use.tz)
+    
+    # rename ID variables for compatibility with existing code
+    names(link.waze.edt)[grep("id.incident", names(link.waze.edt))] = "uuid.waze"
+    names(link.waze.edt)[grep("id.accident", names(link.waze.edt))] = "ID"
+    
+    # save the merged file  to temporary output directory, move to S3 after
+    # write.csv(link.waze.edt, file=file.path(localdir, "Overlay", paste0("merged.waze.edt.", mo, "_", i, ".csv")), row.names = F)
+    
+    save(list=c("link.waze.edt", "edt.df"), file = file.path(localdir, "Overlay", paste0("merged.waze.edt.", mo, "_", i, ".RData")))
+    
+    if(CHECKPLOT) { 
+      lwe.sp <- SpatialPoints(link.waze.edt[!is.na(link.waze.edt$lon) | !is.na(link.waze.edt$lat),c("lon", "lat")],
+                                   proj4string = CRS("+proj=longlat +datum=WGS84")) 
+      lwe.sp <-spTransform(lwe.sp, CRS(proj.USGS))
+      jpeg(file = file.path(volpewazedir, paste0("Figures/Checking2_EDT_Waze_UAoverlay_",mo, "_", i, ".jpg")), width = 500, height = 500) 
+      plot(co_i, main = paste("Linked EDT-Waze", mo, i))
+      plot(lwe.sp, col = alpha("blue", 0.3), add=T, pch = "+")
+      dev.off()
+    }  
+  } # End month loop ----
 
-# move files out of temporary output directory to shared drive. This function will move only files with the pattern 'merged' in the file name, from the tempdir to the outputdir. Files are deleted after copying. Temporary directories are additionaly deleted automatically on restart.
-movefiles(dir(temp.outputdir)[grep("merged", dir(temp.outputdir))], temp.outputdir, outputdir)
+} #End state loop
 
-# Scratch from previous work
-
-# # hexagons matching a Waze event -- 
-# 
-# any.waze.hex <- as.character(unique(unlist(d@data[gridcols])))
-# # remove NA 
-# any.waze.hex <- any.waze.hex[-which(is.na(any.waze.hex))]
-# 
-# 
-# hex.md <- hex2[match(any.waze.hex, hex2$GRID_ID),]
-# 
-# # all hexagons
-# plot(hex2)
-# plot(hex.md, col = "blue", add = T)
-# 
-# save(list = c('hex.md', 'hex2'), file = file.path(volpewazedir, "spatial_layers/MD_hex.RData"))
-
-
-# Read in link file. Three versions: from R script using time point, from Python script, and from R, using wider time window for Waze events. 
-link1 <- read.csv(file.path(wazedir, "MASTER Data Files/Waze Aggregated/month_MD_clipped/EDT_Waze_link_April_MD-timepoint.csv"))
-link2 <- read.csv(file.path(volpewazedir, "output_mmg/link_table_edt_waze.txt"), sep = "\t")
-link <- read.csv(file.path(wazedir, "MASTER Data Files/Waze Aggregated/month_MD_clipped/EDT_Waze_link_April_MD.csv"))
-linkww <- read.csv(file.path(wazedir, "MASTER Data Files/Waze Aggregated/month_MD_clipped/Waze_Waze_link_April_MD.csv"))
-linkee <- read.csv(file.path(wazedir, "MASTER Data Files/Waze Aggregated/month_MD_clipped/EDT_EDT_link_April_MD.csv"))
-
-# EDT_Waze_link_April_MD-timepoint.csv file (used single timepoint instead of window)
-# compare pairs
-link1.p <- paste(link1[,1], link1[,2])
-link2.p <- paste(link2[,1], link2[,2])
-link3.p <- paste(link[,1], link[,2])
-
-link1.p <- sort(link1.p)
-link2.p <- sort(link2.p)
-link3.p <- sort(link3.p)
-
-identical(length(link1.p), length(link2.p)) # identical!!
-length(link3.p) - length(link1.p) # additional linked records
-summary(link1.p == link2.p) # identical!
-
-
-# <><><><><><><><><><><><>
-# Waze-Waze ----
-# <><><><><><><><><><><><>
-
-# Join Waze incident data to link table (full join)
-link.waze <- full_join(linkww, waze.df, by=c("id.accident"="uuid")) 
-
-# Add Wa code to match column to indicate only Waze accident only data
-link.waze$match <- ifelse(is.na(link.waze$match), 'Wa', link.waze$match)
-
-# Join Waze accident data to Waze-link table (full join). X variables for Waze accidents, Y variables for Waze incidents
-link.waze.waze <- full_join(linkww, waze.df, by = c("id.incidents"="uuid")) 
-
-#Add Wu code to match column to indicate only Waze incident only data
-link.waze.waze$match <- ifelse(is.na(link.waze.waze$match), 'Wi', link.waze.waze$match)
-table(link.waze.waze$match)
-
-
-#save the merged file as a csv file
-write.csv(link.waze.waze, file=file.path(outputdir, "merged.waze.waze.April_MD.csv"), row.names = F)
-
-#Save the merged Rdata file as an Rdata file
-saveRDS(link.waze.waze, file = file.path(outputdir, "merged.waze.waze.April_MD.rds"))
+stopCluster(cl)
