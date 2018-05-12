@@ -56,16 +56,15 @@ CHECKPLOT = T # Make plots for each stage, to make sure of spatial overlay
 ua <- readOGR(file.path(localdir, "census"), layer = "cb_2016_us_ua10_500k")
 ua <- spTransform(ua, CRS(proj.USGS))
 
-# Read in county shapefile
+# Read in county shapefile, and apply coordinate reference system of hexagons (USGS version of Albers equal area) to Urban Areas and counties using uproj.USGS
 co <- readOGR(file.path(localdir, "census"), layer = "cb_2017_us_county_500k")
+co <- spTransform(co, proj4string(proj.USGS))
 
-# Read in hexagon shapefile. This is a rectangular surface of 1 sq mi area hexagons, national
+
+# Read in hexagon shapefiles. This is a rectangular surface of 1 sq mi area hexagons, national
 load("~/workingdata/Hex/hexagons_1mi_lower48_neighbors.RData")
 # hex <- readOGR(file.path(localdir, "Hex"), layer = "hexagons_1mi_lower48_neighbors")
 # In terminal, ulimit -s 16384, then R readOGR, save as .RData. Producex 4.5 Gb .Rdata file.
-
-# apply coordinate reference system of hexagons (USGS version of Albers equal area) to Urban Areas and counties; can also use proj.USGS
-co <- spTransform(co, proj4string(hex))
 
 # grid column names
 gridcols <- names(hex)[grep("^GRID", names(hex))]
@@ -73,7 +72,8 @@ gridcols <- names(hex)[grep("^GRID", names(hex))]
 # start state loop ----
 for(i in states){ # i = "UT"
   
-  co_i <- co[co$STATEFP == state.fips[state.fips$abb == i, "fips"][1],]
+  FIPS_i = formatC(state.fips[state.fips$abb == i, "fips"][1], width = 2, flag = "0")
+  co_i <- co[co$STATEFP == FIPS_i,]
   
   # Files -- need to add step to grab from S3 if not in these locations. Also change from tempout to a subdirectory in workingdata
   e_i <- read.csv(file.path(edtdir, dir(edtdir)[grep(i, dir(edtdir))]),
@@ -98,7 +98,7 @@ for(i in states){ # i = "UT"
   # project EDT
   if(class(e_i)=="data.frame"){
     e_i <- SpatialPointsDataFrame(e_i[c("GPSLong", "GPSLat")], e_i, 
-                                  proj4string = CRS("+proj=longlat +datum=WGS84"))  #  make sure EDT data is a SPDF
+                                  proj4string = CRS("+proj=longlat +datum=WGS84"))  
     
     e_i <-spTransform(e_i, CRS(proj.USGS))
   }
@@ -112,11 +112,12 @@ for(i in states){ # i = "UT"
   # make sure months are actually shared 
   stopifnot(all(months_shared == wazemonths[wazemonths %in% edtmonths]))
   
-  # Start loop over months ----
   avail.cores <- parallel::detectCores()
   if(avail.cores > length(months_shared)) avail.cores = length(months_shared) # use only cores necessary
   cl <- makeCluster(avail.cores) 
   registerDoParallel(cl)
+  
+  starttime_state <- Sys.time()
   
   # Start parallel loop over yearmonths within state ----
   foreach(mo = months_shared, .packages = c("dplyr", "tidyr","sp","rgdal")) %dopar% {
@@ -157,7 +158,7 @@ for(i in states){ # i = "UT"
     names(e_i@data)[(length(e_i@data)-1):length(e_i@data)] <- c("EDT_UA_Name", "EDT_UA_Type")
     
     # <><><><><><><><><><><><><><><><><><><><>
-    # Hexagon overlay
+    # Hexagon overlay ----
     
     waze_hex_pip <- over(mb, hex[,gridcols]) # Match hexagon names to each row in mb. 
     edt_hex_pip <- over(e_i, hex[,gridcols]) # Match hexagon names to each row in e_i. 
@@ -214,8 +215,13 @@ for(i in states){ # i = "UT"
     
     # save the merged file  to temporary output directory, move to S3 after
     # write.csv(link.waze.edt, file=file.path(localdir, "Overlay", paste0("merged.waze.edt.", mo, "_", i, ".csv")), row.names = F)
+    fn = paste0("merged.waze.edt.", mo, "_", i, ".RData")
     
-    save(list=c("link.waze.edt", "edt.df"), file = file.path(localdir, "Overlay", paste0("merged.waze.edt.", mo, "_", i, ".RData")))
+    save(list=c("link.waze.edt", "edt.df"), file = file.path(localdir, "Overlay", fn))
+    
+    system(paste("aws s3 cp",
+                 file.path(localdir, "Overlay", fn),
+                 file.path(teambucket, i, fn)))
     
     if(CHECKPLOT) { 
       lwe.sp <- SpatialPoints(link.waze.edt[!is.na(link.waze.edt$lon) | !is.na(link.waze.edt$lat),c("lon", "lat")],
@@ -226,8 +232,11 @@ for(i in states){ # i = "UT"
       plot(lwe.sp, col = alpha("blue", 0.3), add=T, pch = "+")
       dev.off()
     }  
-  } # End month loop ----
-
+  } # End month loop
+  
+  timediff <- Sys.time() - starttime_state
+  cat(round(timediff, 2), attr(timediff, "units"), "elapsed to overlay", i, "\n\n")
+  
 } #End state loop
 
 stopCluster(cl)
