@@ -36,7 +36,7 @@ tzs <- data.frame(states,
                   stringsAsFactors = F)
 
 
-# Project to Albers equal area conic 102008. Check comparision wiht USGS version, WKID: 102039
+# Project to Albers equal area conic 102008. Check comparision with USGS version, WKID: 102039
 proj <- showP4(showWKT("+init=epsg:102008"))
 # USGS version, used for producing hexagons: 
 proj.USGS <- "+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs +ellps=GRS80 +towgs84=0,0,0"
@@ -58,19 +58,26 @@ ua <- spTransform(ua, CRS(proj.USGS))
 
 # Read in county shapefile, and apply coordinate reference system of hexagons (USGS version of Albers equal area) to Urban Areas and counties using uproj.USGS
 co <- readOGR(file.path(localdir, "census"), layer = "cb_2017_us_county_500k")
-co <- spTransform(co, proj4string(proj.USGS))
+co <- spTransform(co, CRS(proj.USGS))
 
 
 # Read in hexagon shapefiles. This is a rectangular surface of 1 sq mi area hexagons, national
-load("~/workingdata/Hex/hexagons_1mi_lower48_neighbors.RData")
+# load("~/workingdata/Hex/hexagons_1mi_lower48_neighbors.RData")
 # hex <- readOGR(file.path(localdir, "Hex"), layer = "hexagons_1mi_lower48_neighbors")
-# In terminal, ulimit -s 16384, then R readOGR, save as .RData. Producex 4.5 Gb .Rdata file.
-
-# grid column names
-gridcols <- names(hex)[grep("^GRID", names(hex))]
+# In terminal, ulimit -s 16384, then R readOGR, save as .RData. Produces 4.5 Gb .Rdata file.
+# !!! Now doing just for these four states with separate files !!!
 
 # start state loop ----
 for(i in states){ # i = "UT"
+  
+  if(i == "MD"){
+    hex = readOGR(file.path(localdir, "Hex", "MD_hexagons_shapefiles"), layer = "MD_hexagons_1mi_newExtent_neighbors")
+  } else {
+    hex = readOGR(file.path(localdir, "Hex"), layer = paste0(i, "_hexagons_1mi_neighbors"))
+  }
+  
+  # grid column names
+  gridcols <- names(hex)[grep("^GRID", names(hex))]
   
   FIPS_i = formatC(state.fips[state.fips$abb == i, "fips"][1], width = 2, flag = "0")
   co_i <- co[co$STATEFP == FIPS_i,]
@@ -120,7 +127,7 @@ for(i in states){ # i = "UT"
   starttime_state <- Sys.time()
   
   # Start parallel loop over yearmonths within state ----
-  foreach(mo = months_shared, .packages = c("dplyr", "tidyr","sp","rgdal")) %dopar% {
+  foreach(mo = months_shared, .packages = c("dplyr", "tidyr","sp","rgdal","scales")) %dopar% {
     # mo = "2018-04" 
     
     # Waze: Comes from aggregated monthly Waze events, clipped to a 0.5 mile buffer around state i, for each month.  All the waze files share the same object name, mb
@@ -169,7 +176,7 @@ for(i in states){ # i = "UT"
     
     # Check:
     if(CHECKPLOT){ 
-      jpeg(file = file.path(volpewazedir, paste0("Figures/Checking_EDT_Waze_UAoverlay_",mo, "_", i, ".jpg")), width = 500, height = 500) 
+      jpeg(file = file.path(localdir, paste0("Figures/Checking_EDT_Waze_UAoverlay_",mo, "_", i, ".jpg")), width = 500, height = 500) 
       plot(mb, main = paste("Pre-linking EDT and Waze", mo, i))
       points(e_i, col = alpha("red", 0.2))
       plot(co_i, add = T, col = alpha("grey80", 0.1))
@@ -227,7 +234,7 @@ for(i in states){ # i = "UT"
       lwe.sp <- SpatialPoints(link.waze.edt[!is.na(link.waze.edt$lon) | !is.na(link.waze.edt$lat),c("lon", "lat")],
                                    proj4string = CRS("+proj=longlat +datum=WGS84")) 
       lwe.sp <-spTransform(lwe.sp, CRS(proj.USGS))
-      jpeg(file = file.path(volpewazedir, paste0("Figures/Checking2_EDT_Waze_UAoverlay_",mo, "_", i, ".jpg")), width = 500, height = 500) 
+      jpeg(file = file.path(localdir, paste0("Figures/Checking2_EDT_Waze_UAoverlay_",mo, "_", i, ".jpg")), width = 500, height = 500) 
       plot(co_i, main = paste("Linked EDT-Waze", mo, i))
       plot(lwe.sp, col = alpha("blue", 0.3), add=T, pch = "+")
       dev.off()

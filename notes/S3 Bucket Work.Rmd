@@ -223,8 +223,11 @@ system(paste0("aws s3 ls ", teambucket))
 system(paste0('aws s3 cp ', teambucket, ' ~/workingdata/ --include "shapefiles_*.zip"'))
 # not working... do individually
 
-system(paste0("aws s3 cp ", teambucket, "shapefiles_nationalHexagons.zip ~/workingdata/"))
-system(paste0("aws s3 cp ", teambucket, "shapefiles_newGRIDID.zip ~/workingdata/"))
+system(paste0("aws s3 cp ", teambucket, "shapefiles_nationalHexagons.zip ~/workingdata/Hex"))
+system(paste0("aws s3 cp ", teambucket, "shapefiles_newGRIDID.zip ~/workingdata/Hex"))
+system(paste0("aws s3 cp ", teambucket, "ct_ut_va_hexagons_1mi.zip ~/workingdata/Hex"))
+
+# 
 
 # EDT data
 system(paste0("aws s3 cp ", teambucket, "Maryland_april2017_to_present.csv ~/workingdata/EDT"))
