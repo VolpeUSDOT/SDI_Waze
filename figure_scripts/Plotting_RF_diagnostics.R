@@ -141,9 +141,8 @@ library(tidyr)
 prec.recall <- as.data.frame(pt.vec) %>%
   gather()
 
-prec.recall$Metric = rep(c(1, 2, 3, 4), ncol(pt.vec))
-prec.recall$Metric <- as.factor(prec.recall$Metric, levels = c("Accuracy", "Precision","Recall","False Positive Rate"))
-
+prec.recall$Metric = rep(c(1, 3, 2, 4), ncol(pt.vec))
+prec.recall$Metric <- factor(prec.recall$Metric, labels = c("Accuracy", "Recall","Precision", "False Positive Rate"))
 names(prec.recall)[1:2] = c("Cutoff", "Value")
 
 ggplot(prec.recall, aes(x = Cutoff, y = Value, group = Metric)) + 
@@ -156,10 +155,6 @@ ggplot(prec.recall, aes(x = Cutoff, y = Value, group = Metric)) +
            hjust = 0,
            label = c("Accuracy", "False Positive Rate", "Precision", "Recall"))
              
-  
-
-
-
 
 dev.off()
 
