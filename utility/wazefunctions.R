@@ -39,6 +39,8 @@ makelink <- function(accfile = edt.april, incfile = waze.april,
     if(class(ei)=="SpatialPointsDataFrame") { ei <- as.data.frame(ei) }
     if(class(d.sp)=="SpatialPointsDataFrame") { d.sp <- as.data.frame(d.sp) }
     
+    # ei: EDT events. We want to look from the time of EDT event -60 minutes to EDT event +60 minutes, and find Waze events in this window
+    # d.sp: Waze events. inctimevar2 is the *end* of the event and inctimevar1 is the *start* of the event. We look to see if the end of the event is greater than EDT event -60 minutes and see if the start of the Waze event is less than the EDT event +60 minutes.
     d.t <- d.sp[d.sp[,inctimevar2] >= ei[,acctimevar]-60*60 & d.sp[,inctimevar1] <= ei[,acctimevar]+60*60,] 
     
     id.accident <- rep(as.character(ei[,accidvar]), nrow(d.t))

@@ -5,49 +5,54 @@
 
 # <><><><><><><><><><><><><><><><><><><><>
 # Setup ----
+codeloc <- "~/SDI_Waze"
+source(file.path(codeloc, 'utility/get_packages.R'))
+
 library(tidyverse)
 library(lubridate)
 library(utils)
 library(doParallel)
 library(foreach)
 
+output.loc <- "~/tempout"
+localdir <- "/home/daniel/workingdata/" # full path for readOGR
+edtdir <- normalizePath(file.path(localdir, "EDT"))
+wazedir <- "~/tempout" # has State_Year-mo.RData files. Grab from S3 if necessary
+
+teambucket <- "s3://prod-sdc-sdi-911061262852-us-east-1-bucket"
+
+source(file.path(codeloc, "utility/wazefunctions.R")) 
+
+states = c("CT", "UT", "VA", "MD")
+
+# Time zone picker:
+tzs <- data.frame(states, 
+                  tz = c("US/Eastern",
+                         "US/Mountain",
+                         "US/Eastern",
+                         "US/Eastern"),
+                  stringsAsFactors = F)
+
+
 #Set parameters for data to process
-HEXSIZE = c("1", "4", "05")#[1] # Change the value in the bracket to use 1, 4, or 0.5 sq mi hexagon grids
-ONLOCAL = F
+HEXSIZE = 1# c("1", "4", "05")#[1] # Change the value in the bracket to use 1, 4, or 0.5 sq mi hexagon grids
 
-if(ONLOCAL){
-  
-#Flynn drive
-codedir <- "~/git/SDI_Waze" 
-wazemonthdir <- "W:/SDI Pilot Projects/Waze/MASTER Data Files/Waze Aggregated/month_MD_clipped"
-wazedir <- "W:/SDI Pilot Projects/Waze/"
-volpewazedir <- "//vntscex.local/DFS/Projects/PROJ-OR02A2/SDI/"
-outputdir <- paste0("W:/SDI Pilot Projects/Waze/MASTER Data Files/Waze Aggregated/HexagonWazeEDT/",
-                    "WazeEDT Agg",HEXSIZE,"mile Rdata Input")
 
-#Sudderth drive
-codedir <- "~/GitHub/SDI_Waze"  #CONNECT TO VPN FIRST
-wazemonthdir <- "S:/SDI Pilot Projects/Waze/MASTER Data Files/Waze Aggregated/month_MD_clipped"
-wazedir <- "S:/SDI Pilot Projects/Waze/"
-volpewazedir <- "//vntscex.local/DFS/Projects/PROJ-OR02A2/SDI/"
-outputdir <- paste0("S:/SDI Pilot Projects/Waze/MASTER Data Files/Waze Aggregated/HexagonWazeEDT/",
-                    "WazeEDT Agg",HEXSIZE,"mile Rdata Input")
-
-} else {
   codedir <- "~/SDI_Waze" 
-  wazemonthdir <- "~/agg_in"
-  wazedir <- "~/workingdata"
-  volpewazedir <- "~/workingdata"
-  outputdir <- "~/agg_out"
-}
+  wazemonthdir <- "~/tempin"
+  localdir <- "~/workingdata"
+  outputdir <- "~/tempout"
+
 
 source(file.path(codedir, "utility/wazefunctions.R")) # for movefiles() function
-setwd(wazedir)
+setwd(localdir)
 
 # Loop through months of available merged data
 avail.months = unique(substr(dir(wazemonthdir)[grep("^merged.waze.edt", dir(wazemonthdir))], 
                       start = 17,
                       stop = 18))
+
+ONLOCAL = F
 
 if(ONLOCAL) { temp.outputdir = tempdir() # for temporary storage 
 } else {
