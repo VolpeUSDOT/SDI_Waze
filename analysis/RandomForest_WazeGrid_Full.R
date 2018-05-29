@@ -96,6 +96,8 @@ alert_subtypes = c("nHazardOnRoad", "nHazardOnShoulder" ,"nHazardWeather", "nWaz
 response.var = "MatchEDT_buffer_Acc"
 
 
+# Filter for days with good EDT data, meaning day < 259 in our initial sample. This cuts off the last 12 days of September 2017.
+w.04_09 = w.04_09 %>% filter(day < 259) 
 
 # A: All Waze ----
 
@@ -449,7 +451,7 @@ if(!REASSESS){
                                 model.no = modelno, rf.inputs = rf.inputs) 
   save("keyoutputs", file = paste0("Output_to_", modelno))
 } else {
-  redo_outputs[[modelno]] = reassess.rf(train.dat = w.04_09, 
+  redo_outputs[[modelno]] = reassess.rf(train.dat = w.04_09,
                                         omits, response.var = "MatchEDT_buffer_Acc", 
                                         model.no = modelno, rf.inputs = rf.inputs) 
 }

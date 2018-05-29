@@ -36,13 +36,10 @@ for(w in c("w.04", "w.05", "w.06", "w.07","w.08", "w.09")){
 
 w.04_09 <- rbind(w.04, w.05, w.06, w.07, w.08, w.09)
 
+# !!! Filter for days with good EDT data, meaning day > 259 in our initial sample.
+w.04_09 = w.04_09 %>% filter(as.numeric(day) < 259) 
+
 avail.cores = parallel::detectCores()
-
-if(avail.cores > 8) avail.cores = 10 # Limit usage below max if on r4.4xlarge instance
-
-rf.inputs = list(ntree.use = avail.cores * 50, avail.cores = avail.cores, mtry = 10, maxnodes = 1000, nodesize = 100)
-
-keyoutputs = redo_outputs = list() # to store model diagnostics
 
 # Omit as predictors in this vector:
 alwaysomit = c(grep("GRID_ID", names(w.04), value = T), "day", "hextime", "year", "weekday", 
@@ -95,7 +92,7 @@ write.csv(w.supp, file = "Waze_GridCounts_Supplemental.csv", row.names = F)
 dim(w.supp)
 for(i in names(w.04[,outputvars])) cat(i, "\n")
 
-# 2. EDT data, April - Septebember 2017 Maryland ----
+# 2. EDT data, April - mid September 2017 Maryland ----
 # Grid ID day hour dayofweek nEDT, fatal etc
 # 2M 8 col
 
@@ -110,6 +107,27 @@ s3load(object = file.path(paste(outputdir, sep="_"), paste("Model", modelno, "Ra
 fitvars <- names(w.04_09)[is.na(match(names(w.04_09), omits))]
 
 head(out.df)
+
+# Re-fit with new cutoff of 0.28
+rf.pred <- predict(rf.out, w.04_09[testrows, fitvars], type = "response", cutoff = c(0.775, 0.225))
+levels(rf.pred) = c("NoCrash","Crash")
+rf.prob <- predict(rf.out, test.dat.use[fitvars], type = "prob", cutoff =  c(0.775, 0.225))
+reference.vec <- test.dat.use[,response.var]
+
+class(reference.vec) <- "data.frame"
+reference.vec <- as.factor(reference.vec[,1])
+levels(reference.vec) = c("NoCrash", "Crash")
+out.df <- data.frame(test.dat.use[, c("GRID_ID", "day", "hour", response.var)], rf.pred, rf.prob)
+out.df$day <- as.numeric(out.df$day)
+names(out.df)[4:7] <- c("Obs", "Pred", "Prob.Noncrash", "Prob.Crash")
+out.df = data.frame(out.df,
+                    TN = out.df$Obs == 0 &  out.df$Pred == "NoCrash",
+                    FP = out.df$Obs == 0 &  out.df$Pred == "Crash",
+                    FN = out.df$Obs == 1 &  out.df$Pred == "NoCrash",
+                    TP = out.df$Obs == 1 &  out.df$Pred == "Crash")
+
+
+
 
 w.test <- w.04_09[testrows,]
 
@@ -163,3 +181,54 @@ ggplot(d2, aes(x= hour, y= Pct_Obs_Est, fill = TotalWazeAcc)) +
 
 write.csv(d2, "Obs_Est_EDT_Model_30_by_hour.csv", row.names = F)
 write.csv(dd, "All_Model_30.csv", row.names = F)
+
+# Average by day
+
+# remake day of week, something went wrong -- should not have 0 and 7 both.
+datetime <- strptime(paste("2017", dd$day, sep = "-"), format = "%Y-%j")
+dd$DayOfWeek <- as.numeric(format(datetime, "%w")) # Weekday as decimal number (0–6, Sunday is 0).
+dd$Month <- as.character(format(datetime, "%B"))  # Full month name
+
+d.day <- dd %>% 
+  group_by(DayOfWeek) %>%
+  summarize(N = n(),
+            TotalWazeAcc = sum(nWazeAccident),
+            TotalObservedEDT = sum(nMatchEDT_buffer_Acc),
+            TotalEstimated = sum(Pred == "Crash"),
+            Obs_Est_diff = TotalObservedEDT - TotalEstimated,
+            Pct_Obs_Est = 100 *TotalEstimated / TotalObservedEDT)
+
+d.day
+
+keepcol = c("GRID_ID",
+            "day",
+            "hour",
+            "Month",
+            "DayOfWeek",
+            "Obs",
+            "Pred",
+            "Prob.Crash",
+            "FN",
+            "FP",
+            "TN",
+            "TP",
+            "Pred.grp",
+            "nMatchEDT_buffer_Acc",
+            "nWazeAccident")
+
+all(keepcol %in% names(dd))
+
+write.csv(dd[keepcol], "Subset2_Model_30.csv", row.names = F)
+
+dd$Pred_sum = 1 # to match previous Tableau prep
+
+keepcol = c("GRID_ID",
+            "day",
+            "hour",
+            "DayOfWeek",
+            "Pred",
+            "Pred_sum",
+            "nMatchEDT_buffer_Acc",
+            "Month")
+
+write.csv(dd[keepcol], "Subset2_Model_30_byMONTH.csv", row.names = F)

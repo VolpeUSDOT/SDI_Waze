@@ -38,14 +38,13 @@ varImpPlot(rf.out,
 
 imp30 <- rf.out$importance
 
+imp30 <- as.data.frame(imp30)
+
 imp30$var = rownames(imp30)
 
 imp30 <- imp30[order(imp30$MeanDecreaseGini, decreasing = T),]
 
-p <- ggplot(data=dat, aes(x=time, y=total_bill)) +
-  geom_bar(stat="identity")
-
-ggplot(imp30, aes(y=MeanDecreaseGini, x=var)) + geom_bar(stat="identity")
+# ggplot(imp30, aes(y=MeanDecreaseGini, x=var)) + geom_bar(stat="identity")
 
 # Classification ----
 pdf(paste0("Visualzing_classification_Model_", modelno, ".pdf"))
