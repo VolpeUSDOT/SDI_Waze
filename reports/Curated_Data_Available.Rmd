@@ -6,7 +6,7 @@ output:
 ---
 
 ```{r setup, echo = F, message = F, warning=F}
-knitr::knit
+knitr::opts_chunk$set(warning = FALSE, message = FALSE)
 library(tidyverse)
 library(DT)
 ```
@@ -38,6 +38,42 @@ And only three months available in more recent version.
 ```{r message=TRUE, warning=TRUE}
 cmd = "aws s3 ls s3://prod-dot-sdc-curated-911061262852-us-east-1/waze/version=20180331/content/state=TX/table=alert/projection=redshift/year=2017/"
 print(system(cmd, intern = T))
+```
+
+Same, but now compare with the recently-completed new ingestion/curation workflow, using the dev bucket. Only 2018 data is available, may and June. No 2017 yet available (2018-06-07).
+
+
+```{r echo=TRUE, message=TRUE, warning=TRUE}
+cmd = "aws s3 ls s3://dev-dot-sdc-curated-911061262852-us-east-1/waze/version=20180531/content/state=NY/table=alert/projection=redshift/year=2018/"
+print(system(cmd, intern = T))
+
+```
+
+
+```{r echo=TRUE, message=TRUE, warning=TRUE}
+cmd = "aws s3 ls s3://dev-dot-sdc-curated-911061262852-us-east-1/waze/version=20180531/content/state=TX/table=alert/projection=redshift/year=2018/"
+print(system(cmd, intern = T))
+
+```
+
+## 2018 Dev
+
+```{r curatedavail2018dev, message = F, warning=F}
+# Loop over states to find which ones have complete data in 2018:
+avail.mo = vector()
+use.states = c(state.abb, c("DC", "CA1", "CA2", "CA3"))
+find.months = formatC(1:12, width = 2, flag = "0")
+for(i in use.states){
+  cmd = paste0('aws s3 ls s3://dev-dot-sdc-curated-911061262852-us-east-1/waze/version=20180531/content/state=', i ,'/table=alert/projection=redshift/year=2018/')
+  mo_i <- system(cmd, intern = T)
+  avail.mo_i <- substr(mo_i, start =nchar(mo_i[1])-2, stop = nchar(mo_i[1])-1)
+  
+  avail.mo = rbind(avail.mo, c(i, find.months %in% avail.mo_i))
+}
+
+avail.mo <- as.data.frame(avail.mo)
+colnames(avail.mo) = c("State", find.months)
+DT::datatable(avail.mo) %>% formatStyle(2:13, background = styleEqual('TRUE', 'lightgreen'))
 ```
 
 ## 2017
