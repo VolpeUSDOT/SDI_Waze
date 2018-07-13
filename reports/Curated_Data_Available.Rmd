@@ -76,6 +76,103 @@ colnames(avail.mo) = c("State", find.months)
 DT::datatable(avail.mo) %>% formatStyle(2:13, background = styleEqual('TRUE', 'lightgreen'))
 ```
 
+## 2018 New Prod 
+
+```{r curatedavail2018prod, message = F, warning=F}
+# Loop over states to find which ones have complete data in 2018, using new production version
+avail.mo = vector()
+use.states = sort(c(state.abb, c("DC", "CA1", "CA2", "CA3")))
+find.months = formatC(1:12, width = 2, flag = "0")
+for(i in use.states){
+  cmd = paste0('aws s3 ls s3://prod-dot-sdc-curated-911061262852-us-east-1/waze/version=20180531/content/state=', i ,'/table=alert/projection=redshift/year=2018/')
+  mo_i <- system(cmd, intern = T)
+  avail.mo_i <- substr(mo_i, start =nchar(mo_i[1])-2, stop = nchar(mo_i[1])-1)
+  
+  avail.mo = rbind(avail.mo, c(i, find.months %in% avail.mo_i))
+}
+
+avail.mo <- as.data.frame(avail.mo)
+colnames(avail.mo) = c("State", find.months)
+DT::datatable(avail.mo) %>% formatStyle(2:13, background = styleEqual('TRUE', 'lightgreen'))
+```
+
+
+Tracking progress of curation for by day. Look to see how many days within each month have at least one record
+
+```{r curatedavail2018prod_byday, message = F, warning=F}
+# Loop over states and months, to find which ones have complete days of data in 2018, using new production version.
+# Also track object number and size of month folder. 
+# Could make faster by making state/month commands pasted together and doing just one loop
+avail.mo = size.mo = obj.mo = vector()
+
+find.months = formatC(1:12, width = 2, flag = "0")
+use.states = sort(c(state.abb, c("DC", "CA1", "CA2", "CA3")))
+
+for(state in use.states){
+  cat(state, "\n")
+  for(i in find.months){ # i = "01"; state = "DC"
+    cmd = paste0('aws s3 ls s3://prod-dot-sdc-curated-911061262852-us-east-1/waze/version=20180531/content/state=', state ,'/table=alert/projection=redshift/year=2018/month=', i, "/")
+    mo_i <- system(cmd, intern = T)
+    avail.day_i <- substr(mo_i, start = nchar(mo_i[1])-2, stop = nchar(mo_i[1])-1)
+    
+    
+    size_cmd = paste0('aws s3 ls s3://prod-dot-sdc-curated-911061262852-us-east-1/waze/version=20180531/content/state=', state ,'/table=alert/projection=redshift/year=2018/month=', i, "/ --recursive --summarize --human-readable ")
+    size_i <- system(size_cmd, intern = T)
+    
+    avail.mo = rbind(avail.mo, c(i, max(as.numeric(avail.day_i))))
+    size.mo = rbind(size.mo, gsub("^(\\s*)+Total Size: ", "", size_i[length(size_i)]))
+    obj.mo = rbind(obj.mo, gsub("^(\\s*)+Total Objects: ", "", size_i[length(size_i)-1]))
+
+  }
+}
+
+avail.mo[avail.mo==-Inf] = NA
+
+df <- data.frame(State = rep(use.states, each = length(find.months)),
+                 Month = rep(find.months, times = length(use.states)),
+                 Days = avail.mo,
+                 Size = size.mo,
+                 Objects = obj.mo)
+
+df$Value = paste(df$Days, df$Size, df$Objects, sep = " \t")
+df$Value[is.na(df$Days)] = NA
+
+df2 <- df %>% 
+  select(State, Month, Value) %>%
+  spread(key = Month, value = Value)
+
+DT::datatable(df2)# %>% formatStyle(2:13, color = styleEqual('<NA>', 'grey20'))
+```
+
+
+
+
+```{r checkcurrent, eval=F}
+July data... what is being curated now?
+
+i = "07"
+for(state in use.states){
+  cat(state, "\n")
+    cmd = paste0('aws s3 ls s3://prod-dot-sdc-curated-911061262852-us-east-1/waze/version=20180531/content/state=', state ,'/table=alert/projection=redshift/year=2018/month=', i, "/")
+    mo_i <- system(cmd, intern = T)
+    avail.day_i <- substr(mo_i, start = nchar(mo_i[1])-2, stop = nchar(mo_i[1])-1)
+    
+    
+    size_cmd = paste0('aws s3 ls s3://prod-dot-sdc-curated-911061262852-us-east-1/waze/version=20180531/content/state=', state ,'/table=alert/projection=redshift/year=2018/month=', i, '/ --recursive --summarize --human-readable')
+    (size_i <- system(size_cmd, intern = T))
+    
+    avail.mo = rbind(avail.mo, c(i, max(as.numeric(avail.day_i))))
+    size.mo = rbind(size.mo, gsub("^(\\s*)+Total Size: ", "", size_i[length(size_i)]))
+    obj.mo = rbind(obj.mo, gsub("^(\\s*)+Total Objects: ", "", size_i[length(size_i)-1]))
+
+  
+}
+
+avail.mo[avail.mo==-Inf] = NA
+
+```
+
+
 ## 2017
 
 Now looping across all 'states' in the curated data:
