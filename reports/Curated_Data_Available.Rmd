@@ -119,9 +119,9 @@ for(state in use.states){
     size_cmd = paste0('aws s3 ls s3://prod-dot-sdc-curated-911061262852-us-east-1/waze/version=20180531/content/state=', state ,'/table=alert/projection=redshift/year=2018/month=', i, "/ --recursive --summarize --human-readable ")
     size_i <- system(size_cmd, intern = T)
     
-    avail.mo = rbind(avail.mo, c(i, max(as.numeric(avail.day_i))))
-    size.mo = rbind(size.mo, gsub("^(\\s*)+Total Size: ", "", size_i[length(size_i)]))
-    obj.mo = rbind(obj.mo, gsub("^(\\s*)+Total Objects: ", "", size_i[length(size_i)-1]))
+    avail.mo = c(avail.mo, max(as.numeric(avail.day_i)))
+    size.mo = c(size.mo, gsub("^(\\s*)+Total Size: ", "", size_i[length(size_i)]))
+    obj.mo = c(obj.mo, gsub("^(\\s*)+Total Objects: ", "", size_i[length(size_i)-1]))
 
   }
 }
