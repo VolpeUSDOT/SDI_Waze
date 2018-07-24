@@ -109,18 +109,18 @@ find.months = formatC(1:12, width = 2, flag = "0")
 use.states = sort(c(state.abb, c("DC", "CA1", "CA2", "CA3")))
 
 for(state in use.states){
-  cat(state, "\n")
+  # cat(state, "\n")
   for(i in find.months){ # i = "01"; state = "DC"
     cmd = paste0('aws s3 ls s3://prod-dot-sdc-curated-911061262852-us-east-1/waze/version=20180720/content/state=', state ,'/table=alert/projection=redshift/year=2018/month=', i, "/")
     mo_i <- system(cmd, intern = T)
     avail.day_i <- substr(mo_i, start = nchar(mo_i[1])-2, stop = nchar(mo_i[1])-1)
     
     
-    size_cmd = paste0('aws s3 ls s3://prod-dot-sdc-curated-911061262852-us-east-1/waze/version=20180720/content/state=', state ,'/table=alert/projection=redshift/year=2018/month=', i, "/ --recursive --summarize --human-readable ")
+    size_cmd = paste0('aws s3 ls s3://prod-dot-sdc-curated-911061262852-us-east-1/waze/version=20180720/content/state=', state ,'/table=alert/projection=redshift/year=2018/month=', i, "/ --recursive --summarize")
     size_i <- system(size_cmd, intern = T)
     
     avail.mo = c(avail.mo, max(as.numeric(avail.day_i)))
-    size.mo = c(size.mo, gsub("^(\\s*)+Total Size: ", "", size_i[length(size_i)]))
+    size.mo = c(size.mo, as.numeric(gsub("^(\\s*)+Total Size: ", "", size_i[length(size_i)])))
     obj.mo = c(obj.mo, gsub("^(\\s*)+Total Objects: ", "", size_i[length(size_i)-1]))
 
   }
@@ -128,18 +128,32 @@ for(state in use.states){
 
 avail.mo[avail.mo==-Inf] = NA
 
+
 df <- data.frame(State = rep(use.states, each = length(find.months)),
                  Month = rep(find.months, times = length(use.states)),
                  Days = as.numeric(avail.mo),
                  Size = size.mo,
                  Objects = as.numeric(obj.mo))
 
-df$Value = paste(df$Days, df$Size, df$Objects, sep = " \t")
+size.h = vector()
+
+for(i in 1:length(size.mo)){
+  smi = size.mo[i]
+  class(smi) = 'object_size'
+  size.h = c(size.h, format(smi, units = "auto"))
+
+  }
+  
+df$Size.h = size.h
+
+df$Value = paste(df$Days, df$Size.h, df$Objects, sep = " \t")
 df$Value[is.na(df$Days)] = NA
 
 df2 <- df %>% 
   select(State, Month, Value) %>%
   spread(key = Month, value = Value)
+
+write.csv(df, file = paste0('Curated_Data_', Sys.Date(), '.csv'), row.names = F)
 
 DT::datatable(df2)# %>% formatStyle(2:13, color = styleEqual('<NA>', 'grey20'))
 ```
