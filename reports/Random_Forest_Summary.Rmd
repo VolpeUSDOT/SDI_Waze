@@ -33,11 +33,11 @@ if(ONLOCAL){
   localdir <- "/home/dflynn-volpe/workingdata" 
 }
 
+library(tidyverse)
 library(knitr)
 library(kableExtra)
 library(randomForest)
 library(aws.s3)
-library(tidyverse)
 library(pander)
 library(DT)
 # Run this if you don't have these packages:

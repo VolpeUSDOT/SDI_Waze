@@ -60,8 +60,8 @@ ggplot(out.df, aes(Prob.Crash, fill = Obs)) +
   geom_histogram(alpha = 0.5, position = "identity", binwidth = 0.01) + 
   scale_y_continuous(limits=c(0,500), oob = scales::rescale_none) + 
   ggtitle("Probability of Waze event being categorized as EDT crash \n (Truncated at count = 500)") + 
-  geom_vline(xintercept = 0.2, linetype = 'dotted') +
-  annotate("text", x = 0.3, y = 500, label = "Cutoff = 0.2") +
+  geom_vline(xintercept = 0.225, linetype = 'dotted') +
+  annotate("text", x = 0.325, y = 500, label = "Cutoff = 0.225") +
   xlab("Estimated Crash Probability") +
   #theme_bw() + 
   scale_fill_brewer(palette="Set1")
@@ -74,7 +74,7 @@ ggplot(out.df, aes(Prob.Crash, fill = Obs)) +
 ggplot(out.df, aes(Prob.Crash, fill = CorrectPred)) + 
   geom_histogram(alpha = 0.5, position = "identity", binwidth = 0.01) + 
   scale_y_continuous(limits=c(0, 500), oob = scales::rescale_none) + 
-  geom_vline(xintercept = 0.2, linetype = 'dotted') +
+  geom_vline(xintercept = 0.225, linetype = 'dotted') +
   facet_wrap(~Obs) +
   xlab("Estimated Crash Probability") +
   scale_fill_brewer(palette="Set1") +
@@ -86,10 +86,49 @@ ggplot(out.df, aes(Prob.Crash, fill = CorrectPred)) +
 #   facet_wrap(~Pred) +
 #   ggtitle("Classification Waze event as EDT crash by predicted values \n (Truncated at count = 500)")
 
+# Plotting historgram of difference from observed and estimated, by grid cell aggregated over time ----
+s3load(object = file.path(outputdir, paste("Model", modelno, "RandomForest_Output.RData", sep= "_")), bucket = waze.bucket)
+levels(out.df$Pred) = c(1, 0) # from Crash, NoCrash
+
+pct.diff.grid <- out.df %>%
+  mutate(nObs = as.numeric(as.character(Obs)),
+         nPred = as.numeric(as.character(Pred))) %>%
+  group_by(GRID_ID) %>%
+  summarize(sumObs = sum(nObs),
+            sumPred = sum(nPred),
+            Pct.diff = 100*(sumPred - sumObs) / sumObs)
+
+pct.diff.grid$Pct.diff[is.na(pct.diff.grid$Pct.diff) | pct.diff.grid$Pct.diff == Inf] = 0
+
+hist(pct.diff.grid$Pct.diff)
+
+# https://drsimonj.svbtle.com/pretty-histograms-with-ggplot2. Trick is fill = cut()
+
+levels(cut(pct.diff.grid$Pct.diff, 25)) # create manual colors to match tablesu 
+
+ggplot(pct.diff.grid, aes(Pct.diff, fill = cut(Pct.diff, 
+                                               breaks = c(-1000, -100, -50, -25, 
+                                                          0, 
+                                                          25, 50, 100, 1000) ))) + 
+  geom_histogram(bins = 10, show.legend = F, binwidth = 10) +
+  theme_dark() +
+  ggtitle("Summary of percent difference from observed and estimated EDT-level crashes") +
+  xlab("Percent difference") + ylab("Frequency by GRID_ID") +
+  scale_fill_brewer(palette = "RdBu", direction = -1)
+#
+  #  scale_color_gradient(low = 'red', high = 'midnightblue')
+
+  
+# 
+  scale_fill_manual(values = c("cadetblue4", "cadetblue2", "cadetblue1",
+                               "chocolate1", "chocolate2", "chocolate3", "chocolate4",
+                               "chocolate4", "chocolate4", "chocolate4"))
+
+
 
 # Choosing cutoffs. ----
 # Low value is most greedy for non-crashes, high value is more greedy for crashes
-# Load w.04_09 from RandomForest_WazeGrid_Full.R
+# Load w.04_09 by running firs 100 lines of RandomForest_WazeGrid_Full.R
 omits = c(alwaysomit, alert_subtypes)
 fitvars <- names(w.04_09)[is.na(match(names(w.04_09), omits))]
 test.dat.use = w.04_09[testrows,]
@@ -171,7 +210,7 @@ plot(pROC::roc(out.df$Obs, out.df$Prob.Crash, auc = TRUE))
 
 
 # From Fx
-(model_auc <- pROC::auc(test.dat.use[,response.var], rf.04.prob[,colnames(rf.04.prob)=="1"]))
+(model_auc <- pROC::auc(test.dat.use[,response.var], rf.prob[,colnames(rf.prob)=="1"]))
 
 identical(out.df$Obs, test.dat.use[,response.var])
 head(data.frame(out.df$Obs, test.dat.use[,response.var]))
