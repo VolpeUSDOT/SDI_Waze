@@ -102,6 +102,11 @@ pct.diff.grid$Pct.diff[is.na(pct.diff.grid$Pct.diff) | pct.diff.grid$Pct.diff ==
 
 hist(pct.diff.grid$Pct.diff)
 
+
+# Aggregate for report table
+
+as.data.frame(table(pct.diff.cut <- cut(pct.diff.grid$Pct.diff, breaks = c(-2000, -100, -50, -1, 0, 50, 100, 2000))))
+
 # https://drsimonj.svbtle.com/pretty-histograms-with-ggplot2. Trick is fill = cut()
 
 levels(cut(pct.diff.grid$Pct.diff, 25)) # create manual colors to match tablesu 
