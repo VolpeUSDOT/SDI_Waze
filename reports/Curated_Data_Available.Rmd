@@ -167,7 +167,7 @@ DT::datatable(df2)# %>% formatStyle(2:13, color = styleEqual('<NA>', 'grey20'))
 ```
 
 
-Visual representation
+### Visual representation
 
 ```{r visualchart}
 library(plotly)
@@ -191,7 +191,55 @@ gp.focal2 <- gp.focal + geom_line(aes(color = State),
   guides(color=guide_legend(title="State"))
 #gp.focal2
 
+ggplotly(gp.focal2, tooltip = "usetext", ```{r visualchart}
+library(plotly)
+#ggplot(df, aes(x = Month, y = Objects, fill = State)) +geom_dotplot(binaxis = "y", stackdir='center', position = 'dodge')
+
+df$usetext <- with(df, paste(State, "\n", Month, "\n",  format(Objects, big.mark = ",", digits = 0, scientific = F), "Objects", "\n", Size))
+
+gp.focal <- ggplot(df %>% filter(State %in% c("AK", "AL", "CT", "DC", "FL", "IL", "IN", "MA", "MD", "NY", "PA", "TN", "TX", "UT", "WY")),
+             aes(x = Month, 
+                 y = Objects,
+                 group = State,
+                 text = usetext)) + theme_bw()
+
+gp.focal2 <- gp.focal + geom_line(aes(color = State), 
+                                  alpha = 0.8,
+                                  size = 2) +
+  theme(axis.text.x = element_text(size=7, angle=45),
+        axis.text.y = element_text(size=7, angle=45)) +
+  ylab("Count of Objects in S3") +
+  xlab(" ")  + 
+  guides(color=guide_legend(title="State"))
+#gp.focal2
+
+ggplotly(gp.focal2, tooltip = "usetext", ```{r visualchart}
+library(plotly)
+#ggplot(df, aes(x = Month, y = Objects, fill = State)) +geom_dotplot(binaxis = "y", stackdir='center', position = 'dodge')
+
+df$usetext <- with(df, paste(State, "\n", Month, "\n",  format(Objects, big.mark = ",", digits = 0, scientific = F), "Objects", "\n", Size))
+
+gp.focal <- ggplot(df %>% filter(State %in% c("AK", "AL", "CT", "DC", "FL", "IL", "IN", "MA", "MD", "NY", "PA", "TN", "TX", "UT", "WY")),
+             aes(x = Month, 
+                 y = Objects,
+                 group = State,
+                 text = usetext)) + theme_bw()
+
+gp.focal2 <- gp.focal + geom_line(aes(color = State), 
+                                  alpha = 0.8,
+                                  size = 2) +
+  theme(axis.text.x = element_text(size=7, angle=45),
+        axis.text.y = element_text(size=7, angle=45)) +
+  ylab("Count of Objects in S3") +
+  xlab(" ")  + 
+  guides(color=guide_legend(title="State"))
+#gp.focal2
+
 ggplotly(gp.focal2, tooltip = "usetext")
+
+```
+
+```
 
 ```
 
