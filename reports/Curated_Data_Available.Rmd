@@ -191,57 +191,10 @@ gp.focal2 <- gp.focal + geom_line(aes(color = State),
   guides(color=guide_legend(title="State"))
 #gp.focal2
 
-ggplotly(gp.focal2, tooltip = "usetext", ```{r visualchart}
-library(plotly)
-#ggplot(df, aes(x = Month, y = Objects, fill = State)) +geom_dotplot(binaxis = "y", stackdir='center', position = 'dodge')
-
-df$usetext <- with(df, paste(State, "\n", Month, "\n",  format(Objects, big.mark = ",", digits = 0, scientific = F), "Objects", "\n", Size))
-
-gp.focal <- ggplot(df %>% filter(State %in% c("AK", "AL", "CT", "DC", "FL", "IL", "IN", "MA", "MD", "NY", "PA", "TN", "TX", "UT", "WY")),
-             aes(x = Month, 
-                 y = Objects,
-                 group = State,
-                 text = usetext)) + theme_bw()
-
-gp.focal2 <- gp.focal + geom_line(aes(color = State), 
-                                  alpha = 0.8,
-                                  size = 2) +
-  theme(axis.text.x = element_text(size=7, angle=45),
-        axis.text.y = element_text(size=7, angle=45)) +
-  ylab("Count of Objects in S3") +
-  xlab(" ")  + 
-  guides(color=guide_legend(title="State"))
-#gp.focal2
-
-ggplotly(gp.focal2, tooltip = "usetext", ```{r visualchart}
-library(plotly)
-#ggplot(df, aes(x = Month, y = Objects, fill = State)) +geom_dotplot(binaxis = "y", stackdir='center', position = 'dodge')
-
-df$usetext <- with(df, paste(State, "\n", Month, "\n",  format(Objects, big.mark = ",", digits = 0, scientific = F), "Objects", "\n", Size))
-
-gp.focal <- ggplot(df %>% filter(State %in% c("AK", "AL", "CT", "DC", "FL", "IL", "IN", "MA", "MD", "NY", "PA", "TN", "TX", "UT", "WY")),
-             aes(x = Month, 
-                 y = Objects,
-                 group = State,
-                 text = usetext)) + theme_bw()
-
-gp.focal2 <- gp.focal + geom_line(aes(color = State), 
-                                  alpha = 0.8,
-                                  size = 2) +
-  theme(axis.text.x = element_text(size=7, angle=45),
-        axis.text.y = element_text(size=7, angle=45)) +
-  ylab("Count of Objects in S3") +
-  xlab(" ")  + 
-  guides(color=guide_legend(title="State"))
-#gp.focal2
-
-ggplotly(gp.focal2, tooltip = "usetext")
-
+ggplotly(gp.focal2, tooltip = "usetext", hovermode="compare")
 ```
 
-```
 
-```
 
 Same, but shown by size of month instead of number of objects.
 
@@ -301,14 +254,14 @@ avail.mo[avail.mo==-Inf] = NA
 
 Now looping across all 'states' in the curated data:
 
-```{r curatedavail2017, message = F, warning=F}
+```{r curatedavail2017_new, message = F, warning=F}
 # Loop over states to find which ones have month directories:
 # can also try previous version, 20171031
 avail.mo = vector()
 use.states = c(state.abb, c("DC", "CA1", "CA2", "CA3"))
 find.months = formatC(1:12, width = 2, flag = "0")
 for(i in use.states){
-  cmd = paste0('aws s3 ls s3://prod-dot-sdc-curated-911061262852-us-east-1/waze/version=20180331/content/state=', i ,'/table=alert/projection=redshift/year=2017/')
+  cmd = paste0('aws s3 ls s3://prod-dot-sdc-curated-911061262852-us-east-1/waze/version=20180720/content/state=', i ,'/table=alert/projection=redshift/year=2017/')
   mo_i <- system(cmd, intern = T)
   avail.mo_i <- substr(mo_i, start =nchar(mo_i[1])-2, stop = nchar(mo_i[1])-1)
   
@@ -318,6 +271,98 @@ for(i in use.states){
 avail.mo <- as.data.frame(avail.mo)
 colnames(avail.mo) = c("State", find.months)
 DT::datatable(avail.mo) %>% formatStyle(2:13, background = styleEqual('TRUE', 'lightgreen'))
+```
+
+
+```{r curatedavail2017prod_byday, message = F, warning=F}
+# Loop over states and months, to find which ones have complete days of data in 2018, using new production version.
+# Also track object number and size of month folder. 
+# Could make faster by making state/month commands pasted together and doing just one loop
+avail.mo = size.mo = obj.mo = vector()
+
+find.months = formatC(1:12, width = 2, flag = "0")
+use.states = sort(c(state.abb, c("DC", "CA1", "CA2", "CA3")))
+# use.states = c("AK", "SD")
+
+statmo <- expand.grid(state = use.states, mo = find.months, stringsAsFactors = F)
+statmo <- statmo[order(statmo$state),]
+
+for(i in 1:nrow(statmo)){
+  # cat(state, "\n")  i = 1; 
+  mo = statmo[i, "mo"]; state = statmo[i, "state"]
+    cmd = paste0('aws s3 ls s3://prod-dot-sdc-curated-911061262852-us-east-1/waze/version=20180720/content/state=', state ,'/table=alert/projection=redshift/year=2017/month=', mo, "/")
+    mo_i <- system(cmd, intern = T)
+    avail.day_i <- substr(mo_i, start = nchar(mo_i[1])-2, stop = nchar(mo_i[1])-1)
+    
+    
+    size_cmd = paste0('aws s3 ls s3://prod-dot-sdc-curated-911061262852-us-east-1/waze/version=20180720/content/state=', state ,'/table=alert/projection=redshift/year=2017/month=', mo, "/ --recursive --summarize")
+    size_i <- system(size_cmd, intern = T)
+    
+    avail.mo = c(avail.mo, max(as.numeric(avail.day_i)))
+    size.mo = c(size.mo, as.numeric(gsub("^(\\s*)+Total Size: ", "", size_i[length(size_i)])))
+    obj.mo = c(obj.mo, gsub("^(\\s*)+Total Objects: ", "", size_i[length(size_i)-1]))
+
+  
+}
+
+avail.mo[avail.mo==-Inf] = NA
+
+
+df <- data.frame(State = rep(use.states, each = length(find.months)),
+                 Month = rep(find.months, times = length(use.states)),
+                 Days = as.numeric(avail.mo),
+                 Size = size.mo,
+                 Objects = as.numeric(obj.mo))
+
+size.h = vector()
+
+for(i in 1:length(size.mo)){
+  smi = size.mo[i]
+  class(smi) = 'object_size'
+  size.h = c(size.h, format(smi, units = "auto"))
+
+  }
+  
+df$Size.h = size.h
+
+df$Value = paste(df$Days, df$Size.h, format(df$Objects, big.mark = ","), sep = "  ")
+df$Value[is.na(df$Days)] = NA
+
+df2 <- df %>% 
+  select(State, Month, Value) %>%
+  spread(key = Month, value = Value)
+
+write.csv(df, file = paste0('Curated_Data_2017_', Sys.Date(), '.csv'), row.names = F)
+
+DT::datatable(df2)# %>% formatStyle(2:13, color = styleEqual('<NA>', 'grey20'))
+```
+
+
+
+```{r visualchart_size_2017}
+library(plotly)
+#ggplot(df, aes(x = Month, y = Objects, fill = State)) +geom_dotplot(binaxis = "y", stackdir='center', position = 'dodge')
+
+df$usetext <- with(df, paste(State, "\n", Month, "\n",  format(Objects, big.mark = ",", digits = 0, scientific = F), "Objects", "\n", Size.h))
+
+gp.focal <- ggplot(df %>% filter(State %in% c("AK", "AL", "CT", "DC", "FL", "IL", "IN", "MA", "MD", "NY", "PA", "TN", "TX", "UT", "WY")),
+             aes(x = Month, 
+                 y = Size/1000000,
+                 group = State,
+                 text = usetext)) + theme_bw()
+
+gp.focal2 <- gp.focal + geom_line(aes(color = State), 
+                                  alpha = 0.8,
+                                  size = 2) +
+  theme(axis.text.x = element_text(size=7, angle=45),
+        axis.text.y = element_text(size=7, angle=45)) +
+  ylab("Size (Mb) of monthly directory in S3") +
+  xlab(" ")  + 
+  guides(color=guide_legend(title="State"))
+#gp.focal2
+
+ggplotly(gp.focal2, tooltip = "usetext")
+
 ```
 
 ### Look at the previous version of the database, from 2017-10-31:
