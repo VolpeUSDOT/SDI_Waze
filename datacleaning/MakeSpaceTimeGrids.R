@@ -27,7 +27,7 @@ outputdir <- paste0("W:/SDI Pilot Projects/Waze/MASTER Data Files/Waze Aggregate
 } else {
   
   codedir <- "~/SDI_Waze" 
-  wazemonthdir <- "~/agg_in"
+  wazemonthdir <- "~/workingdata/Overlay"
   wazedir <- "~/workingdata"
   volpewazedir <- "~/workingdata"
   outputdir <- file.path("~/workingdata",
@@ -51,9 +51,9 @@ setwd(wazedir)
 # Loop through months of available merged data
 avail.months = unique(substr(dir(wazemonthdir)[grep("^merged.waze.edt", dir(wazemonthdir))], 
                       start = 17,
-                      stop = 18))
+                      stop = 23))
 
-todo.months = avail.months[c(2:7)]
+todo.months = avail.months#[c(2:7)]
 
 if(ONLOCAL) { temp.outputdir = tempdir() # for temporary storage 
 } else {

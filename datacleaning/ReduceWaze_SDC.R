@@ -55,7 +55,7 @@ tzs <- data.frame(states,
 # Get year/month, year/month/day, and last day of month vectors to create the SQL queries
 yearmonths = c(
   paste(2017, formatC(4:12, width = 2, flag = "0"), sep="-"),
-  paste(2018, formatC(1:4, width = 2, flag = "0"), sep="-")
+  paste(2018, formatC(1:7, width = 2, flag = "0"), sep="-")
 )
 yearmonths.1 <- paste(yearmonths, "01", sep = "-")
 lastdays <- days_in_month(as.POSIXct(yearmonths.1)) # from lubridate
@@ -68,7 +68,7 @@ for(i in states){ # i = 1
   
   # read data by state, across all query months for processing
   
-  alert_query <- paste0("SELECT * FROM alert WHERE state='", i,
+  alert_query <- paste0("SELECT * FROM dw_waze.alert WHERE state='", i,
                         "' AND pub_utc_timestamp BETWEEN to_timestamp('", yearmonths.1[1], 
                         " 00:00:00','YYYY-MM-DD HH24:MI:SS') AND to_timestamp('", yearmonths.end[length(yearmonths)], " 23:59:59','YYYY-MM-DD HH24:MI:SS')") # end query
   
@@ -92,13 +92,13 @@ for(i in states){ # i = 1
   
 }
 
- # ~ 1.6 h for MD, CT, UT, and VA. File size seems too small for non-MD states... VA especially. Check date range of actual data. May simply be consequence of rectangular 'state' definition by Waze.
+# Previously  ~ 1.6 h for MD, CT, UT, and VA. Now with new Redshift cluster (2018-08-12) only 20 minutes. 
 
 # Clip to state boundaries ----
   # ~ 2 h runtime for these four states
   # Depends on *_Raw_events_to_lastyearmonth.RData being in localdir,
   # and *_buffered.shp (and associated files) being in localdir/census.
-  # Will save *_Buffered_Clipped_events_to_lasyearmonth.RData in localdir and to S3
+  # Will save *_Buffered_Clipped_events_to_lastyearmonth.RData in localdir and to S3
 cliptime <- Sys.time()
 source(file.path(codeloc, "datacleaning/Waze_clip.R"))
 td <- Sys.time()-cliptime
