@@ -9,6 +9,7 @@ TESTCONN = F # Set to T to test connection
 library(DBI) 
 #library(pool) # consider this for pooled connections
 library(RPostgres) 
+library(getPass)
 # Specify username and password manually, once:
 if(Sys.getenv("sdc_waze_username")==""){
   cat("Please enter SDC Waze username and password manually, in the console, the first time accessing the Redshift database, using: \n Sys.setenv('sdc_waze_username' = <see email from SDC Administrator>) \n Sys.setenv('sdc_waze_password' = <see email from SDC Administrator>)")
@@ -26,8 +27,8 @@ conn <- dbConnect(
   RPostgres::Postgres(),
   host=redshift_host,
   port=redshift_port,
-  user=redshift_user,
-  password=redshift_password,
+  user=getPass("redshift_user"),
+  password=getPass("redshift_password"),
   dbname=redshift_db)
 
 if(TESTCONN){
@@ -38,7 +39,7 @@ if(TESTCONN){
 # add to end to limit the rows of queried data: LIMIT 50000
 
 
-alert_query_MD <- "SELECT * FROM alert 
+alert_query_MD <- "SELECT * FROM dw_waze.alert 
                     WHERE state='MD' 
                     AND pub_utc_timestamp BETWEEN to_timestamp('2017-04-01 00:00:00','YYYY-MM-DD HH24:MI:SS') 
                                           AND     to_timestamp('2017-04-30 23:59:59','YYYY-MM-DD HH24:MI:SS')
@@ -65,15 +66,15 @@ lm(timetest ~ results[1:500, "pub_utc_timestamp"])
 
 # Test query, limit to 5 results. First all alerts, then specifying MD
 
-alert_query <- "SELECT * FROM alert LIMIT 5"
+alert_query <- "SELECT * FROM dw_waze.alert LIMIT 5"
 results <- dbGetQuery(conn, alert_query)
 
-alert_query_MD <- "SELECT * FROM alert 
+alert_query_MD <- "SELECT * FROM dw_waze.alert 
                   WHERE state='MD'
                   LIMIT 5"
 results <- dbGetQuery(conn, alert_query_MD)
 
-dbClearResult(results)
+dbClearResult(results) # Jessie receives this error: Error in (function (classes, fdef, mtable)  : unable to find an inherited method for function ‘dbClearResult’ for signature ‘"data.frame"’
 dbDisconnect(conn)
 
 }

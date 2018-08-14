@@ -2,3 +2,6 @@ https://support.rstudio.com/hc/en-us/articles/218730228-Resetting-a-user-s-state
 
 To reset user state (if hanging or otherwise troublesome)
 rm /home/dflynn-volpe/.rstudio -R
+
+jessie test                                                                                                                                                                                      
+To                                                                                                                                                                                                                                                                                                    
