@@ -43,13 +43,13 @@ alert_query_MD <- "SELECT * FROM dw_waze.alert
                     WHERE state='MD' 
                     AND pub_utc_timestamp BETWEEN to_timestamp('2017-04-01 00:00:00','YYYY-MM-DD HH24:MI:SS') 
                                           AND     to_timestamp('2017-04-30 23:59:59','YYYY-MM-DD HH24:MI:SS')
-                    LIMIT 5000
-                      " # end query
-
-results <- dbGetQuery(conn, alert_query_MD)
+                      " # end query. Use LIMIT 5000 to limit
 
 
-format(object.size(results), "Gb") # 1.3 Gb for April 2017 Md data, 
+system.time(results <- dbGetQuery(conn, alert_query_MD)) # 40 s
+
+
+format(object.size(results), "Gb") # Was 1.3 Gb for April 2017 Md data in previous version of database, now 0.7 Gb
 
 summary(duplicated(results$alert_uuid)) # Avg 8x duplicated uuids
 

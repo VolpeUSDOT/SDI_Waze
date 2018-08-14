@@ -8,6 +8,8 @@
 codeloc <- "~/SDI_Waze"
 source(file.path(codeloc, 'utility/get_packages.R')) #comment out unless needed for first setup, takes a long time to compile
 
+VALIDATE = T # to display values from Redshift query for validataion in SQL Workbench
+
 library(tidyverse) # tidyverse install on SDC may require additional steps, see Package Installation Notes.Rmd 
 # library(aws.s3)
 library(lubridate)
@@ -32,8 +34,8 @@ source(file.path(codeloc, 'utility/wazefunctions.R'))
 source(file.path(codeloc, 'utility/connect_redshift_pgsql.R'))
 
 ## uncomment these lines and run with user redshift credentials filled in to resolve error if above line throws one.
-#Sys.setenv('sdc_waze_username' = <see email from SDC Administrator>) 
-#Sys.setenv('sdc_waze_password' = <see email from SDC Administrator>)
+# Sys.setenv('sdc_waze_username' = <see email from SDC Administrator>) 
+# Sys.setenv('sdc_waze_password' = <see email from SDC Administrator>)
 
 
 # Query parameters
@@ -55,7 +57,7 @@ tzs <- data.frame(states,
 # Get year/month, year/month/day, and last day of month vectors to create the SQL queries
 yearmonths = c(
   paste(2017, formatC(4:12, width = 2, flag = "0"), sep="-"),
-  paste(2018, formatC(1:4, width = 2, flag = "0"), sep="-")
+  paste(2018, formatC(1:7, width = 2, flag = "0"), sep="-")
 )
 yearmonths.1 <- paste(yearmonths, "01", sep = "-")
 lastdays <- days_in_month(as.POSIXct(yearmonths.1)) # from lubridate
@@ -64,15 +66,35 @@ yearmonths.end <- paste(yearmonths, lastdays, sep="-")
 starttime <- Sys.time()
 
 # Parallizing this will not help at this point; Redshift only running on one node.
-for(i in states){ # i = 1
+for(i in states){ # i = 'UT'
   
   # read data by state, across all query months for processing
   
-  alert_query <- paste0("SELECT * FROM alert WHERE state='", i,
+  alert_query <- paste0("SELECT * FROM dw_waze.alert WHERE state='", i,
                         "' AND pub_utc_timestamp BETWEEN to_timestamp('", yearmonths.1[1], 
                         " 00:00:00','YYYY-MM-DD HH24:MI:SS') AND to_timestamp('", yearmonths.end[length(yearmonths)], " 23:59:59','YYYY-MM-DD HH24:MI:SS')") # end query
   
   results <- dbGetQuery(conn, alert_query) 
+  
+  # validate against SQL Workbench by getting counts of accidents alert_uuid's by month for this state
+  if(VALIDATE){
+    state_acc_count = results %>%
+      filter(alert_type == 'ACCIDENT') %>%
+      mutate(year = format(pub_utc_timestamp, "%Y")) %>%
+      mutate(month = format(pub_utc_timestamp, "%m")) %>%
+      group_by(year, month, alert_type) %>%
+      summarize(n())
+   
+    fn = paste0(i, "_Acc_counts_", yearmonths[length(yearmonths)],".csv")
+    
+    write.csv(state_acc_count, file = file.path(output.loc, fn))
+    
+    # Copy to S3
+    system(paste("aws s3 cp",
+                 file.path(output.loc, fn),
+                 file.path(teambucket, i, fn)))
+    
+  }
   
   cat(format(nrow(results), big.mark = ","), "observations in", i, "\n")
   timediff <- Sys.time() - starttime
@@ -92,13 +114,13 @@ for(i in states){ # i = 1
   
 }
 
- # ~ 1.6 h for MD, CT, UT, and VA. File size seems too small for non-MD states... VA especially. Check date range of actual data. May simply be consequence of rectangular 'state' definition by Waze.
+# Previously  ~ 1.6 h for MD, CT, UT, and VA. Now with new Redshift cluster (2018-08-12) only 20 minutes. 
 
 # Clip to state boundaries ----
   # ~ 2 h runtime for these four states
   # Depends on *_Raw_events_to_lastyearmonth.RData being in localdir,
   # and *_buffered.shp (and associated files) being in localdir/census.
-  # Will save *_Buffered_Clipped_events_to_lasyearmonth.RData in localdir and to S3
+  # Will save *_Buffered_Clipped_events_to_lastyearmonth.RData in localdir and to S3
 cliptime <- Sys.time()
 source(file.path(codeloc, "datacleaning/Waze_clip.R"))
 td <- Sys.time()-cliptime

@@ -12,7 +12,7 @@ library(doParallel)
 library(foreach)
 
 #Set parameters for data to process
-HEXSIZE = c("1", "4", "05")[3] # Change the value in the bracket to use 1, 4, or 0.5 sq mi hexagon grids
+HEXSIZE = c("1", "4", "05")[1] # Change the value in the bracket to use 1, 4, or 0.5 sq mi hexagon grids
 ONLOCAL = F
 
 if(ONLOCAL){
@@ -27,11 +27,18 @@ outputdir <- paste0("W:/SDI Pilot Projects/Waze/MASTER Data Files/Waze Aggregate
 } else {
   
   codedir <- "~/SDI_Waze" 
-  wazemonthdir <- "~/agg_in"
   wazedir <- "~/workingdata"
-  volpewazedir <- "~/workingdata"
+  
+  
+  user <- paste0( "/home/", system("whoami", intern = TRUE)) #the user directory to use
+  localdir <- paste0(user, "/workingdata/") # full path for readOGR
+  wazemonthdir <- "~/workingdata/Overlay" 
   outputdir <- file.path("~/workingdata",
-                      paste("WazeEDT_Agg",HEXSIZE,"mile_Rdata_Input", sep = "_"))
+                         paste("WazeEDT_Agg",HEXSIZE,"mile_Rdata_Input", sep = "_"))
+  
+  teambucket <- "s3://prod-sdc-sdi-911061262852-us-east-1-bucket"
+  
+ 
   
 }
 
@@ -45,88 +52,110 @@ outputdir <- paste0("W:/SDI Pilot Projects/Waze/MASTER Data Files/Waze Aggregate
 # outputdir <- paste0("S:/SDI Pilot Projects/Waze/MASTER Data Files/Waze Aggregated/HexagonWazeEDT/",
 #                     "WazeEDT Agg",HEXSIZE,"mile Rdata Input")
 
-source(file.path(codedir, "utility/wazefunctions.R")) # for movefiles() function
-setwd(wazedir)
+source(file.path(codeloc, "utility/wazefunctions.R")) 
 
-# Loop through months of available merged data
-avail.months = unique(substr(dir(wazemonthdir)[grep("^merged.waze.edt", dir(wazemonthdir))], 
-                      start = 17,
-                      stop = 18))
+states = c("CT", "UT", "VA", "MD")
 
-todo.months = avail.months[c(2:7)]
+# Time zone picker:
+tzs <- data.frame(states, 
+                  tz = c("US/Eastern",
+                    "US/Mountain",
+                    "US/Eastern",
+                    "US/Eastern"),
+                  stringsAsFactors = F)
+
+setwd(wazemonthdir)
 
 if(ONLOCAL) { temp.outputdir = tempdir() # for temporary storage 
 } else {
   temp.outputdir = "~/agg_out"
 }
-starttime <- Sys.time()
 
-cl <- makeCluster(parallel::detectCores()) # make a cluster of all available cores
-registerDoParallel(cl)
 
-writeLines(c(""), "log.txt")    
+# start state loop ----
+for(state in states){ # state = "CT"
 
-foreach(j = todo.months, .packages = c("dplyr", "lubridate", "utils")) %dopar% {
+  # Loop through months of available merged data for this state
+  mergefiles <- dir(wazemonthdir)[grep("^merged.waze.edt", dir(wazemonthdir))]
+  statemergefiles <- mergefiles[grep(paste0(state, ".RData"), mergefiles)]
+ 
+  avail.months = unique(substr(statemergefiles, 
+                               start = 17,
+                               stop = 23))
   
-  sink("log.txt", append=TRUE)
-  
-  cat(paste(Sys.time()), j, "\n")                                                           
-                                                           
-# for(j in todo.months){ # j="04"
-  
-  load(file.path(wazemonthdir, paste0("merged.waze.edt.", j,"_", HEXSIZE, "mi","_MD.RData"))) # includes both waze (link.waze.edt) and edt (edt.df) data, with grid for central and neighboring cells
-  
-  # format(object.size(link.waze.edt), "Mb"); format(object.size(edt.df), "Mb")
-  # EDT time needs to be POSIXct, not POSIXlt. ct: seconds since beginning of 1970 in UTC. lt is a list of vectors representing seconds, min, hours, day, year. ct is better for analysis, while lt is more human-readable.
-  link.waze.edt$CrashDate_Local <- as.POSIXct(link.waze.edt$CrashDate_Local, "%Y-%m-%d %H:%M:%S", tz = "America/New_York")
-  edt.df$CrashDate_Local <- as.POSIXct(edt.df$CrashDate_Local, "%Y-%m-%d %H:%M:%S", tz = "America/New_York")
-  
-  ##############
-  # Make data frame of all Grid IDs by day of year and time of day in each month of data (subset to all grid IDs with Waze OR EDT data)
-  GridIDall <- c(unique(as.character(link.waze.edt$GRID_ID)), unique(as.character(link.waze.edt$GRID_ID.edt)))
-  
-  month.days <- unique(as.numeric(format(link.waze.edt$last.pull.time, "%d")))
-  lastday = max(month.days[!is.na(month.days)])
-  
-  Month.hour <- seq(from = as.POSIXct(paste0("2017-", j,"-01 0:00"), tz = "America/New_York"), 
-                    to = as.POSIXct(paste0("2017-", j,"-", lastday, " 23:00"), tz = "America/New_York"),
-                    by = "hour")
-  
-  GridIDTime <- expand.grid(Month.hour, GridIDall)
-  names(GridIDTime) <- c("GridDayHour", "GRID_ID")
+  todo.months = sort(avail.months)[c(1:9)]
 
-  # Temporally matching
-  # Match between the first reported time and last pull time of the Waze event. 
-  StartTime <- Sys.time()
-  t.min = min(GridIDTime$GridDayHour)
-  t.max = max(GridIDTime$GridDayHour)
-  i = t.min
+  use.tz <- tzs$tz[tzs$states == state]
   
-  Waze.hex.time.all <- vector()
-  counter = 1
-  while(i+3600 <= t.max){
-    ti.GridIDTime = filter(GridIDTime, GridDayHour == i)
-    ti.link.waze.edt = filter(link.waze.edt, time >= i & time <= i+3600 | last.pull.time >= i & last.pull.time <=i+3600)
+  starttime <- Sys.time()
   
-     ti.Waze.hex <- inner_join(ti.GridIDTime, ti.link.waze.edt, by = "GRID_ID") #Use left_join to get zeros if no match  
-     Waze.hex.time.all <- rbind(Waze.hex.time.all, ti.Waze.hex)
+  cl <- makeCluster(parallel::detectCores()) # make a cluster of all available cores
+  registerDoParallel(cl)
+  
+  writeLines(c(""), "log.txt")    
+  
+  foreach(j = todo.months, .packages = c("dplyr", "lubridate", "utils")) %dopar% { # j="2017-04"
 
-    i=i+3600
-    if(counter %% 3600*24 == 0) cat(paste(i, "\n"))
-   } # end loop
+    sink("log.txt", append=TRUE)
+    
+    cat(paste(Sys.time()), j, "\n")                                                           
+                                                             
+    
+    load(file.path(wazemonthdir, paste0("merged.waze.edt.", j,"_", state, ".RData"))) # includes both waze (link.waze.edt) and edt (edt.df) data, with grid for central and neighboring cells
+    
+    # format(object.size(link.waze.edt), "Mb"); format(object.size(edt.df), "Mb")
+    # EDT time needs to be POSIXct, not POSIXlt. ct: seconds since beginning of 1970 in UTC. lt is a list of vectors representing seconds, min, hours, day, year. ct is better for analysis, while lt is more human-readable.
+    link.waze.edt$CrashDate_Local <- as.POSIXct(link.waze.edt$CrashDate_Local, "%Y-%m-%d %H:%M:%S", tz = use.tz)
+    edt.df$CrashDate_Local <- as.POSIXct(edt.df$CrashDate_Local, "%Y-%m-%d %H:%M:%S", tz = use.tz)
+    
+    ##############
+    # Make data frame of all Grid IDs by day of year and time of day in each month of data (subset to all grid IDs with Waze OR EDT data)
+    GridIDall <- c(unique(as.character(link.waze.edt$GRID_ID)), unique(as.character(link.waze.edt$GRID_ID.edt)))
+    
+    month.days <- unique(as.numeric(format(link.waze.edt$last.pull.time, "%d")))
+    lastday = max(month.days[!is.na(month.days)])
+    
+    Month.hour <- seq(from = as.POSIXct(paste0(j,"-01 0:00"), tz = use.tz), 
+                      to = as.POSIXct(paste0(j,"-", lastday, " 23:00"), tz = use.tz),
+                      by = "hour")
+    
+    GridIDTime <- expand.grid(Month.hour, GridIDall)
+    names(GridIDTime) <- c("GridDayHour", "GRID_ID")
   
-  EndTime <- Sys.time() - StartTime
-  cat(round(EndTime, 2), attr(EndTime, "units"), "\n")
+    # Temporally matching
+    # Match between the first reported time and last pull time of the Waze event. 
+    StartTime <- Sys.time()
+    t.min = min(GridIDTime$GridDayHour)
+    t.max = max(GridIDTime$GridDayHour)
+    i = t.min
+    
+    Waze.hex.time.all <- vector()
+    counter = 1
+    while(i+3600 <= t.max){
+      ti.GridIDTime = filter(GridIDTime, GridDayHour == i)
+      ti.link.waze.edt = filter(link.waze.edt, time >= i & time <= i+3600 | last.pull.time >= i & last.pull.time <=i+3600)
+    
+       ti.Waze.hex <- inner_join(ti.GridIDTime, ti.link.waze.edt, by = "GRID_ID") #Use left_join to get zeros if no match  
+       Waze.hex.time.all <- rbind(Waze.hex.time.all, ti.Waze.hex)
   
-  Waze.hex.time <- filter(Waze.hex.time.all, !is.na(GRID_ID))
+      i=i+3600
+      if(counter %% 3600*24 == 0) cat(paste(i, "\n"))
+     } # end loop
+    
+    EndTime <- Sys.time() - StartTime
+    cat(round(EndTime, 2), attr(EndTime, "units"), "\n")
+    
+    Waze.hex.time <- filter(Waze.hex.time.all, !is.na(GRID_ID))
+    
+    #Save list of Grid cells and time windows with EDT or Waze data  
+    save(list="Waze.hex.time", file = paste(temp.outputdir, "/WazeHexTimeList_", j,"_", HEXSIZE, "mi_", state, ".RData",sep=""))
+    
+    cat("Completed", j, "\n")
+    } # End SpaceTimeGrid loop ----
   
-  #Save list of Grid cells and time windows with EDT or Waze data  
-  save(list="Waze.hex.time", file = paste(temp.outputdir, "/WazeHexTimeList_", j,"_", HEXSIZE, "mi",".RData",sep=""))
+  stopCluster(cl)
   
-  cat("Completed", j, "\n")
-  } # End SpaceTimeGrid loop ----
-
-stopCluster(cl)
+} # end state loop
 
 
 if(ONLOCAL) movefiles(dir(temp.outputdir)[grep("Hex", dir(temp.outputdir))], temp.outputdir, outputdir)
