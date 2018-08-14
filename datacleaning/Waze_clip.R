@@ -37,7 +37,7 @@ FIPS = data.frame(state = c("CT", "MD", "UT", "VA"),
 
 # Start loop over states ----
 
-statefiles <- dir(localdir)[grep("RData", dir(localdir))]
+statefiles <- dir(output.loc)[grep("RData", dir(output.loc))]
 
 starttime <- Sys.time()
 
@@ -53,12 +53,12 @@ for(i in states){ # i = "CT"
   }
   
   # ~ 1 min to read 3.4 Gb CT file
-  load(file.path(localdir, statefiles[grep(paste0(i, "_Raw_"), statefiles)]))
+  load(file.path(output.loc, statefiles[grep(paste0(i, "_Raw_"), statefiles)]))
   
   cat(i, "loaded \n")
   
   # original file size in MB
-  orig.file.size <- round(file.info(file.path(localdir, statefiles[grep(paste0(i, "_Raw_"), statefiles)]))$size/1000000, 2)
+  orig.file.size <- round(file.info(file.path(output.loc, statefiles[grep(paste0(i, "_Raw_"), statefiles)]))$size/1000000, 2)
   orig.nrow <- nrow(results)
   
   # <><><><><><><><><><><><><><><><><><><><>

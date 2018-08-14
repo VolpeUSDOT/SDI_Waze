@@ -17,7 +17,8 @@ library(foreach)
 library(doParallel)
 
 output.loc <- "~/tempout"
-localdir <- "/home/daniel/workingdata/" # full path for readOGR
+user <- paste0( "/home/", system("whoami", intern = TRUE)) #the user directory to use
+localdir <- paste0(user, "/workingdata/") # full path for readOGR
 edtdir <- normalizePath(file.path(localdir, "EDT"))
 wazedir <- "~/tempout" # has State_Year-mo.RData files. Grab from S3 if necessary
 
@@ -29,8 +30,8 @@ states = c("CT", "UT", "VA", "MD")
 
 # Time zone picker:
 tzs <- data.frame(states, 
-                  tz = c("US/Eastern",
-                         "US/Mountain",
+                  tz = c(#"US/Eastern",
+                         #"US/Mountain",
                          "US/Eastern",
                          "US/Eastern"),
                   stringsAsFactors = F)

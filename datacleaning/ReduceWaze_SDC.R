@@ -8,6 +8,8 @@
 codeloc <- "~/SDI_Waze"
 source(file.path(codeloc, 'utility/get_packages.R')) #comment out unless needed for first setup, takes a long time to compile
 
+VALIDATE = T # to display values from Redshift query for validataion in SQL Workbench
+
 library(tidyverse) # tidyverse install on SDC may require additional steps, see Package Installation Notes.Rmd 
 # library(aws.s3)
 library(lubridate)
@@ -32,8 +34,8 @@ source(file.path(codeloc, 'utility/wazefunctions.R'))
 source(file.path(codeloc, 'utility/connect_redshift_pgsql.R'))
 
 ## uncomment these lines and run with user redshift credentials filled in to resolve error if above line throws one.
-#Sys.setenv('sdc_waze_username' = <see email from SDC Administrator>) 
-#Sys.setenv('sdc_waze_password' = <see email from SDC Administrator>)
+# Sys.setenv('sdc_waze_username' = <see email from SDC Administrator>) 
+# Sys.setenv('sdc_waze_password' = <see email from SDC Administrator>)
 
 
 # Query parameters
@@ -64,7 +66,7 @@ yearmonths.end <- paste(yearmonths, lastdays, sep="-")
 starttime <- Sys.time()
 
 # Parallizing this will not help at this point; Redshift only running on one node.
-for(i in states){ # i = 1
+for(i in states){ # i = 'UT'
   
   # read data by state, across all query months for processing
   
@@ -73,6 +75,26 @@ for(i in states){ # i = 1
                         " 00:00:00','YYYY-MM-DD HH24:MI:SS') AND to_timestamp('", yearmonths.end[length(yearmonths)], " 23:59:59','YYYY-MM-DD HH24:MI:SS')") # end query
   
   results <- dbGetQuery(conn, alert_query) 
+  
+  # validate against SQL Workbench by getting counts of accidents alert_uuid's by month for this state
+  if(VALIDATE){
+    state_acc_count = results %>%
+      filter(alert_type == 'ACCIDENT') %>%
+      mutate(year = format(pub_utc_timestamp, "%Y")) %>%
+      mutate(month = format(pub_utc_timestamp, "%m")) %>%
+      group_by(year, month, alert_type) %>%
+      summarize(n())
+   
+    fn = paste0(i, "_Acc_counts_", yearmonths[length(yearmonths)],".csv")
+    
+    write.csv(state_acc_count, file = file.path(output.loc, fn))
+    
+    # Copy to S3
+    system(paste("aws s3 cp",
+                 file.path(output.loc, fn),
+                 file.path(teambucket, i, fn)))
+    
+  }
   
   cat(format(nrow(results), big.mark = ","), "observations in", i, "\n")
   timediff <- Sys.time() - starttime

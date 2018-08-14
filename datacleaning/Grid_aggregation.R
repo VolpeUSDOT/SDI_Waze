@@ -14,10 +14,12 @@ library(utils)
 library(doParallel)
 library(foreach)
 
-output.loc <- "~/tempout"
-localdir <- "/home/daniel/workingdata/" # full path for readOGR
+output.loc <- "~/agg_out"
+user <- paste0( "/home/", system("whoami", intern = TRUE)) #the user directory to use
+localdir <- paste0(user, "/workingdata/") # full path for readOGR
 edtdir <- normalizePath(file.path(localdir, "EDT"))
 wazedir <- "~/tempout" # has State_Year-mo.RData files. Grab from S3 if necessary
+
 
 teambucket <- "s3://prod-sdc-sdi-911061262852-us-east-1-bucket"
 
@@ -38,10 +40,6 @@ tzs <- data.frame(states,
 HEXSIZE = 1# c("1", "4", "05")#[1] # Change the value in the bracket to use 1, 4, or 0.5 sq mi hexagon grids
 
 
-  codedir <- "~/SDI_Waze" 
-  wazemonthdir <- "~/tempin"
-  localdir <- "~/workingdata"
-  outputdir <- "~/tempout"
 
 
 source(file.path(codedir, "utility/wazefunctions.R")) # for movefiles() function
@@ -83,7 +81,7 @@ foreach(j = todo.months, .packages = c("dplyr", "lubridate", "utils")) %dopar% {
   
   # <><><><><><><><><><><><><><><><><><><><>
   
-  #Read in the data frame of all Grid IDs by day of year and time of day in each month of data (subet to all grid IDs with Waze OR EDT data)
+  #Read in the data frame of all Grid IDs by day of year and time of day in each month of data (subset to all grid IDs with Waze OR EDT data)
   load(file.path(paste(outputdir, "/WazeHexTimeList_", j,"_",SIZE,"mi",".RData",sep="")))
   
   # aggregate: new data frame will have one row per cell, per hour, per day.
