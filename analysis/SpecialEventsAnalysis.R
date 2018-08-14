@@ -10,6 +10,7 @@ library(rgdal) # for readOGR(), needed for reading in ArcM shapefiles
 library(foreach)
 library(doParallel)
 library(rgeos) #gintersection
+library(lubridate)
 
 localdir <- "C:/Users/Jessie.Yang.CTR/Downloads/OST/Waze project/Special Events"
 # localdir <- "/home/daniel/workingdata/" # full path for readOGR, Jessie don't have this folder.
@@ -48,7 +49,7 @@ co <- spTransform(co, CRS(proj.USGS))
 
 md <- readOGR(file.path(data.loc,"Census4Waze"), layer = "MD_outline")
 md <- spTransform(md, CRS(proj.USGS))
-md@data
+md@data # check the data table in SpatialPolygonsDataFrame class
 
 grid <- readOGR(file.path(data.loc,"MD_hexagons_shapefiles"), layer = "MD_hexagons_1mi_newExtent_neighbors")
 grid <- spTransform(grid, CRS(proj.USGS))
@@ -57,11 +58,15 @@ GridCount <- read.csv(paste0(output.loc, "/Waze_04-09_GridCounts.csv"))
 AllModel30 <- read.csv(paste0(output.loc, "/All_Model_30.csv"))
 
 # Convert day of year to date
-GridCount$date <- as.Date(GridCount$day, origin = "2017-01-01")
-AllModel30$date <- as.Date(AllModel30$day, origin = "2017-01-01")
+GridCount$date <- as.Date(GridCount$day, origin = "2016-12-31")
+AllModel30$date <- as.Date(AllModel30$day, origin = "2016-12-31")
+
+as.Date(91, origin = "2016-12-31")
 
 max(GridCount$date) # Sept 30
 min(GridCount$date) # April 1
+
+min(AllModel30$date) # April 1, 2017
 
 # Two example events, Baseball game. Fedex Field does not have football event on Sep 17, and M&T Bank Stadium does not have football event on Sept 10. We need to check whether there is any pre-season football events before Sept 10 to have a baseline to compare.
 "1:00 PM ETSeptember 10, 2017, FedEx Field, 1600 Fedex Way, Landover, MD 20785
@@ -78,19 +83,58 @@ AllModel30[AllModel30$GRID_ID %in% paste0(1,c("FC-64", "C-63", "FB-64"))
 # they are all zero, not jams happened at this day.
 
 # To include more hexagons using spatial join
-SpecialEvents <- data.frame(lon = -76.864535, lat = 38.907794) # FedEx Field
-SpecialEvents <- SpatialPointsDataFrame(SpecialEvents[c("lon", "lat")], SpecialEvents, 
-                             proj4string = CRS("+proj=longlat +datum=WGS84"))  #  make sure Waze data is a SPDF
-SpecialEvents <-spTransform(mb, CRS(proj.USGS)) # create spatial point data frame
-plot(SpecialEvents)
+SpecialEvents <- data.frame(location = c("Fedex Field"),
+                            date = c("2017-09-10"),
+                            hour = 13,
+                            lon = -76.864535, 
+                            lat = 38.907794) # FedEx Field
+SpecialEvents_SP <- SpatialPointsDataFrame(SpecialEvents[c("lon", "lat")], SpecialEvents, proj4string = CRS("+proj=longlat +datum=WGS84"))  #  make sure Waze data is a SPDF
+SpecialEvents_SP <-spTransform(SpecialEvents_SP, CRS(proj.USGS)) # create spatial point data frame
+plot(SpecialEvents_SP)
 
 buffdist <- 3*1609 # convert miles to meters
-SpecialEvents_buffer <- gBuffer(SpecialEvents, width = buffdist) # create a buffer, look for buffer_state.R for more information on spatial join
+SpecialEvents_buffer <- gBuffer(SpecialEvents_SP, width = buffdist) # create a buffer, look for buffer_state.R for more information on spatial join
 
 plot(SpecialEvents_buffer) # plot the spatial
 
 grid@data # look at data from the grid 
-over(SpecialEvents_buffer, grid, fn = mean) # join polygons to SpatialPolygonDataFrame, return to only one row of mean values in the data frame.
+# over(SpecialEvents_buffer, grid, fn = mean) # join polygons to SpatialPolygonDataFrame, return to only one row of mean values in the data frame.
+gIntersects(SpecialEvents_buffer, grid, byid = T) # a data frame with T/F logic values of the grid data frame
+sum(gIntersects(SpecialEvents_buffer, grid, byid = T)) # 42 polygons are intersected
+
+grid_id <- grid$GRID_ID[gIntersects(SpecialEvents_buffer, grid, byid = T)]
+grid_id <- paste0(1,grid_id)
+
+# SpecialEvents <- SpecialEvents %>% left_join(grid@data)
+
+GridCount[GridCount$GRID_ID %in% grid_id & GridCount$date == "2017-09-10",]
+
+# # fill in the GridCount for all hours
+# blank.grid <- expand(GridCount, GRID_ID, day, hour)
+# blank.grid
+
+# Columns with numeric counts or values
+col.names <- names(GridCount)[-c(1:4,15)]
+
+# GridCount_new <- blank.grid %>% left_join(GridCount, by = c("GRID_ID", "day", "hour")) %>% mutate_if(colnames(.) %in% col.names,funs(replace(., which(is.na(.)), 0))) %>% mutate(date = as.Date(day, origin = "2016-12-31")) # 30256488 = 24*183*6889
+
+dim(GridCount_new) #30256488       15
+length(unique(GridCount$day)) #183
+length(unique(GridCount$date)) #183
+length(unique(GridCount$GRID_ID)) #6889
+
+# GridCount_sum <- 
+
+# t-test accident counts between event and a week after the event
+y1 <- GridCount %>% filter(GRID_ID %in% grid_id & date %in% SpecialEvents$date) %>% expand(GRID_ID, day, hour) %>% left_join(GridCount, by = c("GRID_ID", "day", "hour")) %>% mutate_if(colnames(.) %in% col.names,funs(replace(., which(is.na(.)), 0))) %>% mutate(date = as.Date(day, origin = "2016-12-31"), DayOfWeek = as.integer(factor(weekdays(date),levels = c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"))), special_events = "Fedex Field")
 
 
+y2 <- GridCount %>% filter(GRID_ID %in% grid_id & date == "2017-09-17") %>% expand(GRID_ID, day, hour) %>% left_join(GridCount, by = c("GRID_ID", "day", "hour")) %>% mutate_if(colnames(.) %in% col.names,funs(replace(., which(is.na(.)), 0))) %>% mutate(date = as.Date(day, origin = "2016-12-31"), DayOfWeek = as.integer(factor(weekdays(date),levels = c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"))), special_events = "Null")
 
+# T-test on accidents between two days.
+t.test(y1$nWazeAccident,y2$nWazeAccident,paired=TRUE) # p-value is different
+
+# remove all other objects, and run the script again
+# rm(list=setdiff(ls(), "AllModel30"))
+
+# Time series plot
