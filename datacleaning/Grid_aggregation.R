@@ -259,8 +259,18 @@ for(state in states){ # state = "CT"
     hextimeChar <- paste(wazeTime.edt.hexAll$day,wazeTime.edt.hexAll$hour,sep=":")
     wazeTime.edt.hexAll$hextime <- strptime(hextimeChar, "%j:%H", tz=)
   
-    save(list="wazeTime.edt.hexAll", file = paste(temp.outputdir, "/WazeTimeEdtHexAll_", j,"_",HEXSIZE,"mi_", state, ".RData", sep=""))
-  
+    
+    class(wazeTime.edt.hexAll) <- "data.frame" # POSIX date/time not supported for grouped tbl
+    
+    fn = paste("WazeTimeEdtHexAll_", j,"_",HEXSIZE,"mi_", state, ".RData", sep="")
+    
+    save(list="wazeTime.edt.hexAll", file = file.path(temp.outputdir, fn))
+
+    # Copy to S3
+    system(paste("aws s3 cp",
+                 file.path(temp.outputdir, fn),
+                 file.path(teambucket, state, fn)))
+    
   } # End month aggregation loop ----
   
   
@@ -270,6 +280,19 @@ for(state in states){ # state = "CT"
 
 ##########################################################################################################
 ##########################################################################################################
+
+# move any old files to S3 (should not be needed any more, S3 copy command is part of loop now.)
+
+aggfiles <- dir(temp.outputdir) # consists of both the TimeList and HexAll files for each state
+for(state in states){
+  state.aggfiles <- aggfiles[grep(state, aggfiles)]
+  for(i in state.aggfiles){
+    system(paste("aws s3 cp",
+                 file.path(temp.outputdir, i),
+                 file.path(teambucket, state, i)))
+  }
+}
+
 
 # Check with plots -- written for ATA, needs update for SDC 2018-08-15
 

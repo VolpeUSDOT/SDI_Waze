@@ -1,6 +1,4 @@
-# Aggregation of Waze and EDT by grid cell
-# Goal: create a gridded data set where grid cell contain the count of 
-# Start from UrbanArea_overlay.R
+# Precursor to Grid_aggregation, follows Hex_UA_overlay_SDC
 
 
 # <><><><><><><><><><><><><><><><><><><><>
@@ -13,45 +11,17 @@ library(foreach)
 
 #Set parameters for data to process
 HEXSIZE = c("1", "4", "05")[1] # Change the value in the bracket to use 1, 4, or 0.5 sq mi hexagon grids
-ONLOCAL = F
 
-if(ONLOCAL){
-##Set file paths - remove for cloud pipeline
-#Flynn drive
-codedir <- "~/git/SDI_Waze" 
-wazemonthdir <- "W:/SDI Pilot Projects/Waze/MASTER Data Files/Waze Aggregated/month_MD_clipped"
-wazedir <- "W:/SDI Pilot Projects/Waze/"
-volpewazedir <- "//vntscex.local/DFS/Projects/PROJ-OR02A2/SDI/"
-outputdir <- paste0("W:/SDI Pilot Projects/Waze/MASTER Data Files/Waze Aggregated/HexagonWazeEDT/",
-                    "WazeEDT Agg",HEXSIZE,"mile Rdata Input")
-} else {
-  
-  codedir <- "~/SDI_Waze" 
-  wazedir <- "~/workingdata"
-  
-  
-  user <- paste0( "/home/", system("whoami", intern = TRUE)) #the user directory to use
-  localdir <- paste0(user, "/workingdata/") # full path for readOGR
-  wazemonthdir <- "~/workingdata/Overlay" 
-  outputdir <- file.path("~/workingdata",
-                         paste("WazeEDT_Agg",HEXSIZE,"mile_Rdata_Input", sep = "_"))
-  
-  teambucket <- "s3://prod-sdc-sdi-911061262852-us-east-1-bucket"
-  
- 
-  
-}
+codedir <- "~/SDI_Waze" 
 
+user <- paste0( "/home/", system("whoami", intern = TRUE)) #the user directory to use
+localdir <- paste0(user, "/workingdata/") # full path for readOGR
 
-# #Sudderth drive
-# #NEED TO CONNECT TO VPN AND CLICK ON "S" DRIVE IN FILE EXPLORER FIRST
-# codedir <- "~/GitHub/SDI_Waze"  
-# wazemonthdir <- "S:/SDI Pilot Projects/Waze/MASTER Data Files/Waze Aggregated/month_MD_clipped"
-# wazedir <- "S:/SDI Pilot Projects/Waze/"
-# volpewazedir <- "//vntscex.local/DFS/Projects/PROJ-OR02A2/SDI/"
-# outputdir <- paste0("S:/SDI Pilot Projects/Waze/MASTER Data Files/Waze Aggregated/HexagonWazeEDT/",
-#                     "WazeEDT Agg",HEXSIZE,"mile Rdata Input")
+wazemonthdir <- "~/workingdata/Overlay" # contains the merged.waze.edt.YYYY-mm_<state>.RData files
+temp.outputdir = "~/agg_out" # Will contain the WazeHexTimeList_YYYY-mm_HEXSIZE_<state>.RData files
 
+teambucket <- "s3://prod-sdc-sdi-911061262852-us-east-1-bucket"
+  
 source(file.path(codeloc, "utility/wazefunctions.R")) 
 
 states = c("CT", "UT")#, "VA", "MD")
@@ -67,11 +37,8 @@ tzs <- data.frame(states,
 
 setwd(wazemonthdir)
 
-if(ONLOCAL) { temp.outputdir = tempdir() # for temporary storage 
-} else {
-  temp.outputdir = "~/agg_out"
-}
 
+# <><><><><><><><><><><><><><><><><><><><>
 
 # start state loop ----
 for(state in states){ # state = "CT"
@@ -158,7 +125,14 @@ for(state in states){ # state = "CT"
     Waze.hex.time <- filter(Waze.hex.time.all, !is.na(GRID_ID))
     
     #Save list of Grid cells and time windows with EDT or Waze data  
-    save(list="Waze.hex.time", file = paste(temp.outputdir, "/WazeHexTimeList_", j,"_", HEXSIZE, "mi_", state, ".RData",sep=""))
+    fn = paste0("WazeHexTimeList_", j,"_", HEXSIZE, "mi_", state, ".RData")
+    
+    save(list="Waze.hex.time", file = paste(temp.outputdir, fn))
+    
+    # Copy to S3
+    system(paste("aws s3 cp",
+                 file.path(temp.outputdir, fn),
+                 file.path(teambucket, state, fn)))
     
     cat("Completed", j, "\n")
     } # End SpaceTimeGrid loop ----
@@ -166,9 +140,3 @@ for(state in states){ # state = "CT"
   stopCluster(cl)
   
 } # end state loop
-
-
-if(ONLOCAL) movefiles(dir(temp.outputdir)[grep("Hex", dir(temp.outputdir))], temp.outputdir, outputdir)
-
-
-  
