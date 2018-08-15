@@ -66,7 +66,7 @@ for(state in states){ # state = "CT"
   cl <- makeCluster(parallel::detectCores()) # make a cluster of all available cores
   registerDoParallel(cl)
   
-  writeLines(c(""), paste0(SIZE, "_log.txt"))    
+  writeLines(c(""), paste0(HEXSIZE, "_log.txt"))    
   
   foreach(j = todo.months, .packages = c("dplyr", "lubridate", "utils")) %dopar% {
     
@@ -94,7 +94,7 @@ for(state in states){ # state = "CT"
     # Predictor variable columns: median values for the numeric characteristics: report rating, confidence..
     # Counts for the number of waze events of each alert_type and sub_type, inside this grid cell at this time.
     # The same, but for each of the neighboring grid cells (N, NE, SE, S, SW, NW). 
-    # counts for roadType, 11 columns: length(unique(link.waze.edt$roadType[!is.na(link.waze.edt$roadType)]))
+    # counts for road_type, 11 columns: length(unique(link.waze.edt$road_type[!is.na(link.waze.edt$road_type)]))
     
     #summarize counts of Waze events in each hexagon and EDT matches to the Waze events (could be in neighboring hexagon)
     # names(Waze.hex.time)
@@ -150,15 +150,15 @@ for(state in states){ # state = "CT"
         nWazeWeatherFog = n_distinct(uuid.waze[sub_type=="HAZARD_WEATHER_FOG"]),
         nWazeHazardIceRoad = n_distinct(uuid.waze[sub_type=="HAZARD_ON_ROAD_ICE"]),
         
-        nWazeRT3 = n_distinct(uuid.waze[roadType=="3"]),
-        nWazeRT4 = n_distinct(uuid.waze[roadType=="4"]),
-        nWazeRT6 = n_distinct(uuid.waze[roadType=="6"]),
-        nWazeRT7 = n_distinct(uuid.waze[roadType=="7"]),
-        nWazeRT2 = n_distinct(uuid.waze[roadType=="2"]),
-        nWazeRT0 = n_distinct(uuid.waze[roadType=="0"]),
-        nWazeRT1 = n_distinct(uuid.waze[roadType=="1"]),
-        nWazeRT20 = n_distinct(uuid.waze[roadType=="20"]),
-        nWazeRT17 = n_distinct(uuid.waze[roadType=="17"]),
+        nWazeRT3 = n_distinct(uuid.waze[road_type=="3"]),
+        nWazeRT4 = n_distinct(uuid.waze[road_type=="4"]),
+        nWazeRT6 = n_distinct(uuid.waze[road_type=="6"]),
+        nWazeRT7 = n_distinct(uuid.waze[road_type=="7"]),
+        nWazeRT2 = n_distinct(uuid.waze[road_type=="2"]),
+        nWazeRT0 = n_distinct(uuid.waze[road_type=="0"]),
+        nWazeRT1 = n_distinct(uuid.waze[road_type=="1"]),
+        nWazeRT20 = n_distinct(uuid.waze[road_type=="20"]),
+        nWazeRT17 = n_distinct(uuid.waze[road_type=="17"]),
         
         medLastRepRate = median(last.reportRating),
         medLastConf = median(last.confidence),
