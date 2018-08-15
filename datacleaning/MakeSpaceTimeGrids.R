@@ -54,14 +54,15 @@ outputdir <- paste0("W:/SDI Pilot Projects/Waze/MASTER Data Files/Waze Aggregate
 
 source(file.path(codeloc, "utility/wazefunctions.R")) 
 
-states = c("CT", "UT", "VA", "MD")
+states = c("CT", "UT")#, "VA", "MD")
 
 # Time zone picker:
 tzs <- data.frame(states, 
                   tz = c("US/Eastern",
-                    "US/Mountain",
-                    "US/Eastern",
-                    "US/Eastern"),
+                    "US/Mountain"#,
+                    #"US/Eastern",
+                    #"US/Eastern"
+                    ),
                   stringsAsFactors = F)
 
 setwd(wazemonthdir)
@@ -112,7 +113,16 @@ for(state in states){ # state = "CT"
     # Make data frame of all Grid IDs by day of year and time of day in each month of data (subset to all grid IDs with Waze OR EDT data)
     GridIDall <- c(unique(as.character(link.waze.edt$GRID_ID)), unique(as.character(link.waze.edt$GRID_ID.edt)))
     
+    # Eliminate any rows which are not for this month -- may happen if an event began the last minute of the last day of previous month.
+    
+    link.waze.edt <- link.waze.edt[!is.na(link.waze.edt$last.pull.time),]
+    
+    year.month <- format(link.waze.edt$last.pull.time, "%Y-%m")
+    
+    link.waze.edt <- link.waze.edt[year.month == j,]
+    
     month.days <- unique(as.numeric(format(link.waze.edt$last.pull.time, "%d")))
+    
     lastday = max(month.days[!is.na(month.days)])
     
     Month.hour <- seq(from = as.POSIXct(paste0(j,"-01 0:00"), tz = use.tz), 
