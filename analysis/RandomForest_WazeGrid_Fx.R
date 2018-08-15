@@ -80,7 +80,11 @@ do.rf <- function(train.dat, omits, response.var = "MatchEDT_buffer_Acc", model.
     test.dat.use = test.dat
     comb.dat <- rbind(train.dat, test.dat)
   }
- 
+  
+  # Remove any rows with NA in predictors
+  cc <- complete.cases(rundat[,fitvars])
+  rundat <- rundat[cc,]
+  
   # Start RF in parallel
   starttime = Sys.time()
   
@@ -171,16 +175,21 @@ do.rf <- function(train.dat, omits, response.var = "MatchEDT_buffer_Acc", model.
   } # end if continuous response variable
 
   write.csv(out.df,
-            file = paste(model.no, "RandomForest_pred.csv", sep = "_"),
+            file = file.path(ouputdir, paste(model.no, "RandomForest_pred.csv", sep = "_")),
             row.names = F)
   
   savelist = c("rf.out", "rf.pred", "rf.prob", "out.df") 
   if(is.null(test.dat)) savelist = c(savelist, "testrows", "trainrows")
   if(!is.null(thin.dat)) savelist = c(savelist, "test.dat.use")
-     
-  s3save(list = savelist,
-     object = file.path(outputdir, paste("Model", model.no, "RandomForest_Output.RData", sep= "_")),
-     bucket = waze.bucket)
+  
+  fn = paste(state, "Model", model.no, "RandomForest_Output.RData", sep= "_")
+  
+  save(list = savelist, file.path(outputdir, fn))
+  
+  # Copy to S3
+  system(paste("aws s3 cp",
+               file.path(outputdir, fn),
+               file.path(teambucket, state, fn)))
   
   # Output is list of three elements: Nobs data frame, predtab table, binary model diagnotics table, and mean squared error
   if(class(rundat[,response.var])=="factor"){
@@ -227,6 +236,7 @@ do.rf <- function(train.dat, omits, response.var = "MatchEDT_buffer_Acc", model.
 
 # Function to re-assess model predictions and diagnostics for an already-fit model ----
 # To do: validate using testrows and training rows from previous model runs
+# To do: For SDC, change s3load to system(aws s3 cp) etc, since aws.s3 package won't work on SDC
 
 reassess.rf <- function(train.dat, omits, response.var = "MatchEDT_buffer_Acc", model.no,
                         test.dat = NULL,

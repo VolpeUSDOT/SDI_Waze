@@ -15,6 +15,7 @@ loadpacks <- c("sp",
            "maptree", # for better graphing of decision trees
            "party",
            "partykit",
+           "pROC",
            "foreach", # for parallel implementation
            "doParallel",
            "aws.s3", # AWS convenience functions s3save and s3load

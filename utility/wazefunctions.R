@@ -195,20 +195,22 @@ bin.mod.diagnostics <- function(predtab){
 
 
 # Read in hexagonally-gridded data of a specific name, prep fields, and save it as a short-named data frame
-prep.hex <- function(hexname, month, s3 = T, bucket = waze.bucket){
-  # Defaults to read from S3 bucket specified with waze.bucket 
+prep.hex <- function(hexname, state, month, s3 = T, bucket = teambucket){
+  # Defaults to read from S3 bucket specified with teambucket 
   # Specify month as two-digit character value, e.g. "04" for April
   # Specify full path in hexname, e.g. file.path(inputdir, paste0("WazeTimeEdtHexWx_", mo,".RData"))
   
   mo = month
-  if(s3) { 
-    s3load(object = hexname, bucket = bucket, envir = environment())
+  if(s3) {
+    system(paste0('aws s3 cp ', bucket, '/', state, '/', hexname, ' ~/workingdata'))
+    load(file.path("~/workingdata", hexname))
   } else {
     load(hexname, envir = environment())
   }
   
   wte <- get(ls(envir = environment())[grep("WazeTime", ls(envir = environment()), ignore.case = T)])
   
+  class(wte) <- "data.frame" 
   # if(length(grep("DayOfWeek", names(wte)) > 0)){
   #   wte$DayOfWeek <- as.factor(wte$DayOfWeek)
   # }
@@ -239,6 +241,8 @@ prep.hex <- function(hexname, month, s3 = T, bucket = waze.bucket){
   wte$MatchEDT_buffer_Acc <- wte$nMatchEDT_buffer_Acc
   wte$MatchEDT_buffer_Acc[wte$MatchEDT_buffer_Acc > 0] = 1 
   wte$MatchEDT_buffer_Acc <- as.factor(wte$MatchEDT_buffer_Acc)
+  
+  mo <- sub("-", "_", mo)
   
   assign(paste("w", mo, sep="."), wte, envir = globalenv()) 
   }

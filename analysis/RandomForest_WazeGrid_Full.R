@@ -1,79 +1,97 @@
 # Running full set of random forest models
 # https://github.com/VolpeUSDOT/SDI_Waze/wiki/Models-to-test
+# Modified for multi-state model running
 
+# Setup ---- 
 library(randomForest)
 library(foreach) # for parallel implementation
 library(doParallel) # includes iterators and parallel
-library(aws.s3)
 library(tidyverse)
 library(rgdal)
-# Run this if you don't have these packages:
-# install.packages(c("rpart", "randomForest", "maptree", "party", "partykit", "rgdal", "foreach", "doParallel"), dep = T)
 
 codeloc <- "~/SDI_Waze" 
+source(file.path(codeloc, 'utility/get_packages.R')) # installs necessary packages
+
 # Set grid size:
-HEXSIZE = c("1", "4", "05")[1] # Change the value in the bracket to use 1, 4, or 0.5 sq mi hexagon grids
-do.months = c("04","05","06","07","08","09")
+HEXSIZE = 1 #c("1", "4", "05")[1] # Change the value in the bracket to use 1, 4, or 0.5 sq mi hexagon grids
+
+state = 'CT' # Sets the state. UT, VA, MD will all be options.
+
+do.months = paste("2017", c("04","05","06","07","08","09"), sep="-")
 
 REASSESS = F # re-assess model fit and diagnostics using reassess.rf instead of do.rf
 
-inputdir <- "WazeEDT_RData_Input"
-outputdir <- paste0("WazeEDT_Agg", HEXSIZE, "mile_RandForest_Output")
+teambucket <- "s3://prod-sdc-sdi-911061262852-us-east-1-bucket"
 
-aws.signature::use_credentials()
-waze.bucket <- "ata-waze"
-localdir <- "/home/dflynn-volpe/workingdata" 
+user <- paste0( "/home/", system("whoami", intern = TRUE)) #the user directory to use
+localdir <- paste0(user, "/workingdata") # full path for readOGR
+
+outputdir <- file.path(localdir, "Random_Forest_Output")
 
 setwd(localdir)
+
 # read utility functions, including movefiles
 source(file.path(codeloc, 'utility/wazefunctions.R'))
 
 # read random forest function
 source(file.path(codeloc, "analysis/RandomForest_WazeGrid_Fx.R"))
 
-# check if already complted this transfer on this instance
-if(length(dir(localdir)[grep("shapefiles_funClass", dir(localdir))]) == 0){
+# not run: this was ATA implementation, will need to update when we have supplemental data ready for multi-state
+# # check if already completed this transfer on this instance
+# if(length(dir(localdir)[grep("shapefiles_funClass", dir(localdir))]) == 0){
+# 
+#   s3transfer = paste("aws s3 cp s3://ata-waze/MD_hexagon_shapefiles", localdir, "--recursive --include '*'")
+#   system(s3transfer)
+#   
+#   for(dd in c("shapefiles_funClass.zip", "shapefiles_rac.zip", "shapefile_wac.zip", "shapefiles_AADT.zip", "shapefiles_FARS.zip")){
+#     uz <- paste("unzip", file.path(localdir, dd))
+#     system(uz)
+#   }
+#   # move any files which are in an unnecessary "shapefiles" folder up to the top level of the localdir
+#   system("mv -v ~/workingdata/shapefiles/* ~/workingdata/")
+# }
 
-  s3transfer = paste("aws s3 cp s3://ata-waze/MD_hexagon_shapefiles", localdir, "--recursive --include '*'")
-  system(s3transfer)
-  
-  for(dd in c("shapefiles_funClass.zip", "shapefiles_rac.zip", "shapefile_wac.zip", "shapefiles_AADT.zip", "shapefiles_FARS.zip")){
-    uz <- paste("unzip", file.path(localdir, dd))
-    system(uz)
-  }
-  # move any files which are in an unnecessary "shapefiles" folder up to the top level of the localdir
-  system("mv -v ~/workingdata/shapefiles/* ~/workingdata/")
-}
+# View the files available in S3 for this state: system(paste0('aws s3 ls ', teambucket, '/', state, '/'))
 
 # rename data files by month. For each month, prep time and response variables
 # See prep.hex() in wazefunctions.R for details.
 for(mo in do.months){
-  prep.hex(file.path(inputdir, paste0("WazeTimeEdtHexWx_", mo, "_", HEXSIZE, "_mi.RData")), month = mo)
+  prep.hex(paste0("WazeTimeEdtHexAll_", mo, "_", HEXSIZE, "mi_", state,".RData"), state = state, month = mo)
 }
 
-# Plot to check grid IDs
+# Plot to check grid IDs. Requires shapefiles to be present in ~/workingdata/Hex, download from S3 if not there
 CHECKPLOT = F
 if(CHECKPLOT){
-  grid_shp <- rgdal::readOGR(localdir, "MD_hexagons_1mi_newExtent_newGRIDID")
+  grid_shp <- rgdal::readOGR(file.path(localdir, "Hex"), paste0(state, "_hexagons_1mi_neighbors"))
   
-  w.g <- match(w.04$GRID_ID, grid_shp$GRID_ID)
+  w.g <- match(w.2017_04$GRID_ID, grid_shp$GRID_ID)
   w.g <- w.g[!is.na(w.g)]
   gs <- grid_shp[w.g,]
   
   plot(gs, col = "red")
 }
 
+# Update this later after getting supplemental data ready
 # Add FARS, AADT, HPMS, jobs
-na.action = "fill0"
-for(w in c("w.04", "w.05", "w.06", "w.07","w.08", "w.09")){
-  append.hex(hexname = w, data.to.add = "FARS_MD_2012_2016_sum_annual", na.action = na.action)
-  append.hex(hexname = w, data.to.add = "hexagons_1mi_routes_AADT_total_sum", na.action = na.action)
-  append.hex(hexname = w, data.to.add = "hexagons_1mi_routes_sum", na.action = na.action)
-  append.hex(hexname = w, data.to.add = "hexagons_1mi_bg_lodes_sum", na.action = na.action)
-  append.hex(hexname = w, data.to.add = "hexagons_1mi_bg_rac_sum", na.action = na.action)
-  }
-  
-w.04_09 <- rbind(w.04, w.05, w.06, w.07, w.08, w.09)
+# na.action = "fill0"
+# for(w in c("w.allmonths", "w.05", "w.06", "w.07","w.08", "w.09")){
+#   append.hex(hexname = w, data.to.add = "FARS_MD_2012_2016_sum_annual", na.action = na.action)
+#   append.hex(hexname = w, data.to.add = "hexagons_1mi_routes_AADT_total_sum", na.action = na.action)
+#   append.hex(hexname = w, data.to.add = "hexagons_1mi_routes_sum", na.action = na.action)
+#   append.hex(hexname = w, data.to.add = "hexagons_1mi_bg_lodes_sum", na.action = na.action)
+#   append.hex(hexname = w, data.to.add = "hexagons_1mi_bg_rac_sum", na.action = na.action)
+#   }
+
+
+# Bind all months together
+w.allmonths.named <- ls()[grep("^w.", ls())]
+
+w.allmonths <- vector()
+for(i in w.allmonths.named){
+  w.allmonths <- rbind(w.allmonths, get(i))
+}
+
+# format(object.size(w.allmonths), "Gb")
 
 avail.cores = parallel::detectCores()
 
@@ -84,10 +102,10 @@ rf.inputs = list(ntree.use = avail.cores * 50, avail.cores = avail.cores, mtry =
 keyoutputs = redo_outputs = list() # to store model diagnostics
 
 # Omit as predictors in this vector:
-alwaysomit = c(grep("GRID_ID", names(w.04), value = T), "day", "hextime", "year", "weekday", 
+alwaysomit = c(grep("GRID_ID", names(w.allmonths), value = T), "day", "hextime", "year", "weekday", 
                "uniqWazeEvents", "nWazeRowsInMatch", 
                "nMatchWaze_buffer", "nNoMatchWaze_buffer",
-               grep("EDT", names(w.04), value = T))
+               grep("EDT", names(w.allmonths), value = T))
 
 alert_types = c("nWazeAccident", "nWazeJam", "nWazeRoadClosed", "nWazeWeatherOrHazard")
 
@@ -95,9 +113,6 @@ alert_subtypes = c("nHazardOnRoad", "nHazardOnShoulder" ,"nHazardWeather", "nWaz
 
 response.var = "MatchEDT_buffer_Acc"
 
-
-# Filter for days with good EDT data, meaning day < 259 in our initial sample. This cuts off the last 12 days of September 2017.
-w.04_09 = w.04_09 %>% filter(day < 259) 
 
 # A: All Waze ----
 
@@ -112,20 +127,20 @@ starttime = Sys.time()
 omits = c(alwaysomit,
           "wx",
           c("CRASH_SUM", "FATALS_SUM"), # FARS variables, 
-          grep("F_SYSTEM", names(w.04), value = T), # road class
+          grep("F_SYSTEM", names(w.allmonths), value = T), # road class
           c("MEAN_AADT", "SUM_AADT", "SUM_miles"), # AADT
-          grep("WAC", names(w.04), value = T), # Jobs workplace
-          grep("RAC", names(w.04), value = T), # Jobs residential
-          grep("MagVar", names(w.04), value = T), # direction of travel
-          grep("medLast", names(w.04), value = T), # report rating, reliability, confidence
-          grep("nWazeAcc_", names(w.04), value = T), # neighboring accidents
-          grep("nWazeJam_", names(w.04), value = T) # neighboring jams
+          grep("WAC", names(w.allmonths), value = T), # Jobs workplace
+          grep("RAC", names(w.allmonths), value = T), # Jobs residential
+          grep("MagVar", names(w.allmonths), value = T), # direction of travel
+          grep("medLast", names(w.allmonths), value = T), # report rating, reliability, confidence
+          grep("nWazeAcc_", names(w.allmonths), value = T), # neighboring accidents
+          grep("nWazeJam_", names(w.allmonths), value = T) # neighboring jams
 )
 
 modelno = "18"
 
 if(!REASSESS){
-  keyoutputs[[modelno]] = do.rf(train.dat = w.04_09, 
+  keyoutputs[[modelno]] = do.rf(train.dat = w.allmonths, 
                                 omits, response.var = "MatchEDT_buffer_Acc", 
                                # thin.dat = 0.01,
                                 model.no = modelno, rf.inputs = rf.inputs) 
@@ -133,10 +148,19 @@ if(!REASSESS){
   save("keyoutputs", file = paste0("Output_to_", modelno))
   } else {
 
-redo_outputs[[modelno]] = reassess.rf(train.dat = w.04_09, 
+redo_outputs[[modelno]] = reassess.rf(train.dat = w.allmonths, 
                               omits, response.var = "MatchEDT_buffer_Acc", 
                               model.no = modelno, rf.inputs = rf.inputs) 
 }
+
+
+save("keyoutputs", file = paste0("Output_to_", modelno))
+
+timediff <- Sys.time() - starttime
+cat(round(timediff, 2), attr(timediff, "units"), "elapsed to model", modelno)
+
+
+# <><><><><><><><><><><><><><><><><><> 2018-08-15 Dan stopped here! 
 
 # 19, add FARS
 modelno = "19"
@@ -144,26 +168,26 @@ modelno = "19"
 omits = c(alwaysomit,
           "wx",
           #c("CRASH_SUM", "FATALS_SUM"), # FARS variables, 
-          grep("F_SYSTEM", names(w.04), value = T), # road class
+          grep("F_SYSTEM", names(w.allmonths), value = T), # road class
           c("MEAN_AADT", "SUM_AADT", "SUM_miles"), # AADT
-          grep("WAC", names(w.04), value = T), # Jobs workplace
-          grep("RAC", names(w.04), value = T), # Jobs residential
-          grep("MagVar", names(w.04), value = T), # direction of travel
-          grep("medLast", names(w.04), value = T), # report rating, reliability, confidence
-          grep("nWazeAcc_", names(w.04), value = T), # neighboring accidents
-          grep("nWazeJam_", names(w.04), value = T) # neighboring jams
+          grep("WAC", names(w.allmonths), value = T), # Jobs workplace
+          grep("RAC", names(w.allmonths), value = T), # Jobs residential
+          grep("MagVar", names(w.allmonths), value = T), # direction of travel
+          grep("medLast", names(w.allmonths), value = T), # report rating, reliability, confidence
+          grep("nWazeAcc_", names(w.allmonths), value = T), # neighboring accidents
+          grep("nWazeJam_", names(w.allmonths), value = T) # neighboring jams
 )
 
 
 if(!REASSESS){
-  keyoutputs[[modelno]] = do.rf(train.dat = w.04_09, 
+  keyoutputs[[modelno]] = do.rf(train.dat = w.allmonths, 
                               omits, response.var = "MatchEDT_buffer_Acc", 
                               model.no = modelno, rf.inputs = rf.inputs) 
 
  save("keyoutputs", file = paste0("Output_to_", modelno))
 } else {
 
-redo_outputs[[modelno]] = reassess.rf(train.dat = w.04_09, 
+redo_outputs[[modelno]] = reassess.rf(train.dat = w.allmonths, 
                                       omits, response.var = "MatchEDT_buffer_Acc", 
                                       model.no = modelno, rf.inputs = rf.inputs) 
 }
@@ -173,26 +197,26 @@ modelno = "20"
 omits = c(alwaysomit,
           #"wx",
           c("CRASH_SUM", "FATALS_SUM"), # FARS variables, 
-          grep("F_SYSTEM", names(w.04), value = T), # road class
+          grep("F_SYSTEM", names(w.allmonths), value = T), # road class
           c("MEAN_AADT", "SUM_AADT", " SUM_miles"), # AADT
-          grep("WAC", names(w.04), value = T), # Jobs workplace
-          grep("RAC", names(w.04), value = T), # Jobs residential
-          grep("MagVar", names(w.04), value = T), # direction of travel
-          grep("medLast", names(w.04), value = T), # report rating, reliability, confidence
-          grep("nWazeAcc_", names(w.04), value = T), # neighboring accidents
-          grep("nWazeJam_", names(w.04), value = T) # neighboring jams
+          grep("WAC", names(w.allmonths), value = T), # Jobs workplace
+          grep("RAC", names(w.allmonths), value = T), # Jobs residential
+          grep("MagVar", names(w.allmonths), value = T), # direction of travel
+          grep("medLast", names(w.allmonths), value = T), # report rating, reliability, confidence
+          grep("nWazeAcc_", names(w.allmonths), value = T), # neighboring accidents
+          grep("nWazeJam_", names(w.allmonths), value = T) # neighboring jams
 )
 
 if(!REASSESS){
 
-keyoutputs[[modelno]] = do.rf(train.dat = w.04_09, 
+keyoutputs[[modelno]] = do.rf(train.dat = w.allmonths, 
                               omits = omits, response.var = "MatchEDT_buffer_Acc", 
                               model.no = modelno, rf.inputs = rf.inputs) 
 
 save("keyoutputs", file = paste0("Output_to_", modelno))
 } else {
 
-redo_outputs[[modelno]] = reassess.rf(train.dat = w.04_09, 
+redo_outputs[[modelno]] = reassess.rf(train.dat = w.allmonths, 
                                       omits, response.var = "MatchEDT_buffer_Acc", 
                                       model.no = modelno, rf.inputs = rf.inputs) 
 }
@@ -202,24 +226,24 @@ modelno = "21"
 omits = c(alwaysomit,
           "wx",
           c("CRASH_SUM", "FATALS_SUM"), # FARS variables, 
-#          grep("F_SYSTEM", names(w.04), value = T), # road class
+#          grep("F_SYSTEM", names(w.allmonths), value = T), # road class
 #          c("MEAN_AADT", "SUM_AADT", " SUM_miles"), # AADT
-          grep("WAC", names(w.04), value = T), # Jobs workplace
-          grep("RAC", names(w.04), value = T), # Jobs residential
-          grep("MagVar", names(w.04), value = T), # direction of travel
-          grep("medLast", names(w.04), value = T), # report rating, reliability, confidence
-          grep("nWazeAcc_", names(w.04), value = T), # neighboring accidents
-          grep("nWazeJam_", names(w.04), value = T) # neighboring jams
+          grep("WAC", names(w.allmonths), value = T), # Jobs workplace
+          grep("RAC", names(w.allmonths), value = T), # Jobs residential
+          grep("MagVar", names(w.allmonths), value = T), # direction of travel
+          grep("medLast", names(w.allmonths), value = T), # report rating, reliability, confidence
+          grep("nWazeAcc_", names(w.allmonths), value = T), # neighboring accidents
+          grep("nWazeJam_", names(w.allmonths), value = T) # neighboring jams
 )
 
 
 if(!REASSESS){
-  keyoutputs[[modelno]] = do.rf(train.dat = w.04_09, 
+  keyoutputs[[modelno]] = do.rf(train.dat = w.allmonths, 
                               omits = omits, response.var = "MatchEDT_buffer_Acc", 
                               model.no = modelno, rf.inputs = rf.inputs) 
 } else {
 
-redo_outputs[[modelno]] = reassess.rf(train.dat = w.04_09, 
+redo_outputs[[modelno]] = reassess.rf(train.dat = w.allmonths, 
                                       omits, response.var = "MatchEDT_buffer_Acc", 
                                       model.no = modelno, rf.inputs = rf.inputs) 
 }
@@ -229,23 +253,23 @@ modelno = "22"
 omits = c(alwaysomit,
           "wx",
           c("CRASH_SUM", "FATALS_SUM"), # FARS variables, 
-          grep("F_SYSTEM", names(w.04), value = T), # road class
+          grep("F_SYSTEM", names(w.allmonths), value = T), # road class
           c("MEAN_AADT", "SUM_AADT", " SUM_miles"), # AADT
-#          grep("WAC", names(w.04), value = T), # Jobs workplace
-#          grep("RAC", names(w.04), value = T), # Jobs residential
-          grep("MagVar", names(w.04), value = T), # direction of travel
-          grep("medLast", names(w.04), value = T), # report rating, reliability, confidence
-          grep("nWazeAcc_", names(w.04), value = T), # neighboring accidents
-          grep("nWazeJam_", names(w.04), value = T) # neighboring jams
+#          grep("WAC", names(w.allmonths), value = T), # Jobs workplace
+#          grep("RAC", names(w.allmonths), value = T), # Jobs residential
+          grep("MagVar", names(w.allmonths), value = T), # direction of travel
+          grep("medLast", names(w.allmonths), value = T), # report rating, reliability, confidence
+          grep("nWazeAcc_", names(w.allmonths), value = T), # neighboring accidents
+          grep("nWazeJam_", names(w.allmonths), value = T) # neighboring jams
 )
 
 if(!REASSESS){
-  keyoutputs[[modelno]] = do.rf(train.dat = w.04_09, 
+  keyoutputs[[modelno]] = do.rf(train.dat = w.allmonths, 
                               omits = c(omits), response.var = "MatchEDT_buffer_Acc", 
                               model.no = modelno, rf.inputs = rf.inputs) 
   save("keyoutputs", file = paste0("Output_to_", modelno))
 } else { 
-  redo_outputs[[modelno]] = reassess.rf(train.dat = w.04_09, 
+  redo_outputs[[modelno]] = reassess.rf(train.dat = w.allmonths, 
                                       omits, response.var = "MatchEDT_buffer_Acc", 
                                       model.no = modelno, rf.inputs = rf.inputs) 
   }
@@ -255,23 +279,23 @@ modelno = "23"
 omits = c(alwaysomit,
 #          "wx",
 #          c("CRASH_SUM", "FATALS_SUM"), # FARS variables, 
-#          grep("F_SYSTEM", names(w.04), value = T), # road class
+#          grep("F_SYSTEM", names(w.allmonths), value = T), # road class
 #          c("MEAN_AADT", "SUM_AADT", " SUM_miles"), # AADT
-#          grep("WAC", names(w.04), value = T), # Jobs workplace
-#          grep("RAC", names(w.04), value = T), # Jobs residential
-          grep("MagVar", names(w.04), value = T), # direction of travel
-          grep("medLast", names(w.04), value = T), # report rating, reliability, confidence
-          grep("nWazeAcc_", names(w.04), value = T), # neighboring accidents
-          grep("nWazeJam_", names(w.04), value = T) # neighboring jams
+#          grep("WAC", names(w.allmonths), value = T), # Jobs workplace
+#          grep("RAC", names(w.allmonths), value = T), # Jobs residential
+          grep("MagVar", names(w.allmonths), value = T), # direction of travel
+          grep("medLast", names(w.allmonths), value = T), # report rating, reliability, confidence
+          grep("nWazeAcc_", names(w.allmonths), value = T), # neighboring accidents
+          grep("nWazeJam_", names(w.allmonths), value = T) # neighboring jams
 )
 
 if(!REASSESS){
-  keyoutputs[[modelno]] = do.rf(train.dat = w.04_09, 
+  keyoutputs[[modelno]] = do.rf(train.dat = w.allmonths, 
                               omits = c(omits), response.var = "MatchEDT_buffer_Acc", 
                               model.no = modelno, rf.inputs = rf.inputs) 
   save("keyoutputs", file = paste0("Output_to_", modelno))
 } else {
-  redo_outputs[[modelno]] = reassess.rf(train.dat = w.04_09, 
+  redo_outputs[[modelno]] = reassess.rf(train.dat = w.allmonths, 
                                       omits, response.var = "MatchEDT_buffer_Acc", 
                                       model.no = modelno, rf.inputs = rf.inputs) 
 }
@@ -283,22 +307,22 @@ modelno = "24"
 omits = c(alwaysomit, alert_subtypes,
           "wx",
           c("CRASH_SUM", "FATALS_SUM"), # FARS variables, added in 19
-          grep("F_SYSTEM", names(w.04), value = T), # road class
+          grep("F_SYSTEM", names(w.allmonths), value = T), # road class
           c("MEAN_AADT", "SUM_AADT", " SUM_miles"), # AADT
-          grep("WAC", names(w.04), value = T), # Jobs workplace
-          grep("RAC", names(w.04), value = T), # Jobs residential
-          grep("MagVar", names(w.04), value = T), # direction of travel
-          grep("medLast", names(w.04), value = T), # report rating, reliability, confidence
-          grep("nWazeAcc_", names(w.04), value = T), # neighboring accidents
-          grep("nWazeJam_", names(w.04), value = T) # neighboring jams
+          grep("WAC", names(w.allmonths), value = T), # Jobs workplace
+          grep("RAC", names(w.allmonths), value = T), # Jobs residential
+          grep("MagVar", names(w.allmonths), value = T), # direction of travel
+          grep("medLast", names(w.allmonths), value = T), # report rating, reliability, confidence
+          grep("nWazeAcc_", names(w.allmonths), value = T), # neighboring accidents
+          grep("nWazeJam_", names(w.allmonths), value = T) # neighboring jams
           )
 
 
 if(!REASSESS){
-  keyoutputs[[modelno]] = do.rf(train.dat = w.04_09, omits, response.var = "MatchEDT_buffer_Acc", 
+  keyoutputs[[modelno]] = do.rf(train.dat = w.allmonths, omits, response.var = "MatchEDT_buffer_Acc", 
                               model.no = modelno, rf.inputs = rf.inputs) 
 } else {
-  redo_outputs[[modelno]] = reassess.rf(train.dat = w.04_09, 
+  redo_outputs[[modelno]] = reassess.rf(train.dat = w.allmonths, 
                                       omits, response.var = "MatchEDT_buffer_Acc", 
                                       model.no = modelno, rf.inputs = rf.inputs) 
 
@@ -309,23 +333,23 @@ modelno = "25"
 omits = c(alwaysomit, alert_subtypes,
           "wx",
           c("CRASH_SUM", "FATALS_SUM"), # FARS variables, 
-          grep("F_SYSTEM", names(w.04), value = T), # road class
+          grep("F_SYSTEM", names(w.allmonths), value = T), # road class
           c("MEAN_AADT", "SUM_AADT", " SUM_miles"), # AADT
-          grep("WAC", names(w.04), value = T), # Jobs workplace
-          grep("RAC", names(w.04), value = T) # Jobs residential
-#          grep("MagVar", names(w.04), value = T), # direction of travel
-#          grep("medLast", names(w.04), value = T), # report rating, reliability, confidence
-#          grep("nWazeAcc_", names(w.04), value = T), # neighboring accidents
-#          grep("nWazeJam_", names(w.04), value = T) # neighboring jams
+          grep("WAC", names(w.allmonths), value = T), # Jobs workplace
+          grep("RAC", names(w.allmonths), value = T) # Jobs residential
+#          grep("MagVar", names(w.allmonths), value = T), # direction of travel
+#          grep("medLast", names(w.allmonths), value = T), # report rating, reliability, confidence
+#          grep("nWazeAcc_", names(w.allmonths), value = T), # neighboring accidents
+#          grep("nWazeJam_", names(w.allmonths), value = T) # neighboring jams
 )
 
 
 if(!REASSESS){
-  keyoutputs[[modelno]] = do.rf(train.dat = w.04_09, omits, response.var = "MatchEDT_buffer_Acc",  
+  keyoutputs[[modelno]] = do.rf(train.dat = w.allmonths, omits, response.var = "MatchEDT_buffer_Acc",  
                               model.no = modelno, rf.inputs = rf.inputs) 
   save("keyoutputs", file = paste0("Output_to_", modelno))
 } else {
-  redo_outputs[[modelno]] = reassess.rf(train.dat = w.04_09, 
+  redo_outputs[[modelno]] = reassess.rf(train.dat = w.allmonths, 
                                       omits, response.var = "MatchEDT_buffer_Acc", 
                                       model.no = modelno, rf.inputs = rf.inputs) 
 }
@@ -335,23 +359,23 @@ modelno = "26"
 omits = c(alwaysomit, alert_subtypes,
           "wx",
 #          c("CRASH_SUM", "FATALS_SUM"), # FARS variables, added in 19
-          grep("F_SYSTEM", names(w.04), value = T), # road class
+          grep("F_SYSTEM", names(w.allmonths), value = T), # road class
           c("MEAN_AADT", "SUM_AADT", " SUM_miles"), # AADT
-          grep("WAC", names(w.04), value = T), # Jobs workplace
-          grep("RAC", names(w.04), value = T), # Jobs residential
-          grep("MagVar", names(w.04), value = T), # direction of travel
-          grep("medLast", names(w.04), value = T), # report rating, reliability, confidence
-          grep("nWazeAcc_", names(w.04), value = T), # neighboring accidents
-          grep("nWazeJam_", names(w.04), value = T) # neighboring jams
+          grep("WAC", names(w.allmonths), value = T), # Jobs workplace
+          grep("RAC", names(w.allmonths), value = T), # Jobs residential
+          grep("MagVar", names(w.allmonths), value = T), # direction of travel
+          grep("medLast", names(w.allmonths), value = T), # report rating, reliability, confidence
+          grep("nWazeAcc_", names(w.allmonths), value = T), # neighboring accidents
+          grep("nWazeJam_", names(w.allmonths), value = T) # neighboring jams
 )
 
 
 if(!REASSESS){
-  keyoutputs[[modelno]] = do.rf(train.dat = w.04_09, omits, response.var = "MatchEDT_buffer_Acc",  
+  keyoutputs[[modelno]] = do.rf(train.dat = w.allmonths, omits, response.var = "MatchEDT_buffer_Acc",  
                               model.no = modelno, rf.inputs = rf.inputs) 
   save("keyoutputs", file = paste0("Output_to_", modelno))
 } else {
-  redo_outputs[[modelno]] = reassess.rf(train.dat = w.04_09, 
+  redo_outputs[[modelno]] = reassess.rf(train.dat = w.allmonths, 
                                       omits, response.var = "MatchEDT_buffer_Acc", 
                                       model.no = modelno, rf.inputs = rf.inputs) 
 }
@@ -361,22 +385,22 @@ modelno = "27"
 omits = c(alwaysomit, alert_subtypes,
           #"wx",
           c("CRASH_SUM", "FATALS_SUM"), # FARS variables, added in 19
-          grep("F_SYSTEM", names(w.04), value = T), # road class
+          grep("F_SYSTEM", names(w.allmonths), value = T), # road class
           c("MEAN_AADT", "SUM_AADT", " SUM_miles"), # AADT
-          grep("WAC", names(w.04), value = T), # Jobs workplace
-          grep("RAC", names(w.04), value = T), # Jobs residential
-          grep("MagVar", names(w.04), value = T), # direction of travel
-          grep("medLast", names(w.04), value = T), # report rating, reliability, confidence
-          grep("nWazeAcc_", names(w.04), value = T), # neighboring accidents
-          grep("nWazeJam_", names(w.04), value = T) # neighboring jams
+          grep("WAC", names(w.allmonths), value = T), # Jobs workplace
+          grep("RAC", names(w.allmonths), value = T), # Jobs residential
+          grep("MagVar", names(w.allmonths), value = T), # direction of travel
+          grep("medLast", names(w.allmonths), value = T), # report rating, reliability, confidence
+          grep("nWazeAcc_", names(w.allmonths), value = T), # neighboring accidents
+          grep("nWazeJam_", names(w.allmonths), value = T) # neighboring jams
           )
 
 if(!REASSESS){
-  keyoutputs[[modelno]] = do.rf(train.dat = w.04_09, omits, response.var = "MatchEDT_buffer_Acc",  
+  keyoutputs[[modelno]] = do.rf(train.dat = w.allmonths, omits, response.var = "MatchEDT_buffer_Acc",  
                               model.no = modelno, rf.inputs = rf.inputs) 
   save("keyoutputs", file = paste0("Output_to_", modelno))
 } else {
-  redo_outputs[[modelno]] = reassess.rf(train.dat = w.04_09, 
+  redo_outputs[[modelno]] = reassess.rf(train.dat = w.allmonths, 
                                       omits, response.var = "MatchEDT_buffer_Acc", 
                                       model.no = modelno, rf.inputs = rf.inputs) 
 }
@@ -386,22 +410,22 @@ modelno = "28"
 omits = c(alwaysomit, alert_subtypes,
           "wx",
           c("CRASH_SUM", "FATALS_SUM"), # FARS variables, added in 19
-          #grep("F_SYSTEM", names(w.04), value = T), # road class
+          #grep("F_SYSTEM", names(w.allmonths), value = T), # road class
           #c("MEAN_AADT", "SUM_AADT", " SUM_miles"), # AADT
-          grep("WAC", names(w.04), value = T), # Jobs workplace
-          grep("RAC", names(w.04), value = T), # Jobs residential
-          grep("MagVar", names(w.04), value = T), # direction of travel
-          grep("medLast", names(w.04), value = T), # report rating, reliability, confidence
-          grep("nWazeAcc_", names(w.04), value = T), # neighboring accidents
-          grep("nWazeJam_", names(w.04), value = T) # neighboring jams
+          grep("WAC", names(w.allmonths), value = T), # Jobs workplace
+          grep("RAC", names(w.allmonths), value = T), # Jobs residential
+          grep("MagVar", names(w.allmonths), value = T), # direction of travel
+          grep("medLast", names(w.allmonths), value = T), # report rating, reliability, confidence
+          grep("nWazeAcc_", names(w.allmonths), value = T), # neighboring accidents
+          grep("nWazeJam_", names(w.allmonths), value = T) # neighboring jams
           )
 
 if(!REASSESS){
-  keyoutputs[[modelno]] = do.rf(train.dat = w.04_09, omits, response.var = "MatchEDT_buffer_Acc",  
+  keyoutputs[[modelno]] = do.rf(train.dat = w.allmonths, omits, response.var = "MatchEDT_buffer_Acc",  
                               model.no = modelno, rf.inputs = rf.inputs) 
   save("keyoutputs", file = paste0("Output_to_", modelno))
 } else {
-  redo_outputs[[modelno]] = reassess.rf(train.dat = w.04_09, 
+  redo_outputs[[modelno]] = reassess.rf(train.dat = w.allmonths, 
                                       omits, response.var = "MatchEDT_buffer_Acc", 
                                       model.no = modelno, rf.inputs = rf.inputs) 
 }
@@ -411,22 +435,22 @@ modelno = "29"
 omits = c(alwaysomit, alert_subtypes,
           "wx",
           c("CRASH_SUM", "FATALS_SUM"), # FARS variables, added in 19
-          grep("F_SYSTEM", names(w.04), value = T), # road class
+          grep("F_SYSTEM", names(w.allmonths), value = T), # road class
           c("MEAN_AADT", "SUM_AADT", " SUM_miles"), # AADT
-          #grep("WAC", names(w.04), value = T), # Jobs workplace
-          #grep("RAC", names(w.04), value = T), # Jobs residential
-          grep("MagVar", names(w.04), value = T), # direction of travel
-          grep("medLast", names(w.04), value = T), # report rating, reliability, confidence
-          grep("nWazeAcc_", names(w.04), value = T), # neighboring accidents
-          grep("nWazeJam_", names(w.04), value = T) # neighboring jams
+          #grep("WAC", names(w.allmonths), value = T), # Jobs workplace
+          #grep("RAC", names(w.allmonths), value = T), # Jobs residential
+          grep("MagVar", names(w.allmonths), value = T), # direction of travel
+          grep("medLast", names(w.allmonths), value = T), # report rating, reliability, confidence
+          grep("nWazeAcc_", names(w.allmonths), value = T), # neighboring accidents
+          grep("nWazeJam_", names(w.allmonths), value = T) # neighboring jams
           )
 
 if(!REASSESS){
-  keyoutputs[[modelno]] = do.rf(train.dat = w.04_09, omits, response.var = "MatchEDT_buffer_Acc",  
+  keyoutputs[[modelno]] = do.rf(train.dat = w.allmonths, omits, response.var = "MatchEDT_buffer_Acc",  
                               model.no = modelno, rf.inputs = rf.inputs) 
   save("keyoutputs", file = paste0("Output_to_", modelno))
 } else {
-  redo_outputs[[modelno]] = reassess.rf(train.dat = w.04_09, 
+  redo_outputs[[modelno]] = reassess.rf(train.dat = w.allmonths, 
                                       omits, response.var = "MatchEDT_buffer_Acc", 
                                       model.no = modelno, rf.inputs = rf.inputs) 
   }
@@ -436,22 +460,22 @@ modelno = "30"
 omits = c(alwaysomit, alert_subtypes
           #"wx",
           #c("CRASH_SUM", "FATALS_SUM"), # FARS variables, added in 19
-          #grep("F_SYSTEM", names(w.04), value = T), # road class
+          #grep("F_SYSTEM", names(w.allmonths), value = T), # road class
           #c("MEAN_AADT", "SUM_AADT", " SUM_miles"), # AADT
-          #grep("WAC", names(w.04), value = T), # Jobs workplace
-          #grep("RAC", names(w.04), value = T), # Jobs residential
-          #grep("MagVar", names(w.04), value = T), # direction of travel
-          #grep("medLast", names(w.04), value = T), # report rating, reliability, confidence
-          #grep("nWazeAcc_", names(w.04), value = T), # neighboring accidents
-          #grep("nWazeJam_", names(w.04), value = T) # neighboring jams
+          #grep("WAC", names(w.allmonths), value = T), # Jobs workplace
+          #grep("RAC", names(w.allmonths), value = T), # Jobs residential
+          #grep("MagVar", names(w.allmonths), value = T), # direction of travel
+          #grep("medLast", names(w.allmonths), value = T), # report rating, reliability, confidence
+          #grep("nWazeAcc_", names(w.allmonths), value = T), # neighboring accidents
+          #grep("nWazeJam_", names(w.allmonths), value = T) # neighboring jams
           )
 
 if(!REASSESS){
-  keyoutputs[[modelno]] = do.rf(train.dat = w.04_09, omits, response.var = "MatchEDT_buffer_Acc",  
+  keyoutputs[[modelno]] = do.rf(train.dat = w.allmonths, omits, response.var = "MatchEDT_buffer_Acc",  
                                 model.no = modelno, rf.inputs = rf.inputs) 
   save("keyoutputs", file = paste0("Output_to_", modelno))
 } else {
-  redo_outputs[[modelno]] = reassess.rf(train.dat = w.04_09,
+  redo_outputs[[modelno]] = reassess.rf(train.dat = w.allmonths,
                                         omits, response.var = "MatchEDT_buffer_Acc", 
                                         model.no = modelno, rf.inputs = rf.inputs) 
 }
@@ -462,15 +486,15 @@ if(!REASSESS){
 
 modelno = "31"
 
-EDTonlyrows <- apply(w.04_09[c(alert_types, alert_subtypes)], 1, FUN = function(x) all(x == 0))
+EDTonlyrows <- apply(w.allmonths[c(alert_types, alert_subtypes)], 1, FUN = function(x) all(x == 0))
 summary(EDTonlyrows)
 
 if(!REASSESS){
-  keyoutputs[[modelno]] = do.rf(train.dat = w.04_09[!EDTonlyrows,], omits, response.var = "MatchEDT_buffer_Acc",  
+  keyoutputs[[modelno]] = do.rf(train.dat = w.allmonths[!EDTonlyrows,], omits, response.var = "MatchEDT_buffer_Acc",  
                                  model.no = modelno, rf.inputs = rf.inputs) 
   save("keyoutputs", file = paste0("Output_to_", modelno))
 } else {
-    redo_outputs[[modelno]] = reassess.rf(train.dat = w.04_09[!EDTonlyrows,], 
+    redo_outputs[[modelno]] = reassess.rf(train.dat = w.allmonths[!EDTonlyrows,], 
                                         omits, response.var = "MatchEDT_buffer_Acc", 
                                         model.no = modelno, rf.inputs = rf.inputs) 
 }
@@ -479,15 +503,15 @@ if(!REASSESS){
 
 modelno = "32"
 
-Road.closure.onlyrows <- apply(w.04_09[c("nWazeRoadClosed","nWazeAccident","nWazeJam","nWazeWeatherOrHazard", alert_subtypes)], 1, FUN = function(x) all(x[2:21] == 0) & x[1] > 0)
+Road.closure.onlyrows <- apply(w.allmonths[c("nWazeRoadClosed","nWazeAccident","nWazeJam","nWazeWeatherOrHazard", alert_subtypes)], 1, FUN = function(x) all(x[2:21] == 0) & x[1] > 0)
 summary(Road.closure.onlyrows)
 
 if(!REASSESS){
-  keyoutputs[[modelno]] = do.rf(train.dat = w.04_09[!Road.closure.onlyrows,], omits, response.var = "MatchEDT_buffer_Acc",  
+  keyoutputs[[modelno]] = do.rf(train.dat = w.allmonths[!Road.closure.onlyrows,], omits, response.var = "MatchEDT_buffer_Acc",  
                                  model.no = modelno, rf.inputs = rf.inputs) 
   save("keyoutputs", file = paste0("Output_to_", modelno))
 } else {
-    redo_outputs[[modelno]] = reassess.rf(train.dat = w.04_09[!Road.closure.onlyrows,], 
+    redo_outputs[[modelno]] = reassess.rf(train.dat = w.allmonths[!Road.closure.onlyrows,], 
                                         omits, response.var = "MatchEDT_buffer_Acc", 
                                         model.no = modelno, rf.inputs = rf.inputs) 
 }
@@ -501,24 +525,24 @@ modelno = "33"
 omits = c(alwaysomit, alert_types,
           "wx",
           c("CRASH_SUM", "FATALS_SUM"), # FARS variables, added in 19
-          grep("F_SYSTEM", names(w.04), value = T), # road class
+          grep("F_SYSTEM", names(w.allmonths), value = T), # road class
           c("MEAN_AADT", "SUM_AADT", " SUM_miles"), # AADT
-          grep("WAC", names(w.04), value = T), # Jobs workplace
-          grep("RAC", names(w.04), value = T), # Jobs residential
-          grep("MagVar", names(w.04), value = T), # direction of travel
-          grep("medLast", names(w.04), value = T), # report rating, reliability, confidence
-          grep("nWazeAcc_", names(w.04), value = T), # neighboring accidents
-          grep("nWazeJam_", names(w.04), value = T) # neighboring jams
+          grep("WAC", names(w.allmonths), value = T), # Jobs workplace
+          grep("RAC", names(w.allmonths), value = T), # Jobs residential
+          grep("MagVar", names(w.allmonths), value = T), # direction of travel
+          grep("medLast", names(w.allmonths), value = T), # report rating, reliability, confidence
+          grep("nWazeAcc_", names(w.allmonths), value = T), # neighboring accidents
+          grep("nWazeJam_", names(w.allmonths), value = T) # neighboring jams
           )
 
 if(!REASSESS){
-  keyoutputs[[modelno]] = do.rf(train.dat = w.04_09, 
+  keyoutputs[[modelno]] = do.rf(train.dat = w.allmonths, 
                               omits, response.var = "MatchEDT_buffer_Acc", 
                               model.no = modelno, rf.inputs = rf.inputs) 
   save("keyoutputs", file = paste0("Output_to_", modelno))
 
 } else {
-  redo_outputs[[modelno]] = reassess.rf(train.dat = w.04_09, 
+  redo_outputs[[modelno]] = reassess.rf(train.dat = w.allmonths, 
                                       omits, response.var = "MatchEDT_buffer_Acc", 
                                       model.no = modelno, rf.inputs = rf.inputs) 
 }
@@ -528,23 +552,23 @@ modelno = "34"
 omits = c(alwaysomit, alert_types,
           "wx",
           c("CRASH_SUM", "FATALS_SUM"), # FARS variables, added in 19
-          grep("F_SYSTEM", names(w.04), value = T), # road class
+          grep("F_SYSTEM", names(w.allmonths), value = T), # road class
           c("MEAN_AADT", "SUM_AADT", " SUM_miles"), # AADT
-          grep("WAC", names(w.04), value = T), # Jobs workplace
-          grep("RAC", names(w.04), value = T) # Jobs residential
-          # grep("MagVar", names(w.04), value = T), # direction of travel
-          # grep("medLast", names(w.04), value = T), # report rating, reliability, confidence
-          # grep("nWazeAcc_", names(w.04), value = T), # neighboring accidents
-          # grep("nWazeJam_", names(w.04), value = T) # neighboring jams
+          grep("WAC", names(w.allmonths), value = T), # Jobs workplace
+          grep("RAC", names(w.allmonths), value = T) # Jobs residential
+          # grep("MagVar", names(w.allmonths), value = T), # direction of travel
+          # grep("medLast", names(w.allmonths), value = T), # report rating, reliability, confidence
+          # grep("nWazeAcc_", names(w.allmonths), value = T), # neighboring accidents
+          # grep("nWazeJam_", names(w.allmonths), value = T) # neighboring jams
           )
 
 if(!REASSESS){
-  keyoutputs[[modelno]] = do.rf(train.dat = w.04_09, 
+  keyoutputs[[modelno]] = do.rf(train.dat = w.allmonths, 
                               omits, response.var = "MatchEDT_buffer_Acc", 
                               model.no = modelno, rf.inputs = rf.inputs) 
 
 } else { 
-  redo_outputs[[modelno]] = reassess.rf(train.dat = w.04_09, 
+  redo_outputs[[modelno]] = reassess.rf(train.dat = w.allmonths, 
                                       omits, response.var = "MatchEDT_buffer_Acc", 
                                       model.no = modelno, rf.inputs = rf.inputs) 
 }
@@ -555,22 +579,22 @@ modelno = "35"
 omits = c(alwaysomit, alert_types,
           "wx",
           #c("CRASH_SUM", "FATALS_SUM"), # FARS variables, added in 19
-          grep("F_SYSTEM", names(w.04), value = T), # road class
+          grep("F_SYSTEM", names(w.allmonths), value = T), # road class
           c("MEAN_AADT", "SUM_AADT", " SUM_miles"), # AADT
-          grep("WAC", names(w.04), value = T), # Jobs workplace
-          grep("RAC", names(w.04), value = T), # Jobs residential
-          grep("MagVar", names(w.04), value = T), # direction of travel
-          grep("medLast", names(w.04), value = T), # report rating, reliability, confidence
-          grep("nWazeAcc_", names(w.04), value = T), # neighboring accidents
-          grep("nWazeJam_", names(w.04), value = T) # neighboring jams
+          grep("WAC", names(w.allmonths), value = T), # Jobs workplace
+          grep("RAC", names(w.allmonths), value = T), # Jobs residential
+          grep("MagVar", names(w.allmonths), value = T), # direction of travel
+          grep("medLast", names(w.allmonths), value = T), # report rating, reliability, confidence
+          grep("nWazeAcc_", names(w.allmonths), value = T), # neighboring accidents
+          grep("nWazeJam_", names(w.allmonths), value = T) # neighboring jams
 )
 
 if(!REASSESS){
-  keyoutputs[[modelno]] = do.rf(train.dat = w.04_09, 
+  keyoutputs[[modelno]] = do.rf(train.dat = w.allmonths, 
                               omits, response.var = "MatchEDT_buffer_Acc", 
                               model.no = modelno, rf.inputs = rf.inputs) 
 } else {
-  redo_outputs[[modelno]] = reassess.rf(train.dat = w.04_09, 
+  redo_outputs[[modelno]] = reassess.rf(train.dat = w.allmonths, 
                                       omits, response.var = "MatchEDT_buffer_Acc", 
                                       model.no = modelno, rf.inputs = rf.inputs) 
 }
@@ -581,22 +605,22 @@ modelno = "36"
 omits = c(alwaysomit, alert_types,
           # "wx",
           c("CRASH_SUM", "FATALS_SUM"), # FARS variables, added in 19
-          grep("F_SYSTEM", names(w.04), value = T), # road class
+          grep("F_SYSTEM", names(w.allmonths), value = T), # road class
           c("MEAN_AADT", "SUM_AADT", " SUM_miles"), # AADT
-          grep("WAC", names(w.04), value = T), # Jobs workplace
-          grep("RAC", names(w.04), value = T), # Jobs residential
-          grep("MagVar", names(w.04), value = T), # direction of travel
-          grep("medLast", names(w.04), value = T), # report rating, reliability, confidence
-          grep("nWazeAcc_", names(w.04), value = T), # neighboring accidents
-          grep("nWazeJam_", names(w.04), value = T) # neighboring jams
+          grep("WAC", names(w.allmonths), value = T), # Jobs workplace
+          grep("RAC", names(w.allmonths), value = T), # Jobs residential
+          grep("MagVar", names(w.allmonths), value = T), # direction of travel
+          grep("medLast", names(w.allmonths), value = T), # report rating, reliability, confidence
+          grep("nWazeAcc_", names(w.allmonths), value = T), # neighboring accidents
+          grep("nWazeJam_", names(w.allmonths), value = T) # neighboring jams
 )
 
 if(!REASSESS){
-  keyoutputs[[modelno]] = do.rf(train.dat = w.04_09, 
+  keyoutputs[[modelno]] = do.rf(train.dat = w.allmonths, 
                               omits, response.var = "MatchEDT_buffer_Acc", 
                               model.no = modelno, rf.inputs = rf.inputs) 
 } else {
-  redo_outputs[[modelno]] = reassess.rf(train.dat = w.04_09, 
+  redo_outputs[[modelno]] = reassess.rf(train.dat = w.allmonths, 
                                       omits, response.var = "MatchEDT_buffer_Acc", 
                                       model.no = modelno, rf.inputs = rf.inputs) 
 }
@@ -607,23 +631,23 @@ modelno = "37"
 omits = c(alwaysomit, alert_types,
           "wx",
           c("CRASH_SUM", "FATALS_SUM"), # FARS variables, added in 19
-          # grep("F_SYSTEM", names(w.04), value = T), # road class
+          # grep("F_SYSTEM", names(w.allmonths), value = T), # road class
           # c("MEAN_AADT", "SUM_AADT", " SUM_miles"), # AADT
-          grep("WAC", names(w.04), value = T), # Jobs workplace
-          grep("RAC", names(w.04), value = T), # Jobs residential
-          grep("MagVar", names(w.04), value = T), # direction of travel
-          grep("medLast", names(w.04), value = T), # report rating, reliability, confidence
-          grep("nWazeAcc_", names(w.04), value = T), # neighboring accidents
-          grep("nWazeJam_", names(w.04), value = T) # neighboring jams
+          grep("WAC", names(w.allmonths), value = T), # Jobs workplace
+          grep("RAC", names(w.allmonths), value = T), # Jobs residential
+          grep("MagVar", names(w.allmonths), value = T), # direction of travel
+          grep("medLast", names(w.allmonths), value = T), # report rating, reliability, confidence
+          grep("nWazeAcc_", names(w.allmonths), value = T), # neighboring accidents
+          grep("nWazeJam_", names(w.allmonths), value = T) # neighboring jams
 )
 
 if(!REASSESS){
-  keyoutputs[[modelno]] = do.rf(train.dat = w.04_09, 
+  keyoutputs[[modelno]] = do.rf(train.dat = w.allmonths, 
                               omits, response.var = "MatchEDT_buffer_Acc", 
                               model.no = modelno, rf.inputs = rf.inputs) 
   save("keyoutputs", file = paste0("Output_to_", modelno))
 } else {
-  redo_outputs[[modelno]] = reassess.rf(train.dat = w.04_09, 
+  redo_outputs[[modelno]] = reassess.rf(train.dat = w.allmonths, 
                                       omits, response.var = "MatchEDT_buffer_Acc", 
                                       model.no = modelno, rf.inputs = rf.inputs) 
 }
@@ -633,22 +657,22 @@ modelno = "38"
 omits = c(alwaysomit, alert_types,
           "wx",
           c("CRASH_SUM", "FATALS_SUM"), # FARS variables, added in 19
-          grep("F_SYSTEM", names(w.04), value = T), # road class
+          grep("F_SYSTEM", names(w.allmonths), value = T), # road class
           c("MEAN_AADT", "SUM_AADT", " SUM_miles"), # AADT
-          # grep("WAC", names(w.04), value = T), # Jobs workplace
-          # grep("RAC", names(w.04), value = T), # Jobs residential
-          grep("MagVar", names(w.04), value = T), # direction of travel
-          grep("medLast", names(w.04), value = T), # report rating, reliability, confidence
-          grep("nWazeAcc_", names(w.04), value = T), # neighboring accidents
-          grep("nWazeJam_", names(w.04), value = T) # neighboring jams
+          # grep("WAC", names(w.allmonths), value = T), # Jobs workplace
+          # grep("RAC", names(w.allmonths), value = T), # Jobs residential
+          grep("MagVar", names(w.allmonths), value = T), # direction of travel
+          grep("medLast", names(w.allmonths), value = T), # report rating, reliability, confidence
+          grep("nWazeAcc_", names(w.allmonths), value = T), # neighboring accidents
+          grep("nWazeJam_", names(w.allmonths), value = T) # neighboring jams
 )
 
 if(!REASSESS){
-  keyoutputs[[modelno]] = do.rf(train.dat = w.04_09, 
+  keyoutputs[[modelno]] = do.rf(train.dat = w.allmonths, 
                               omits, response.var = "MatchEDT_buffer_Acc", 
                               model.no = modelno, rf.inputs = rf.inputs) 
 } else {
-  redo_outputs[[modelno]] = reassess.rf(train.dat = w.04_09, 
+  redo_outputs[[modelno]] = reassess.rf(train.dat = w.allmonths, 
                                       omits, response.var = "MatchEDT_buffer_Acc", 
                                       model.no = modelno, rf.inputs = rf.inputs) 
 }
@@ -658,24 +682,24 @@ modelno = "39"
 omits = c(alwaysomit, alert_types
           # "wx",
           # c("CRASH_SUM", "FATALS_SUM"), # FARS variables, added in 19
-          # grep("F_SYSTEM", names(w.04), value = T), # road class
+          # grep("F_SYSTEM", names(w.allmonths), value = T), # road class
           # c("MEAN_AADT", "SUM_AADT", " SUM_miles"), # AADT
-          # grep("WAC", names(w.04), value = T), # Jobs workplace
-          # grep("RAC", names(w.04), value = T), # Jobs residential
-          # grep("MagVar", names(w.04), value = T), # direction of travel
-          # grep("medLast", names(w.04), value = T), # report rating, reliability, confidence
-          # grep("nWazeAcc_", names(w.04), value = T), # neighboring accidents
-          # grep("nWazeJam_", names(w.04), value = T) # neighboring jams
+          # grep("WAC", names(w.allmonths), value = T), # Jobs workplace
+          # grep("RAC", names(w.allmonths), value = T), # Jobs residential
+          # grep("MagVar", names(w.allmonths), value = T), # direction of travel
+          # grep("medLast", names(w.allmonths), value = T), # report rating, reliability, confidence
+          # grep("nWazeAcc_", names(w.allmonths), value = T), # neighboring accidents
+          # grep("nWazeJam_", names(w.allmonths), value = T) # neighboring jams
 )
 
 if(!REASSESS){
-  keyoutputs[[modelno]] = do.rf(train.dat = w.04_09, 
+  keyoutputs[[modelno]] = do.rf(train.dat = w.allmonths, 
                               omits, response.var = "MatchEDT_buffer_Acc", 
                               model.no = modelno, rf.inputs = rf.inputs) 
   save("keyoutputs", file = paste0("Output_to_", modelno))
   
 } else {
-  redo_outputs[[modelno]] = reassess.rf(train.dat = w.04_09, 
+  redo_outputs[[modelno]] = reassess.rf(train.dat = w.allmonths, 
                                       omits, response.var = "MatchEDT_buffer_Acc", 
                                       model.no = modelno, rf.inputs = rf.inputs) 
 }
@@ -696,23 +720,23 @@ modelno = "42a"
 omits = c(alwaysomit,
           #          "wx",
           #          c("CRASH_SUM", "FATALS_SUM"), # FARS variables, 
-          #          grep("F_SYSTEM", names(w.04), value = T), # road class
+          #          grep("F_SYSTEM", names(w.allmonths), value = T), # road class
           #          c("MEAN_AADT", "SUM_AADT", " SUM_miles"), # AADT
-          #          grep("WAC", names(w.04), value = T), # Jobs workplace
-          #          grep("RAC", names(w.04), value = T), # Jobs residential
-          grep("MagVar", names(w.04), value = T), # direction of travel
-          grep("medLast", names(w.04), value = T), # report rating, reliability, confidence
-          grep("nWazeAcc_", names(w.04), value = T), # neighboring accidents
-          grep("nWazeJam_", names(w.04), value = T) # neighboring jams
+          #          grep("WAC", names(w.allmonths), value = T), # Jobs workplace
+          #          grep("RAC", names(w.allmonths), value = T), # Jobs residential
+          grep("MagVar", names(w.allmonths), value = T), # direction of travel
+          grep("medLast", names(w.allmonths), value = T), # report rating, reliability, confidence
+          grep("nWazeAcc_", names(w.allmonths), value = T), # neighboring accidents
+          grep("nWazeJam_", names(w.allmonths), value = T) # neighboring jams
 )
 
 if(!REASSESS){
-  keyoutputs[[modelno]] = do.rf(train.dat = w.04_09, 
+  keyoutputs[[modelno]] = do.rf(train.dat = w.allmonths, 
                                 omits, response.var = "nMatchEDT_buffer_Acc", 
                                 model.no = modelno, rf.inputs = rf.inputs) 
   save("keyoutputs", file = paste0("Output_to_", modelno))
 } else {
-  keyoutputs[[modelno]] = reassess.rf(train.dat = w.04_09, 
+  keyoutputs[[modelno]] = reassess.rf(train.dat = w.allmonths, 
                                         omits, response.var = "nMatchEDT_buffer_Acc", 
                                         model.no = modelno, rf.inputs = rf.inputs) 
 }
@@ -723,12 +747,12 @@ modelno = "43a"
 # Based on model 23, without EDT-only rows
 
 if(!REASSESS){
-  keyoutputs[[modelno]] = do.rf(train.dat = w.04_09[!EDTonlyrows,], 
+  keyoutputs[[modelno]] = do.rf(train.dat = w.allmonths[!EDTonlyrows,], 
                                 omits, response.var = "nMatchEDT_buffer_Acc", 
                                 model.no = modelno, rf.inputs = rf.inputs) 
   save("keyoutputs", file = paste0("Output_to_", modelno))
 } else {
-  keyoutputs[[modelno]] = reassess.rf(train.dat = w.04_09[!EDTonlyrows,], 
+  keyoutputs[[modelno]] = reassess.rf(train.dat = w.allmonths[!EDTonlyrows,], 
                                         omits, response.var = "nMatchEDT_buffer_Acc", 
                                         model.no = modelno, rf.inputs = rf.inputs) 
 }
@@ -739,12 +763,12 @@ modelno = "44a"
 # Based on model 23, without road closure-only rows
 
 if(!REASSESS){
-  keyoutputs[[modelno]] = do.rf(train.dat = w.04_09[!Road.closure.onlyrows,], 
+  keyoutputs[[modelno]] = do.rf(train.dat = w.allmonths[!Road.closure.onlyrows,], 
                                 omits, response.var = "nMatchEDT_buffer_Acc", 
                                 model.no = modelno, rf.inputs = rf.inputs) 
   save("keyoutputs", file = paste0("Output_to_", modelno))
 } else {
-  keyoutputs[[modelno]] = reassess.rf(train.dat = w.04_09[!Road.closure.onlyrows,], 
+  keyoutputs[[modelno]] = reassess.rf(train.dat = w.allmonths[!Road.closure.onlyrows,], 
                                         omits, response.var = "nMatchEDT_buffer_Acc", 
                                         model.no = modelno, rf.inputs = rf.inputs) 
 }
@@ -756,24 +780,24 @@ modelno = "42b"
 omits = c(alwaysomit, alert_subtypes
           #"wx",
           #c("CRASH_SUM", "FATALS_SUM"), # FARS variables, added in 19
-          #grep("F_SYSTEM", names(w.04), value = T), # road class
+          #grep("F_SYSTEM", names(w.allmonths), value = T), # road class
           #c("MEAN_AADT", "SUM_AADT", " SUM_miles"), # AADT
-          #grep("WAC", names(w.04), value = T), # Jobs workplace
-          #grep("RAC", names(w.04), value = T), # Jobs residential
-          #grep("MagVar", names(w.04), value = T), # direction of travel
-          #grep("medLast", names(w.04), value = T), # report rating, reliability, confidence
-          #grep("nWazeAcc_", names(w.04), value = T), # neighboring accidents
-          #grep("nWazeJam_", names(w.04), value = T) # neighboring jams
+          #grep("WAC", names(w.allmonths), value = T), # Jobs workplace
+          #grep("RAC", names(w.allmonths), value = T), # Jobs residential
+          #grep("MagVar", names(w.allmonths), value = T), # direction of travel
+          #grep("medLast", names(w.allmonths), value = T), # report rating, reliability, confidence
+          #grep("nWazeAcc_", names(w.allmonths), value = T), # neighboring accidents
+          #grep("nWazeJam_", names(w.allmonths), value = T) # neighboring jams
 )
 
 
 if(!REASSESS){
-  keyoutputs[[modelno]] = do.rf(train.dat = w.04_09, 
+  keyoutputs[[modelno]] = do.rf(train.dat = w.allmonths, 
                                 omits, response.var = "nMatchEDT_buffer_Acc", 
                                 model.no = modelno, rf.inputs = rf.inputs) 
   save("keyoutputs", file = paste0("Output_to_", modelno))
 } else {
-  keyoutputs[[modelno]] = reassess.rf(train.dat = w.04_09, 
+  keyoutputs[[modelno]] = reassess.rf(train.dat = w.allmonths, 
                                         omits, response.var = "nMatchEDT_buffer_Acc", 
                                         model.no = modelno, rf.inputs = rf.inputs) 
 }
@@ -784,12 +808,12 @@ modelno = "43b"
 # Based on model 30, without EDT-only rows
 
 if(!REASSESS){
-  keyoutputs[[modelno]] = do.rf(train.dat = w.04_09[!EDTonlyrows,], 
+  keyoutputs[[modelno]] = do.rf(train.dat = w.allmonths[!EDTonlyrows,], 
                                 omits, response.var = "nMatchEDT_buffer_Acc", 
                                 model.no = modelno, rf.inputs = rf.inputs) 
   save("keyoutputs", file = paste0("Output_to_", modelno))
 } else {
-  keyoutputs[[modelno]] = reassess.rf(train.dat = w.04_09[!EDTonlyrows,], 
+  keyoutputs[[modelno]] = reassess.rf(train.dat = w.allmonths[!EDTonlyrows,], 
                                         omits, response.var = "nMatchEDT_buffer_Acc", 
                                         model.no = modelno, rf.inputs = rf.inputs) 
 }
@@ -800,12 +824,12 @@ modelno = "44b"
 # Based on model 30, without road closure-only rows
 
 if(!REASSESS){
-  keyoutputs[[modelno]] = do.rf(train.dat = w.04_09[!Road.closure.onlyrows,], 
+  keyoutputs[[modelno]] = do.rf(train.dat = w.allmonths[!Road.closure.onlyrows,], 
                                 omits, response.var = "nMatchEDT_buffer_Acc", 
                                 model.no = modelno, rf.inputs = rf.inputs) 
   save("keyoutputs", file = paste0("Output_to_", modelno))
 } else {
-  keyoutputs[[modelno]] = reassess.rf(train.dat = w.04_09[!Road.closure.onlyrows,], 
+  keyoutputs[[modelno]] = reassess.rf(train.dat = w.allmonths[!Road.closure.onlyrows,], 
                                         omits, response.var = "nMatchEDT_buffer_Acc", 
                                         model.no = modelno, rf.inputs = rf.inputs) 
 }

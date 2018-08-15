@@ -296,37 +296,49 @@ for(state in states){
 
 # Check with plots -- written for ATA, needs update for SDC 2018-08-15
 
-CHECKPLOT = F
+CHECKPLOT = T
+
 
 library(rgdal)
-
-gdaldir = localdir # Requires full path, no alias
+library(maps) # for state.fips
 
 if(CHECKPLOT){  
   
-  co <- rgdal::readOGR(gdaldir, layer = "cb_2015_us_county_500k")
+  co <- rgdal::readOGR(file.path(localdir, 'census'), layer = "cb_2017_us_county_500k")
+
+  FIPS = state.fips[state.fips$abb %in% states,]
+  FIPS = FIPS[!duplicated(FIPS$abb),]
+  FIPS$fips = formatC(FIPS$fips, width = 2, flag = "0")  
   
-  # maryland FIPS = 24
-  md.co <- co[co$STATEFP == 24,]
-  
-  pdf("Checking_Grid_agg_newID.pdf", width = 11, height = 8)
-  for(SIZE in HEXSIZE){
+  pdf(file.path("Figures", "Checking_Grid_agg_Multistate.pdf"), width = 11, height = 8)
+  for(state in states){ # state = 'UT'
+
+  months = c("2017-04", "2017-09") # just a few for example
+
+  state.co <- co[co$STATEFP == FIPS[FIPS$abb==state,"fips"],]
+    
   # Read in hexagon shapefile. This is a rectangular surface of 1 sq mi area hexagons, 
-  hex <- rgdal::readOGR(gdaldir, layer = paste0("MD_hexagons_", SIZE, "mi_newExtent_newGRIDID"))
+  hex <- rgdal::readOGR(file.path(localdir, 'Hex'), layer = paste0(state, "_hexagons_1mi_neighbors"))
   
-  hex2 <- spTransform(hex, proj4string(md.co))
-  plot(hex2)
-  plot(md.co, add = T, col = "red")
+  hex2 <- spTransform(hex, proj4string(state.co))
   
-  load(paste0(temp.outputdir, "/WazeTimeEdtHexAll_04_", SIZE,"mi",".RData"))
-  
-  class(wazeTime.edt.hexAll) <- "data.frame"
-  
-  # Join back to hex2, just check unique grid IDs for plotting
-  w.t <- wazeTime.edt.hexAll[!duplicated(wazeTime.edt.hexAll$GRID_ID),]
-  
-  h.w <- hex2[hex2$GRID_ID %in% w.t$GRID_ID,]
-  plot(h.w, col = "blue", add = T)
+  for(j in months){
+      plot(hex2, main = paste(state, j))
+    
+      plot(state.co, add = T, col = "red")
+      
+      fn = paste0("WazeTimeEdtHexAll_", j, "_1mi_", state, ".RData")
+      
+      load(file.path(temp.outputdir, fn))
+      
+      class(wazeTime.edt.hexAll) <- "data.frame"
+      
+      # Join back to hex2, just check unique grid IDs for plotting
+      w.t <- wazeTime.edt.hexAll[!duplicated(wazeTime.edt.hexAll$GRID_ID),]
+      
+      h.w <- hex2[hex2$GRID_ID %in% w.t$GRID_ID,]
+      plot(h.w, col = "blue", add = T)
+    }
   }
   dev.off()
 }
