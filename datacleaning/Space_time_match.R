@@ -34,8 +34,7 @@ setwd(localdir)
 source(file.path(codeloc, 'utility/wazefunctions.R'))
 
 # Set parameters: states, yearmonths, time zone and projection
-states = #c("CT", "UT", 
-  c("VA", "MD")
+states = c("CT", "UT", "VA", "MD")
 
 yearmonths = c(
   paste(2017, formatC(4:12, width = 2, flag = "0"), sep="-"),
@@ -45,8 +44,8 @@ yearmonths = c(
 # Time zone picker:
 tzs <- data.frame(states, 
                   tz = c(
-#                    "US/Eastern",
- #                   "US/Mountain",
+                    "US/Eastern",
+                    "US/Mountain",
                     "US/Eastern",
                     "US/Eastern"
                     ),
