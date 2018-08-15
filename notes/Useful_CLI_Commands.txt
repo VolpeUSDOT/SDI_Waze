@@ -1,0 +1,58 @@
+#################################
+# General Unix commands
+netstate 
+    #check network usage
+
+top -i
+    # Monitor CPU and RAM usage. Hit 1 to view by CPU. Hit 'q' to exit
+    
+df -h
+    # Monitor available disk usage, human-readable format
+    
+df -hT /home
+    # Look at available disk space, human-readable, for the /home file system
+    
+du -d 1 -h
+    # Disk usage by size of top-level of directory; run this from cd ~/
+    
+ 
+cat /proc/version
+     # find the operating system information
+
+
+
+# Recursively zip all contents of a folder to a .zip file
+zip -r <zipfilename.zip> <foldertozip>/*
+
+unzip <file>
+# unzip it
+
+#####################################
+# Git
+# If getting an 'insufficienct permissions' error when trying to pull or push, make sure permissions are set correclty in the .git/objects directory. As root, either chmod or chown:
+
+sudo chmod 777 -R .git/objects
+        #777 = read + write + execute = 4 + 2 + 1 for all, owner, group, and world. 
+
+sudo chown –R daniel:daniel /home/daniel/SDI_Waze/.git/objects
+        # Recursively change the owner of .git/objects and all descendent files to daniel
+
+#####################################
+# AWS tips
+Team bucket:
+
+aws s3 ls prod-sdc-sdi-911061262852-us-east-1-bucket/
+
+Curated data:
+
+aws s3 ls s3://prod-dot-sdc-curated-911061262852-us-east-1/
+
+
+#####################################
+# RStudio Server
+# RStudio: reset one session
+sudo rm /home/daniel/.rstudio/sessions/active/session-9e017252 -R
+
+# RStudio: reset entire state for one user
+sudo rm /home/daniel/.rstudio/ -R
+
