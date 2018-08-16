@@ -1,8 +1,10 @@
 # Running full set of random forest models
 # https://github.com/VolpeUSDOT/SDI_Waze/wiki/Models-to-test
-# Modified for multi-state model running
+# Modified for multi-state model running, currently only model 18 run for CT and UT
+
 
 # Setup ---- 
+rm(list=ls()) # Start fresh
 library(randomForest)
 library(foreach) # for parallel implementation
 library(doParallel) # includes iterators and parallel
@@ -15,15 +17,18 @@ source(file.path(codeloc, 'utility/get_packages.R')) # installs necessary packag
 # Set grid size:
 HEXSIZE = 1 #c("1", "4", "05")[1] # Change the value in the bracket to use 1, 4, or 0.5 sq mi hexagon grids
 
-state = 'CT' # Sets the state. UT, VA, MD will all be options.
+# <><><><><>
+state = 'CT'  #'UT' # Sets the state. UT, VA, MD will all be options.
+# <><><><><>
 
+# Manually setting months to run here; could also scan S3 for months available for this state
 do.months = paste("2017", c("04","05","06","07","08","09"), sep="-")
 
 REASSESS = F # re-assess model fit and diagnostics using reassess.rf instead of do.rf
 
 teambucket <- "s3://prod-sdc-sdi-911061262852-us-east-1-bucket"
 
-user <- paste0( "/home/", system("whoami", intern = TRUE)) #the user directory to use
+user <- paste0( "/home/", system("whoami", intern = TRUE)) # the user directory to use
 localdir <- paste0(user, "/workingdata") # full path for readOGR
 
 outputdir <- file.path(localdir, "Random_Forest_Output")
@@ -59,7 +64,8 @@ for(mo in do.months){
   prep.hex(paste0("WazeTimeEdtHexAll_", mo, "_", HEXSIZE, "mi_", state,".RData"), state = state, month = mo)
 }
 
-# Plot to check grid IDs. Requires shapefiles to be present in ~/workingdata/Hex, download from S3 if not there
+# Plot to check grid IDs. Requires shapefiles to be present in ~/workingdata/Hex, download from S3 if not there.
+# This was useful when testing differnt grid sizes, to make sure everything was matching correctly.
 CHECKPLOT = F
 if(CHECKPLOT){
   grid_shp <- rgdal::readOGR(file.path(localdir, "Hex"), paste0(state, "_hexagons_1mi_neighbors"))
@@ -69,6 +75,7 @@ if(CHECKPLOT){
   gs <- grid_shp[w.g,]
   
   plot(gs, col = "red")
+  rm(w.g, gs, grid_shp)
 }
 
 # Update this later after getting supplemental data ready
@@ -97,6 +104,8 @@ avail.cores = parallel::detectCores()
 
 if(avail.cores > 8) avail.cores = 10 # Limit usage below max if on r4.4xlarge instance
 
+# Use this to set number of decision trees to use, and key RF parameters. mtry is especially important, should consider tuning this with caret package
+# For now use same parameters for all models for comparision; tune parameters after models are selected
 rf.inputs = list(ntree.use = avail.cores * 50, avail.cores = avail.cores, mtry = 10, maxnodes = 1000, nodesize = 100)
 
 keyoutputs = redo_outputs = list() # to store model diagnostics
@@ -162,7 +171,11 @@ cat(round(timediff, 2), attr(timediff, "units"), "elapsed to model", modelno)
 
 # <><><><><><><><><><><><><><><><><><> 2018-08-15 Dan stopped here! 
 
-# 19, add FARS
+READY = F # Use this to skip models which aren't ready for multi-state implementation yet 2018-08-15
+
+if(READY){
+
+  # 19, add FARS
 modelno = "19"
 
 omits = c(alwaysomit,
@@ -299,6 +312,10 @@ if(!REASSESS){
                                       omits, response.var = "MatchEDT_buffer_Acc", 
                                       model.no = modelno, rf.inputs = rf.inputs) 
 }
+
+
+} # end READY
+
 # B: TypeCounts ----
 
 # 24 Base: nWazeAccident, nWazeJam, nWazeWeatherOrHazard, nWazeRoadClosed
@@ -353,6 +370,9 @@ if(!REASSESS){
                                       omits, response.var = "MatchEDT_buffer_Acc", 
                                       model.no = modelno, rf.inputs = rf.inputs) 
 }
+
+if(READY){
+  
 # 26 Add FARS only
 modelno = "26"
 
@@ -516,6 +536,8 @@ if(!REASSESS){
                                         model.no = modelno, rf.inputs = rf.inputs) 
 }
 
+} # end READY
+
 # C. SubtypeCounts ----
 
 # 33 Base: nWazeAccidentMajor, nWazeAccidentMinor, nWazeJamModerate, nWazeJamHeavy, nWazeJamStandStill, nHazardOnRoad, nHazardOnShoulder, nHazardWeather
@@ -572,6 +594,9 @@ if(!REASSESS){
                                       omits, response.var = "MatchEDT_buffer_Acc", 
                                       model.no = modelno, rf.inputs = rf.inputs) 
 }
+
+
+if(READY){
 
 # 35 Add FARS only
 modelno = "35"
@@ -835,6 +860,8 @@ if(!REASSESS){
 }
 
 
+} # end READY
+
 # E. Buffer vs grid cell counts for response variable ----
 
 # 45 Run best combination of each base model (A, B, and C) on buffer counts vs grid cell counts
@@ -845,7 +872,13 @@ if(!REASSESS){
 # 
 # modelno = "45b"
 
-if(REASSESS) save("keyoutputs", file = paste0("Reassess_Output_to_", modelno))
+
+if(REASSESS) {
+  save("keyoutputs", file = paste0(state, "_Reassess_Output_to_", modelno)) 
+} else {
+  save("keyoutputs", file = paste0(state, "_Output_to_", modelno))
+  
+}
 
 
 timediff <- Sys.time() - starttime

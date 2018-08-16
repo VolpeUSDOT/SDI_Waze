@@ -35,6 +35,10 @@ do.rf <- function(train.dat, omits, response.var = "MatchEDT_buffer_Acc", model.
 
   fitvars <- names(train.dat)[is.na(match(names(train.dat), omits))]
   
+  # Remove any rows with NA in predictors
+  cc <- complete.cases(train.dat[,fitvars])
+  train.dat <- train.dat[cc,]
+  
   # Provide mtry if null
   if(is.null(rf.inputs$mtry)){
     mtry.use = if (!is.factor(response.var)) max(floor(length(fitvars)/3), 1) else floor(sqrt(length(fitvars)))
@@ -77,13 +81,15 @@ do.rf <- function(train.dat, omits, response.var = "MatchEDT_buffer_Acc", model.
   } else {
     class(test.dat) <- "data.frame"
     rundat = train.dat
+    
+    # Remove any rows with NA in predictors from test.dat
+    cc <- complete.cases(test.dat[,fitvars])
+    test.dat <- test.dat[cc,]
+    
     test.dat.use = test.dat
     comb.dat <- rbind(train.dat, test.dat)
   }
   
-  # Remove any rows with NA in predictors
-  cc <- complete.cases(rundat[,fitvars])
-  rundat <- rundat[cc,]
   
   # Start RF in parallel
   starttime = Sys.time()
@@ -175,7 +181,7 @@ do.rf <- function(train.dat, omits, response.var = "MatchEDT_buffer_Acc", model.
   } # end if continuous response variable
 
   write.csv(out.df,
-            file = file.path(ouputdir, paste(model.no, "RandomForest_pred.csv", sep = "_")),
+            file = file.path(outputdir, paste(model.no, "RandomForest_pred.csv", sep = "_")),
             row.names = F)
   
   savelist = c("rf.out", "rf.pred", "rf.prob", "out.df") 
@@ -184,7 +190,7 @@ do.rf <- function(train.dat, omits, response.var = "MatchEDT_buffer_Acc", model.
   
   fn = paste(state, "Model", model.no, "RandomForest_Output.RData", sep= "_")
   
-  save(list = savelist, file.path(outputdir, fn))
+  save(list = savelist, file = file.path(outputdir, fn))
   
   # Copy to S3
   system(paste("aws s3 cp",
