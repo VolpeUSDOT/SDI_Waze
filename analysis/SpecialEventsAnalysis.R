@@ -55,8 +55,11 @@ md@data # check the data table in SpatialPolygonsDataFrame class
 grid <- readOGR(file.path(data.loc,"MD_hexagons_shapefiles"), layer = "MD_hexagons_1mi_newExtent_neighbors")
 grid <- spTransform(grid, CRS(proj.USGS))
 
-GridCount <- read.csv(paste0(output.loc, "/Waze_04-09_GridCounts.csv"))
-AllModel30 <- read.csv(paste0(output.loc, "/All_Model_30.csv"))
+GridCount <- read.csv(paste0(output.loc, "/Waze_04-09_GridCounts.csv")) #623,251*14
+AllModel30 <- read.csv(paste0(output.loc, "/All_Model_30.csv")) # 617,338*124
+
+length(unique(AllModel30$GRID_ID)) # 5880
+length(unique(GridCount$GRID_ID)) # 5176
 
 # Convert day of year to date
 GridCount$date <- as.Date(GridCount$day, origin = "2016-12-31")
@@ -91,6 +94,7 @@ SpecialEvents <- data.frame(location = c("Fedex Field", "Fedex Field"),
                             lon = c(-76.864535, -76.864535), 
                             lat = c(38.907794,38.907794),
                             buffer = 3) # FedEx Field
+write.csv(SpecialEvents, paste0(localdir, "/SpecielEvents.csv"), row.names = F)
 SpecialEvents_SP <- SpatialPointsDataFrame(SpecialEvents[c("lon", "lat")], SpecialEvents, proj4string = CRS("+proj=longlat +datum=WGS84"))  #  make sure Waze data is a SPDF
 SpecialEvents_SP <-spTransform(SpecialEvents_SP, CRS(proj.USGS)) # create spatial point data frame
 plot(SpecialEvents_SP)
