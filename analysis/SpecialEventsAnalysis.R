@@ -68,7 +68,7 @@ AllModel30 <- read.csv(paste0(output.loc, "/All_Model_30.csv")) # 617,338*124
 # Convert day of year to date
 GridCount$date <- as.Date(GridCount$day, origin = "2016-12-31")
 AllModel30$date <- as.Date(AllModel30$day, origin = "2016-12-31")
-# as.Date(91, origin = "2016-12-31") # "2017-04-01", the origins need to be the last day of 2016.
+# as.Date(91, origin = "2016-12-31") # "2017-04-01", the origin needs to be the last day of 2016.
 
 length(unique(AllModel30$GRID_ID)) # 5880
 length(unique(GridCount$GRID_ID)) # 5176
@@ -76,16 +76,73 @@ length(unique(GridCount$GRID_ID)) # 5176
 # Verify the date range
 max(GridCount$date) # Sept 30
 min(GridCount$date) # April 1
-max(AllModel30$date)
+max(AllModel30$date) # Sept 30
 min(AllModel30$date) # April 1, 2017
 
-# Read special event data
+# Read special event data and convert it to spatial data format
 SpecialEvents <- read.csv(file = paste0(wazedir,"/Data/SpecialEvents/SpecialEvents_MD_AprilToSept_2017.csv"))
-SpecialEvents_SP <- SpatialPointsDataFrame(SpecialEvents[c("Lon", "Lat")], SpecialEvents, proj4string = CRS("+proj=longlat +datum=WGS84"))  #  make sure Waze data is a SPDF
-SpecialEvents_SP <-spTransform(SpecialEvents_SP, CRS(proj.USGS)) # create spatial point data frame
-plot(SpecialEvents_SP)
+# SpecialEvents_SP <- SpatialPointsDataFrame(SpecialEvents[c("Lon", "Lat")], SpecialEvents, proj4string = CRS("+proj=longlat +datum=WGS84"))  #  make sure Waze data is a SPDF
+# SpecialEvents_SP <-spTransform(SpecialEvents_SP, CRS(proj.USGS)) # create spatial point data frame
+# plot(SpecialEvents_SP)
 
-#### Special events mini example ####
+
+#### Special Event Data Process ####
+# expand the SpecialEvents data with a variety of buffer values
+buffer = c(3,2,1)
+# Location.ID = unique(SpecialEvents$Location.ID)
+# com <- expand.grid(Location.ID,Buffer_Miles) # all combination of buffer_miles and locations that we are interested in.
+# names(com) <- c("Location.ID", "Buffer_Miles")
+SpecialEventsExpand <- do.call("rbind", replicate(3, SpecialEvents, simplify = FALSE))
+SpecialEventsExpand$Buffer_Miles <- rep(buffer, each = 8)
+
+# Convert the expanded table to spatial class
+SpecialEventsExpand_SP <- SpatialPointsDataFrame(SpecialEventsExpand[c("Lon", "Lat")], SpecialEventsExpand, proj4string = CRS("+proj=longlat +datum=WGS84"))  #  make sure Waze data is a SPDF
+SpecialEventsExpand_SP <-spTransform(SpecialEventsExpand_SP, CRS(proj.USGS)) # create spatial point data frame
+plot(SpecialEventsExpand_SP)
+
+# Calculate the grid_ids that fall in to each buffer of the each location
+uniquelocbuf <- unique(SpecialEventsExpand[,c("Location.ID","Buffer_Miles")]) # how many unique combninations of location and buffer miles
+
+for (i in c(1:nrow(uniquelocbuf))){
+  loc = uniquelocbuf$Location.ID[i]
+  buf = uniquelocbuf$Buffer_Miles[i]
+  
+  # create buffer for each location
+  SpecialEventsExpand_SP <- SpatialPointsDataFrame(SpecialEventsExpand[c("Lon", "Lat")], 
+                                                   SpecialEventsExpand %>% filter(Location.ID == loc), 
+                                                   proj4string = CRS("+proj=longlat +datum=WGS84")
+                                                   )  #  make sure Waze data is a SPDF
+  SpecialEventsExpand_SP <-spTransform(SpecialEventsExpand_SP, CRS(proj.USGS)) # create spatial point data frame
+  SE_buffer <- gBuffer(SpecialEventsExpand_SP, width = buf * 1609.34) # create buffer
+  
+  # Spatial join of special events buffer and grid network to get the GRID_IDs that are within the buffer
+  inbuffer <- gIntersects(SE_buffer, grid, byid = T) # a data frame with T/F logic values of the grid data frame
+  grid_id <- paste0(1,grid$GRID_ID[inbuffer])
+  
+  uniquelocbuf$GRID_ID[i] <- paste(grid_id, collapse = ",")
+}
+
+# left join the SpecialEventsExpand data on the grid_ids.
+SpecialEventsExpand <- SpecialEventsExpand %>% left_join(uniquelocbuf, by = c("Location.ID","Buffer_Miles"))
+write.csv(SpecialEventsExpand, file = paste0(wazedir,"/Data/SpecialEvents/SpecialEventsExpand_MD_AprilToSept_2017.csv"))
+
+# To recover the grid_ids
+grid_id <- unlist(strsplit(SpecialEventsExpand$GRID_ID[1], split = ","))
+  
+#### Special Events Time Series Plots ####
+
+
+  
+  
+
+
+  
+  
+  
+  
+  
+
+#### Special events mini example - Week ending 8/17/2018 ####
 # Two example events, Baseball game. Fedex Field does not have football event on Sep 17, and M&T Bank Stadium does not have football event on Sept 10. We need to check whether there is any pre-season football events before Sept 10 to have a baseline to compare.
 "1:00 PM ETSeptember 10, 2017, FedEx Field, 1600 Fedex Way, Landover, MD 20785
 1:00 PM ETSeptember 17, 2017, M&T Bank Stadium, 1101 Russell St, Baltimore, MD 21230"	
@@ -100,24 +157,23 @@ AllModel30[AllModel30$GRID_ID %in% paste0(1,c("FC-64", "C-63", "FB-64"))
                     & AllModel30$date == "2017-09-10", c("GRID_ID","hour","nWazeJam","nWazeHazardCarStoppedRoad","nWazeHazardCarStoppedShoulder","nHazardOnRoad")]
 # they are all zero, not jams happened at this day.
 
-# # Write special events into a table
-# SpecialEvents <- data.frame(location = c("Fedex Field", "Fedex Field"),
-#                             event = c("Football@1pm", "No Event"),
-#                             date = c("2017-09-10", "2017-09-17"),
-#                             day = c(253, 260),
-#                             lon = c(-76.864535, -76.864535),
-#                             lat = c(38.907794,38.907794),
-#                             buffer = 3) # FedEx Field
-# write.csv(SpecialEvents, paste0(localdir, "/SpecielEvents.csv"), row.names = F)
-# 
-# SpecialEvents_SP <- SpatialPointsDataFrame(SpecialEvents[c("Lon", "Lat")], SpecialEvents, proj4string = CRS("+proj=longlat +datum=WGS84"))  #  make sure Waze data is a SPDF
-# SpecialEvents_SP <-spTransform(SpecialEvents_SP, CRS(proj.USGS)) # create spatial point data frame
-# plot(SpecialEvents_SP)
-# 
-# buffdist <- SpecialEvents$buffer*1609 # convert miles to meters
-# SpecialEvents_buffer <- gBuffer(SpecialEvents_SP, width = buffdist[1]) # create a buffer, look for buffer_state.R for more information on spatial join
+# Write special events into a table
+SpecialEvents <- data.frame(location = c("Fedex Field", "Fedex Field"),
+                            event = c("Football@1pm", "No Event"),
+                            date = c("2017-09-10", "2017-09-17"),
+                            day = c(253, 260),
+                            lon = c(-76.864535, -76.864535),
+                            lat = c(38.907794,38.907794),
+                            buffer = 3) # FedEx Field
+write.csv(SpecialEvents, paste0(localdir, "/SpecielEvents.csv"), row.names = F)
 
-#### Special Event Data Process ####
+SpecialEvents_SP <- SpatialPointsDataFrame(SpecialEvents[c("Lon", "Lat")], SpecialEvents, proj4string = CRS("+proj=longlat +datum=WGS84"))  #  make sure Waze data is a SPDF
+SpecialEvents_SP <-spTransform(SpecialEvents_SP, CRS(proj.USGS)) # create spatial point data frame
+plot(SpecialEvents_SP)
+
+buffdist <- SpecialEvents$buffer*1609 # convert miles to meters
+SpecialEvents_buffer <- gBuffer(SpecialEvents_SP, width = buffdist[1]) # create a buffer, look for buffer_state.R for more information on spatial join
+
 plot(SpecialEvents_buffer) # plot the spatial
 
 grid@data # look at data from the grid 
@@ -147,8 +203,6 @@ col.names <- names(GridCount)[-c(1:4,15)]
 length(unique(GridCount$day)) #183
 length(unique(GridCount$date)) #183
 length(unique(GridCount$GRID_ID)) #6889
-
-# GridCount_sum <- 
 
 # t-test accident counts between event and a week after the event
 y <- grid_overlap %>% left_join(GridCount, by = c("GRID_ID", "day", "hour")) %>% mutate_if(colnames(.) %in% col.names,funs(replace(., which(is.na(.)), 0))) %>% mutate(date = as.Date(day, origin = "2016-12-31"), DayOfWeek = as.integer(factor(weekdays(date),levels = c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")))) %>% left_join(SpecialEvents, by =  c("day") )
