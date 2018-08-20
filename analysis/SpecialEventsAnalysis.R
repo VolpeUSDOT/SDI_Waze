@@ -1,5 +1,6 @@
 # Identify special events with the Waze data
 
+#### Set up ####
 codeloc <- "~/Github/SDI_Waze"
 source(file.path(codeloc, 'utility/get_packages.R'))
 
@@ -41,37 +42,50 @@ proj <- showP4(showWKT("+init=epsg:102008"))
 # USGS version, used for producing hexagons: 
 proj.USGS <- "+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs +ellps=GRS80 +towgs84=0,0,0"
 
+#### Read shapefiles and data ####
+# Read shapefiles and apply coordinate reference system of hexagons (USGS version of Albers equal area) to Urban Areas and counties using uproj.USGS
+
+# Read in US state shapefile
 ua <- readOGR(file.path(data.loc,"Census4Waze"), layer = "cb_2016_us_ua10_500k")
 ua <- spTransform(ua, CRS(proj.USGS))
 
-# Read in county shapefile, and apply coordinate reference system of hexagons (USGS version of Albers equal area) to Urban Areas and counties using uproj.USGS
+# Read in county shapefile 
 co <- readOGR(file.path(data.loc,"Census4Waze"), layer = "cb_2015_us_county_500k")
 co <- spTransform(co, CRS(proj.USGS))
 
 md <- readOGR(file.path(data.loc,"Census4Waze"), layer = "MD_outline")
 md <- spTransform(md, CRS(proj.USGS))
-md@data # check the data table in SpatialPolygonsDataFrame class
+# md@data # check the data table in SpatialPolygonsDataFrame class
 
+# Read in hexagon shapefile
 grid <- readOGR(file.path(data.loc,"MD_hexagons_shapefiles"), layer = "MD_hexagons_1mi_newExtent_neighbors")
 grid <- spTransform(grid, CRS(proj.USGS))
 
+# Read in model output and independent variables used in the model
 GridCount <- read.csv(paste0(output.loc, "/Waze_04-09_GridCounts.csv")) #623,251*14
 AllModel30 <- read.csv(paste0(output.loc, "/All_Model_30.csv")) # 617,338*124
-
-length(unique(AllModel30$GRID_ID)) # 5880
-length(unique(GridCount$GRID_ID)) # 5176
 
 # Convert day of year to date
 GridCount$date <- as.Date(GridCount$day, origin = "2016-12-31")
 AllModel30$date <- as.Date(AllModel30$day, origin = "2016-12-31")
+# as.Date(91, origin = "2016-12-31") # "2017-04-01", the origins need to be the last day of 2016.
 
-# as.Date(91, origin = "2016-12-31")
-# 
-# max(GridCount$date) # Sept 30
-# min(GridCount$date) # April 1
-# 
-# min(AllModel30$date) # April 1, 2017
+length(unique(AllModel30$GRID_ID)) # 5880
+length(unique(GridCount$GRID_ID)) # 5176
 
+# Verify the date range
+max(GridCount$date) # Sept 30
+min(GridCount$date) # April 1
+max(AllModel30$date)
+min(AllModel30$date) # April 1, 2017
+
+# Read special event data
+SpecialEvents <- read.csv(file = paste0(wazedir,"/Data/SpecialEvents/SpecialEvents_MD_AprilToSept_2017.csv"))
+SpecialEvents_SP <- SpatialPointsDataFrame(SpecialEvents[c("Lon", "Lat")], SpecialEvents, proj4string = CRS("+proj=longlat +datum=WGS84"))  #  make sure Waze data is a SPDF
+SpecialEvents_SP <-spTransform(SpecialEvents_SP, CRS(proj.USGS)) # create spatial point data frame
+plot(SpecialEvents_SP)
+
+#### Special events mini example ####
 # Two example events, Baseball game. Fedex Field does not have football event on Sep 17, and M&T Bank Stadium does not have football event on Sept 10. We need to check whether there is any pre-season football events before Sept 10 to have a baseline to compare.
 "1:00 PM ETSeptember 10, 2017, FedEx Field, 1600 Fedex Way, Landover, MD 20785
 1:00 PM ETSeptember 17, 2017, M&T Bank Stadium, 1101 Russell St, Baltimore, MD 21230"	
@@ -86,22 +100,24 @@ AllModel30[AllModel30$GRID_ID %in% paste0(1,c("FC-64", "C-63", "FB-64"))
                     & AllModel30$date == "2017-09-10", c("GRID_ID","hour","nWazeJam","nWazeHazardCarStoppedRoad","nWazeHazardCarStoppedShoulder","nHazardOnRoad")]
 # they are all zero, not jams happened at this day.
 
-# To include more hexagons using spatial join
-SpecialEvents <- data.frame(location = c("Fedex Field", "Fedex Field"),
-                            event = c("Football@1pm", "No Event"),
-                            date = c("2017-09-10", "2017-09-17"),
-                            day = c(253, 260),
-                            lon = c(-76.864535, -76.864535), 
-                            lat = c(38.907794,38.907794),
-                            buffer = 3) # FedEx Field
-write.csv(SpecialEvents, paste0(localdir, "/SpecielEvents.csv"), row.names = F)
-SpecialEvents_SP <- SpatialPointsDataFrame(SpecialEvents[c("lon", "lat")], SpecialEvents, proj4string = CRS("+proj=longlat +datum=WGS84"))  #  make sure Waze data is a SPDF
-SpecialEvents_SP <-spTransform(SpecialEvents_SP, CRS(proj.USGS)) # create spatial point data frame
-plot(SpecialEvents_SP)
+# # Write special events into a table
+# SpecialEvents <- data.frame(location = c("Fedex Field", "Fedex Field"),
+#                             event = c("Football@1pm", "No Event"),
+#                             date = c("2017-09-10", "2017-09-17"),
+#                             day = c(253, 260),
+#                             lon = c(-76.864535, -76.864535),
+#                             lat = c(38.907794,38.907794),
+#                             buffer = 3) # FedEx Field
+# write.csv(SpecialEvents, paste0(localdir, "/SpecielEvents.csv"), row.names = F)
+# 
+# SpecialEvents_SP <- SpatialPointsDataFrame(SpecialEvents[c("Lon", "Lat")], SpecialEvents, proj4string = CRS("+proj=longlat +datum=WGS84"))  #  make sure Waze data is a SPDF
+# SpecialEvents_SP <-spTransform(SpecialEvents_SP, CRS(proj.USGS)) # create spatial point data frame
+# plot(SpecialEvents_SP)
+# 
+# buffdist <- SpecialEvents$buffer*1609 # convert miles to meters
+# SpecialEvents_buffer <- gBuffer(SpecialEvents_SP, width = buffdist[1]) # create a buffer, look for buffer_state.R for more information on spatial join
 
-buffdist <- SpecialEvents$buffer*1609 # convert miles to meters
-SpecialEvents_buffer <- gBuffer(SpecialEvents_SP, width = buffdist[1]) # create a buffer, look for buffer_state.R for more information on spatial join
-
+#### Special Event Data Process ####
 plot(SpecialEvents_buffer) # plot the spatial
 
 grid@data # look at data from the grid 
