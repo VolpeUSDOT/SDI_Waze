@@ -79,6 +79,10 @@ min(GridCount$date) # April 1
 max(AllModel30$date) # Sept 30
 min(AllModel30$date) # April 1, 2017
 
+# subset AllModel30
+var <- c("GRID_ID","day","date","hour","Obs","Pred","Prob.Noncrash","Prob.Crash","weekday","nWazeAccident","nWazeJam","nHazardOnShoulder","nHazardOnRoad","nHazardWeather")
+AllModel30_sub <- AllModel30[, var]
+
 # Read special event data and convert it to spatial data format
 SpecialEvents <- read.csv(file = paste0(wazedir,"/Data/SpecialEvents/SpecialEvents_MD_AprilToSept_2017.csv"))
 # SpecialEvents_SP <- SpatialPointsDataFrame(SpecialEvents[c("Lon", "Lat")], SpecialEvents, proj4string = CRS("+proj=longlat +datum=WGS84"))  #  make sure Waze data is a SPDF
@@ -87,20 +91,22 @@ SpecialEvents <- read.csv(file = paste0(wazedir,"/Data/SpecialEvents/SpecialEven
 
 
 #### Special Event Data Process ####
+
+# format date
+SpecialEvents$Date <- as.Date(SpecialEvents$Date, format = "%m/%d/%Y")
+
+# format day of week
+SpecialEvents$DayofWeekN <- as.numeric(format(SpecialEvents$Date, format = "%u"))
+
 # expand the SpecialEvents data with a variety of buffer values
 buffer = c(3,2,1)
 # Location.ID = unique(SpecialEvents$Location.ID)
 # com <- expand.grid(Location.ID,Buffer_Miles) # all combination of buffer_miles and locations that we are interested in.
 # names(com) <- c("Location.ID", "Buffer_Miles")
-SpecialEventsExpand <- do.call("rbind", replicate(3, SpecialEvents, simplify = FALSE))
+SpecialEventsExpand <- do.call("rbind", replicate(length(buffer), SpecialEvents, simplify = FALSE))
 SpecialEventsExpand$Buffer_Miles <- rep(buffer, each = 8)
 
-# Convert the expanded table to spatial class
-SpecialEventsExpand_SP <- SpatialPointsDataFrame(SpecialEventsExpand[c("Lon", "Lat")], SpecialEventsExpand, proj4string = CRS("+proj=longlat +datum=WGS84"))  #  make sure Waze data is a SPDF
-SpecialEventsExpand_SP <-spTransform(SpecialEventsExpand_SP, CRS(proj.USGS)) # create spatial point data frame
-plot(SpecialEventsExpand_SP)
-
-# Calculate the grid_ids that fall in to each buffer of the each location
+# Extract the grid_ids that fall in to each buffer of the each location
 uniquelocbuf <- unique(SpecialEventsExpand[,c("Location.ID","Buffer_Miles")]) # how many unique combninations of location and buffer miles
 
 for (i in c(1:nrow(uniquelocbuf))){
@@ -124,25 +130,86 @@ for (i in c(1:nrow(uniquelocbuf))){
 
 # left join the SpecialEventsExpand data on the grid_ids.
 SpecialEventsExpand <- SpecialEventsExpand %>% left_join(uniquelocbuf, by = c("Location.ID","Buffer_Miles"))
+
+# Save expanded data to shared drive
 write.csv(SpecialEventsExpand, file = paste0(wazedir,"/Data/SpecialEvents/SpecialEventsExpand_MD_AprilToSept_2017.csv"))
 
-# To recover the grid_ids
-grid_id <- unlist(strsplit(SpecialEventsExpand$GRID_ID[1], split = ","))
-  
+
 #### Special Events Time Series Plots ####
+# To recover the grid_ids for 3 mile buffer of location SE1
+grid_id <- unlist(strsplit(unique(SpecialEventsExpand$GRID_ID[SpecialEventsExpand$Buffer_Miles == max(buffer) & SpecialEventsExpand$Location.ID == "SE1"]), split = ",")
+                  ) # an example of extracting grib_id of the largest buffer
+# Get all combinations of grid_id, hour, and day
+alldays = seq(from = min(AllModel30_sub$date), to = max(AllModel30_sub$date), by = "days") # get all days during April - Sep
+days = alldays[as.numeric(format(alldays, format = "%u")) %in% unique(SpecialEventsExpand$DayofWeekN)] # get all Sundays, Saturdays, Tuesdays, and Wednesdays
 
+gridcom <- expand.grid(GRID_ID = grid_id, hour = c(0:23), date = days) # 105840 = 105 days*24 hour*42 grid_id
+gridcom$day <- yday(gridcom$date) # convert date
+gridcom$weekday <- as.numeric(format(gridcom$date, format = "%u"))
 
-  
-  
+# left_join the Event Type to the model output data
+col.names <- c("Obs","nWazeAccident","nWazeJam","nHazardOnShoulder","nHazardOnRoad","nHazardWeather")
 
+dt <- gridcom %>% left_join(AllModel30_sub, by = c("GRID_ID", "day", "hour","date", "weekday")) %>% mutate_if(colnames(.) %in% col.names,funs(replace(., which(is.na(.)), 0))) %>% left_join(SpecialEvents[,c("Day","EventType","StartTime","EndTime")], by =  c("day" = "Day")) %>% mutate_if(colnames(.) %in% c("EventType"),funs(replace(., which(is.na(.)), "NoEvent")))
 
-  
-  
-  
-  
-  
+# By Event Type
+dt_EventType <- dt %>% group_by(EventType, hour) %>% summarize(nWazeJam = mean(nWazeJam),
+                                                         Obs = mean(Obs),
+                                                         nWazeAccident = mean(nWazeAccident),
+                                                         nHazardOnShoulder = mean(nHazardOnShoulder),
+                                                         nHazardOnRoad = mean(nHazardOnRoad),
+                                                         nHazardWeather = mean(nHazardWeather)
+                                                         )
 
-#### Special events mini example - Week ending 8/17/2018 ####
+ggplot(dt_EventType, aes(x = hour, y = nWazeJam)) + geom_point() + geom_line() + facet_wrap(~ EventType) + ylab("Average Waze Jam") + ggtitle("3 mile buffer")
+
+ggplot(dt_EventType, aes(x = hour, y = Obs)) + geom_point() + geom_line() + facet_wrap(~ EventType) + ylab("Average EDT Accident") + ggtitle("3 mile buffer")
+
+ggplot(dt_EventType, aes(x = hour, y = nWazeAccident)) + geom_point() + geom_line() + facet_wrap(~ EventType) + ylab("Average Waze Accident") + ggtitle("3 mile buffer")
+
+ggplot(dt_EventType, aes(x = hour, y = nHazardOnShoulder)) + geom_point() + geom_line() + facet_wrap(~ EventType) + ylab("Average Waze Hazard On Shoulder") + ggtitle("3 mile buffer")
+
+ggplot(dt_EventType, aes(x = hour, y = nHazardOnRoad)) + geom_point() + geom_line() + facet_wrap(~ EventType) + ylab("Average Waze Hazard Hazard On Road") + ggtitle("3 mile buffer")
+
+ggplot(dt_EventType, aes(x = hour, y = nHazardWeather)) + geom_point() + geom_line() + facet_wrap(~ EventType) + ylab("Average Waze Hazard or Weather") + ggtitle("3 mile buffer")
+  
+# By date, averages are over 42 grids
+dt_Date <- dt %>% group_by(date, weekday, hour) %>% summarize(nWazeJam = mean(nWazeJam),
+                                                               Obs = mean(Obs),
+                                                               nWazeAccident = mean(nWazeAccident),
+                                                               nHazardOnShoulder = mean(nHazardOnShoulder),
+                                                               nHazardOnRoad = mean(nHazardOnRoad),
+                                                               nHazardWeather = mean(nHazardWeather)
+) %>% mutate(Date = paste(date, weekday))
+
+ggplot(dt_Date %>% filter(weekday == 7), aes(x = hour, y = nWazeJam)) + geom_point() + geom_line() + facet_wrap(~ Date) + ylab("Average Waze Jam") + ggtitle("3 mile buffer") 
+
+# Select Sunday, averages are over 42 grid cells
+dt_Sun <- dt %>% filter(weekday == 7) %>% mutate(EventDay = ifelse(EventType != "NoEvent", paste0(date, EventType), "NoEvent")) %>% group_by(EventDay, hour) %>% summarize(nWazeJam = mean(nWazeJam),
+                                                              Obs = mean(Obs),
+                                                              nWazeAccident = mean(nWazeAccident),
+                                                              nHazardOnShoulder = mean(nHazardOnShoulder),
+                                                              nHazardOnRoad = mean(nHazardOnRoad),
+                                                              nHazardWeather = mean(nHazardWeather)
+)
+
+ggplot(dt_Sun, aes(x = hour, y = nWazeJam)) + geom_point() + geom_line() + facet_wrap(~ EventDay) + ylab("Average Waze Jam") + ggtitle("3 mile buffer, Sundays") 
+
+dt_Tue <- dt %>% filter(weekday == 2) %>% mutate(EventDay = ifelse(EventType != "NoEvent", paste0(date, EventType), "NoEvent")) %>% group_by(EventDay, hour) %>% summarize(nWazeJam = mean(nWazeJam),
+                                                                                                                                                                           Obs = mean(Obs),
+                                                                                                                                                                           nWazeAccident = mean(nWazeAccident),
+                                                                                                                                                                           nHazardOnShoulder = mean(nHazardOnShoulder),
+                                                                                                                                                                           nHazardOnRoad = mean(nHazardOnRoad),
+                                                                                                                                                                           nHazardWeather = mean(nHazardWeather)
+)
+
+ggplot(dt_Tue, aes(x = hour, y = nWazeJam)) + geom_point() + geom_line() + facet_wrap(~ EventDay) + ylab("Average Waze Jam") + ggtitle("3 mile buffer, Tuesdays") 
+
+#### To do:  ####
+# Consider write a function to derive the dt table for each location and buffer mile.
+# Save plots
+
+#### Special events mini example - Work on the Week ending 8/17/2018, move to the end of the script ####
 # Two example events, Baseball game. Fedex Field does not have football event on Sep 17, and M&T Bank Stadium does not have football event on Sept 10. We need to check whether there is any pre-season football events before Sept 10 to have a baseline to compare.
 "1:00 PM ETSeptember 10, 2017, FedEx Field, 1600 Fedex Way, Landover, MD 20785
 1:00 PM ETSeptember 17, 2017, M&T Bank Stadium, 1101 Russell St, Baltimore, MD 21230"	
