@@ -127,7 +127,7 @@ for(state in states){ # state = "CT"
     #Save list of Grid cells and time windows with EDT or Waze data  
     fn = paste0("WazeHexTimeList_", j,"_", HEXSIZE, "mi_", state, ".RData")
     
-    save(list="Waze.hex.time", file = paste(temp.outputdir, fn))
+    save(list="Waze.hex.time", file = file.path(temp.outputdir, fn))
     
     # Copy to S3
     system(paste("aws s3 cp",

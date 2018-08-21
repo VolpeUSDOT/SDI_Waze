@@ -44,7 +44,7 @@ yearmonths = c(
 # Time zone picker:
 tzs <- data.frame(states, 
                   tz = c(
-                    "US/Eastern",
+                     "US/Eastern",
                     "US/Mountain",
                     "US/Eastern",
                     "US/Eastern"

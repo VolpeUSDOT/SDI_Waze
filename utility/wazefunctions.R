@@ -112,7 +112,6 @@ movefiles <- function(filelist, temp = outdir, wazedir){
   
   # Check to make sure the from and to directories are accessible
   if(!dir.exists(wazedir)) stop("Destination output directory does not exist or shared drive is not connected")
-  if(!dir.exists(wazedir)) stop("Destination output directory does not exist or shared drive is not connected")
   if(length(filelist) < 1) stop("No files selected to move, check filelist argument")
   if(length(dir(temp)[grep(filelist[1], dir(temp))]) < 1) stop("Selected files not found in the temporary output directory")
     
@@ -197,8 +196,8 @@ bin.mod.diagnostics <- function(predtab){
 # Read in hexagonally-gridded data of a specific name, prep fields, and save it as a short-named data frame
 prep.hex <- function(hexname, state, month, s3 = T, bucket = teambucket){
   # Defaults to read from S3 bucket specified with teambucket 
-  # Specify month as two-digit character value, e.g. "04" for April
-  # Specify full path in hexname, e.g. file.path(inputdir, paste0("WazeTimeEdtHexWx_", mo,".RData"))
+  # Specify month as 6-digit character value, e.g. "2017-04" for April 2017
+  # Specify full path in hexname, e.g. for MD weather-overlaid files: file.path(inputdir, paste0("WazeTimeEdtHexWx_", mo,".RData"))
   
   mo = month
   if(s3) {
@@ -242,7 +241,7 @@ prep.hex <- function(hexname, state, month, s3 = T, bucket = teambucket){
   wte$MatchEDT_buffer_Acc[wte$MatchEDT_buffer_Acc > 0] = 1 
   wte$MatchEDT_buffer_Acc <- as.factor(wte$MatchEDT_buffer_Acc)
   
-  mo <- sub("-", "_", mo)
+  mo <- sub("-", "_", mo) # change e.g. from 2017-04 to 2017_04 for R object naming
   
   assign(paste("w", mo, sep="."), wte, envir = globalenv()) 
   }

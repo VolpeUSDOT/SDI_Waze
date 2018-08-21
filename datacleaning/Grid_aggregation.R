@@ -58,7 +58,7 @@ for(state in states){ # state = "CT"
                                start = 17,
                                stop = 23))
   
-  todo.months = sort(avail.months)[c(1:9)]
+  todo.months = sort(avail.months)#[c(1:9)]
   
   use.tz <- tzs$tz[tzs$states == state]
   
@@ -318,8 +318,12 @@ if(CHECKPLOT){
   state.co <- co[co$STATEFP == FIPS[FIPS$abb==state,"fips"],]
     
   # Read in hexagon shapefile. This is a rectangular surface of 1 sq mi area hexagons, 
-  hex <- rgdal::readOGR(file.path(localdir, 'Hex'), layer = paste0(state, "_hexagons_1mi_neighbors"))
-  
+  if(state == "MD"){
+    hex = readOGR(file.path(localdir, "Hex", "MD_hexagons_shapefiles"), layer = "MD_hexagons_1mi_newExtent_neighbors")
+  } else {
+    hex = readOGR(file.path(localdir, "Hex"), layer = paste0(state, "_hexagons_1mi_neighbors"))
+  }
+    
   hex2 <- spTransform(hex, proj4string(state.co))
   
   for(j in months){
