@@ -205,13 +205,18 @@ dt_Date <- dt %>% group_by(date, DayofWeek, hour) %>% summarize(nWazeJam = mean(
 ) %>% mutate(Date = paste(date, DayofWeek))
 
 weekday = "Sun"
-ggplot(dt_Date %>% filter(DayofWeek == weekday), aes(x = hour, y = nWazeJam)) + geom_point() + geom_line() + facet_wrap(~ Date) + ylab("Average Waze Jam") + ggtitle(paste(loc, buf,"mile buffer", weekday)) 
+ggplot(dt_Date %>% filter(DayofWeek == weekday), aes(x = hour, y = nWazeJam, group = date)) + 
+  geom_point(alpha = 0.2, color = "red") +
+  # geom_line(alpha = 0.2, color = "blue") +
+  # facet_wrap(~ Date) + 
+  ylab("Average Waze Jam") + ggtitle(paste(loc, buf,"mile buffer", weekday)) 
+# consider an area/density chart
 
 # Select Sunday, averages are over 42 grid cells
 weekday = "Sun"
 
 # Create a new varaible EventDay for a specific day of week.
-dt_Sun <- dt %>% filter(DayofWeek == weekday) %>% mutate(EventDay = ifelse(EventType != "NoEvent", paste0(date, EventType), "NoEvent")) %>% group_by(EventDay, hour) %>% summarize(nWazeJam = mean(nWazeJam),
+dt_Sun <- dt %>% filter(DayofWeek == "Sun") %>% mutate(EventDay = ifelse(EventType != "NoEvent", paste0(date, EventType), "NoEvent")) %>% group_by(EventDay, hour) %>% summarize(nWazeJam = mean(nWazeJam),
                                Obs = mean(Obs),
                                nWazeAccident = mean(nWazeAccident),
                                nHazardOnShoulder = mean(nHazardOnShoulder),
@@ -219,7 +224,7 @@ dt_Sun <- dt %>% filter(DayofWeek == weekday) %>% mutate(EventDay = ifelse(Event
                                nHazardWeather = mean(nHazardWeather),
 )
 
-ggplot(dt_Sun, aes(x = hour, y = nWazeJam)) + geom_point() + geom_line() + facet_wrap(~ EventDay) + ylab("Average Waze Jam") + ggtitle(paste(loc, buf,"mile buffer",weekday)) 
+ggplot(dt_Sun, aes(x = hour, y = nWazeJam)) + geom_point() + geom_line() + facet_wrap(~ EventDay) + ylab("Average Waze Jam") + ggtitle(paste(loc, buf,"mile buffer","Sunday")) 
 
 # Select Tuesday, averages are over 42 grid cells
 weekday = "Tue"
