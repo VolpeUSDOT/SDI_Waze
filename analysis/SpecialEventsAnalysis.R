@@ -134,23 +134,45 @@ SpecialEventsExpand <- SpecialEventsExpand %>% left_join(uniquelocbuf, by = c("L
 # Save expanded data to shared drive
 write.csv(SpecialEventsExpand, file = paste0(wazedir,"/Data/SpecialEvents/SpecialEventsExpand_MD_AprilToSept_2017.csv"))
 
+# Save necessary objects as Rdata for easy access for visualization
+save(list = c("co","AllModel30_sub","SpecialEventsExpand","SpecialEvents","md","ua"), file = paste0(wazedir,"/Data/SpecialEvents/SpecialEvents_MD_AprilToSept_2017.Rdata"))
 
 #### Special Events Time Series Plots ####
+load(file = paste0(wazedir,"/Data/SpecialEvents/SpecialEvents_MD_AprilToSept_2017.Rdata"))
+
 # To recover the grid_ids for 3 mile buffer of location SE1
-grid_id <- unlist(strsplit(unique(SpecialEventsExpand$GRID_ID[SpecialEventsExpand$Buffer_Miles == max(buffer) & SpecialEventsExpand$Location.ID == "SE1"]), split = ",")
-                  ) # an example of extracting grib_id of the largest buffer
+loc = "SE1"
+buf = 3
+
 # Get all combinations of grid_id, hour, and day
 alldays = seq(from = min(AllModel30_sub$date), to = max(AllModel30_sub$date), by = "days") # get all days during April - Sep
-days = alldays[as.numeric(format(alldays, format = "%u")) %in% unique(SpecialEventsExpand$DayofWeekN)] # get all Sundays, Saturdays, Tuesdays, and Wednesdays
+days = alldays[as.numeric(format(alldays, format = "%u")) %in% unique(SpecialEventsExpand$DayofWeekN)] # get all Sundays, Saturdays, Tuesdays, and Wednesdays that had special events
+daterange = days
 
-gridcom <- expand.grid(GRID_ID = grid_id, hour = c(0:23), date = days) # 105840 = 105 days*24 hour*42 grid_id
-gridcom$day <- yday(gridcom$date) # convert date
-gridcom$weekday <- as.numeric(format(gridcom$date, format = "%u"))
-
-# left_join the Event Type to the model output data
+# Numeric variables if missing, can be replaced using zeros
 col.names <- c("Obs","nWazeAccident","nWazeJam","nHazardOnShoulder","nHazardOnRoad","nHazardWeather")
 
-dt <- gridcom %>% left_join(AllModel30_sub, by = c("GRID_ID", "day", "hour","date", "weekday")) %>% mutate_if(colnames(.) %in% col.names,funs(replace(., which(is.na(.)), 0))) %>% left_join(SpecialEvents[,c("Day","EventType","StartTime","EndTime")], by =  c("day" = "Day")) %>% mutate_if(colnames(.) %in% c("EventType"),funs(replace(., which(is.na(.)), "NoEvent")))
+# Function to create GridData joined with Special events, the special events are linked to date, not hours.
+GridDataSE <- function(loc,buf,daterange,col.names){
+  # recover the grid_ids from column GRID_ID
+    grid_id <- unlist(strsplit(unique(SpecialEventsExpand$GRID_ID[SpecialEventsExpand$Buffer_Miles == buf & SpecialEventsExpand$Location.ID == loc]), split = ",")
+                      ) # an example of extracting grib_id of the largest buffer
+    
+    # all possible combinations
+    gridcom <- expand.grid(GRID_ID = grid_id, hour = c(0:23), date = daterange) # for example, if daterange include 105 days, then row number 105840 = 105 days*24 hour*42 grid_id
+    
+    # create new variables
+    gridcom <- gridcom %>% mutate(day = yday(date), # convert day to date
+                                  weekday = as.numeric(format(date, format = "%u")), # convert weekday
+                                  DayofWeek = wday(date, label = T) #weekdays() returns a full week of day name
+    )
+    
+    # left_join the Event Type to the model output data
+    dt <- gridcom %>% left_join(AllModel30_sub, by = c("GRID_ID", "day", "hour","date", "weekday")) %>% mutate_if(colnames(.) %in% col.names,funs(replace(., which(is.na(.)), 0))) %>% left_join(SpecialEvents[,c("Day","EventType","StartTime","EndTime")], by =  c("day" = "Day")) %>% mutate_if(colnames(.) %in% c("EventType"),funs(replace(., which(is.na(.)), "NoEvent")))
+    dt
+}
+
+dt <- GridDataSE(loc,buf,daterange,col.names)
 
 # By Event Type
 dt_EventType <- dt %>% group_by(EventType, hour) %>% summarize(nWazeJam = mean(nWazeJam),
@@ -161,41 +183,47 @@ dt_EventType <- dt %>% group_by(EventType, hour) %>% summarize(nWazeJam = mean(n
                                                          nHazardWeather = mean(nHazardWeather)
                                                          )
 
-ggplot(dt_EventType, aes(x = hour, y = nWazeJam)) + geom_point() + geom_line() + facet_wrap(~ EventType) + ylab("Average Waze Jam") + ggtitle("3 mile buffer")
+ggplot(dt_EventType, aes(x = hour, y = nWazeJam)) + geom_point() + geom_line() + facet_wrap(~ EventType) + ylab("Average Waze Jam") + ggtitle(paste(loc, buf,"mile buffer"))
 
-ggplot(dt_EventType, aes(x = hour, y = Obs)) + geom_point() + geom_line() + facet_wrap(~ EventType) + ylab("Average EDT Accident") + ggtitle("3 mile buffer")
+ggplot(dt_EventType, aes(x = hour, y = Obs)) + geom_point() + geom_line() + facet_wrap(~ EventType) + ylab("Average EDT Accident") + ggtitle(paste(loc, buf,"mile buffer"))
 
-ggplot(dt_EventType, aes(x = hour, y = nWazeAccident)) + geom_point() + geom_line() + facet_wrap(~ EventType) + ylab("Average Waze Accident") + ggtitle("3 mile buffer")
+ggplot(dt_EventType, aes(x = hour, y = nWazeAccident)) + geom_point() + geom_line() + facet_wrap(~ EventType) + ylab("Average Waze Accident") + ggtitle(paste(loc, buf,"mile buffer"))
 
-ggplot(dt_EventType, aes(x = hour, y = nHazardOnShoulder)) + geom_point() + geom_line() + facet_wrap(~ EventType) + ylab("Average Waze Hazard On Shoulder") + ggtitle("3 mile buffer")
+ggplot(dt_EventType, aes(x = hour, y = nHazardOnShoulder)) + geom_point() + geom_line() + facet_wrap(~ EventType) + ylab("Average Waze Hazard On Shoulder") + ggtitle(paste(loc, buf,"mile buffer"))
 
-ggplot(dt_EventType, aes(x = hour, y = nHazardOnRoad)) + geom_point() + geom_line() + facet_wrap(~ EventType) + ylab("Average Waze Hazard Hazard On Road") + ggtitle("3 mile buffer")
+ggplot(dt_EventType, aes(x = hour, y = nHazardOnRoad)) + geom_point() + geom_line() + facet_wrap(~ EventType) + ylab("Average Waze Hazard Hazard On Road") + ggtitle(paste(loc, buf,"mile buffer"))
 
-ggplot(dt_EventType, aes(x = hour, y = nHazardWeather)) + geom_point() + geom_line() + facet_wrap(~ EventType) + ylab("Average Waze Hazard or Weather") + ggtitle("3 mile buffer")
+ggplot(dt_EventType, aes(x = hour, y = nHazardWeather)) + geom_point() + geom_line() + facet_wrap(~ EventType) + ylab("Average Waze Hazard or Weather") + ggtitle(paste(loc, buf,"mile buffer"))
   
 # By date, averages are over 42 grids
-dt_Date <- dt %>% group_by(date, weekday, hour) %>% summarize(nWazeJam = mean(nWazeJam),
+dt_Date <- dt %>% group_by(date, DayofWeek, hour) %>% summarize(nWazeJam = mean(nWazeJam),
                                                                Obs = mean(Obs),
                                                                nWazeAccident = mean(nWazeAccident),
                                                                nHazardOnShoulder = mean(nHazardOnShoulder),
                                                                nHazardOnRoad = mean(nHazardOnRoad),
                                                                nHazardWeather = mean(nHazardWeather)
-) %>% mutate(Date = paste(date, weekday))
+) %>% mutate(Date = paste(date, DayofWeek))
 
-ggplot(dt_Date %>% filter(weekday == 7), aes(x = hour, y = nWazeJam)) + geom_point() + geom_line() + facet_wrap(~ Date) + ylab("Average Waze Jam") + ggtitle("3 mile buffer") 
+weekday = "Sun"
+ggplot(dt_Date %>% filter(DayofWeek == weekday), aes(x = hour, y = nWazeJam)) + geom_point() + geom_line() + facet_wrap(~ Date) + ylab("Average Waze Jam") + ggtitle(paste(loc, buf,"mile buffer", weekday)) 
 
 # Select Sunday, averages are over 42 grid cells
-dt_Sun <- dt %>% filter(weekday == 7) %>% mutate(EventDay = ifelse(EventType != "NoEvent", paste0(date, EventType), "NoEvent")) %>% group_by(EventDay, hour) %>% summarize(nWazeJam = mean(nWazeJam),
-                                                              Obs = mean(Obs),
-                                                              nWazeAccident = mean(nWazeAccident),
-                                                              nHazardOnShoulder = mean(nHazardOnShoulder),
-                                                              nHazardOnRoad = mean(nHazardOnRoad),
-                                                              nHazardWeather = mean(nHazardWeather)
+weekday = "Sun"
+
+# Create a new varaible EventDay for a specific day of week.
+dt_Sun <- dt %>% filter(DayofWeek == weekday) %>% mutate(EventDay = ifelse(EventType != "NoEvent", paste0(date, EventType), "NoEvent")) %>% group_by(EventDay, hour) %>% summarize(nWazeJam = mean(nWazeJam),
+                               Obs = mean(Obs),
+                               nWazeAccident = mean(nWazeAccident),
+                               nHazardOnShoulder = mean(nHazardOnShoulder),
+                               nHazardOnRoad = mean(nHazardOnRoad),
+                               nHazardWeather = mean(nHazardWeather),
 )
 
-ggplot(dt_Sun, aes(x = hour, y = nWazeJam)) + geom_point() + geom_line() + facet_wrap(~ EventDay) + ylab("Average Waze Jam") + ggtitle("3 mile buffer, Sundays") 
+ggplot(dt_Sun, aes(x = hour, y = nWazeJam)) + geom_point() + geom_line() + facet_wrap(~ EventDay) + ylab("Average Waze Jam") + ggtitle(paste(loc, buf,"mile buffer",weekday)) 
 
-dt_Tue <- dt %>% filter(weekday == 2) %>% mutate(EventDay = ifelse(EventType != "NoEvent", paste0(date, EventType), "NoEvent")) %>% group_by(EventDay, hour) %>% summarize(nWazeJam = mean(nWazeJam),
+# Select Tuesday, averages are over 42 grid cells
+weekday = "Tue"
+dt_Tue <- dt %>% filter(DayofWeek == weekday) %>% mutate(EventDay = ifelse(EventType != "NoEvent", paste0(date, EventType), "NoEvent")) %>% group_by(EventDay, hour) %>% summarize(nWazeJam = mean(nWazeJam),
                                                                                                                                                                            Obs = mean(Obs),
                                                                                                                                                                            nWazeAccident = mean(nWazeAccident),
                                                                                                                                                                            nHazardOnShoulder = mean(nHazardOnShoulder),
