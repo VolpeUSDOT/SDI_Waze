@@ -134,7 +134,7 @@ SpecialEventsExpand <- SpecialEventsExpand %>% left_join(uniquelocbuf, by = c("L
 write.csv(SpecialEventsExpand, file = paste0(wazedir,"/Data/SpecialEvents/SpecialEventsExpand_MD_AprilToSept_2017.csv"))
 
 # Save necessary objects as Rdata for easy access for visualization
-save(list = c("co","AllModel30_sub","SpecialEventsExpand","SpecialEvents","md","ua"), file = paste0(wazedir,"/Data/SpecialEvents/SpecialEvents_MD_AprilToSept_2017.Rdata"))
+save(list = c("co","AllModel30_sub","SpecialEventsExpand","SpecialEvents","md","ua","grid"), file = paste0(wazedir,"/Data/SpecialEvents/SpecialEvents_MD_AprilToSept_2017.Rdata"))
 
 #### Special Events Time Series Plots ####
 load(file = paste0(wazedir,"/Data/SpecialEvents/SpecialEvents_MD_AprilToSept_2017.Rdata"))
@@ -254,6 +254,11 @@ dt_Tue <- dt %>% filter(DayofWeek == weekday) %>% mutate(EventDay = ifelse(Event
 )
 
 ggplot(dt_Tue, aes(x = hour, y = nWazeJam)) + geom_point() + geom_line() + facet_wrap(~ EventDay) + ylab("Average Waze Jam") + ggtitle("3 mile buffer, Tuesdays") 
+
+
+#### Special Events Mapping ####
+plot(grid)
+points(SpecialEventsExpand_SP, col = "red")
 
 #### To do:  ####
 # Consider write a function to derive the dt table for each location and buffer mile.
