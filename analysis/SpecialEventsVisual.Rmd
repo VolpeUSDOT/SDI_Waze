@@ -1,0 +1,167 @@
+---
+title: "Special Events Visualization - Part 1"
+author: "Ci (Jessie) Yang"
+date: "`r paste('Last Updated:',format(Sys.time(), '%B %d, %Y'))`"
+output:
+  html_document: default
+pdf_document:
+  fig_caption: yes
+fig_height: 5
+fig_width: 8
+---
+
+This is an example of visuals that we can create visualizations for a specific location and buffer zone around the location where we have model outputs on.
+
+```{r setup, include=FALSE}
+#set options
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE, error = FALSE)
+options(scipen = 20)
+
+codeloc <- "~/Github/SDI_Waze"
+source(file.path(codeloc, 'utility/get_packages.R'))
+
+library(tidyverse)
+library(sp)
+library(maps) # for mapping base layers
+library(rgdal) # for readOGR(), needed for reading in ArcM shapefiles
+library(foreach)
+library(doParallel)
+library(rgeos) #gintersection
+library(lubridate)
+library(ggplot2)
+
+localdir <- "C:/Users/Jessie.Yang.CTR/Downloads/OST/Waze project/Special Events"
+# localdir <- "/home/daniel/workingdata/" # full path for readOGR, Jessie don't have this folder.
+# edtdir <- normalizePath(file.path(localdir, "EDT"))
+# wazedir <- "~/tempout" # has State_Year-mo.RData files. Grab from S3 if necessary
+wazedir <- "//vntscex.local/DFS/Projects/PROJ-OS62A1/SDI Waze Phase 2"
+output.loc <- file.path(wazedir, "WazeEDT Pilot Phase1 Archive Incomplete/SDI/Model_Output")
+data.loc <- file.path(wazedir, "WazeEDT Pilot Phase1 Archive Incomplete/SDI/Data")
+
+teambucket <- "s3://prod-sdc-sdi-911061262852-us-east-1-bucket"
+
+source(file.path(codeloc, "utility/wazefunctions.R")) 
+
+states = c("CT", "UT", "VA", "MD")
+
+# Time zone picker:
+tzs <- data.frame(states, 
+                  tz = c("US/Eastern",
+                         "US/Mountain",
+                         "US/Eastern",
+                         "US/Eastern"),
+                  stringsAsFactors = F)
+
+
+# Project to Albers equal area conic 102008. Check comparision with USGS version, WKID: 102039
+proj <- showP4(showWKT("+init=epsg:102008"))
+# USGS version, used for producing hexagons: 
+proj.USGS <- "+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs +ellps=GRS80 +towgs84=0,0,0"
+
+load(file = paste0(wazedir,"/Data/SpecialEvents/SpecialEvents_MD_AprilToSept_2017.Rdata"))
+```
+
+# Time Series Plots
+
+Metrics we use include:
+
+* Number of EDT Accidents (Model Dependent Variable)
+* Number of Waze Accidents
+* Number of Waze Jam
+* Number of Hazard On Shoulder
+* Number of Hazard On Road
+* Number of Hazard Weather (nHazardWeather) - is it # of hazard or weather?
+
+# Probability of NonCrash and Crash - real prob from RF model.
+The probability has converted to based on the threshold ~ 0.2 using the built-in function in RF.
+
+Following visualizations are for location "SE1" and 3 mile buffer zone.
+
+To do:
+- total number of accidents/jams
+- number of accidents per gridcell per hour
+- add shadebox for event duration
+- boxplot of accidents over 42 grid cells.
+- look at hour aggregation
+- heatmap for each hour
+- decrease buffer zone, 0.25, 0.5, 1 mile radius
+- Easten shore beach - Bay Bridge area (7/4, 9/4 Labor Day, 3lanes both ways) for a typical holiday pattern
+- 
+- follow up with Erika tomorrow
+
+```{r data Process, include = FALSE}
+# To recover the grid_ids for 3 mile buffer of location SE1
+loc = "SE1"
+buf = 3
+
+# Get all combinations of grid_id, hour, and day
+alldays = seq(from = min(AllModel30_sub$date), to = max(AllModel30_sub$date), by = "days") # get all days during April - Sep
+days = alldays[as.numeric(format(alldays, format = "%u")) %in% unique(SpecialEventsExpand$DayofWeekN)] # get all Sundays, Saturdays, Tuesdays, and Wednesdays that had special events
+daterange = days
+
+# Numeric variables if missing, can be replaced using zeros
+col.names <- c("Obs","nWazeAccident","nWazeJam","nHazardOnShoulder","nHazardOnRoad","nHazardWeather")
+
+# Function to create GridData joined with Special events, the special events are linked to date, not hours.
+GridDataSE <- function(loc,buf,daterange,col.names){
+  # recover the grid_ids from column GRID_ID
+    grid_id <- unlist(strsplit(unique(SpecialEventsExpand$GRID_ID[SpecialEventsExpand$Buffer_Miles == buf & SpecialEventsExpand$Location.ID == loc]), split = ",")
+                      ) # an example of extracting grib_id of the largest buffer
+    
+    # all possible combinations
+    gridcom <- expand.grid(GRID_ID = grid_id, hour = c(0:23), date = daterange) # for example, if daterange include 105 days, then row number 105840 = 105 days*24 hour*42 grid_id
+    
+    # create new variables
+    gridcom <- gridcom %>% mutate(day = yday(date), # convert day to date
+                                  weekday = as.numeric(format(date, format = "%u")), # convert weekday
+                                  DayofWeek = wday(date, label = T) #weekdays() returns a full week of day name
+    )
+    
+    # left_join the Event Type to the model output data
+    dt <- gridcom %>% left_join(AllModel30_sub, by = c("GRID_ID", "day", "hour","date", "weekday")) %>% mutate_if(colnames(.) %in% col.names,funs(replace(., which(is.na(.)), 0))) %>% left_join(SpecialEvents[,c("Day","EventType","StartTime","EndTime")], by =  c("day" = "Day")) %>% mutate_if(colnames(.) %in% c("EventType"),funs(replace(., which(is.na(.)), "NoEvent")))
+    dt
+}
+
+dt <- GridDataSE(loc,buf,daterange,col.names)
+```
+
+## Hourly By Event Type
+
+```{r}
+dt_EventType <- dt %>% group_by(EventType, hour) %>% summarize(nWazeJam = mean(nWazeJam),
+                                                         Obs = mean(Obs),
+                                                         nWazeAccident = mean(nWazeAccident),
+                                                         nHazardOnShoulder = mean(nHazardOnShoulder),
+                                                         nHazardOnRoad = mean(nHazardOnRoad),
+                                                         nHazardWeather = mean(nHazardWeather)
+                                                         )
+
+ggplot(dt_EventType, aes(x = hour, y = Obs)) + geom_point() + geom_line() + facet_wrap(~ EventType) + ylab("Average EDT Accident") + ggtitle(paste(loc, buf,"mile buffer"))
+
+ggplot(dt_EventType, aes(x = hour, y = nWazeAccident)) + geom_point() + geom_line() + facet_wrap(~ EventType) + ylab("Average Waze Accident") + ggtitle(paste(loc, buf,"mile buffer"))
+
+ggplot(dt_EventType, aes(x = hour, y = nWazeJam)) + geom_point() + geom_line() + facet_wrap(~ EventType) + ylab("Average Waze Jam") + ggtitle(paste(loc, buf,"mile buffer"))
+
+ggplot(dt_EventType, aes(x = hour, y = nHazardOnShoulder)) + geom_point() + geom_line() + facet_wrap(~ EventType) + ylab("Average Waze Hazard On Shoulder") + ggtitle(paste(loc, buf,"mile buffer"))
+
+ggplot(dt_EventType, aes(x = hour, y = nHazardOnRoad)) + geom_point() + geom_line() + facet_wrap(~ EventType) + ylab("Average Waze Hazard On Road") + ggtitle(paste(loc, buf,"mile buffer"))
+
+ggplot(dt_EventType, aes(x = hour, y = nHazardWeather)) + geom_point() + geom_line() + facet_wrap(~ EventType) + ylab("Average Waze Hazard or Weather") + ggtitle(paste(loc, buf,"mile buffer"))
+```
+
+## Hourly By Day
+
+```{r, fig.width=12, fig.height=12}
+dt_Date <- dt %>% group_by(date, DayofWeek, hour) %>% summarize(nWazeJam = mean(nWazeJam),
+                                                               Obs = mean(Obs),
+                                                               nWazeAccident = mean(nWazeAccident),
+                                                               nHazardOnShoulder = mean(nHazardOnShoulder),
+                                                               nHazardOnRoad = mean(nHazardOnRoad),
+                                                               nHazardWeather = mean(nHazardWeather)
+) %>% mutate(Date = paste(date, DayofWeek))
+
+ggplot(dt_Date, aes(x = hour, y = nWazeJam)) + geom_point() + geom_line() + facet_wrap(~ Date) + ylab("Average Waze Jam") + ggtitle(paste(loc, buf,"mile buffer")) 
+
+weekday = "Sun"
+ggplot(dt_Date %>% filter(DayofWeek == weekday), aes(x = hour, y = nWazeJam)) + geom_point() + geom_line() + facet_wrap(~ Date) + ylab("Average Waze Jam") + ggtitle(paste(loc, buf,"mile buffer", weekday)) 
+```
