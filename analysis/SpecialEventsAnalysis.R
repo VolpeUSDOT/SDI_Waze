@@ -91,7 +91,6 @@ SpecialEvents <- read.csv(file = paste0(wazedir,"/Data/SpecialEvents/SpecialEven
 
 
 #### Special Event Data Process ####
-
 # format date
 SpecialEvents$Date <- as.Date(SpecialEvents$Date, format = "%m/%d/%Y")
 
@@ -99,7 +98,7 @@ SpecialEvents$Date <- as.Date(SpecialEvents$Date, format = "%m/%d/%Y")
 SpecialEvents$DayofWeekN <- as.numeric(format(SpecialEvents$Date, format = "%u"))
 
 # expand the SpecialEvents data with a variety of buffer values
-buffer = c(3,2,1)
+buffer = c(3,2,1,0.75, 0.5, 0.25) # 3 mile buffer might be too large, covers some parts of the DC, therefore, we want to use a smaller radius.
 # Location.ID = unique(SpecialEvents$Location.ID)
 # com <- expand.grid(Location.ID,Buffer_Miles) # all combination of buffer_miles and locations that we are interested in.
 # names(com) <- c("Location.ID", "Buffer_Miles")
@@ -142,7 +141,7 @@ load(file = paste0(wazedir,"/Data/SpecialEvents/SpecialEvents_MD_AprilToSept_201
 
 # To recover the grid_ids for 3 mile buffer of location SE1
 loc = "SE1"
-buf = 3
+buf = 1
 
 # Get all combinations of grid_id, hour, and day
 alldays = seq(from = min(AllModel30_sub$date), to = max(AllModel30_sub$date), by = "days") # get all days during April - Sep
@@ -155,21 +154,24 @@ col.names <- c("Obs","nWazeAccident","nWazeJam","nHazardOnShoulder","nHazardOnRo
 # Function to create GridData joined with Special events, the special events are linked to date, not hours.
 GridDataSE <- function(loc,buf,daterange,col.names){
   # recover the grid_ids from column GRID_ID
-    grid_id <- unlist(strsplit(unique(SpecialEventsExpand$GRID_ID[SpecialEventsExpand$Buffer_Miles == buf & SpecialEventsExpand$Location.ID == loc]), split = ",")
-                      ) # an example of extracting grib_id of the largest buffer
-    
-    # all possible combinations
-    gridcom <- expand.grid(GRID_ID = grid_id, hour = c(0:23), date = daterange) # for example, if daterange include 105 days, then row number 105840 = 105 days*24 hour*42 grid_id
-    
-    # create new variables
-    gridcom <- gridcom %>% mutate(day = yday(date), # convert day to date
-                                  weekday = as.numeric(format(date, format = "%u")), # convert weekday
-                                  DayofWeek = wday(date, label = T) #weekdays() returns a full week of day name
-    )
-    
-    # left_join the Event Type to the model output data
-    dt <- gridcom %>% left_join(AllModel30_sub, by = c("GRID_ID", "day", "hour","date", "weekday")) %>% mutate_if(colnames(.) %in% col.names,funs(replace(., which(is.na(.)), 0))) %>% left_join(SpecialEvents[,c("Day","EventType","StartTime","EndTime")], by =  c("day" = "Day")) %>% mutate_if(colnames(.) %in% c("EventType"),funs(replace(., which(is.na(.)), "NoEvent")))
-    dt
+  grid_id <- unlist(strsplit(unique(SpecialEventsExpand$GRID_ID[SpecialEventsExpand$Buffer_Miles == buf & SpecialEventsExpand$Location.ID == loc]), split = ",")
+  ) # an example of extracting grib_id of the largest buffer
+  
+  # all possible combinations
+  gridcom <- expand.grid(GRID_ID = grid_id, hour = c(0:23), date = daterange) # for example, if daterange include 105 days, then row number 105840 = 105 days*24 hour*42 grid_id
+  
+  # create new variables
+  gridcom <- gridcom %>% mutate(day = yday(date), # convert day to date
+                                weekday = as.numeric(format(date, format = "%u")), # convert weekday
+                                DayofWeek = wday(date, label = T) #weekdays() returns a full week of day name
+  )
+  
+  # grid cells in the model
+  grid_cells_model <- unique(AllModel30_sub$GRID_ID)
+  
+  # left_join the Event Type to the model output data
+  dt <- gridcom %>% left_join(AllModel30_sub, by = c("GRID_ID", "day", "hour","date", "weekday")) %>% mutate_if(colnames(.) %in% col.names,funs(replace(., which(is.na(.)), 0))) %>% left_join(SpecialEvents[,c("Day","EventType","StartTime","EndTime")], by =  c("day" = "Day")) %>% mutate_if(colnames(.) %in% c("EventType"),funs(replace(., which(is.na(.)), "NoEvent"))) %>% mutate(Grid_In_Model = ifelse(GRID_ID %in% grid_cells_model, "Yes", "No"))
+  dt
 }
 
 dt <- GridDataSE(loc,buf,daterange,col.names)
@@ -194,6 +196,12 @@ ggplot(dt_EventType, aes(x = hour, y = nHazardOnShoulder)) + geom_point() + geom
 ggplot(dt_EventType, aes(x = hour, y = nHazardOnRoad)) + geom_point() + geom_line() + facet_wrap(~ EventType) + ylab("Average Waze Hazard Hazard On Road") + ggtitle(paste(loc, buf,"mile buffer"))
 
 ggplot(dt_EventType, aes(x = hour, y = nHazardWeather)) + geom_point() + geom_line() + facet_wrap(~ EventType) + ylab("Average Waze Hazard or Weather") + ggtitle(paste(loc, buf,"mile buffer"))
+
+# Scatter plot
+ggplot(dt, aes(x = factor(hour), y = nWazeJam)) + geom_point(alpha = 0.2) + facet_wrap(~ EventType) + ylab("Number of Waze Jam") + ggtitle(paste(loc, buf,"mile buffer"))
+
+# boxplot
+ggplot(dt, aes(x = factor(hour), y = nWazeJam)) + geom_boxplot() + facet_wrap(~ EventType) + ylab("Number of Waze Jam") + ggtitle(paste(loc, buf,"mile buffer"))
   
 # By date, averages are over 42 grids
 dt_Date <- dt %>% group_by(date, DayofWeek, hour) %>% summarize(nWazeJam = mean(nWazeJam),
