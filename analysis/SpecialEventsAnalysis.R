@@ -212,11 +212,20 @@ dt_Date <- dt %>% group_by(date, DayofWeek, hour) %>% summarize(nWazeJam = mean(
                                                                nHazardWeather = mean(nHazardWeather)
 ) %>% mutate(Date = paste(date, DayofWeek))
 
+dt_Date <- dt %>% group_by(date, DayofWeek, hour) %>% summarize(nWazeJam = sum(nWazeJam),
+                                                                Obs = sum(Obs),
+                                                                nWazeAccident = sum(nWazeAccident),
+                                                                nHazardOnShoulder = sum(nHazardOnShoulder),
+                                                                nHazardOnRoad = sum(nHazardOnRoad),
+                                                                nHazardWeather = sum(nHazardWeather)
+) %>% mutate(Date = paste(date, DayofWeek))
+
+
 weekday = "Sun"
 ggplot(dt_Date %>% filter(DayofWeek == weekday), aes(x = hour, y = nWazeJam, group = date)) + 
-  geom_point(alpha = 0.2, color = "red") +
-  # geom_line(alpha = 0.2, color = "blue") +
-  # facet_wrap(~ Date) + 
+  # geom_point(alpha = 0.5, color = "red") +
+  geom_line(alpha = 0.2, color = "blue") +
+  facet_wrap(~ Date) +
   ylab("Average Waze Jam") + ggtitle(paste(loc, buf,"mile buffer", weekday)) 
 # consider an area/density chart
 

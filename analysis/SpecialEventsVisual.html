@@ -143,11 +143,16 @@ $(document).ready(function () {
 <li>Probability of NonCrash and Crash - real prob from RF model (needs further investigation/decision making) The probability has converted to based on the threshold ~ 0.2 using the built-in function in RF.</li>
 </ul>
 <p>Following visualizations are for location “SE1” and 1 mile buffer zone.</p>
-<p>To do 8/22/2018:</p>
+<p>To do 8/23/2018:</p>
 <ul>
-<li>total number of accidents/jams</li>
-<li>number of accidents per gridcell per hour</li>
+<li>total/average/max (point/line) number of accidents/jams for every day
+<ul>
+<li>plot on top of each other for the NoEvents with a different color. Use other colors for a type of special events. 4/23, 5/21, 7/02 weekends near holidays.</li>
+<li>Do both 3-miles and 1-mile. Removing zeros.</li>
+<li>Panels by month.</li>
 <li>add shadebox for event duration</li>
+</ul></li>
+<li>number of accidents per gridcell per hour</li>
 <li>boxplot of accidents over 42 grid cells. (done)</li>
 <li>look at hour aggregation</li>
 <li>heatmap for each hour</li>
