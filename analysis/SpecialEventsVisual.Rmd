@@ -63,21 +63,24 @@ load(file = paste0(wazedir,"/Data/SpecialEvents/SpecialEvents_MD_AprilToSept_201
 
 # Time Series Plots
 
+We used the AllModel30.csv output for this analysis.
+
 Metrics we use include:
 
 * Number of EDT Accidents (Model Dependent Variable)
 * Number of Waze Accidents
 * Number of Waze Jam
-* Number of Hazard On Shoulder
-* Number of Hazard On Road
-* Number of Hazard Weather (nHazardWeather) - is it # of hazard or weather?
+* Number of Hazard On Shoulder (nHazardOnShoulder)
+* Number of Hazard On Road (nHazardOnRoad)
+* Number of Hazard Weather (nHazardWeather) - is it # of hazard or weather? According to Michelle, this should be one of the three categories of Waze event (Accidents, Jam, and Hazard/Weather). However, in the dataset, nHazardWeather is smaller than sum of the sub-categories (e.g., nHazardOnShoulder, nHazardOnRoad). This needs further investigation.
 
 # Probability of NonCrash and Crash - real prob from RF model.
 The probability has converted to based on the threshold ~ 0.2 using the built-in function in RF.
 
 Following visualizations are for location "SE1" and 3 mile buffer zone.
 
-To do:
+To do 8/22/2018:
+
 - total number of accidents/jams
 - number of accidents per gridcell per hour
 - add shadebox for event duration
@@ -86,7 +89,6 @@ To do:
 - heatmap for each hour
 - decrease buffer zone, 0.25, 0.5, 1 mile radius
 - Easten shore beach - Bay Bridge area (7/4, 9/4 Labor Day, 3lanes both ways) for a typical holiday pattern
-- 
 - follow up with Erika tomorrow
 
 ```{r data Process, include = FALSE}
