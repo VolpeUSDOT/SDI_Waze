@@ -28,7 +28,7 @@ localdir <- paste0(user, "/workingdata/") # full path for readOGR
 wazedir <- "~/tempout" # has State_Year-mo.RData files. Grab from S3 if necessary
 edtdir <- file.path(localdir, "EDT") # Unzip and rename with shortnames if necessary
 
-setwd(localdir)
+setwd(localdir) #try mkdir ~/workingdata in terminal if this returns an error
 
 # read functions
 source(file.path(codeloc, 'utility/wazefunctions.R'))
@@ -56,7 +56,7 @@ proj <- showP4(showWKT("+init=epsg:102008"))
 
 # Start loop over states ---
 
-for(i in states) { # i= "UT"
+for(i in states) {  #i= "MD"
   
   # Start loop over months ----
   wazemonthfiles <- dir(wazedir)[grep(i, dir(wazedir))]

@@ -6,7 +6,7 @@
 # <><><><><><><><><><><><><><><><><><><><>
 # Setup ----
 
-# Values passsed from ReduceWaze_SDC.R:
+# Values passed from ReduceWaze_SDC.R:
 # states = vector of state abbreviations
 # teambucket = S3 bucket name
 # codeloc; functions from utilities/wazefunctions.R
