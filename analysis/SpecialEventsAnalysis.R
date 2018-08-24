@@ -131,7 +131,7 @@ for (i in c(1:nrow(uniquelocbuf))){
 SpecialEventsExpand <- SpecialEventsExpand %>% left_join(uniquelocbuf, by = c("Location.ID","Buffer_Miles"))
 
 # Save expanded data to shared drive
-write.csv(SpecialEventsExpand, file = paste0(wazedir,"/Data/SpecialEvents/SpecialEventsExpand_MD_AprilToSept_2017.csv"))
+write.csv(SpecialEventsExpand, file = paste0(wazedir,"/Data/SpecialEvents/SpecialEventsExpand_MD_AprilToSept_2017.csv"), row.names = F)
 
 # Save necessary objects as Rdata for easy access for visualization
 save(list = c("co","AllModel30_sub","SpecialEventsExpand","SpecialEvents","md","ua","grid"), file = paste0(wazedir,"/Data/SpecialEvents/SpecialEvents_MD_AprilToSept_2017.Rdata"))
@@ -174,7 +174,9 @@ GridDataSE <- function(loc,buf,daterange,col.names){
   dt
 }
 
+buf = 3
 dt <- GridDataSE(loc,buf,daterange,col.names)
+write.csv(dt, file = paste0(wazedir,"/Data/SpecialEvents/DT",buf, "MileBuffer_MD_AprilToSept_2017.csv"), row.names = F) # save the 3 mile and 1 mile buffer as CVS for Michelle.
 
 # By Event Type
 dt_EventType <- dt %>% group_by(EventType, hour) %>% summarize(nWazeJam = mean(nWazeJam),
@@ -258,7 +260,7 @@ ggplot(dt_Tue, aes(x = hour, y = nWazeJam)) + geom_point() + geom_line() + facet
 
 #### Special Events Mapping ####
 plot(grid)
-points(SpecialEventsExpand_SP, col = "red")
+points(SpecialEventsExpand_SP, col = "red") # 0.25 sq mile buffer
 
 #### To do:  ####
 # Consider write a function to derive the dt table for each location and buffer mile.
