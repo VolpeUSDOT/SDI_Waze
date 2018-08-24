@@ -158,12 +158,12 @@ GridDataSE <- function(loc,buf,daterange,col.names){
   ) # an example of extracting grib_id of the largest buffer
   
   # all possible combinations
-  gridcom <- expand.grid(GRID_ID = grid_id, hour = c(0:23), date = daterange) # for example, if daterange include 105 days, then row number 105840 = 105 days*24 hour*42 grid_id
+  gridcom <- expand.grid(Location.ID = loc, GRID_ID = grid_id, hour = c(0:23), date = daterange) # for example, if daterange include 105 days, then row number 105840 = 105 days*24 hour*42 grid_id
   
   # create new variables
   gridcom <- gridcom %>% mutate(day = yday(date), # convert day to date
                                 weekday = as.numeric(format(date, format = "%u")), # convert weekday
-                                DayofWeek = wday(date, label = T) #weekdays() returns a full week of day name
+                                DayofWeek = weekdays(date) #wday(date, label = T) returns a full week of day name
   )
   
   # grid cells in the model
@@ -212,7 +212,7 @@ dt_Date <- dt %>% group_by(date, DayofWeek, hour) %>% summarize(nWazeJam = mean(
                                                                nHazardOnShoulder = mean(nHazardOnShoulder),
                                                                nHazardOnRoad = mean(nHazardOnRoad),
                                                                nHazardWeather = mean(nHazardWeather)
-) %>% mutate(Date = paste(date, DayofWeek))
+) %>% mutate(Date = paste(date, DayofWeek), Month = month(date))
 
 dt_Date <- dt %>% group_by(date, DayofWeek, hour) %>% summarize(nWazeJam = sum(nWazeJam),
                                                                 Obs = sum(Obs),
@@ -255,8 +255,29 @@ dt_Tue <- dt %>% filter(DayofWeek == weekday) %>% mutate(EventDay = ifelse(Event
                                                                                                                                                                            nHazardWeather = mean(nHazardWeather)
 )
 
+# Scatter Plot
 ggplot(dt_Tue, aes(x = hour, y = nWazeJam)) + geom_point() + geom_line() + facet_wrap(~ EventDay) + ylab("Average Waze Jam") + ggtitle("3 mile buffer, Tuesdays") 
 
+ggplot(dt, aes(x = factor(hour), y = Obs)) + geom_point(alpha = 0.2, color = "blue") + facet_wrap(~ EventType) + ylab("Number EDT Accident") + ggtitle(paste(loc, buf,"mile buffer"))
+
+ggplot(dt, aes(x = factor(hour), y = nWazeAccident)) + geom_point(alpha = 0.2, color = "blue") + facet_wrap(~ EventType) + ylab("Number Waze Accident") + ggtitle(paste(loc, buf,"mile buffer"))
+
+ggplot(dt, aes(x = factor(hour), y = nWazeJam)) + geom_point(alpha = 0.2, color = "blue") + facet_wrap(~ EventType) + ylab("Number Waze Jam") + ggtitle(paste(loc, buf,"mile buffer"))
+
+ggplot(dt, aes(x = factor(hour), y = nHazardOnShoulder)) + geom_point(alpha = 0.2, color = "blue") + facet_wrap(~ EventType) + ylab("Number Waze Hazard On Shoulder") + ggtitle(paste(loc, buf,"mile buffer"))
+
+ggplot(dt, aes(x = factor(hour), y = nHazardOnRoad)) + geom_point(alpha = 0.2, color = "blue") + facet_wrap(~ EventType) + ylab("Number Waze Hazard On Road") + ggtitle(paste(loc, buf,"mile buffer"))
+
+# Boxplot
+ggplot(dt, aes(x = factor(hour), y = Obs)) + geom_boxplot(alpha = 0.2, color = "blue") + facet_wrap(~ EventType) + ylab("Number EDT Accident") + ggtitle(paste(loc, buf,"mile buffer"))
+
+ggplot(dt, aes(x = factor(hour), y = nWazeAccident)) + geom_boxplot(alpha = 0.2, color = "blue") + facet_wrap(~ EventType) + ylab("Number Waze Accident") + ggtitle(paste(loc, buf,"mile buffer"))
+
+ggplot(dt, aes(x = factor(hour), y = nWazeJam)) + geom_boxplot(alpha = 0.2, color = "blue") + facet_wrap(~ EventType) + ylab("Number Waze Jam") + ggtitle(paste(loc, buf,"mile buffer"))
+
+ggplot(dt, aes(x = factor(hour), y = nHazardOnShoulder)) + geom_boxplot(alpha = 0.2, color = "blue") + facet_wrap(~ EventType) + ylab("Number Waze Hazard On Shoulder") + ggtitle(paste(loc, buf,"mile buffer"))
+
+ggplot(dt, aes(x = factor(hour), y = nHazardOnRoad)) + geom_boxplot(alpha = 0.2, color = "blue") + facet_wrap(~ EventType) + ylab("Number Waze Hazard On Road") + ggtitle(paste(loc, buf,"mile buffer"))
 
 #### Special Events Mapping ####
 plot(grid)
