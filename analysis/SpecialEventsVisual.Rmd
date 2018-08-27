@@ -30,6 +30,7 @@ library(rgeos) #gintersection
 library(lubridate)
 library(ggplot2)
 library(extrafont)
+library(splus2R)
 
 localdir <- "C:/Users/Jessie.Yang.CTR/Downloads/OST/Waze project/Special Events"
 # localdir <- "/home/daniel/workingdata/" # full path for readOGR, Jessie don't have this folder.
@@ -180,6 +181,54 @@ GridDataSE <- function(loc,buf,daterange,col.names){
 buf = 3
 dt <- GridDataSE(loc,buf,daterange,col.names)
 
+plotAvgJamMonth <- function(dt, weekday){
+            # Mean
+          dt_Date <- dt %>% group_by(Location.ID, date, hour) %>% summarize(nWazeJam = mean(nWazeJam),
+                                                                         Obs = mean(Obs),
+                                                                         nWazeAccident = mean(nWazeAccident),
+                                                                         nHazardOnShoulder = mean(nHazardOnShoulder),
+                                                                         nHazardOnRoad = mean(nHazardOnRoad),
+                                                                         nHazardWeather = mean(nHazardWeather)
+          ) %>% mutate(DayofWeek = weekdays(date), Date = paste(date, DayofWeek), Month = month(date)) %>%  left_join(unique(dt[, c("date","EventType","StartTime","EndTime")]), by = "date") %>% mutate(background_col = ifelse(EventType == "NoEvent", NA,ifelse(EventType == "Football","#E69F00", "#56B4E9")))
+          
+          dt_Date$Month <- factor(dt_Date$Month) 
+          levels(dt_Date$Month) <- list("April" = 4, "May" = 5, "June" = 6, "July" = 7, "August" = 8, "September" = 9)
+          
+          # Military time to regular HH:MM, and then to decimals.
+          dt_Date$StartTime <- hm_to_num(mil_to_hm(dt_Date$StartTime))
+          dt_Date$EndTime <- hm_to_num(mil_to_hm(dt_Date$EndTime))
+          
+          dt_visual <-  dt_Date %>% filter(DayofWeek == weekday)
+          
+          ggplot(dt_visual, aes(x = hour, y = nWazeJam, color = EventType, group = date)) + 
+            # geom_point(alpha = 0.5, color = "red") +
+            geom_line(alpha = 0.5) +
+            geom_rect(data = dt_visual,aes(xmin = ave(dt_visual$StartTime, dt_visual$date, FUN = function(x) mean(x)),xmax = ave(dt_visual$EndTime, dt_visual$date, FUN = function(x) mean(x)), ymin = -Inf,ymax=Inf), fill = dt_visual$background_col, alpha= 0.2/100, inherit.aes = FALSE) +
+            facet_wrap(~ Month) +
+            ylab("Average Waze Jam") +
+            xlab("Hour of Day") +
+            scale_color_manual(name = NULL, values=c("NoEvent" = "#999999", "Football" = "#E69F00", "Concert" = "#56B4E9")) +
+            ggtitle(paste("Fedex Field,", buf,"Mile Buffer,", weekday)) 
+}
+
+weekday = "Sunday"
+plotAvgJamMonth(dt, weekday)
+
+# weekday = "Saturday"
+# plotAvgJamMonth(dt, weekday)
+# 
+# weekday = "Tuesday"
+# plotAvgJamMonth(dt, weekday)
+# 
+# weekday = "Wednesday"
+# plotAvgJamMonth(dt, weekday)
+```
+
+### 3 mile buffer zone - Averages without zeros
+```{r}
+buf = 3
+dt <- GridDataSE(loc,buf,daterange,col.names)
+
 # Mean
 dt_Date <- dt %>% group_by(Location.ID, date, hour) %>% summarize(nWazeJam = mean(nWazeJam),
                                                                Obs = mean(Obs),
@@ -187,7 +236,7 @@ dt_Date <- dt %>% group_by(Location.ID, date, hour) %>% summarize(nWazeJam = mea
                                                                nHazardOnShoulder = mean(nHazardOnShoulder),
                                                                nHazardOnRoad = mean(nHazardOnRoad),
                                                                nHazardWeather = mean(nHazardWeather)
-) %>% mutate(DayofWeek = weekdays(date), Date = paste(date, DayofWeek), Month = month(date)) %>%  left_join(unique(dt[, c("date","EventType","StartTime","EndTime")]), by = "date") %>% mutate(background_col = ifelse(EventType == "NoEvent", NA,ifelse(EventType == "Football","#E69F00", "#56B4E9")))
+) %>% mutate(DayofWeek = weekdays(date), Date = paste(date, DayofWeek), Month = month(date)) %>%  left_join(unique(dt[, c("date","EventType","StartTime","EndTime")]), by = "date") %>% mutate(background_col = ifelse(EventType == "NoEvent", NA,ifelse(EventType == "Football","#E69F00", "#56B4E9"))) %>% mutate_at(.vars = vars(Obs, nWazeAccident, nWazeJam,nHazardOnShoulder,nHazardOnRoad),.funs = funs(replace(., which(. == 0), NA)))
 
 dt_Date$Month <- factor(dt_Date$Month) 
 levels(dt_Date$Month) <- list("April" = 4, "May" = 5, "June" = 6, "July" = 7, "August" = 8, "September" = 9)
@@ -200,7 +249,7 @@ weekday = "Sunday"
 dt_visual <-  dt_Date %>% filter(DayofWeek == weekday)
 
 ggplot(dt_visual, aes(x = hour, y = nWazeJam, color = EventType, group = date)) + 
-  # geom_point(alpha = 0.5, color = "red") +
+  # geom_point(alpha = 0.5, color = "black") +
   geom_line(alpha = 0.5) +
   geom_rect(data = dt_visual,aes(xmin = ave(dt_visual$StartTime, dt_visual$date, FUN = function(x) mean(x)),xmax = ave(dt_visual$EndTime, dt_visual$date, FUN = function(x) mean(x)), ymin = -Inf,ymax=Inf), fill = dt_visual$background_col, alpha= 0.2/100, inherit.aes = FALSE) +
   facet_wrap(~ Month) +
@@ -215,35 +264,34 @@ ggplot(dt_visual, aes(x = hour, y = nWazeJam, color = EventType, group = date)) 
 buf = 1
 dt <- GridDataSE(loc,buf,daterange,col.names)
 
-# Mean
-dt_Date <- dt %>% group_by(Location.ID, date, hour) %>% summarize(nWazeJam = mean(nWazeJam),
-                                                               Obs = mean(Obs),
-                                                               nWazeAccident = mean(nWazeAccident),
-                                                               nHazardOnShoulder = mean(nHazardOnShoulder),
-                                                               nHazardOnRoad = mean(nHazardOnRoad),
-                                                               nHazardWeather = mean(nHazardWeather)
-) %>% mutate(DayofWeek = weekdays(date), Date = paste(date, DayofWeek), Month = month(date)) %>%  left_join(unique(dt[, c("date","EventType","StartTime","EndTime")]), by = "date") %>% mutate(background_col = ifelse(EventType == "NoEvent", NA,ifelse(EventType == "Football","#E69F00", "#56B4E9")))
+weekday = "Sunday"
+plotAvgJamMonth(dt, weekday)
 
-dt_Date$Month <- factor(dt_Date$Month) 
-levels(dt_Date$Month) <- list("April" = 4, "May" = 5, "June" = 6, "July" = 7, "August" = 8, "September" = 9)
-
-# Military time to regular HH:MM, and then to decimals.
-dt_Date$StartTime <- hm_to_num(mil_to_hm(dt_Date$StartTime))
-dt_Date$EndTime <- hm_to_num(mil_to_hm(dt_Date$EndTime))
+# weekday = "Saturday"
+# plotAvgJamMonth(dt, weekday)
+# 
+# weekday = "Tuesday"
+# plotAvgJamMonth(dt, weekday)
+# 
+# weekday = "Wednesday"
+# plotAvgJamMonth(dt, weekday)
+```
+### 0.5 mile buffer zone - Averages
+```{r}
+buf = 0.5
+dt <- GridDataSE(loc,buf,daterange,col.names)
 
 weekday = "Sunday"
-dt_visual <-  dt_Date %>% filter(DayofWeek == weekday)
+plotAvgJamMonth(dt, weekday)
 
-ggplot(dt_visual, aes(x = hour, y = nWazeJam, color = EventType, group = date)) + 
-  # geom_point(alpha = 0.5, color = "red") +
-  geom_line(alpha = 0.5) +
-  geom_rect(data = dt_visual,aes(xmin = ave(dt_visual$StartTime, dt_visual$date, FUN = function(x) mean(x)),xmax = ave(dt_visual$EndTime, dt_visual$date, FUN = function(x) mean(x)), ymin = -Inf,ymax=Inf), fill = dt_visual$background_col, alpha= 0.2/100, inherit.aes = FALSE) +
-  facet_wrap(~ Month) +
-  ylab("Average Waze Jam") +
-  xlab("Hour of Day") +
-  scale_color_manual(name = NULL, values=c("NoEvent" = "#999999", "Football" = "#E69F00", "Concert" = "#56B4E9")) +
-  ggtitle(paste("Fedex Field,", buf,"Mile Buffer,", weekday)) 
-
+# weekday = "Saturday"
+# plotAvgJamMonth(dt, weekday)
+# 
+# weekday = "Tuesday"
+# plotAvgJamMonth(dt, weekday)
+# 
+# weekday = "Wednesday"
+# plotAvgJamMonth(dt, weekday)
 ```
 
 ### 3 mile buffer zone - Sum Value
@@ -251,35 +299,39 @@ ggplot(dt_visual, aes(x = hour, y = nWazeJam, color = EventType, group = date)) 
 buf = 3
 dt <- GridDataSE(loc,buf,daterange,col.names)
 
-# Mean
-dt_Date <- dt %>% group_by(Location.ID, date, hour) %>% summarize(nWazeJam = sum(nWazeJam),
-                                                               Obs = sum(Obs),
-                                                               nWazeAccident = sum(nWazeAccident),
-                                                               nHazardOnShoulder = sum(nHazardOnShoulder),
-                                                               nHazardOnRoad = sum(nHazardOnRoad),
-                                                               nHazardWeather = sum(nHazardWeather)
-) %>% mutate(DayofWeek = weekdays(date), Date = paste(date, DayofWeek), Month = month(date)) %>%  left_join(unique(dt[, c("date","EventType","StartTime","EndTime")]), by = "date") %>% mutate(background_col = ifelse(EventType == "NoEvent", NA,ifelse(EventType == "Football","#E69F00", "#56B4E9")))
-
-dt_Date$Month <- factor(dt_Date$Month) 
-levels(dt_Date$Month) <- list("April" = 4, "May" = 5, "June" = 6, "July" = 7, "August" = 8, "September" = 9)
-
-# Military time to regular HH:MM, and then to decimals.
-dt_Date$StartTime <- hm_to_num(mil_to_hm(dt_Date$StartTime))
-dt_Date$EndTime <- hm_to_num(mil_to_hm(dt_Date$EndTime))
+plotSumJamMonth <- function(dt, weekday) {
+        # Total
+      dt_Date <- dt %>% group_by(Location.ID, date, hour) %>% summarize(nWazeJam = sum(nWazeJam),
+                                                                     Obs = sum(Obs),
+                                                                     nWazeAccident = sum(nWazeAccident),
+                                                                     nHazardOnShoulder = sum(nHazardOnShoulder),
+                                                                     nHazardOnRoad = sum(nHazardOnRoad),
+                                                                     nHazardWeather = sum(nHazardWeather)
+      ) %>% mutate(DayofWeek = weekdays(date), Date = paste(date, DayofWeek), Month = month(date)) %>%  left_join(unique(dt[, c("date","EventType","StartTime","EndTime")]), by = "date") %>% mutate(background_col = ifelse(EventType == "NoEvent", NA,ifelse(EventType == "Football","#E69F00", "#56B4E9")))
+      
+      dt_Date$Month <- factor(dt_Date$Month) 
+      levels(dt_Date$Month) <- list("April" = 4, "May" = 5, "June" = 6, "July" = 7, "August" = 8, "September" = 9)
+      
+      # Military time to regular HH:MM, and then to decimals.
+      dt_Date$StartTime <- hm_to_num(mil_to_hm(dt_Date$StartTime))
+      dt_Date$EndTime <- hm_to_num(mil_to_hm(dt_Date$EndTime))
+      
+      weekday = "Sunday"
+      dt_visual <-  dt_Date %>% filter(DayofWeek == weekday)
+      
+      ggplot(dt_visual, aes(x = hour, y = nWazeJam, color = EventType, group = date)) + 
+        # geom_point(alpha = 0.5, color = "red") +
+        geom_line(alpha = 0.5) +
+        geom_rect(data = dt_visual,aes(xmin = ave(dt_visual$StartTime, dt_visual$date, FUN = function(x) mean(x)),xmax = ave(dt_visual$EndTime, dt_visual$date, FUN = function(x) mean(x)), ymin = -Inf,ymax=Inf), fill = dt_visual$background_col, alpha= 0.2/100, inherit.aes = FALSE) +
+        facet_wrap(~ Month) +
+        ylab("Total Waze Jam") +
+        xlab("Hour of Day") +
+        scale_color_manual(name = NULL, values=c("NoEvent" = "#999999", "Football" = "#E69F00", "Concert" = "#56B4E9")) +
+        ggtitle(paste("Fedex Field,", buf,"Mile Buffer,", weekday)) 
+}
 
 weekday = "Sunday"
-dt_visual <-  dt_Date %>% filter(DayofWeek == weekday)
-
-ggplot(dt_visual, aes(x = hour, y = nWazeJam, color = EventType, group = date)) + 
-  # geom_point(alpha = 0.5, color = "red") +
-  geom_line(alpha = 0.5) +
-  geom_rect(data = dt_visual,aes(xmin = ave(dt_visual$StartTime, dt_visual$date, FUN = function(x) mean(x)),xmax = ave(dt_visual$EndTime, dt_visual$date, FUN = function(x) mean(x)), ymin = -Inf,ymax=Inf), fill = dt_visual$background_col, alpha= 0.2/100, inherit.aes = FALSE) +
-  facet_wrap(~ Month) +
-  ylab("Total Waze Jam") +
-  xlab("Hour of Day") +
-  scale_color_manual(name = NULL, values=c("NoEvent" = "#999999", "Football" = "#E69F00", "Concert" = "#56B4E9")) +
-  ggtitle(paste("Fedex Field,", buf,"Mile Buffer,", weekday)) 
-
+plotSumJamMonth(dt, weekday)
 ```
 
 
@@ -288,43 +340,27 @@ ggplot(dt_visual, aes(x = hour, y = nWazeJam, color = EventType, group = date)) 
 buf = 1
 dt <- GridDataSE(loc,buf,daterange,col.names)
 
-# Mean
-dt_Date <- dt %>% group_by(Location.ID, date, hour) %>% summarize(nWazeJam = sum(nWazeJam),
-                                                               Obs = sum(Obs),
-                                                               nWazeAccident = sum(nWazeAccident),
-                                                               nHazardOnShoulder = sum(nHazardOnShoulder),
-                                                               nHazardOnRoad = sum(nHazardOnRoad),
-                                                               nHazardWeather = sum(nHazardWeather)
-) %>% mutate(DayofWeek = weekdays(date), Date = paste(date, DayofWeek), Month = month(date)) %>%  left_join(unique(dt[, c("date","EventType","StartTime","EndTime")]), by = "date") %>% mutate(background_col = ifelse(EventType == "NoEvent", NA,ifelse(EventType == "Football","#E69F00", "#56B4E9")))
+weekday = "Sunday"
+plotSumJamMonth(dt, weekday)
+```
 
-dt_Date$Month <- factor(dt_Date$Month) 
-levels(dt_Date$Month) <- list("April" = 4, "May" = 5, "June" = 6, "July" = 7, "August" = 8, "September" = 9)
-
-# Military time to regular HH:MM, and then to decimals.
-dt_Date$StartTime <- hm_to_num(mil_to_hm(dt_Date$StartTime))
-dt_Date$EndTime <- hm_to_num(mil_to_hm(dt_Date$EndTime))
+### half mile buffer zone - Sum Value
+```{r}
+buf = 0.5
+dt <- GridDataSE(loc,buf,daterange,col.names)
 
 weekday = "Sunday"
-dt_visual <-  dt_Date %>% filter(DayofWeek == weekday)
-
-ggplot(dt_visual, aes(x = hour, y = nWazeJam, color = EventType, group = date)) + 
-  # geom_point(alpha = 0.5, color = "red") +
-  geom_line(alpha = 0.5) +
-  geom_rect(data = dt_visual,aes(xmin = ave(dt_visual$StartTime, dt_visual$date, FUN = function(x) mean(x)),xmax = ave(dt_visual$EndTime, dt_visual$date, FUN = function(x) mean(x)), ymin = -Inf,ymax=Inf), fill = dt_visual$background_col, alpha= 0.2/100, inherit.aes = FALSE) +
-  facet_wrap(~ Month) +
-  ylab("Total Waze Jam") +
-  xlab("Hour of Day") +
-  scale_color_manual(name = NULL, values=c("NoEvent" = "#999999", "Football" = "#E69F00", "Concert" = "#56B4E9")) +
-  ggtitle(paste("Fedex Field,", buf,"Mile Buffer,", weekday)) 
-
+plotSumJamMonth(dt, weekday)
 ```
+
 
 ### 3 mile buffer zone - Max Value
 ```{r}
 buf = 3
 dt <- GridDataSE(loc,buf,daterange,col.names)
 
-# Mean
+plotMaxJamMonth <- function(dt, weekday){
+  # Max
 dt_Date <- dt %>% group_by(Location.ID, date, hour) %>% summarize(nWazeJam = max(nWazeJam),
                                                                Obs = max(Obs),
                                                                nWazeAccident = max(nWazeAccident),
@@ -352,7 +388,10 @@ ggplot(dt_visual, aes(x = hour, y = nWazeJam, color = EventType, group = date)) 
   xlab("Hour of Day") +
   scale_color_manual(name = NULL, values=c("NoEvent" = "#999999", "Football" = "#E69F00", "Concert" = "#56B4E9")) +
   ggtitle(paste("Fedex Field,", buf,"Mile Buffer,", weekday)) 
+}
 
+weekday = "Sunday"
+plotMaxJamMonth(dt, weekday)
 ```
 
 ### 1 mile buffer zone - Max Value
@@ -360,71 +399,125 @@ ggplot(dt_visual, aes(x = hour, y = nWazeJam, color = EventType, group = date)) 
 buf = 1
 dt <- GridDataSE(loc,buf,daterange,col.names)
 
-# Mean
-dt_Date <- dt %>% group_by(Location.ID, date, hour) %>% summarize(nWazeJam = max(nWazeJam),
-                                                               Obs = max(Obs),
-                                                               nWazeAccident = max(nWazeAccident),
-                                                               nHazardOnShoulder = max(nHazardOnShoulder),
-                                                               nHazardOnRoad = max(nHazardOnRoad),
-                                                               nHazardWeather = max(nHazardWeather)
-) %>% mutate(DayofWeek = weekdays(date), Date = paste(date, DayofWeek), Month = month(date)) %>%  left_join(unique(dt[, c("date","EventType","StartTime","EndTime")]), by = "date") %>% mutate(background_col = ifelse(EventType == "NoEvent", NA,ifelse(EventType == "Football","#E69F00", "#56B4E9")))
-
-dt_Date$Month <- factor(dt_Date$Month) 
-levels(dt_Date$Month) <- list("April" = 4, "May" = 5, "June" = 6, "July" = 7, "August" = 8, "September" = 9)
-
-# Military time to regular HH:MM, and then to decimals.
-dt_Date$StartTime <- hm_to_num(mil_to_hm(dt_Date$StartTime))
-dt_Date$EndTime <- hm_to_num(mil_to_hm(dt_Date$EndTime))
-
 weekday = "Sunday"
-dt_visual <-  dt_Date %>% filter(DayofWeek == weekday)
-
-ggplot(dt_visual, aes(x = hour, y = nWazeJam, color = EventType, group = date)) + 
-  # geom_point(alpha = 0.5, color = "red") +
-  geom_line(alpha = 0.5) +
-  geom_rect(data = dt_visual,aes(xmin = ave(dt_visual$StartTime, dt_visual$date, FUN = function(x) unique(x)),xmax = ave(dt_visual$EndTime, dt_visual$date, FUN = function(x) mean(x)), ymin = -Inf,ymax=Inf), fill = dt_visual$background_col, alpha= 0.2/100, inherit.aes = FALSE) +
-  facet_wrap(~ Month) +
-  ylab("Max Waze Jam") +
-  xlab("Hour of Day") +
-  scale_color_manual(name = NULL, values=c("NoEvent" = "#999999", "Football" = "#E69F00", "Concert" = "#56B4E9")) +
-  ggtitle(paste("Fedex Field,", buf,"Mile Buffer,", weekday)) 
-
+plotMaxJamMonth(dt, weekday)
 ```
 
+### half mile buffer zone - Max Value
+```{r}
+buf = 0.5
+dt <- GridDataSE(loc,buf,daterange,col.names)
+
+weekday = "Sunday"
+plotMaxJamMonth(dt, weekday)
+```
+
+### Hourly By Day of Week - 3 mile buffer
+
+```{r, fig.width=12, fig.height=12}
+buf = 3
+dt <- GridDataSE(loc,buf,daterange,col.names)
+
+plotAvgJam <- function (dt, weekday) {
+            # Mean
+          dt_Date <- dt %>% group_by(Location.ID, date, hour) %>% summarize(nWazeJam = mean(nWazeJam),
+                                                                         Obs = mean(Obs),
+                                                                         nWazeAccident = mean(nWazeAccident),
+                                                                         nHazardOnShoulder = mean(nHazardOnShoulder),
+                                                                         nHazardOnRoad = mean(nHazardOnRoad),
+                                                                         nHazardWeather = mean(nHazardWeather)
+          ) %>% mutate(DayofWeek = weekdays(date), Date = paste(date, DayofWeek), Month = month(date)) %>%  left_join(unique(dt[, c("date","EventType","StartTime","EndTime")]), by = "date") %>% mutate(background_col = ifelse(EventType == "NoEvent", NA,ifelse(EventType == "Football","#E69F00",ifelse(EventType == "Concert", "#56B4E9", "chartreuse4" ))))
+          
+          dt_Date$Month <- factor(dt_Date$Month) 
+          levels(dt_Date$Month) <- list("April" = 4, "May" = 5, "June" = 6, "July" = 7, "August" = 8, "September" = 9)
+          
+          # Military time to regular HH:MM, and then to decimals.
+          dt_Date$StartTime <- hm_to_num(mil_to_hm(dt_Date$StartTime))
+          dt_Date$EndTime <- hm_to_num(mil_to_hm(dt_Date$EndTime))
+          
+          dt_visual <-  dt_Date %>% filter(DayofWeek == weekday)
+          
+          ggplot(dt_visual, aes(x = hour, y = nWazeJam, color = EventType, group = date)) + 
+            # geom_point(alpha = 0.5, color = "red") +
+            geom_line(alpha = 0.5) +
+            geom_rect(data = dt_visual,aes(xmin = ave(dt_visual$StartTime, dt_visual$date, FUN = function(x) mean(x)),xmax = ave(dt_visual$EndTime, dt_visual$date, FUN = function(x) mean(x)), ymin = -Inf,ymax=Inf), fill = dt_visual$background_col, alpha= 0.2/100, inherit.aes = FALSE) +
+            facet_wrap(~ Date) +
+            ylab("Average Waze Jam") +
+            xlab("Hour of Day") +
+            scale_color_manual(name = NULL, values=c("NoEvent" = "#999999", "Football" = "#E69F00", "Concert" = "#56B4E9", "Soccer" = "chartreuse4")) +
+            ggtitle(paste("Fedex Field,", buf,"Mile Buffer,", weekday)) 
+}
 
 
-<!-- ```{r} -->
-<!-- dt_EventType <- dt %>% group_by(EventType, hour) %>% summarize(nWazeJam = mean(nWazeJam), -->
-<!--                                                          Obs = mean(Obs), -->
-<!--                                                          nWazeAccident = mean(nWazeAccident), -->
-<!--                                                          nHazardOnShoulder = mean(nHazardOnShoulder), -->
-<!--                                                          nHazardOnRoad = mean(nHazardOnRoad), -->
-<!--                                                          nHazardWeather = mean(nHazardWeather) -->
-<!--                                                          ) -->
+weekday = "Sunday"
+plotAvgJam(dt,weekday)
 
-<!-- ggplot(dt_EventType, aes(x = hour, y = Obs)) + geom_point() + geom_line() + facet_wrap(~ EventType) + ylab("Average EDT Accident") + ggtitle(paste(loc, buf,"mile buffer")) -->
+weekday = "Saturday"
+plotAvgJam(dt,weekday)
 
-<!-- ggplot(dt_EventType, aes(x = hour, y = nWazeAccident)) + geom_point() + geom_line() + facet_wrap(~ EventType) + ylab("Average Waze Accident") + ggtitle(paste(loc, buf,"mile buffer")) -->
+weekday = "Tuesday"
+plotAvgJam(dt,weekday)
 
-<!-- ggplot(dt_EventType, aes(x = hour, y = nWazeJam)) + geom_point() + geom_line() + facet_wrap(~ EventType) + ylab("Average Waze Jam") + ggtitle(paste(loc, buf,"mile buffer")) -->
+weekday = "Wednesday"
+plotAvgJam(dt,weekday)
+```
 
-<!-- ggplot(dt_EventType, aes(x = hour, y = nHazardOnShoulder)) + geom_point() + geom_line() + facet_wrap(~ EventType) + ylab("Average Waze Hazard On Shoulder") + ggtitle(paste(loc, buf,"mile buffer")) -->
+### Hourly By Day of Week - 1 mile buffer
 
-<!-- ggplot(dt_EventType, aes(x = hour, y = nHazardOnRoad)) + geom_point() + geom_line() + facet_wrap(~ EventType) + ylab("Average Waze Hazard On Road") + ggtitle(paste(loc, buf,"mile buffer")) -->
-<!-- ``` -->
-<!-- ## Hourly By Day of Week -->
+```{r, fig.width=12, fig.height=12}
+buf = 1
+dt <- GridDataSE(loc,buf,daterange,col.names)
 
-<!-- ```{r, fig.width=12, fig.height=12} -->
-<!-- dt_Date <- dt %>% group_by(date, DayofWeek, hour) %>% summarize(nWazeJam = mean(nWazeJam), -->
-<!--                                                                Obs = mean(Obs), -->
-<!--                                                                nWazeAccident = mean(nWazeAccident), -->
-<!--                                                                nHazardOnShoulder = mean(nHazardOnShoulder), -->
-<!--                                                                nHazardOnRoad = mean(nHazardOnRoad), -->
-<!--                                                                nHazardWeather = mean(nHazardWeather) -->
-<!-- ) %>% mutate(Date = paste(date, DayofWeek)) -->
+weekday = "Sunday"
+plotAvgJam(dt,weekday)
 
-<!-- ggplot(dt_Date, aes(x = hour, y = nWazeJam)) + geom_point() + geom_line() + facet_wrap(~ Date) + ylab("Average Waze Jam") + ggtitle(paste(loc, buf,"mile buffer"))  -->
+weekday = "Saturday"
+plotAvgJam(dt,weekday)
 
-<!-- weekday = "Sun" -->
-<!-- ggplot(dt_Date %>% filter(DayofWeek == weekday), aes(x = hour, y = nWazeJam)) + geom_point() + geom_line() + facet_wrap(~ Date) + ylab("Average Waze Jam") + ggtitle(paste(loc, buf,"mile buffer", weekday))  -->
-<!-- ``` -->
+weekday = "Tuesday"
+plotAvgJam(dt,weekday)
+
+weekday = "Wednesday"
+plotAvgJam(dt,weekday)
+```
+
+### Hourly By Day of Week - half mile buffer
+
+```{r, fig.width=12, fig.height=12}
+buf = 0.5
+dt <- GridDataSE(loc,buf,daterange,col.names)
+
+weekday = "Sunday"
+plotAvgJam(dt,weekday)
+
+weekday = "Saturday"
+plotAvgJam(dt,weekday)
+
+weekday = "Tuesday"
+plotAvgJam(dt,weekday)
+
+weekday = "Wednesday"
+plotAvgJam(dt,weekday)
+```
+
+## Comparing all Matrics
+
+```{r}
+dt_EventType <- dt %>% group_by(EventType, hour) %>% summarize(nWazeJam = mean(nWazeJam),
+                                                         Obs = mean(Obs),
+                                                         nWazeAccident = mean(nWazeAccident),
+                                                         nHazardOnShoulder = mean(nHazardOnShoulder),
+                                                         nHazardOnRoad = mean(nHazardOnRoad),
+                                                         nHazardWeather = mean(nHazardWeather)
+                                                         )
+
+ggplot(dt_EventType, aes(x = hour, y = Obs)) + geom_point() + geom_line() + facet_wrap(~ EventType) + ylab("Average EDT Accident") + ggtitle(paste(loc, buf,"mile buffer"))
+
+ggplot(dt_EventType, aes(x = hour, y = nWazeAccident)) + geom_point() + geom_line() + facet_wrap(~ EventType) + ylab("Average Waze Accident") + ggtitle(paste(loc, buf,"mile buffer"))
+
+ggplot(dt_EventType, aes(x = hour, y = nWazeJam)) + geom_point() + geom_line() + facet_wrap(~ EventType) + ylab("Average Waze Jam") + ggtitle(paste(loc, buf,"mile buffer"))
+
+ggplot(dt_EventType, aes(x = hour, y = nHazardOnShoulder)) + geom_point() + geom_line() + facet_wrap(~ EventType) + ylab("Average Waze Hazard On Shoulder") + ggtitle(paste(loc, buf,"mile buffer"))
+
+ggplot(dt_EventType, aes(x = hour, y = nHazardOnRoad)) + geom_point() + geom_line() + facet_wrap(~ EventType) + ylab("Average Waze Hazard On Road") + ggtitle(paste(loc, buf,"mile buffer"))
+```

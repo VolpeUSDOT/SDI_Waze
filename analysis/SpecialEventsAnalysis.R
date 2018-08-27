@@ -195,7 +195,7 @@ ggplot(dt_EventType, aes(x = hour, y = nWazeAccident)) + geom_point() + geom_lin
 
 ggplot(dt_EventType, aes(x = hour, y = nHazardOnShoulder)) + geom_point() + geom_line() + facet_wrap(~ EventType) + ylab("Average Waze Hazard On Shoulder") + ggtitle(paste(loc, buf,"mile buffer"))
 
-ggplot(dt_EventType, aes(x = hour, y = nHazardOnRoad)) + geom_point() + geom_line() + facet_wrap(~ EventType) + ylab("Average Waze Hazard Hazard On Road") + ggtitle(paste(loc, buf,"mile buffer"))
+ggplot(dt_EventType, aes(x = hour, y = nHazardOnRoad)) + geom_point() + geom_line() + facet_wrap(~ EventType) + ylab("Average Waze Hazard On Road") + ggtitle(paste(loc, buf,"mile buffer"))
 
 ggplot(dt_EventType, aes(x = hour, y = nHazardWeather)) + geom_point() + geom_line() + facet_wrap(~ EventType) + ylab("Average Waze Hazard or Weather") + ggtitle(paste(loc, buf,"mile buffer"))
 
@@ -223,7 +223,15 @@ dt_Date <- dt %>% group_by(date, DayofWeek, hour) %>% summarize(nWazeJam = sum(n
 ) %>% mutate(Date = paste(date, DayofWeek))
 
 
-weekday = "Sun"
+weekday = "Sunday"
+ggplot(dt_Date %>% filter(DayofWeek == weekday), aes(x = hour, y = nWazeJam, group = date)) + 
+  # geom_point(alpha = 0.5, color = "red") +
+  geom_line(alpha = 0.2, color = "blue") +
+  facet_wrap(~ Date) +
+  ylab("Average Waze Jam") + ggtitle(paste(loc, buf,"mile buffer", weekday)) 
+# consider an area/density chart
+
+weekday = "Saturday"
 ggplot(dt_Date %>% filter(DayofWeek == weekday), aes(x = hour, y = nWazeJam, group = date)) + 
   # geom_point(alpha = 0.5, color = "red") +
   geom_line(alpha = 0.2, color = "blue") +
