@@ -275,7 +275,7 @@ ggplot(dt_visual, aes(x = hour, y = nWazeJam, color = EventType, group = date)) 
   geom_line(alpha = 0.5) +
   geom_rect(data = dt_visual,aes(xmin = ave(dt_visual$StartTime, dt_visual$date, FUN = function(x) mean(x)),xmax = ave(dt_visual$EndTime, dt_visual$date, FUN = function(x) mean(x)), ymin = -Inf,ymax=Inf), fill = dt_visual$background_col, alpha= 0.2/100, inherit.aes = FALSE) +
   facet_wrap(~ Month) +
-  ylab("Average Waze Jam") +
+  ylab("Total Waze Jam") +
   xlab("Hour of Day") +
   scale_color_manual(name = NULL, values=c("NoEvent" = "#999999", "Football" = "#E69F00", "Concert" = "#56B4E9")) +
   ggtitle(paste("Fedex Field,", buf,"Mile Buffer,", weekday)) 
@@ -312,7 +312,7 @@ ggplot(dt_visual, aes(x = hour, y = nWazeJam, color = EventType, group = date)) 
   geom_line(alpha = 0.5) +
   geom_rect(data = dt_visual,aes(xmin = ave(dt_visual$StartTime, dt_visual$date, FUN = function(x) mean(x)),xmax = ave(dt_visual$EndTime, dt_visual$date, FUN = function(x) mean(x)), ymin = -Inf,ymax=Inf), fill = dt_visual$background_col, alpha= 0.2/100, inherit.aes = FALSE) +
   facet_wrap(~ Month) +
-  ylab("Average Waze Jam") +
+  ylab("Total Waze Jam") +
   xlab("Hour of Day") +
   scale_color_manual(name = NULL, values=c("NoEvent" = "#999999", "Football" = "#E69F00", "Concert" = "#56B4E9")) +
   ggtitle(paste("Fedex Field,", buf,"Mile Buffer,", weekday)) 
@@ -348,7 +348,7 @@ ggplot(dt_visual, aes(x = hour, y = nWazeJam, color = EventType, group = date)) 
   geom_line(alpha = 0.5) +
   geom_rect(data = dt_visual,aes(xmin = ave(dt_visual$StartTime, dt_visual$date, FUN = function(x) unique(x)),xmax = ave(dt_visual$EndTime, dt_visual$date, FUN = function(x) mean(x)), ymin = -Inf,ymax=Inf), fill = dt_visual$background_col, alpha= 0.2/100, inherit.aes = FALSE) +
   facet_wrap(~ Month) +
-  ylab("Average Waze Jam") +
+  ylab("Max Waze Jam") +
   xlab("Hour of Day") +
   scale_color_manual(name = NULL, values=c("NoEvent" = "#999999", "Football" = "#E69F00", "Concert" = "#56B4E9")) +
   ggtitle(paste("Fedex Field,", buf,"Mile Buffer,", weekday)) 
@@ -384,7 +384,7 @@ ggplot(dt_visual, aes(x = hour, y = nWazeJam, color = EventType, group = date)) 
   geom_line(alpha = 0.5) +
   geom_rect(data = dt_visual,aes(xmin = ave(dt_visual$StartTime, dt_visual$date, FUN = function(x) unique(x)),xmax = ave(dt_visual$EndTime, dt_visual$date, FUN = function(x) mean(x)), ymin = -Inf,ymax=Inf), fill = dt_visual$background_col, alpha= 0.2/100, inherit.aes = FALSE) +
   facet_wrap(~ Month) +
-  ylab("Average Waze Jam") +
+  ylab("Max Waze Jam") +
   xlab("Hour of Day") +
   scale_color_manual(name = NULL, values=c("NoEvent" = "#999999", "Football" = "#E69F00", "Concert" = "#56B4E9")) +
   ggtitle(paste("Fedex Field,", buf,"Mile Buffer,", weekday)) 
