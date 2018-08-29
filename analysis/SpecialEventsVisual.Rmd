@@ -130,6 +130,7 @@ To do 8/23/2018:
     + update the analysis and visuals
 * Easten shore beach - Bay Bridge area (7/4, 9/4 Labor Day, 3lanes both ways) for a typical holiday pattern
 * follow up with Erika tomorrow
+* write one plot function in stead of multiple plot functions.
 
 ```{r data Process, include = FALSE}
 # To recover the grid_ids for 1 mile buffer of location SE1
