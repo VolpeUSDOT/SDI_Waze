@@ -132,6 +132,15 @@ To do 8/23/2018:
 * follow up with Erika tomorrow
 * write one plot function in stead of multiple plot functions.
 
+Dave's feedback
+* try large buffer, e.g., 5 miles (Dan's suggestion: work with individual lag/lons instead of grid cells)
+* broader patterns - can we add baseball game,(Michelle's comments: baseball games are usually hosted in urban areas with intercity activities and good public transportation, less parking. Erika - How far aways is the parking. Look that the parking in the buffer).
+* Two days of week (Saturday, Wednesday)
+* Extend the 23 hours through another 6 hours, change time window from 5 am to 5 am.
+* Other types of metric, Hazards on the roads, car stopped on shoulders. Car stopped on shoulders.
+* Other location: for exmaple, University football games.
+* Can we try to make this a little more of hot spots, can we do this on a grid cell level.
+
 ```{r data Process, include = FALSE}
 # To recover the grid_ids for 1 mile buffer of location SE1
 loc = "SE1"
