@@ -62,20 +62,20 @@ grid <- readOGR(file.path(data.loc,"MD_hexagons_shapefiles"), layer = "MD_hexago
 grid <- spTransform(grid, CRS(proj.USGS))
 
 # Read in model output and independent variables used in the model
-GridCount <- read.csv(paste0(output.loc, "/Waze_04-09_GridCounts.csv")) #623,251*14
+# GridCount <- read.csv(paste0(output.loc, "/Waze_04-09_GridCounts.csv")) #623,251*14
 AllModel30 <- read.csv(paste0(output.loc, "/All_Model_30.csv")) # 617,338*124
 
 # Convert day of year to date
-GridCount$date <- as.Date(GridCount$day, origin = "2016-12-31")
+# GridCount$date <- as.Date(GridCount$day, origin = "2016-12-31")
 AllModel30$date <- as.Date(AllModel30$day, origin = "2016-12-31")
 # as.Date(91, origin = "2016-12-31") # "2017-04-01", the origin needs to be the last day of 2016.
 
 length(unique(AllModel30$GRID_ID)) # 5880
-length(unique(GridCount$GRID_ID)) # 5176
+# length(unique(GridCount$GRID_ID)) # 5176
 
 # Verify the date range
-max(GridCount$date) # Sept 30
-min(GridCount$date) # April 1
+# max(GridCount$date) # Sept 30
+# min(GridCount$date) # April 1
 max(AllModel30$date) # Sept 30
 min(AllModel30$date) # April 1, 2017
 
@@ -98,12 +98,12 @@ SpecialEvents$Date <- as.Date(SpecialEvents$Date, format = "%m/%d/%Y")
 SpecialEvents$DayofWeekN <- as.numeric(format(SpecialEvents$Date, format = "%u"))
 
 # expand the SpecialEvents data with a variety of buffer values
-buffer = c(3,2,1,0.75, 0.5, 0.25) # 3 mile buffer might be too large, covers some parts of the DC, therefore, we want to use a smaller radius.
+buffer = c(5, 3,2,1,0.75, 0.5, 0.25) # 3 mile buffer might be too large, covers some parts of the DC, therefore, we want to use a smaller radius.
 # Location.ID = unique(SpecialEvents$Location.ID)
 # com <- expand.grid(Location.ID,Buffer_Miles) # all combination of buffer_miles and locations that we are interested in.
 # names(com) <- c("Location.ID", "Buffer_Miles")
 SpecialEventsExpand <- do.call("rbind", replicate(length(buffer), SpecialEvents, simplify = FALSE))
-SpecialEventsExpand$Buffer_Miles <- rep(buffer, each = 8)
+SpecialEventsExpand$Buffer_Miles <- rep(buffer, each = nrow(SpecialEvents))
 
 # Extract the grid_ids that fall in to each buffer of the each location
 uniquelocbuf <- unique(SpecialEventsExpand[,c("Location.ID","Buffer_Miles")]) # how many unique combninations of location and buffer miles
@@ -113,7 +113,7 @@ for (i in c(1:nrow(uniquelocbuf))){
   buf = uniquelocbuf$Buffer_Miles[i]
   
   # create buffer for each location
-  SpecialEventsExpand_SP <- SpatialPointsDataFrame(SpecialEventsExpand[c("Lon", "Lat")], 
+  SpecialEventsExpand_SP <- SpatialPointsDataFrame(SpecialEventsExpand %>% filter(Location.ID == loc) %>% select(Lon, Lat), 
                                                    SpecialEventsExpand %>% filter(Location.ID == loc), 
                                                    proj4string = CRS("+proj=longlat +datum=WGS84")
                                                    )  #  make sure Waze data is a SPDF
@@ -136,7 +136,7 @@ write.csv(SpecialEventsExpand, file = paste0(wazedir,"/Data/SpecialEvents/Specia
 # Save necessary objects as Rdata for easy access for visualization
 save(list = c("co","AllModel30_sub","SpecialEventsExpand","SpecialEvents","md","ua","grid"), file = paste0(wazedir,"/Data/SpecialEvents/SpecialEvents_MD_AprilToSept_2017.Rdata"))
 
-#### Special Events Time Series Plots ####
+#### Data for Time Series ####
 load(file = paste0(wazedir,"/Data/SpecialEvents/SpecialEvents_MD_AprilToSept_2017.Rdata"))
 
 # To recover the grid_ids for 3 mile buffer of location SE1
@@ -177,6 +177,15 @@ GridDataSE <- function(loc,buf,daterange,col.names){
 buf = 3
 dt <- GridDataSE(loc,buf,daterange,col.names)
 write.csv(dt, file = paste0(wazedir,"/Data/SpecialEvents/DT",buf, "MileBuffer_MD_AprilToSept_2017.csv"), row.names = F) # save the 3 mile and 1 mile buffer as CVS for Michelle.
+
+
+#######################################################
+# Visualization Only 
+#######################################################
+#### Special Events Time Series Plots ####
+loc = "SE1"
+buf = 3
+dt <- GridDataSE(loc,buf,daterange,col.names)
 
 # By Event Type
 dt_EventType <- dt %>% group_by(EventType, hour) %>% summarize(nWazeJam = mean(nWazeJam),
@@ -290,10 +299,6 @@ ggplot(dt, aes(x = factor(hour), y = nHazardOnRoad)) + geom_boxplot(alpha = 0.2,
 #### Special Events Mapping ####
 plot(grid)
 points(SpecialEventsExpand_SP, col = "red") # 0.25 sq mile buffer
-
-#### To do:  ####
-# Consider write a function to derive the dt table for each location and buffer mile.
-# Save plots
 
 #### Special events mini example - Work on the Week ending 8/17/2018, move to the end of the script ####
 # Two example events, Baseball game. Fedex Field does not have football event on Sep 17, and M&T Bank Stadium does not have football event on Sept 10. We need to check whether there is any pre-season football events before Sept 10 to have a baseline to compare.
