@@ -17,83 +17,14 @@ This is an example of visuals that we can create visualizations for a specific l
 knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE, error = FALSE)
 options(scipen = 20)
 
-codeloc <- "~/Github/SDI_Waze"
-source(file.path(codeloc, 'utility/get_packages.R'))
-
-library(tidyverse)
-library(sp)
-library(maps) # for mapping base layers
-library(rgdal) # for readOGR(), needed for reading in ArcM shapefiles
-library(foreach)
-library(doParallel)
-library(rgeos) #gintersection
-library(lubridate)
-library(ggplot2)
-library(extrafont)
-library(splus2R)
-
-localdir <- "C:/Users/Jessie.Yang.CTR/Downloads/OST/Waze project/Special Events"
-# localdir <- "/home/daniel/workingdata/" # full path for readOGR, Jessie don't have this folder.
-# edtdir <- normalizePath(file.path(localdir, "EDT"))
-# wazedir <- "~/tempout" # has State_Year-mo.RData files. Grab from S3 if necessary
-wazedir <- "//vntscex.local/DFS/Projects/PROJ-OS62A1/SDI Waze Phase 2"
-output.loc <- file.path(wazedir, "WazeEDT Pilot Phase1 Archive Incomplete/SDI/Model_Output")
-data.loc <- file.path(wazedir, "WazeEDT Pilot Phase1 Archive Incomplete/SDI/Data")
-
-teambucket <- "s3://prod-sdc-sdi-911061262852-us-east-1-bucket"
-
-source(file.path(codeloc, "utility/wazefunctions.R")) 
-
-states = c("CT", "UT", "VA", "MD")
-
-# Time zone picker:
-tzs <- data.frame(states, 
-                  tz = c("US/Eastern",
-                         "US/Mountain",
-                         "US/Eastern",
-                         "US/Eastern"),
-                  stringsAsFactors = F)
-
-
-# Project to Albers equal area conic 102008. Check comparision with USGS version, WKID: 102039
-proj <- showP4(showWKT("+init=epsg:102008"))
-# USGS version, used for producing hexagons: 
-proj.USGS <- "+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs +ellps=GRS80 +towgs84=0,0,0"
-
-load(file = paste0(wazedir,"/Data/SpecialEvents/SpecialEvents_MD_AprilToSept_2017.Rdata"))
-
-# ggplot format
-theme_set(theme_bw(base_size = 12) +
-            theme(plot.background = element_blank(),
-                  panel.grid.major = element_blank(),
-                  panel.grid.minor = element_blank(),
-                  panel.border = element_blank(),
-                  text = element_text(family="Gill Sans MT", size=12,colour = "#666666"),
-                  legend.text = element_text(family="Gill Sans MT", size=10, colour = "#666666"),
-                  plot.title = element_text(size = rel(1),
-                                            colour = "#666666", vjust=2, hjust=0.5, face="bold",family="Gill Sans MT"),
-                  strip.text.x = element_text(size = 11,colour = "#666666",family="Gill Sans MT"),
-                  axis.text.x=element_text(size=11, angle = 0, hjust = 0.5,family="Gill Sans MT",colour = "#666666"),
-                  axis.text.y=element_text(size=11, angle = 0, hjust = 1,family="Gill Sans MT",colour = "#666666"))
-)
-
-# function to convert military time to HH:MM
-mil_to_hm <- function(x){
-  format(strptime(substr(as.POSIXct(sprintf("%04.0f", x), 
-                                    format="%H%M"), 
-                         12, 16), '%H:%M')
-         , '%H:%M')
+source2 <- function(file, start, end, ...) {
+    file.lines <- scan(file, what=character(), skip=start-1, nlines=end-start+1, sep='\n')
+    file.lines.collapsed <- paste(file.lines, collapse='\n')
+    source(textConnection(file.lines.collapsed), ...)
 }
 
-# function to convert HH:MM to decimals
-hm_to_num <- function(x){
-  sapply(strsplit(x,":"),
-  function(x) {
-    x <- as.numeric(x)
-    x[1]+x[2]/60
-    }
-)
-}
+source2("SpecialEventsAnalysis.R", 3, 76) # setting
+source2("SpecialEventsAnalysis.R", 172, 209) # Date process
 ```
 
 # Time Series Plots
@@ -141,65 +72,60 @@ Dave's feedback
 * Other location: for exmaple, University football games.
 * Can we try to make this a little more of hot spots, can we do this on a grid cell level.
 
-```{r data Process, include = FALSE}
-# To recover the grid_ids for 1 mile buffer of location SE1
-loc = "SE1"
-# buf = 1
-
-# Get all combinations of grid_id, hour, and day
-alldays = seq(from = min(AllModel30_sub$date), to = max(AllModel30_sub$date), by = "days") # get all days during April - Sep
-days = alldays[as.numeric(format(alldays, format = "%u")) %in% unique(SpecialEventsExpand$DayofWeekN)] # get all Sundays, Saturdays, Tuesdays, and Wednesdays that had special events
-daterange = days
-
-# Numeric variables if missing, can be replaced using zeros
-col.names <- c("Obs","nWazeAccident","nWazeJam","nHazardOnShoulder","nHazardOnRoad","nHazardWeather")
-
-# Function to create GridData joined with Special events, the special events are linked to date, not hours.
-GridDataSE <- function(loc,buf,daterange,col.names){
-  # recover the grid_ids from column GRID_ID
-  grid_id <- unlist(strsplit(unique(SpecialEventsExpand$GRID_ID[SpecialEventsExpand$Buffer_Miles == buf & SpecialEventsExpand$Location.ID == loc]), split = ",")
-  ) # an example of extracting grib_id of the largest buffer
-  
-  # all possible combinations
-  gridcom <- expand.grid(Location.ID = loc, GRID_ID = grid_id, hour = c(0:23), date = daterange) # for example, if daterange include 105 days, then row number 105840 = 105 days*24 hour*42 grid_id
-  
-  # create new variables
-  gridcom <- gridcom %>% mutate(day = yday(date), # convert day to date
-                                weekday = as.numeric(format(date, format = "%u")), # convert weekday
-                                DayofWeek = weekdays(date) #wday(date, label = T) returns a full week of day name
-  )
-  
-  # grid cells in the model
-  grid_cells_model <- unique(AllModel30_sub$GRID_ID)
-  
-  # left_join the Event Type to the model output data
-  dt <- gridcom %>% left_join(AllModel30_sub, by = c("GRID_ID", "day", "hour","date", "weekday")) %>% mutate_if(colnames(.) %in% col.names,funs(replace(., which(is.na(.)), 0))) %>% left_join(SpecialEvents[,c("Day","EventType","StartTime","EndTime")], by =  c("day" = "Day")) %>% mutate_if(colnames(.) %in% c("EventType"),funs(replace(., which(is.na(.)), "NoEvent"))) %>% mutate(Grid_In_Model = ifelse(GRID_ID %in% grid_cells_model, "Yes", "No"))
-  dt
-}
-
-# # Function to create time series by day of week, month, and date
-# ts_day_month <- function(buf, stat ){
-#   
-# }
-
-```
-
 ## Hourly By Event Type
 
 ### 3 mile buffer zone - Averages
 ```{r eval = F}
-buf = 3
-dt <- GridDataSE(loc,buf,daterange,col.names)
+loc = "SE1"
+buf = 1
+dt <- GridDataSE(loc,buf,alldays,col.names)
+weekday = "Sunday"
+statistic = "Sum" #c("Sum","Mean","Max")
+metrics = "Obs" #c("Obs","nWazeAccident","nWazeJam","nHazardOnShoulder","nHazardOnRoad")
 
-plotAvgJamMonth <- function(dt, weekday){
-            # Mean
-          dt_Date <- dt %>% group_by(Location.ID, date, hour) %>% summarize(nWazeJam = mean(nWazeJam),
-                                                                         Obs = mean(Obs),
-                                                                         nWazeAccident = mean(nWazeAccident),
-                                                                         nHazardOnShoulder = mean(nHazardOnShoulder),
-                                                                         nHazardOnRoad = mean(nHazardOnRoad),
-                                                                         nHazardWeather = mean(nHazardWeather)
-          ) %>% mutate(DayofWeek = weekdays(date), Date = paste(date, DayofWeek), Month = month(date)) %>%  left_join(unique(dt[, c("date","EventType","StartTime","EndTime")]), by = "date") %>% mutate(background_col = ifelse(EventType == "NoEvent", NA,ifelse(EventType == "Football","#E69F00", "#56B4E9")))
+meanfun <- function(dt, weekday){
+  dt_Date <- dt %>% group_by(Location.ID, date, hour) %>% 
+            summarize(nWazeJam = mean(nWazeJam),
+                      Obs = mean(Obs),
+                      nWazeAccident = mean(nWazeAccident),
+                      nHazardOnShoulder = mean(nHazardOnShoulder),
+                      nHazardOnRoad = mean(nHazardOnRoad),
+                      nHazardWeather = mean(nHazardWeather)
+                      )
+  dt_Date
+}
+
+sumfun <- function(dt, weekday){
+  dt_Date <- dt %>% group_by(Location.ID, date, hour) %>% 
+            summarize(nWazeJam = sum(nWazeJam),
+                      Obs = sum(Obs),
+                      nWazeAccident = sum(nWazeAccident),
+                      nHazardOnShoulder = sum(nHazardOnShoulder),
+                      nHazardOnRoad = sum(nHazardOnRoad),
+                      nHazardWeather = sum(nHazardWeather)
+                      )
+  dt_Date
+}
+
+maxfun <- function(dt, weekday){
+  dt_Date <- dt %>% group_by(Location.ID, date, hour) %>% 
+            summarize(nWazeJam = max(nWazeJam),
+                      Obs = max(Obs),
+                      nWazeAccident = max(nWazeAccident),
+                      nHazardOnShoulder = max(nHazardOnShoulder),
+                      nHazardOnRoad = max(nHazardOnRoad),
+                      nHazardWeather = max(nHazardWeather)
+                      )
+  dt_Date
+}
+
+plotMonth <- function(dt, weekday, statistic, metrics){
+          dt_Date <- ifelse(statistic = "Sum", sumfun(dt, weekday), 
+                      ifelse(statistic = "Mean",  meanfun(dt, weekday), maxfun(dt, weekday))
+                      )      
+    
+          # Process data to include more information of the date and event
+         dt_Date <- dt_Date %>% mutate(DayofWeek = weekdays(date), Date = paste(date, DayofWeek), Month = month(date)) %>%  left_join(unique(dt[, c("date","EventType","StartTime","EndTime")]), by = "date") %>% mutate(background_col = ifelse(EventType == "NoEvent", NA,ifelse(EventType == "Football","#E69F00",ifelse(EventType == "Concert", "#56B4E9", "chartreuse4"))))
           
           dt_Date$Month <- factor(dt_Date$Month) 
           levels(dt_Date$Month) <- list("April" = 4, "May" = 5, "June" = 6, "July" = 7, "August" = 8, "September" = 9)
@@ -210,19 +136,27 @@ plotAvgJamMonth <- function(dt, weekday){
           
           dt_visual <-  dt_Date %>% filter(DayofWeek == weekday)
           
-          ggplot(dt_visual, aes(x = hour, y = nWazeJam, color = EventType, group = date)) + 
+          # Choose data
+          p <- ifelse(metrics = "Obs", ggplot(dt_visual, aes(x = hour, y = Obs, color = EventType, group = date)), 
+                      ifelse(metrics = "nWazeJam", ggplot(dt_visual, aes(x = hour, y = nWazeJam, color = EventType, group = date)), 
+                             ifelse(metrics = "nWazeAccident", ggplot(dt_visual, aes(x = hour, y = nWazeAccident, color = EventType, group = date)), 
+                                    ifelse(metrics = "nHazardOnShoulder", ggplot(dt_visual, aes(x = hour, y = nHazardOnShoulder, color = EventType, group = date)), 
+                                           ifelse(metrics = "nHazardOnRoad", ggplot(dt_visual, aes(x = hour, y = nHazardOnRoad, color = EventType, group = date)), NA))))) 
+          # Choose y title
+          p <- ifelse(statistic = "Sum", p + ylab("Total Waze Jam"), 
+                      ifelse(statistic = "Mean", p + ylab("Average Waze Jam"), p + ylab("Max Waze Jam")))
+          p + 
             # geom_point(alpha = 0.5, color = "red") +
             geom_line(alpha = 0.5) +
             geom_rect(data = dt_visual,aes(xmin = ave(dt_visual$StartTime, dt_visual$date, FUN = function(x) mean(x)),xmax = ave(dt_visual$EndTime, dt_visual$date, FUN = function(x) mean(x)), ymin = -Inf,ymax=Inf), fill = dt_visual$background_col, alpha= 0.2/100, inherit.aes = FALSE) +
             facet_wrap(~ Month) +
-            ylab("Average Waze Jam") +
             xlab("Hour of Day") +
             scale_color_manual(name = NULL, values=c("NoEvent" = "#999999", "Football" = "#E69F00", "Concert" = "#56B4E9")) +
             ggtitle(paste("Fedex Field,", buf,"Mile Buffer,", weekday)) 
 }
 
-weekday = "Sunday"
-plotAvgJamMonth(dt, weekday)
+
+plotMonth(dt, weekday)
 
 
 # weekday = "Saturday"
@@ -238,7 +172,7 @@ plotAvgJamMonth(dt, weekday)
 ### 3 mile buffer zone - Averages without zeros
 ```{r, eval = F}
 buf = 3
-dt <- GridDataSE(loc,buf,daterange,col.names)
+dt <- GridDataSE(loc,buf,alldays,col.names)
 
 # Mean
 dt_Date <- dt %>% group_by(Location.ID, date, hour) %>% summarize(nWazeJam = mean(nWazeJam),
@@ -273,7 +207,7 @@ ggplot(dt_visual, aes(x = hour, y = nWazeJam, color = EventType, group = date)) 
 ### 1 mile buffer zone - Averages
 ```{r eval = F}
 buf = 1
-dt <- GridDataSE(loc,buf,daterange,col.names)
+dt <- GridDataSE(loc,buf,alldays,col.names)
 
 weekday = "Sunday"
 plotAvgJamMonth(dt, weekday)
@@ -290,7 +224,7 @@ plotAvgJamMonth(dt, weekday)
 ### 0.5 mile buffer zone - Averages
 ```{r eval = F}
 buf = 0.5
-dt <- GridDataSE(loc,buf,daterange,col.names)
+dt <- GridDataSE(loc,buf,alldays,col.names)
 
 weekday = "Sunday"
 plotAvgJamMonth(dt, weekday)
@@ -308,7 +242,7 @@ plotAvgJamMonth(dt, weekday)
 ### 3 mile buffer zone - Sum Value
 ```{r}
 buf = 3
-dt <- GridDataSE(loc,buf,daterange,col.names)
+dt <- GridDataSE(loc,buf,alldays,col.names)
 
 plotSumJamMonth <- function(dt, weekday) {
         # Total
@@ -410,7 +344,7 @@ plotSumEDTMonth(dt, weekday)
 ### 1 mile buffer zone - Sum Value
 ```{r}
 buf = 1
-dt <- GridDataSE(loc,buf,daterange,col.names)
+dt <- GridDataSE(loc,buf,alldays,col.names)
 
 weekday = "Sunday"
 plotSumJamMonth(dt, weekday)
@@ -421,7 +355,7 @@ plotSumEDTMonth(dt, weekday)
 ### half mile buffer zone - Sum Value
 ```{r}
 buf = 0.5
-dt <- GridDataSE(loc,buf,daterange,col.names)
+dt <- GridDataSE(loc,buf,alldays,col.names)
 
 weekday = "Sunday"
 plotSumJamMonth(dt, weekday)
@@ -433,7 +367,7 @@ plotSumEDTMonth(dt, weekday)
 ### 3 mile buffer zone - Max Value
 ```{r eval = F}
 buf = 3
-dt <- GridDataSE(loc,buf,daterange,col.names)
+dt <- GridDataSE(loc,buf,alldays,col.names)
 
 plotMaxJamMonth <- function(dt, weekday){
   # Max
@@ -473,7 +407,7 @@ plotMaxJamMonth(dt, weekday)
 ### 1 mile buffer zone - Max Value
 ```{r eval = F}
 buf = 1
-dt <- GridDataSE(loc,buf,daterange,col.names)
+dt <- GridDataSE(loc,buf,alldays,col.names)
 
 weekday = "Sunday"
 plotMaxJamMonth(dt, weekday)
@@ -482,7 +416,7 @@ plotMaxJamMonth(dt, weekday)
 ### half mile buffer zone - Max Value
 ```{r eval = F}
 buf = 0.5
-dt <- GridDataSE(loc,buf,daterange,col.names)
+dt <- GridDataSE(loc,buf,alldays,col.names)
 
 weekday = "Sunday"
 plotMaxJamMonth(dt, weekday)
@@ -492,7 +426,7 @@ plotMaxJamMonth(dt, weekday)
 
 ```{r, fig.width=12, fig.height=12}
 buf = 3
-dt <- GridDataSE(loc,buf,daterange,col.names)
+dt <- GridDataSE(loc,buf,alldays,col.names)
 
 plotSumJam <- function (dt, weekday) {
             # Mean
@@ -532,7 +466,7 @@ plotSumCrash <- function (dt, weekday) {
                                                                          nHazardOnShoulder = sum(nHazardOnShoulder),
                                                                          nHazardOnRoad = sum(nHazardOnRoad),
                                                                          nHazardWeather = sum(nHazardWeather)
-          ) %>% mutate(DayofWeek = weekdays(date), Date = paste(date, DayofWeek), Month = month(date)) %>%  left_join(unique(dt[, c("date","EventType","StartTime","EndTime")]), by = "date") %>% mutate(background_col = ifelse(EventType == "NoEvent", NA,ifelse(EventType == "Football","#E69F00",ifelse(EventType == "Concert", "#56B4E9", "chartreuse4" ))))
+          ) %>% mutate(DayofWeek = weekdays(date), Date = paste(date, DayofWeek), Month = month(date)) %>%  left_join(unique(dt[, c("date","EventType","StartTime","EndTime")]), by = "date") %>% mutate(background_col = ifelse(EventType == "NoEvent", NA,ifelse(EventType == "Football","#E69F00",ifelse(EventType == "Concert", "#56B4E9", "chartreuse4"))))
           
           dt_Date$Month <- factor(dt_Date$Month) 
           levels(dt_Date$Month) <- list("April" = 4, "May" = 5, "June" = 6, "July" = 7, "August" = 8, "September" = 9)
@@ -604,7 +538,7 @@ plotSumEDT(dt,weekday)
 
 ```{r, fig.width=12, fig.height=12}
 buf = 1
-dt <- GridDataSE(loc,buf,daterange,col.names)
+dt <- GridDataSE(loc,buf,alldays,col.names)
 
 weekday = "Sunday"
 plotSumJam(dt,weekday)
@@ -625,7 +559,7 @@ plotSumEDT(dt,weekday)
 
 ```{r, fig.width=12, fig.height=12}
 buf = 0.5
-dt <- GridDataSE(loc,buf,daterange,col.names)
+dt <- GridDataSE(loc,buf,alldays,col.names)
 
 weekday = "Sunday"
 plotSumJam(dt,weekday)

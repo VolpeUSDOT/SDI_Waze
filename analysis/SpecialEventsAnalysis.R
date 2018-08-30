@@ -42,6 +42,39 @@ proj <- showP4(showWKT("+init=epsg:102008"))
 # USGS version, used for producing hexagons: 
 proj.USGS <- "+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs +ellps=GRS80 +towgs84=0,0,0"
 
+# ggplot format
+theme_set(theme_bw(base_size = 12) +
+            theme(plot.background = element_blank(),
+                  panel.grid.major = element_blank(),
+                  panel.grid.minor = element_blank(),
+                  panel.border = element_blank(),
+                  text = element_text(family="Gill Sans MT", size=12,colour = "#666666"),
+                  legend.text = element_text(family="Gill Sans MT", size=10, colour = "#666666"),
+                  plot.title = element_text(size = rel(1),
+                                            colour = "#666666", vjust=2, hjust=0.5, face="bold",family="Gill Sans MT"),
+                  strip.text.x = element_text(size = 11,colour = "#666666",family="Gill Sans MT"),
+                  axis.text.x=element_text(size=11, angle = 0, hjust = 0.5,family="Gill Sans MT",colour = "#666666"),
+                  axis.text.y=element_text(size=11, angle = 0, hjust = 1,family="Gill Sans MT",colour = "#666666"))
+)
+
+# function to convert military time to HH:MM
+mil_to_hm <- function(x){
+  format(strptime(substr(as.POSIXct(sprintf("%04.0f", x), 
+                                    format="%H%M"), 
+                         12, 16), '%H:%M')
+         , '%H:%M')
+}
+
+# function to convert HH:MM to decimals
+hm_to_num <- function(x){
+  sapply(strsplit(x,":"),
+         function(x) {
+           x <- as.numeric(x)
+           x[1]+x[2]/60
+         }
+  )
+}
+
 #### Read shapefiles and data ####
 # Read shapefiles and apply coordinate reference system of hexagons (USGS version of Albers equal area) to Urban Areas and counties using uproj.USGS
 
@@ -140,22 +173,22 @@ save(list = c("co","AllModel30_sub","SpecialEventsExpand","SpecialEvents","md","
 load(file = paste0(wazedir,"/Data/SpecialEvents/SpecialEvents_MD_AprilToSept_2017.Rdata"))
 
 # To recover the grid_ids for 3 mile buffer of location SE1
-loc = "SE1"
-buf = 1
+# loc = "SE1" # loc can be only be one location
+# buf = 1 # buf can only be one location
 
 # Get all combinations of grid_id, hour, and day
 alldays = seq(from = min(AllModel30_sub$date), to = max(AllModel30_sub$date), by = "days") # get all days during April - Sep
-days = alldays[as.numeric(format(alldays, format = "%u")) %in% unique(SpecialEventsExpand$DayofWeekN)] # get all Sundays, Saturdays, Tuesdays, and Wednesdays that had special events
-daterange = days
 
 # Numeric variables if missing, can be replaced using zeros
 col.names <- c("Obs","nWazeAccident","nWazeJam","nHazardOnShoulder","nHazardOnRoad","nHazardWeather")
 
 # Function to create GridData joined with Special events, the special events are linked to date, not hours.
-GridDataSE <- function(loc,buf,daterange,col.names){
+GridDataSE <- function(loc,buf,alldays,col.names){
   # recover the grid_ids from column GRID_ID
   grid_id <- unlist(strsplit(unique(SpecialEventsExpand$GRID_ID[SpecialEventsExpand$Buffer_Miles == buf & SpecialEventsExpand$Location.ID == loc]), split = ",")
   ) # an example of extracting grib_id of the largest buffer
+  
+  daterange = alldays[as.numeric(format(alldays, format = "%u")) %in% unique(SpecialEventsExpand$DayofWeekN[SpecialEventsExpand$Location.ID == loc])] # get all Sundays, Saturdays, Tuesdays, and Wednesdays that had special events for SE1, now once we added the baseball events, we are testing all days now.
   
   # all possible combinations
   gridcom <- expand.grid(Location.ID = loc, GRID_ID = grid_id, hour = c(0:23), date = daterange) # for example, if daterange include 105 days, then row number 105840 = 105 days*24 hour*42 grid_id
@@ -170,22 +203,60 @@ GridDataSE <- function(loc,buf,daterange,col.names){
   grid_cells_model <- unique(AllModel30_sub$GRID_ID)
   
   # left_join the Event Type to the model output data
-  dt <- gridcom %>% left_join(AllModel30_sub, by = c("GRID_ID", "day", "hour","date", "weekday")) %>% mutate_if(colnames(.) %in% col.names,funs(replace(., which(is.na(.)), 0))) %>% left_join(SpecialEvents[,c("Day","EventType","StartTime","EndTime")], by =  c("day" = "Day")) %>% mutate_if(colnames(.) %in% c("EventType"),funs(replace(., which(is.na(.)), "NoEvent"))) %>% mutate(Grid_In_Model = ifelse(GRID_ID %in% grid_cells_model, "Yes", "No"))
+  dt <- gridcom %>% left_join(AllModel30_sub, by = c("GRID_ID", "day", "hour","date", "weekday")) %>% mutate_if(colnames(.) %in% col.names,funs(replace(., which(is.na(.)), 0))) %>% left_join(SpecialEvents[SpecialEvents$Location.ID == loc,c("Day","EventType","StartTime","EndTime")], by =  c("day" = "Day")) %>% mutate_if(colnames(.) %in% c("EventType"),funs(replace(., which(is.na(.)), "NoEvent"))) %>% mutate(Grid_In_Model = ifelse(GRID_ID %in% grid_cells_model, "Yes", "No"))
+  
   dt
 }
 
-buf = 3
-dt <- GridDataSE(loc,buf,daterange,col.names)
-write.csv(dt, file = paste0(wazedir,"/Data/SpecialEvents/DT",buf, "MileBuffer_MD_AprilToSept_2017.csv"), row.names = F) # save the 3 mile and 1 mile buffer as CVS for Michelle.
+loc = c("SE2")
+buf = c(3)
+dt <- GridDataSE(loc,buf,alldays,col.names) # SE1: 105840 + 180072 (183*41*24) = 285912, however, the results does not equal, so we need a different approach
+
+## What if we want multiple locations and multiple buffer zone?
+multipleLocBuf <- function(loclist, buflist){
+  # Produce a long table
+  dt <- data.frame()
+  for (i in 1:length(loclist)) {
+    for (j in 1:length(buflist)) {
+      dtij <- GridDataSE(loclist[i],buflist[j],alldays,col.names)
+      dtij$Mile_Buffer <- buflist[j]
+      dtij$Buffer <- 1
+      dt <- rbind(dt, dtij)
+    }
+  }
+  
+  dim(dt) #52920+105840+92232+180072 = 431064, the trial was successful
+  dt
+}
+
+long_to_wide <- function(dt){
+  # Due to lots of duplicated information for each grid cell for each location at each hour, and each day, we wanted to convert long table to wide table
+  allvar <- names(dt)[1:(ncol(dt)-2)]
+  var <- c("Location.ID","GRID_ID","hour","date")
+  nrow(unique(dt[,var])) # 285912 unique ID variables
+  
+  widetb <- reshape(dt[,c("Location.ID","GRID_ID","hour","date","Mile_Buffer","Buffer")], idvar = var, timevar = "Mile_Buffer", direction = "wide")
+  
+  widetb <- unique(dt %>% select(allvar)) %>% left_join(widetb , by = var)
+  dim(widetb)
+  widetb
+}
+
+loclist = c("SE1","SE2")
+buflist = c(5,3,2,1,0.75,0.5,0.25)
+  
+widetb <- long_to_wide(multipleLocBuf(loclist, buflist))
+
+write.csv(widetb, file = paste0(wazedir,"/Data/SpecialEvents/DT_All_MileBuffer_MD_AprilToSept_2017.csv"), row.names = F) # save the 3 mile and 1 mile buffer as CVS for Michelle.
 
 
 #######################################################
-# Visualization Only 
+# Visualization Only
 #######################################################
 #### Special Events Time Series Plots ####
 loc = "SE1"
 buf = 3
-dt <- GridDataSE(loc,buf,daterange,col.names)
+dt <- GridDataSE(loc,buf,alldays,col.names)
 
 # By Event Type
 dt_EventType <- dt %>% group_by(EventType, hour) %>% summarize(nWazeJam = mean(nWazeJam),
@@ -213,7 +284,7 @@ ggplot(dt, aes(x = factor(hour), y = nWazeJam)) + geom_point(alpha = 0.2) + face
 
 # boxplot
 ggplot(dt, aes(x = factor(hour), y = nWazeJam)) + geom_boxplot() + facet_wrap(~ EventType) + ylab("Number of Waze Jam") + ggtitle(paste(loc, buf,"mile buffer"))
-  
+
 # By date, averages are over 42 grids
 dt_Date <- dt %>% group_by(date, DayofWeek, hour) %>% summarize(nWazeJam = mean(nWazeJam),
                                                                Obs = mean(Obs),
@@ -233,19 +304,19 @@ dt_Date <- dt %>% group_by(date, DayofWeek, hour) %>% summarize(nWazeJam = sum(n
 
 
 weekday = "Sunday"
-ggplot(dt_Date %>% filter(DayofWeek == weekday), aes(x = hour, y = nWazeJam, group = date)) + 
+ggplot(dt_Date %>% filter(DayofWeek == weekday), aes(x = hour, y = nWazeJam, group = date)) +
   # geom_point(alpha = 0.5, color = "red") +
   geom_line(alpha = 0.2, color = "blue") +
   facet_wrap(~ Date) +
-  ylab("Average Waze Jam") + ggtitle(paste(loc, buf,"mile buffer", weekday)) 
+  ylab("Average Waze Jam") + ggtitle(paste(loc, buf,"mile buffer", weekday))
 # consider an area/density chart
 
 weekday = "Saturday"
-ggplot(dt_Date %>% filter(DayofWeek == weekday), aes(x = hour, y = nWazeJam, group = date)) + 
+ggplot(dt_Date %>% filter(DayofWeek == weekday), aes(x = hour, y = nWazeJam, group = date)) +
   # geom_point(alpha = 0.5, color = "red") +
   geom_line(alpha = 0.2, color = "blue") +
   facet_wrap(~ Date) +
-  ylab("Average Waze Jam") + ggtitle(paste(loc, buf,"mile buffer", weekday)) 
+  ylab("Average Waze Jam") + ggtitle(paste(loc, buf,"mile buffer", weekday))
 # consider an area/density chart
 
 # Select Sunday, averages are over 42 grid cells
@@ -260,7 +331,7 @@ dt_Sun <- dt %>% filter(DayofWeek == "Sun") %>% mutate(EventDay = ifelse(EventTy
                                nHazardWeather = mean(nHazardWeather),
 )
 
-ggplot(dt_Sun, aes(x = hour, y = nWazeJam)) + geom_point() + geom_line() + facet_wrap(~ EventDay) + ylab("Average Waze Jam") + ggtitle(paste(loc, buf,"mile buffer","Sunday")) 
+ggplot(dt_Sun, aes(x = hour, y = nWazeJam)) + geom_point() + geom_line() + facet_wrap(~ EventDay) + ylab("Average Waze Jam") + ggtitle(paste(loc, buf,"mile buffer","Sunday"))
 
 # Select Tuesday, averages are over 42 grid cells
 weekday = "Tue"
@@ -273,7 +344,7 @@ dt_Tue <- dt %>% filter(DayofWeek == weekday) %>% mutate(EventDay = ifelse(Event
 )
 
 # Scatter Plot
-ggplot(dt_Tue, aes(x = hour, y = nWazeJam)) + geom_point() + geom_line() + facet_wrap(~ EventDay) + ylab("Average Waze Jam") + ggtitle("3 mile buffer, Tuesdays") 
+ggplot(dt_Tue, aes(x = hour, y = nWazeJam)) + geom_point() + geom_line() + facet_wrap(~ EventDay) + ylab("Average Waze Jam") + ggtitle("3 mile buffer, Tuesdays")
 
 ggplot(dt, aes(x = factor(hour), y = Obs)) + geom_point(alpha = 0.2, color = "blue") + facet_wrap(~ EventType) + ylab("Number EDT Accident") + ggtitle(paste(loc, buf,"mile buffer"))
 
@@ -303,8 +374,8 @@ points(SpecialEventsExpand_SP, col = "red") # 0.25 sq mile buffer
 #### Special events mini example - Work on the Week ending 8/17/2018, move to the end of the script ####
 # Two example events, Baseball game. Fedex Field does not have football event on Sep 17, and M&T Bank Stadium does not have football event on Sept 10. We need to check whether there is any pre-season football events before Sept 10 to have a baseline to compare.
 "1:00 PM ETSeptember 10, 2017, FedEx Field, 1600 Fedex Way, Landover, MD 20785
-1:00 PM ETSeptember 17, 2017, M&T Bank Stadium, 1101 Russell St, Baltimore, MD 21230"	
-"(38.907794, -76.864535) (39.278187, -76.622329)"	
+1:00 PM ETSeptember 17, 2017, M&T Bank Stadium, 1101 Russell St, Baltimore, MD 21230"
+"(38.907794, -76.864535) (39.278187, -76.622329)"
 "(FC-64, C-63, FB-64) (FK-38, FK-37, FJ-38)"
 
 # Compare hourly distribution of these pologans, they are mostly zero.
@@ -334,7 +405,7 @@ SpecialEvents_buffer <- gBuffer(SpecialEvents_SP, width = buffdist[1]) # create 
 
 plot(SpecialEvents_buffer) # plot the spatial
 
-grid@data # look at data from the grid 
+grid@data # look at data from the grid
 # over(SpecialEvents_buffer, grid, fn = mean) # join polygons to SpatialPolygonDataFrame, return to only one row of mean values in the data frame.
 gIntersects(SpecialEvents_buffer, grid, byid = T) # a data frame with T/F logic values of the grid data frame
 sum(gIntersects(SpecialEvents_buffer, grid, byid = T)) # 42 polygons are intersected
