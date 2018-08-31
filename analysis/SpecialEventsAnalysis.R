@@ -188,7 +188,8 @@ GridDataSE <- function(loc,buf,alldays,col.names){
   grid_id <- unlist(strsplit(unique(SpecialEventsExpand$GRID_ID[SpecialEventsExpand$Buffer_Miles == buf & SpecialEventsExpand$Location.ID == loc]), split = ",")
   ) # an example of extracting grib_id of the largest buffer
   
-  daterange = alldays[as.numeric(format(alldays, format = "%u")) %in% unique(SpecialEventsExpand$DayofWeekN[SpecialEventsExpand$Location.ID == loc])] # get all Sundays, Saturdays, Tuesdays, and Wednesdays that had special events for SE1, now once we added the baseball events, we are testing all days now.
+  daterange = alldays
+  # [as.numeric(format(alldays, format = "%u")) %in% unique(SpecialEventsExpand$DayofWeekN[SpecialEventsExpand$Location.ID == loc])] # get all Sundays, Saturdays, Tuesdays, and Wednesdays that had special events for SE1, now once we added the baseball events, we are testing all days now.
   
   # all possible combinations
   gridcom <- expand.grid(Location.ID = loc, GRID_ID = grid_id, hour = c(0:23), date = daterange) # for example, if daterange include 105 days, then row number 105840 = 105 days*24 hour*42 grid_id

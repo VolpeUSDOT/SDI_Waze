@@ -24,7 +24,7 @@ source2 <- function(file, start, end, ...) {
 }
 
 source2("SpecialEventsAnalysis.R", 3, 76) # setting
-source2("SpecialEventsAnalysis.R", 172, 209) # Data process
+source2("SpecialEventsAnalysis.R", 172, 210) # Data process
 
 # Plotting functions.
 meanfun <- function(dt, weekday){
