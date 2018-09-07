@@ -133,16 +133,27 @@ edt <- edt %>%
   mutate(CrashDate_Local = as.POSIXct(strptime(
                              paste(substr(CrashDate, 1, 10),
                                    HourofDay, MinuteofDay), format = "%Y-%m-%d %H %M", tz = "America/New_York"))
-  ) %>% # format datetime of crash
-  filter(!is.na(GPSLat) & !is.na(GPSLong)) %>% # Discard rows with no lat or long
-  mutate(GPSLat = as.numeric(GPSLat), GPSLong = as.numeric(GPSLong))
+  ) 
+
+# No NAs
+sum(is.na(edt$GPSLat))
+sum(is.na(edt$GPSLong))
+
+# What about "NULL"
+sum(edt$GPSLat == "NULL") #14
+sum(edt$GPSLong == "NULL") #11
+
+# format datetime of crash
+edt <- edt %>% filter(GPSLat != "NULL" & GPSLong != "NULL")  # Discard rows with no lat or long
+ 
+edt <- edt %>% mutate(GPSLat = as.numeric(as.character(GPSLat)), GPSLong = as.numeric(as.character(GPSLong)))
 
 # Convert to spatial data format
 edt_SP <- SpatialPointsDataFrame(edt[c("GPSLong", "GPSLat")], edt, proj4string = CRS("+proj=longlat +datum=WGS84"))  #  make sure Waze data is a SPDF
 edt_SP <-spTransform(edt_SP, CRS(proj.USGS)) # create spatial point data frame
 
 # match crash locations with GRID_ID
-
+gIntersects(edt_SP, grid, byid = T)
 
 #### Special Event Data Process ####
 # format date
