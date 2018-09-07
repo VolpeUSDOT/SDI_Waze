@@ -14,8 +14,8 @@ library(rgeos) #gintersection
 library(lubridate)
 library(ggplot2)
 
-localdir <- "C:/Users/Jessie.Yang.CTR/Downloads/OST/Waze project/Special Events"
-# localdir <- "/home/daniel/workingdata/" # full path for readOGR, Jessie don't have this folder.
+localdir <- "C:/Users/Jessie.Yang.CTR/Downloads/OST/Waze project"
+# edtdir <- "/home/daniel/workingdata/" # full path for readOGR, Jessie don't have this folder.
 # edtdir <- normalizePath(file.path(localdir, "EDT"))
 # wazedir <- "~/tempout" # has State_Year-mo.RData files. Grab from S3 if necessary
 wazedir <- "//vntscex.local/DFS/Projects/PROJ-OS62A1/SDI Waze Phase 2"
@@ -121,6 +121,27 @@ SpecialEvents <- read.csv(file = paste0(wazedir,"/Data/SpecialEvents/SpecialEven
 # SpecialEvents_SP <- SpatialPointsDataFrame(SpecialEvents[c("Lon", "Lat")], SpecialEvents, proj4string = CRS("+proj=longlat +datum=WGS84"))  #  make sure Waze data is a SPDF
 # SpecialEvents_SP <-spTransform(SpecialEvents_SP, CRS(proj.USGS)) # create spatial point data frame
 # plot(SpecialEvents_SP)
+
+#### Proceses EDT data ####
+# Read EDT Data
+edt <- read.delim(file = paste0(localdir, "/Data/EDT/CTMDUTVA_20170401_20180731.txt"),header = TRUE,sep = "\t")
+table(edt$StudyYear) # total two years, 2017 - 2018
+table(edt$CrashState) # total four states: Connecticut    Maryland        Utah    Virginia 
+
+edt <- edt %>% 
+  filter(StudyYear == 2017,CrashState == "Maryland") %>% # select state and year
+  mutate(CrashDate_Local = as.POSIXct(strptime(
+                             paste(substr(CrashDate, 1, 10),
+                                   HourofDay, MinuteofDay), format = "%Y-%m-%d %H %M", tz = "America/New_York"))
+  ) %>% # format datetime of crash
+  filter(!is.na(GPSLat) & !is.na(GPSLong)) %>% # Discard rows with no lat or long
+  mutate(GPSLat = as.numeric(GPSLat), GPSLong = as.numeric(GPSLong))
+
+# Convert to spatial data format
+edt_SP <- SpatialPointsDataFrame(edt[c("GPSLong", "GPSLat")], edt, proj4string = CRS("+proj=longlat +datum=WGS84"))  #  make sure Waze data is a SPDF
+edt_SP <-spTransform(edt_SP, CRS(proj.USGS)) # create spatial point data frame
+
+# match crash locations with GRID_ID
 
 
 #### Special Event Data Process ####
@@ -395,7 +416,7 @@ SpecialEvents <- data.frame(location = c("Fedex Field", "Fedex Field"),
                             lon = c(-76.864535, -76.864535),
                             lat = c(38.907794,38.907794),
                             buffer = 3) # FedEx Field
-write.csv(SpecialEvents, paste0(localdir, "/SpecielEvents.csv"), row.names = F)
+write.csv(SpecialEvents, paste0(localdir, "/Special Events/SpecielEvents.csv"), row.names = F)
 
 SpecialEvents_SP <- SpatialPointsDataFrame(SpecialEvents[c("Lon", "Lat")], SpecialEvents, proj4string = CRS("+proj=longlat +datum=WGS84"))  #  make sure Waze data is a SPDF
 SpecialEvents_SP <-spTransform(SpecialEvents_SP, CRS(proj.USGS)) # create spatial point data frame
