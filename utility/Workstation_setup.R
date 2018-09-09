@@ -64,13 +64,15 @@ for(i in census.ls){
 # EDT ----
 
 edt.ls = c("EDTsubset_april2017_to_present.zip",
-              "Maryland_april2017_to_present.csv")
+              "Maryland_april2017_to_present.csv",
+           'CTMDUTVA_20170401_20180731.txt')
 
 for(i in edt.ls){
   system(paste("aws s3 cp",
-               file.path(teambucket, i),
+               file.path(teambucket, 'EDT', i),
                file.path('~', 'workingdata', 'EDT', i)))
-  if(length(grep('zip$', i))!=0) system(paste('unzip', file.path('~', 'workingdata', 'EDT', i)))
+  if(length(grep('zip$', i))!=0) system(paste('unzip -o', file.path('~', 'workingdata', 'EDT', i), '-d',
+                                              file.path('~', 'workingdata', 'EDT/')))
   
 }
 
@@ -94,7 +96,8 @@ for(i in hex.ls){
   system(paste("aws s3 cp",
                file.path(teambucket, 'Hex', i),
                file.path('~', 'workingdata', 'Hex', i)))
-  if(length(grep('zip$', i))!=0) system(paste('unzip', file.path('~', 'workingdata', 'Hex', i)))
+  if(length(grep('zip$', i))!=0) system(paste('unzip -o', file.path('~', 'workingdata', 'Hex', i), '-d',
+                                              file.path('~', 'workingdata', 'Hex/')))
   
 }
 
@@ -115,7 +118,8 @@ for(i in hex.ls){
   system(paste("aws s3 cp",
                file.path(teambucket, 'Hex', 'MD_hexagons_shapefiles', i),
                file.path('~', 'workingdata', 'Hex', 'MD_hexagons_shapefiles', i)))
-  if(length(grep('zip$', i))!=0) system(paste('unzip', file.path('~', 'workingdata', 'Hex', 'MD_hexagons_shapefiles', i)))
+  if(length(grep('zip$', i))!=0) system(paste('unzip -o', file.path('~', 'workingdata', 'Hex', 'MD_hexagons_shapefiles', i),
+                                              '-d', file.path('~', 'workingdata', 'Hex/')))
   
 }
 
@@ -136,7 +140,8 @@ for(i in Link.ls){
   system(paste("aws s3 cp",
                file.path(teambucket, 'Link', i),
                file.path('~', 'workingdata', 'Link', i)))
-  if(length(grep('zip$', i))!=0) system(paste('unzip', file.path('~', 'workingdata', 'Link', i)))
+  if(length(grep('zip$', i))!=0) system(paste('unzip -o', file.path('~', 'workingdata', 'Link', i), -'d',
+                                              file.path('~', 'workingdata', 'Link/')))
   
 }
 
@@ -190,19 +195,94 @@ for(state in states){
 # AADT ----
 
 
-aadt.ls = c('vmt_max_aadt_by_grid_fc_urban_factored.txt')
+aadt.ls = c('vmt_max_aadt_by_grid_fc_urban_factored.txt', 'AADT_CT_MD.zip')
   
 for(i in aadt.ls){
   system(paste("aws s3 cp",
-               file.path(teambucket, i),
+               file.path(teambucket, 'AADT', i),
                file.path('~', 'workingdata', 'AADT', i)))
-  if(length(grep('zip$', i))!=0) system(paste('unzip', file.path('~', 'workingdata', 'AADT', i)))
+  if(length(grep('zip$', i))!=0) system(paste('unzip -o', file.path('~', 'workingdata', 'AADT', i),
+                                              '-d', file.path('~', 'workingdata', 'AADT/')))
   
 }
 
 
 # LODES_LEHD ----
 
+
+lodes.ls = c('LODES_LEHD_CT_UT.zip')
+
+for(i in lodes.ls){
+  system(paste("aws s3 cp",
+               file.path(teambucket, 'LODES_LEHD', i),
+               file.path('~', 'workingdata', 'LODES_LEHD', i)))
+  if(length(grep('zip$', i))!=0) system(paste('unzip', file.path('~', 'workingdata', 'LODES_LEHD', i), '-d',
+                                              file.path('~', 'workingdata', 'LODES_LEHD/')))
+  
+}
+
 # FARS ----
 
 
+
+fars.ls = c('FARS_CT_UT.zip')
+
+for(i in fars.ls){
+  system(paste("aws s3 cp",
+               file.path(teambucket, 'FARS', i),
+               file.path('~', 'workingdata', 'FARS', i)))
+  if(length(grep('zip$', i))!=0) system(paste('unzip', file.path('~', 'workingdata', 'FARS', i), '-d',
+                                              file.path('~', 'workingdata', 'FARS/')))
+}
+  
+
+# Team bucket organization ----
+# one time work, saving here for posterity
+
+REORG = F
+
+if(REORG){
+
+system(paste("aws s3 ls", teambucket))
+
+  
+system(paste("aws s3 rm", 
+             file.path(teambucket, 'FARS_CT_2015_2016_sum_fclass.shp')))
+  
+# Organize EDT data
+system(paste("aws s3 mv", 
+             file.path(teambucket, "Maryland_april2017_to_present.csv"),
+             file.path(teambucket, "EDT", "Maryland_april2017_to_present.csv"))
+       )
+
+system(paste("aws s3 mv", 
+             file.path(teambucket, "EDTsubset_april2017_to_present.zip"),
+             file.path(teambucket, "EDT", "EDTsubset_april2017_to_present.zip"))
+       )
+
+system(paste("aws s3 mv", 
+             file.path(teambucket, "CTMDUTVA_20170401_20180731.txt"),
+             file.path(teambucket, "EDT", "CTMDUTVA_20170401_20180731.txt"))
+)
+
+system(paste("aws s3 mv", 
+             file.path(teambucket, "vmt_max_aadt_by_grid_fc_urban_factored.txt"),
+             file.path(teambucket, "AADT", "vmt_max_aadt_by_grid_fc_urban_factored.txt"))
+)
+
+system(paste("aws s3 mv", 
+             file.path(teambucket, "AADT_CT_MD.zip"),
+             file.path(teambucket, "AADT", "AADT_CT_MD.zip"))
+)
+
+system(paste("aws s3 mv", 
+             file.path(teambucket, "FARS_CT_UT.zip"),
+             file.path(teambucket, "FARS", "FARS_CT_UT.zip"))
+)
+
+system(paste("aws s3 mv", 
+             file.path(teambucket, "LODES_LEHD_CT_UT.zip"),
+             file.path(teambucket, "LODES_LEHD", "LODES_LEHD_CT_UT.zip"))
+)
+
+}
