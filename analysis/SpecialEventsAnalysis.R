@@ -13,6 +13,7 @@ library(doParallel)
 library(rgeos) #gintersection
 library(lubridate)
 library(ggplot2)
+require(spatialEco) # point.in.poly() function
 
 localdir <- "C:/Users/Jessie.Yang.CTR/Downloads/OST/Waze project"
 # edtdir <- "/home/daniel/workingdata/" # full path for readOGR, Jessie don't have this folder.
@@ -130,8 +131,9 @@ table(edt$CrashState) # total four states: Connecticut    Maryland        Utah  
 
 edt <- edt %>% 
   filter(StudyYear == 2017,CrashState == "Maryland") %>% # select state and year
-  mutate(CrashDate_Local = as.POSIXct(strptime(
-                             paste(substr(CrashDate, 1, 10),
+  mutate(CrashDate = as.Date(substr(CrashDate, 1, 10)),
+    CrashDate_Local = as.POSIXct(strptime(
+                             paste(CrashDate,
                                    HourofDay, MinuteofDay), format = "%Y-%m-%d %H %M", tz = "America/New_York"))
   ) # format datetime of crash
 
@@ -153,7 +155,23 @@ edt_SP <- SpatialPointsDataFrame(edt[c("GPSLong", "GPSLat")], edt, proj4string =
 edt_SP <- spTransform(edt_SP, CRS(proj.USGS)) # create spatial point data frame
 
 # match crash locations with GRID_ID
-gIntersects(edt_SP, grid, byid = T)
+pts.poly <- point.in.poly(edt_SP, grid)
+head(pts.poly@data)
+dim(pts.poly@data) # 88786*65
+
+# Join AllModel30_sub table with the new columns.
+pts.poly.sum <- data.frame(pts.poly@data)
+pts.poly.sum <- pts.poly.sum %>%
+  filter(CrashDate >= "2017-04-01" & CrashDate <= "2017-09-30") %>%
+  group_by(GRID_ID, CrashDate, HourofDay) %>% 
+  summarize(nEDTFatal = sum(TotalFatalCount),
+            nEDTPedInv = sum(CrashPedCount),
+            nEDTBikeInv = sum(CrashBikeCount),
+            nEDTSchoolBusInv = sum(SchoolBusRelated),
+            nEDTVehCount = sum(VehicleCount)
+  )
+AllModel30_sub <- AllModel30_sub %>% left_join(pts.poly.sum, by = c("GRID_ID", "date" = "CrashDate","hour" = "HourofDay"))  %>% mutate_if(is.numeric, funs(replace(., which(is.na(.)), 0)))
+
 
 #### Special Event Data Process ####
 # format date
