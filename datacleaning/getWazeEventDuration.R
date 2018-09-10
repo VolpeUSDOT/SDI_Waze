@@ -72,6 +72,8 @@ alert_query <- paste0(
 
 alert_results <- dbGetQuery(conn, alert_query)
 
+alert_save <- alert_results
+
 
 alert_results$start_pub_millis <- as.numeric(alert_results$start_pub_millis)
 
@@ -93,7 +95,7 @@ alert_results$end_pub_utc_timestamp <- as.POSIXct(as.numeric(alert_results$est_e
 hr_breaks <- c(0, 1*3600, 2*3600, 3*3600, 4*3600, 5*3600, 6*3600, 
                7*3600, 8*3600, 9*3600, 10*3600, 11*3600, 12*3600,
                13*3600, 14*3600, 15*3600, 16*3600, 17*3600, 18*3600, 
-               19*3600, 20*3600, 21*3600, 22*3600, 23*3600)
+               19*3600, 20*3600, 21*3600, 22*3600, 23*3600, 24*3600)
 
 hr_breaks_lbs <- c("hr_00", "hr_01", "hr_02", "hr_03", "hr_04", "hr_05", "hr_06", 
                    "hr_07", "hr_08", "hr_09", "hr_10", "hr_11", "hr_12", 
@@ -104,11 +106,18 @@ sec.per.day <- 24*60*60
 
 get.cuts <- function(x, y) as.list(table(cut((x:y)%%sec.per.day, breaks = hr_breaks, labels = hr_breaks_lbs))/60)
 
+class(alert_results) = "data.table"
+
 alert_results[,c(hr_breaks_lbs):=get.cuts(start_pub_utc_timestamp, end_pub_utc_timestamp), by=1:nrow(alert_results)]
 
 
+alert_results$end_pub_utc_timestamp%%sec.per.day
+
+class(alert_results)
 
 
+
+setDT(alert_results)[,c("start_pub_utc_timestamp","end_pub_utc_timestamp"):=lapply(.SD, as.POSIXct, tz="GMT"), .SDcols=c(14, 19)]
 
 
 
