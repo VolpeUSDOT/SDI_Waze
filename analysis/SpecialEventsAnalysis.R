@@ -160,21 +160,29 @@ head(pts.poly@data)
 dim(pts.poly@data) # 88786*65
 
 # Plot the points on the 
-plot(pts.poly)
-points(grid, pch=20, col = "red")
+plot(grid)
+points(edt_SP, pch=20, col = "red")
+
+# Variables to consider
+table(edt$SchoolBusRelated) # binary variable - residential crash indicator, occasionally will happen on highway.
+length(unique(edt$CrashCaseID)) # 88786, CrashCaseID is unique
+sum(table(edt$CrashPedCount)) # No NA value - local crash indicator
+sum(table(edt$CrashBikeCount)) # No NA value - local crash indicator
 
 # Join AllModel30_sub table with the new columns.
-pts.poly.sum <- data.frame(pts.poly@data)
-pts.poly.sum <- pts.poly.sum %>%
+edt.sum <- data.frame(pts.poly@data)
+edt.sum <- edt.sum %>%
   filter(CrashDate >= "2017-04-01" & CrashDate <= "2017-09-30") %>%
+  mutate(GRID_ID = paste0(1,GRID_ID),
+         PedBikeInd = ifelse(CrashPedCount > 0 | CrashBikeCount > 0 , 1, 0)) %>%
   group_by(GRID_ID, CrashDate, HourofDay) %>% 
-  summarize(nEDTFatal = sum(TotalFatalCount),
-            nEDTPedInv = sum(CrashPedCount),
-            nEDTBikeInv = sum(CrashBikeCount),
-            nEDTSchoolBusInv = sum(SchoolBusRelated),
+  summarize(nEDTAccident = n(),
+            nEDTFatal = sum(TotalFatalCount),
+            nEDTCrashWPedBikeInv = sum(PedBikeInd),
+            nEDTCrashWSchoolBusInv = sum(SchoolBusRelated),
             nEDTVehCount = sum(VehicleCount)
   )
-AllModel30_sub <- AllModel30_sub %>% left_join(pts.poly.sum, by = c("GRID_ID", "date" = "CrashDate","hour" = "HourofDay"))  %>% mutate_if(is.numeric, funs(replace(., which(is.na(.)), 0)))
+AllModel30_sub <- AllModel30_sub %>% left_join(edt.sum, by = c("GRID_ID", "date" = "CrashDate","hour" = "HourofDay"))  %>% mutate_if(is.numeric, funs(replace(., which(is.na(.)), 0)))
 
 #### Special Event Data Process ####
 # format date
@@ -199,7 +207,7 @@ for (i in c(1:nrow(uniquelocbuf))){
   buf = uniquelocbuf$Buffer_Miles[i]
   
   # create buffer for each location
-  SpecialEventsExpand_SP <- SpatialPointsDataFrame(SpecialEventsExpand %>% filter(Location.ID == loc) %>% select(Lon, Lat), SpecialEventsExpand %>% filter(Location.ID == loc), 
+  SpecialEventsExpand_SP <- SpatialPointsDataFrame(SpecialEventsExpand[SpecialEventsExpand$Location.ID == loc, c("Lon", "Lat")], SpecialEventsExpand %>% filter(Location.ID == loc), 
                                                    proj4string = CRS("+proj=longlat +datum=WGS84")
                                                    )  #  make sure Waze data is a SPDF
   SpecialEventsExpand_SP <-spTransform(SpecialEventsExpand_SP, CRS(proj.USGS)) # create spatial point data frame
@@ -219,7 +227,7 @@ SpecialEventsExpand <- SpecialEventsExpand %>% left_join(uniquelocbuf, by = c("L
 write.csv(SpecialEventsExpand, file = paste0(wazedir,"/Data/SpecialEvents/SpecialEventsExpand_MD_AprilToSept_2017.csv"), row.names = F)
 
 # Save necessary objects as Rdata for easy access for visualization
-save(list = c("co","AllModel30_sub","SpecialEventsExpand","SpecialEvents","md","ua","grid"), file = paste0(wazedir,"/Data/SpecialEvents/SpecialEvents_MD_AprilToSept_2017.Rdata"))
+save(list = c("co","AllModel30_sub","SpecialEventsExpand","SpecialEvents","edt.sum","md","ua","grid"), file = paste0(wazedir,"/Data/SpecialEvents/SpecialEvents_MD_AprilToSept_2017.Rdata"))
 
 #### Data for Time Series ####
 load(file = paste0(wazedir,"/Data/SpecialEvents/SpecialEvents_MD_AprilToSept_2017.Rdata"))
@@ -232,7 +240,7 @@ load(file = paste0(wazedir,"/Data/SpecialEvents/SpecialEvents_MD_AprilToSept_201
 alldays = seq(from = min(AllModel30_sub$date), to = max(AllModel30_sub$date), by = "days") # get all days during April - Sep
 
 # Numeric variables if missing, can be replaced using zeros
-col.names <- c("Obs","nWazeAccident","nWazeJam","nHazardOnShoulder","nHazardOnRoad","nHazardWeather")
+col.names <- c("Obs","nWazeAccident","nWazeJam","nHazardOnShoulder","nHazardOnRoad","nHazardWeather","nEDTFatal","nEDTCrashWPedBikeInv","nEDTCrashWSchoolBusInv","nEDTVehCount")
 
 # Function to create GridData joined with Special events, the special events are linked to date, not hours.
 GridDataSE <- function(loc,buf,alldays,col.names){

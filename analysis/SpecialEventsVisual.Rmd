@@ -23,8 +23,8 @@ source2 <- function(file, start, end, ...) {
     source(textConnection(file.lines.collapsed), ...)
 }
 
-source2("SpecialEventsAnalysis.R", 3, 76) # setting
-source2("SpecialEventsAnalysis.R", 172, 210) # Data process
+source2("SpecialEventsAnalysis.R", 3, 78) # setting
+source2("SpecialEventsAnalysis.R", 232, 270) # Data process
 
 # Plotting functions.
 meanfun <- function(dt, weekday){
@@ -34,7 +34,11 @@ meanfun <- function(dt, weekday){
                       nWazeAccident = mean(nWazeAccident),
                       nHazardOnShoulder = mean(nHazardOnShoulder),
                       nHazardOnRoad = mean(nHazardOnRoad),
-                      nHazardWeather = mean(nHazardWeather)
+                      nHazardWeather = mean(nHazardWeather),
+                      nEDTFatal = mean(nEDTFatal),
+                      nEDTCrashWPedBikeInv = mean(nEDTCrashWPedBikeInv),
+                      nEDTCrashWSchoolBusInv = mean(nEDTCrashWSchoolBusInv),
+                      nEDTVehCount = mean(nEDTVehCount)
                       )
   dt_Date
 }
@@ -46,7 +50,11 @@ sumfun <- function(dt, weekday){
                       nWazeAccident = sum(nWazeAccident),
                       nHazardOnShoulder = sum(nHazardOnShoulder),
                       nHazardOnRoad = sum(nHazardOnRoad),
-                      nHazardWeather = sum(nHazardWeather)
+                      nHazardWeather = sum(nHazardWeather),
+                      nEDTFatal = sum(nEDTFatal),
+                      nEDTCrashWPedBikeInv = sum(nEDTCrashWPedBikeInv),
+                      nEDTCrashWSchoolBusInv = sum(nEDTCrashWSchoolBusInv),
+                      nEDTVehCount = sum(nEDTVehCount)
                       )
   dt_Date
 }
@@ -58,7 +66,11 @@ maxfun <- function(dt, weekday){
                       nWazeAccident = max(nWazeAccident),
                       nHazardOnShoulder = max(nHazardOnShoulder),
                       nHazardOnRoad = max(nHazardOnRoad),
-                      nHazardWeather = max(nHazardWeather)
+                      nHazardWeather = max(nHazardWeather),
+                      nEDTFatal = max(nEDTFatal),
+                      nEDTCrashWPedBikeInv = max(nEDTCrashWPedBikeInv),
+                      nEDTCrashWSchoolBusInv = max(nEDTCrashWSchoolBusInv),
+                      nEDTVehCount = max(nEDTVehCount)
                       )
   dt_Date
 }
@@ -81,7 +93,7 @@ plotMonth <- function(dt, loc, weekday, statistic, metrics){
           dt_visual <-  dt_Date %>% filter(DayofWeek == weekday)
           
           # Choose data
-          p <- if(metrics == "EDT Accident") ggplot(dt_visual, aes(x = hour, y = Obs, color = EventType, group = date)) else if (metrics == "Waze Jam") ggplot(dt_visual, aes(x = hour, y = nWazeJam, color = EventType, group = date)) else if (metrics == "Waze Accident") ggplot(dt_visual, aes(x = hour, y = nWazeAccident, color = EventType, group = date)) else if (metrics == "Waze Hazard On Shoulder") ggplot(dt_visual, aes(x = hour, y = nHazardOnShoulder, color = EventType, group = date)) else ggplot(dt_visual, aes(x = hour, y = nHazardOnRoad, color = EventType, group = date))
+          p <- if(metrics == "EDT Accident") ggplot(dt_visual, aes(x = hour, y = Obs, color = EventType, group = date)) else if (metrics == "Waze Jam") ggplot(dt_visual, aes(x = hour, y = nWazeJam, color = EventType, group = date)) else if (metrics == "Waze Accident") ggplot(dt_visual, aes(x = hour, y = nWazeAccident, color = EventType, group = date))  else if (metrics == "Waze Hazard On Shoulder") ggplot(dt_visual, aes(x = hour, y = nHazardOnShoulder, color = EventType, group = date)) else if (metrics == "Waze Hazard On Road") ggplot(dt_visual, aes(x = hour, y = nHazardOnRoad, color = EventType, group = date)) else if (metrics == "EDT Fatals") ggplot(dt_visual, aes(x = hour, y = nEDTFatal, color = EventType, group = date)) else if (metrics == "EDT Crashes with Ped or Bike Involvement") ggplot(dt_visual, aes(x = hour, y = nEDTCrashWPedBikeInv, color = EventType, group = date))  else if (metrics == "EDT Crashes with School Bus Involvement") ggplot(dt_visual, aes(x = hour, y = nEDTCrashWSchoolBusInv, color = EventType, group = date)) else  ggplot(dt_visual, aes(x = hour, y = nEDTVehCount, color = EventType, group = date))
 
           p + 
             # geom_point(alpha = 0.5, color = "red") +
@@ -112,7 +124,7 @@ plotDate <- function(dt, loc, weekday, statistic, metrics){
           dt_visual <-  dt_Date %>% filter(DayofWeek == weekday)
           
           # Choose data
-          p <- if(metrics == "EDT Accident") ggplot(dt_visual, aes(x = hour, y = Obs, color = EventType, group = date)) else if (metrics == "Waze Jam") ggplot(dt_visual, aes(x = hour, y = nWazeJam, color = EventType, group = date)) else if (metrics == "Waze Accident") ggplot(dt_visual, aes(x = hour, y = nWazeAccident, color = EventType, group = date)) else if (metrics == "Waze Hazard On Shoulder") ggplot(dt_visual, aes(x = hour, y = nHazardOnShoulder, color = EventType, group = date)) else ggplot(dt_visual, aes(x = hour, y = nHazardOnRoad, color = EventType, group = date))
+          p <- if(metrics == "EDT Accident") ggplot(dt_visual, aes(x = hour, y = Obs, color = EventType, group = date)) else if (metrics == "Waze Jam") ggplot(dt_visual, aes(x = hour, y = nWazeJam, color = EventType, group = date)) else if (metrics == "Waze Accident") ggplot(dt_visual, aes(x = hour, y = nWazeAccident, color = EventType, group = date))  else if (metrics == "Waze Hazard On Shoulder") ggplot(dt_visual, aes(x = hour, y = nHazardOnShoulder, color = EventType, group = date)) else if (metrics == "Waze Hazard On Road") ggplot(dt_visual, aes(x = hour, y = nHazardOnRoad, color = EventType, group = date)) else if (metrics == "EDT Fatals") ggplot(dt_visual, aes(x = hour, y = nEDTFatal, color = EventType, group = date)) else if (metrics == "EDT Crashes with Ped or Bike Involvement") ggplot(dt_visual, aes(x = hour, y = nEDTCrashWPedBikeInv, color = EventType, group = date))  else if (metrics == "EDT Crashes with School Bus Involvement") ggplot(dt_visual, aes(x = hour, y = nEDTCrashWSchoolBusInv, color = EventType, group = date)) else  ggplot(dt_visual, aes(x = hour, y = nEDTVehCount, color = EventType, group = date))
 
           p + 
             # geom_point(alpha = 0.5, color = "red") +
@@ -180,13 +192,17 @@ buf = 5
 dt <- GridDataSE(loc,buf,alldays,col.names)
 weekday = "Saturday"
 statistic = "Total" #c("Total","Average","Maximum")
-metrics = "EDT Accident" #c("EDT Accident","Waze Accident","Waze Jam","Waze Hazard On Shoulder","Waze Hazard On Road")
+metrics = "EDT Accident" #c("EDT Accident","Waze Accident","Waze Jam","Waze Hazard On Shoulder","Waze Hazard On Road","EDT Fatals","EDT Crashes with Ped or Bike Involvement","EDT Crashes with School Bus Involvement","EDT Vehicle Counts")
 
-plotMonth(dt, loc, weekday, statistic, metrics)
 plotMonth(dt, loc, weekday, statistic, "Waze Accident")
 plotMonth(dt, loc, weekday, statistic, "Waze Jam")
 plotMonth(dt, loc, weekday, statistic, "Waze Hazard On Shoulder")
 plotMonth(dt, loc, weekday, statistic, "Waze Hazard On Road")
+plotMonth(dt, loc, weekday, statistic, "EDT Accident")
+plotMonth(dt, loc, weekday, statistic, "EDT Fatals")
+plotMonth(dt, loc, weekday, statistic, "EDT Crashes with Ped or Bike Involvement")
+plotMonth(dt, loc, weekday, statistic, "EDT Crashes with School Bus Involvement")
+plotMonth(dt, loc, weekday, statistic, "EDT Vehicle Counts")
 
 ```
 
@@ -199,12 +215,15 @@ weekday = "Saturday"
 statistic = "Total" #c("Total","Average","Maximum")
 metrics = "EDT Accident" #c("EDT Accident","Waze Accident","Waze Jam","Waze Hazard On Shoulder","Waze Hazard On Road")
 
-plotMonth(dt, loc, weekday, statistic, metrics)
 plotMonth(dt, loc, weekday, statistic, "Waze Accident")
 plotMonth(dt, loc, weekday, statistic, "Waze Jam")
 plotMonth(dt, loc, weekday, statistic, "Waze Hazard On Shoulder")
 plotMonth(dt, loc, weekday, statistic, "Waze Hazard On Road")
-
+plotMonth(dt, loc, weekday, statistic, "EDT Accident")
+plotMonth(dt, loc, weekday, statistic, "EDT Fatals")
+plotMonth(dt, loc, weekday, statistic, "EDT Crashes with Ped or Bike Involvement")
+plotMonth(dt, loc, weekday, statistic, "EDT Crashes with School Bus Involvement")
+plotMonth(dt, loc, weekday, statistic, "EDT Vehicle Counts")
 ```
 
 ### 1 mile buffer zone - Total
@@ -216,12 +235,15 @@ weekday = "Saturday"
 statistic = "Total" #c("Total","Average","Maximum")
 metrics = "EDT Accident" #c("EDT Accident","Waze Accident","Waze Jam","Waze Hazard On Shoulder","Waze Hazard On Road")
 
-plotMonth(dt, loc, weekday, statistic, metrics)
 plotMonth(dt, loc, weekday, statistic, "Waze Accident")
 plotMonth(dt, loc, weekday, statistic, "Waze Jam")
 plotMonth(dt, loc, weekday, statistic, "Waze Hazard On Shoulder")
 plotMonth(dt, loc, weekday, statistic, "Waze Hazard On Road")
-
+plotMonth(dt, loc, weekday, statistic, "EDT Accident")
+plotMonth(dt, loc, weekday, statistic, "EDT Fatals")
+plotMonth(dt, loc, weekday, statistic, "EDT Crashes with Ped or Bike Involvement")
+plotMonth(dt, loc, weekday, statistic, "EDT Crashes with School Bus Involvement")
+plotMonth(dt, loc, weekday, statistic, "EDT Vehicle Counts")
 ```
 
 
@@ -235,11 +257,15 @@ weekday = "Saturday"
 statistic = "Total" #c("Total","Average","Maximum")
 metrics = "EDT Accident" #c("EDT Accident","Waze Accident","Waze Jam","Waze Hazard On Shoulder","Waze Hazard On Road")
 
-plotDate(dt, loc, weekday, statistic, metrics)
 plotDate(dt, loc, weekday, statistic, "Waze Accident")
 plotDate(dt, loc, weekday, statistic, "Waze Jam")
 plotDate(dt, loc, weekday, statistic, "Waze Hazard On Shoulder")
 plotDate(dt, loc, weekday, statistic, "Waze Hazard On Road")
+plotDate(dt, loc, weekday, statistic, "EDT Accident")
+plotDate(dt, loc, weekday, statistic, "EDT Fatals")
+plotDate(dt, loc, weekday, statistic, "EDT Crashes with Ped or Bike Involvement")
+plotDate(dt, loc, weekday, statistic, "EDT Crashes with School Bus Involvement")
+plotDate(dt, loc, weekday, statistic, "EDT Vehicle Counts")
 ```
 ### Hourly By Day of Week - 3 mile buffer
 
@@ -251,11 +277,15 @@ weekday = "Saturday"
 statistic = "Total" #c("Total","Average","Maximum")
 metrics = "EDT Accident" #c("EDT Accident","Waze Accident","Waze Jam","Waze Hazard On Shoulder","Waze Hazard On Road")
 
-plotDate(dt, loc, weekday, statistic, metrics)
 plotDate(dt, loc, weekday, statistic, "Waze Accident")
 plotDate(dt, loc, weekday, statistic, "Waze Jam")
 plotDate(dt, loc, weekday, statistic, "Waze Hazard On Shoulder")
 plotDate(dt, loc, weekday, statistic, "Waze Hazard On Road")
+plotDate(dt, loc, weekday, statistic, "EDT Accident")
+plotDate(dt, loc, weekday, statistic, "EDT Fatals")
+plotDate(dt, loc, weekday, statistic, "EDT Crashes with Ped or Bike Involvement")
+plotDate(dt, loc, weekday, statistic, "EDT Crashes with School Bus Involvement")
+plotDate(dt, loc, weekday, statistic, "EDT Vehicle Counts")
 ```
 
 ### Hourly By Day of Week - 1 mile buffer
@@ -268,11 +298,15 @@ weekday = "Saturday"
 statistic = "Total" #c("Total","Average","Maximum")
 metrics = "EDT Accident" #c("EDT Accident","Waze Accident","Waze Jam","Waze Hazard On Shoulder","Waze Hazard On Road")
 
-plotDate(dt, loc, weekday, statistic, metrics)
 plotDate(dt, loc, weekday, statistic, "Waze Accident")
 plotDate(dt, loc, weekday, statistic, "Waze Jam")
 plotDate(dt, loc, weekday, statistic, "Waze Hazard On Shoulder")
 plotDate(dt, loc, weekday, statistic, "Waze Hazard On Road")
+plotDate(dt, loc, weekday, statistic, "EDT Accident")
+plotDate(dt, loc, weekday, statistic, "EDT Fatals")
+plotDate(dt, loc, weekday, statistic, "EDT Crashes with Ped or Bike Involvement")
+plotDate(dt, loc, weekday, statistic, "EDT Crashes with School Bus Involvement")
+plotDate(dt, loc, weekday, statistic, "EDT Vehicle Counts")
 ```
 
 ## Comparing all Matrics
