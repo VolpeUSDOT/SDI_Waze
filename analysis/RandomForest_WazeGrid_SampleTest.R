@@ -1,6 +1,8 @@
 # Running full set of random forest models - Here testing different sampling, 70/30 by day and by week
 # https://github.com/VolpeUSDOT/SDI_Waze/wiki/Models-to-test
 
+# !!! NOTE: Written for ATA, will not run on SDC without some updated paths 2018-09 !!! 
+
 library(randomForest)
 library(foreach) # for parallel implementation
 library(doParallel) # includes iterators and parallel

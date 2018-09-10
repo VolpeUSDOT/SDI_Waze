@@ -41,20 +41,14 @@ source(file.path(codeloc, 'utility/wazefunctions.R'))
 # read random forest function
 source(file.path(codeloc, "analysis/RandomForest_WazeGrid_Fx.R"))
 
-# not run: this was ATA implementation, will need to update when we have supplemental data ready for multi-state
-# # check if already completed this transfer on this instance
-# if(length(dir(localdir)[grep("shapefiles_funClass", dir(localdir))]) == 0){
-# 
-#   s3transfer = paste("aws s3 cp s3://ata-waze/MD_hexagon_shapefiles", localdir, "--recursive --include '*'")
-#   system(s3transfer)
-#   
-#   for(dd in c("shapefiles_funClass.zip", "shapefiles_rac.zip", "shapefile_wac.zip", "shapefiles_AADT.zip", "shapefiles_FARS.zip")){
-#     uz <- paste("unzip", file.path(localdir, dd))
-#     system(uz)
-#   }
-#   # move any files which are in an unnecessary "shapefiles" folder up to the top level of the localdir
-#   system("mv -v ~/workingdata/shapefiles/* ~/workingdata/")
-# }
+
+# check if already completed transfer of necessary supplemental data on this instance
+if(length(dir(localdir)[grep("aadt_by_grid", dir(file.path(localdir, 'AADT')))]) == 0){
+
+  source(file.path(codeloc, "utility/Workstation_setup.R"))
+  # move any files which are in an unnecessary "shapefiles" folder up to the top level of the localdir
+  system("mv -v ~/workingdata/shapefiles/* ~/workingdata/")
+}
 
 # View the files available in S3 for this state: system(paste0('aws s3 ls ', teambucket, '/', state, '/'))
 
@@ -65,7 +59,7 @@ for(mo in do.months){
 }
 
 # Plot to check grid IDs. Requires shapefiles to be present in ~/workingdata/Hex, download from S3 if not there.
-# This was useful when testing differnt grid sizes, to make sure everything was matching correctly.
+# This was useful when testing different grid sizes, to make sure everything was matching correctly.
 CHECKPLOT = F
 if(CHECKPLOT){
   grid_shp <- rgdal::readOGR(file.path(localdir, "Hex"), paste0(state, "_hexagons_1mi_neighbors"))
