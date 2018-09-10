@@ -33,8 +33,9 @@ outputdir <- paste0("WazeEDT_Agg", HEXSIZE, "mile_RandForest_Output")
 do.months = c("04", "05", "06")
 
 waze.bucket <- "ata-waze"
-localdir <- "/home/dflynn-volpe/workingdata" 
-
+codedir <- "~/SDI_Waze" 
+user <- paste0( "/home/", system("whoami", intern = TRUE)) #the user directory to use
+localdir <- paste0(user, "/workingdata/") # full path for readOGR
 setwd(localdir)
 
 # read utility functions, including movefiles
