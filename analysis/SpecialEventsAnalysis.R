@@ -19,8 +19,8 @@ localdir <- "C:/Users/Jessie.Yang.CTR/Downloads/OST/Waze project"
 # edtdir <- normalizePath(file.path(localdir, "EDT"))
 # wazedir <- "~/tempout" # has State_Year-mo.RData files. Grab from S3 if necessary
 wazedir <- "//vntscex.local/DFS/Projects/PROJ-OS62A1/SDI Waze Phase 2"
-output.loc <- file.path(wazedir, "WazeEDT Pilot Phase1 Archive Incomplete/SDI/Model_Output")
-data.loc <- file.path(wazedir, "WazeEDT Pilot Phase1 Archive Incomplete/SDI/Data")
+output.loc <- file.path(wazedir, "WazeEDT Pilot Phase1 Archive/Model_Output")
+data.loc <- file.path(wazedir, "WazeEDT Pilot Phase1 Archive/Data")
 
 teambucket <- "s3://prod-sdc-sdi-911061262852-us-east-1-bucket"
 
@@ -122,9 +122,9 @@ SpecialEvents <- read.csv(file = paste0(wazedir,"/Data/SpecialEvents/SpecialEven
 # SpecialEvents_SP <-spTransform(SpecialEvents_SP, CRS(proj.USGS)) # create spatial point data frame
 # plot(SpecialEvents_SP)
 
-#### Proceses EDT data ####
+#### Process EDT data ####
 # Read EDT Data
-edt <- read.delim(file = paste0(localdir, "/Data/EDT/CTMDUTVA_20170401_20180731.txt"),header = TRUE,sep = "\t")
+edt <- read.delim(file = paste0(wazedir, "/Data/EDT/CTMDUTVA_20170401_20180731.txt"),header = TRUE,sep = "\t")
 table(edt$StudyYear) # total two years, 2017 - 2018
 table(edt$CrashState) # total four states: Connecticut    Maryland        Utah    Virginia 
 
@@ -133,24 +133,24 @@ edt <- edt %>%
   mutate(CrashDate_Local = as.POSIXct(strptime(
                              paste(substr(CrashDate, 1, 10),
                                    HourofDay, MinuteofDay), format = "%Y-%m-%d %H %M", tz = "America/New_York"))
-  ) 
+  ) # format datetime of crash
 
-# No NAs
-sum(is.na(edt$GPSLat))
-sum(is.na(edt$GPSLong))
+# # No NAs
+# sum(is.na(edt$GPSLat))
+# sum(is.na(edt$GPSLong))
+# 
+# # What about "NULL"
+# sum(edt$GPSLat == "NULL") #14
+# sum(edt$GPSLong == "NULL") #11
 
-# What about "NULL"
-sum(edt$GPSLat == "NULL") #14
-sum(edt$GPSLong == "NULL") #11
-
-# format datetime of crash
-edt <- edt %>% filter(GPSLat != "NULL" & GPSLong != "NULL")  # Discard rows with no lat or long
- 
+# Discard rows with no lat or long
+edt <- edt %>% filter(GPSLat != "NULL" & GPSLong != "NULL")  
+# Convert to Numeric
 edt <- edt %>% mutate(GPSLat = as.numeric(as.character(GPSLat)), GPSLong = as.numeric(as.character(GPSLong)))
 
 # Convert to spatial data format
 edt_SP <- SpatialPointsDataFrame(edt[c("GPSLong", "GPSLat")], edt, proj4string = CRS("+proj=longlat +datum=WGS84"))  #  make sure Waze data is a SPDF
-edt_SP <-spTransform(edt_SP, CRS(proj.USGS)) # create spatial point data frame
+edt_SP <- spTransform(edt_SP, CRS(proj.USGS)) # create spatial point data frame
 
 # match crash locations with GRID_ID
 gIntersects(edt_SP, grid, byid = T)
