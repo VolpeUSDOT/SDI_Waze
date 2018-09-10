@@ -159,6 +159,10 @@ pts.poly <- point.in.poly(edt_SP, grid)
 head(pts.poly@data)
 dim(pts.poly@data) # 88786*65
 
+# Plot the points on the 
+plot(pts.poly)
+points(grid, pch=20, col = "red")
+
 # Join AllModel30_sub table with the new columns.
 pts.poly.sum <- data.frame(pts.poly@data)
 pts.poly.sum <- pts.poly.sum %>%
@@ -171,7 +175,6 @@ pts.poly.sum <- pts.poly.sum %>%
             nEDTVehCount = sum(VehicleCount)
   )
 AllModel30_sub <- AllModel30_sub %>% left_join(pts.poly.sum, by = c("GRID_ID", "date" = "CrashDate","hour" = "HourofDay"))  %>% mutate_if(is.numeric, funs(replace(., which(is.na(.)), 0)))
-
 
 #### Special Event Data Process ####
 # format date
@@ -196,8 +199,7 @@ for (i in c(1:nrow(uniquelocbuf))){
   buf = uniquelocbuf$Buffer_Miles[i]
   
   # create buffer for each location
-  SpecialEventsExpand_SP <- SpatialPointsDataFrame(SpecialEventsExpand %>% filter(Location.ID == loc) %>% select(Lon, Lat), 
-                                                   SpecialEventsExpand %>% filter(Location.ID == loc), 
+  SpecialEventsExpand_SP <- SpatialPointsDataFrame(SpecialEventsExpand %>% filter(Location.ID == loc) %>% select(Lon, Lat), SpecialEventsExpand %>% filter(Location.ID == loc), 
                                                    proj4string = CRS("+proj=longlat +datum=WGS84")
                                                    )  #  make sure Waze data is a SPDF
   SpecialEventsExpand_SP <-spTransform(SpecialEventsExpand_SP, CRS(proj.USGS)) # create spatial point data frame
