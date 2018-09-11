@@ -247,6 +247,8 @@ prep.hex <- function(hexname, state, month, s3 = T, bucket = teambucket){
   }
 
 # Append jobs, road class, or future other gridded data.
+# This version will be superceded by 'append.hex2', but keeping here for compatibility with previous scripts
+
 # Assumptions: 
 # 1. There are already files like "w.04" representing gridded, hourly Waze-EDT data fusions in the working environment. This script appends static data to the hourly gridded data, repeating the static values for each hour.
 # 2. There are paths like the S3 bucket, inputdir, localdir, all in working environment
@@ -272,6 +274,8 @@ append.hex <- function(hexname, data.to.add, na.action = c("omit", "keep", "fill
   }
   
   dd <- get(data.to.add)
+  
+  
   
   if(length(grep("routes_AADT_total_sum", data.to.add)) > 0){
     dd <- dd@data
@@ -326,6 +330,106 @@ append.hex <- function(hexname, data.to.add, na.action = c("omit", "keep", "fill
     cat("Appending", IDprefix, "to GRID_ID \n")
     dd$GRID_ID <- paste0(IDprefix, dd$GRID_ID)
   }
+  
+  w2 <- left_join(w, dd, by = "GRID_ID")
+  # Consider assigning 0 to NA values after joining; e.g. no road info available, give 0 miles
+  if(na.action == "fill0") { w2[is.na(w2)] = 0 }
+  if(na.action == "omit") { w2 = w2[complete.cases(w2),] }
+  
+  assign(hexname, w2, envir = globalenv()) 
+  
+}
+
+# Another version of append.hex, updated for SDC and the new supplemental data, including VMT.
+
+append.hex2 <- function(hexname, data.to.add, state, na.action = c("omit", "keep", "fill0"), IDprefix = "1"){
+  # hexname: string of data frame names in working memory like "w.04"
+  # data.to.add: string of unzipped file set in the localdir, including sub-directory path and state name, like "FARS/CT/FARS_CT_2015_2016_sum_fclass"
+  # na.action: what to do if missing any values; applies this action across the whole data frame, not just the appended data
+  if(missing(na.action)) { na.action = "omit" } # set default value
+  na.action <- match.arg(na.action) # match partially entered values
+  
+  w <- get(hexname)
+  
+  # Check to see if this shapefile has been read in already. For FARS multipoint data, simply read DBF file
+  if(!exists(data.to.add)){
+    if(length(grep("FARS", data.to.add)) > 0){
+      assign(data.to.add, foreign::read.dbf(file = file.path(localdir, "FARS", state, paste0(data.to.add, ".dbf"))), envir = globalenv())
+    }
+    if(length(grep("aadt", data.to.add)) > 0){
+      assign(data.to.add, read.csv(file = file.path(localdir, "AADT", paste0(data.to.add, ".txt"))),
+             envir = globalenv())
+      
+      } else { # Build this out lodes, aadt
+      assign(data.to.add, rgdal::readOGR(localdir, layer = data.to.add), envir = globalenv())
+    }
+  }
+  
+  dd <- get(data.to.add)
+  
+  if(length(grep("FARS", data.to.add)) > 0){
+    dd <- dd %>% 
+      group_by(GRID_ID) %>%
+      summarise(CRASH_SUM = sum(CRASH_SUM),
+                FATALS_SUM = sum(FATALS_SUM))
+  }
+  
+  
+  if(length(grep("routes_AADT_total_sum", data.to.add)) > 0){
+    dd <- dd@data
+  }
+  
+  if(length(grep("routes_sum", data.to.add)) > 0){
+    dd <- dd@data %>% 
+      group_by(GRID_ID) %>%
+      tidyr::spread(key = F_SYSTEM_V, value = SUM_miles, fill = 0, sep = "_")
+  }
+  
+
+  if(length(grep("bg_rac_", data.to.add)) > 0){
+    
+    dd <- dd@data 
+    dd <- dd[c("GRID_ID", 
+               "SUM_C000",                                                            # Total jobs
+               #               "SUM_CA01", "SUM_CA02", "SUM_CA03",                                    # By age category
+               "SUM_CE01", "SUM_CE02", "SUM_CE03"                                    # By earnings
+               #               ,"SUM_CD01", "SUM_CD02", "SUM_CD03", "SUM_CD04",                        # By educational attainment
+               #               "SUM_CS01", "SUM_CS02"                                                 # By sex
+    )]
+    names(dd)[2:length(names(dd))] <- paste("RAC", names(dd)[2:length(names(dd))], sep = "_")
+    
+  }
+  
+  if(length(grep("bg_lodes_", data.to.add)) > 0){
+    
+    dd <- dd@data 
+    dd <- dd[c("GRID_ID", 
+               "SUM_C000",                                                            # Total jobs
+               #               "SUM_CA01", "SUM_CA02", "SUM_CA03",                                    # By age category
+               "SUM_CE01", "SUM_CE02", "SUM_CE03",                                    # By earnings
+               #              "SUM_CD01", "SUM_CD02", "SUM_CD03", "SUM_CD04",                        # By educational attainment
+               "SUM_CS01", "SUM_CS02",                                                # By sex
+               #             "SUM_CFA01", "SUM_CFA02" ,"SUM_CFA03" ,"SUM_CFA04", "SUM_CFA05",       # By firm age
+               "SUM_CFS01", "SUM_CFS02", "SUM_CFS03", "SUM_CFS04",  "SUM_CFS05"       # By firm size
+    )]
+    names(dd)[2:length(names(dd))] <- paste("WAC", names(dd)[2:length(names(dd))], sep = "_")
+    
+  }
+  
+  # End data type if statements, now merge with w data frame of Waze-EDT data
+  
+  # Match with new grid ID 
+  if(sum(dd$GRID_ID %in% w$GRID_ID) == 0 & substr(dd$GRID_ID[1], 1, 1)=="A"){
+    cat("Appending", IDprefix, "to GRID_ID \n")
+    dd$GRID_ID <- paste0(IDprefix, dd$GRID_ID)
+  }
+  
+  # For Maryland! Match with old grid ID
+  if(sum(dd$GRID_ID %in% w$GRID_ID) == 0 & substr(w$GRID_ID[1], 1, 1)=="A"){
+    cat("Appending", IDprefix, "to w.GRID_ID \n")
+    w$GRID_ID <- paste0(IDprefix, w$GRID_ID)
+  }
+  
   
   w2 <- left_join(w, dd, by = "GRID_ID")
   # Consider assigning 0 to NA values after joining; e.g. no road info available, give 0 miles

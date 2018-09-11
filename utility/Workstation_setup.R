@@ -225,16 +225,18 @@ for(i in lodes.ls){
 
 
 
-fars.ls = c('FARS_CT_UT.zip')
+fars.ls = c('FARS_CT_MD_UT.zip')
 
 for(i in fars.ls){
   system(paste("aws s3 cp",
                file.path(teambucket, 'FARS', i),
                file.path('~', 'workingdata', 'FARS', i)))
-  if(length(grep('zip$', i))!=0) system(paste('unzip', file.path('~', 'workingdata', 'FARS', i), '-d',
+  if(length(grep('zip$', i))!=0) system(paste('unzip -o', file.path('~', 'workingdata', 'FARS', i), '-d',
                                               file.path('~', 'workingdata', 'FARS/')))
 }
   
+
+
 
 # Team bucket organization ----
 # one time work, saving here for posterity
@@ -276,8 +278,8 @@ system(paste("aws s3 mv",
 )
 
 system(paste("aws s3 mv", 
-             file.path(teambucket, "FARS_CT_UT.zip"),
-             file.path(teambucket, "FARS", "FARS_CT_UT.zip"))
+             file.path(teambucket, "FARS_CT_MD_UT.zip"),
+             file.path(teambucket, "FARS", "FARS_CT_MD_UT.zip"))
 )
 
 system(paste("aws s3 mv", 
