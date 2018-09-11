@@ -311,6 +311,26 @@ widetb <- long_to_wide(multipleLocBuf(loclist, buflist))
 write.csv(widetb, file = paste0(wazedir,"/Data/SpecialEvents/DT_All_MileBuffer_MD_AprilToSept_2017.csv"), row.names = F) # save the 3 mile and 1 mile buffer as CVS for Michelle.
 
 
+
+#### EDT accidents do not match model Obs ####
+wazedir <- "//vntscex.local/DFS/Projects/PROJ-OS62A1/SDI Waze Phase 2"
+load(file = paste0(wazedir,"/Data/SpecialEvents/SpecialEvents_MD_AprilToSept_2017.Rdata"))
+x <- AllModel30_sub[AllModel30_sub$Obs != AllModel30_sub$nEDTAccident, c("GRID_ID","date","hour","Obs","nEDTAccident")]
+sum(x$Obs)
+sum(x$nEDTAccident)
+
+AllModel30_sub$Waze_avail <- ifelse(AllModel30_sub$nWazeAccident >0 | 
+                                      AllModel30_sub$nWazeJam > 0 |
+                                      AllModel30_sub$nHazardOnShoulder >0 |
+                                      AllModel30_sub$nHazardOnRoad >0, 1, 0)
+
+sum(AllModel30_sub$Waze_avail)
+
+y <- AllModel30_sub[AllModel30_sub$Obs != AllModel30_sub$nEDTAccident & (AllModel30_sub$Waze_avail == 1), c("GRID_ID","date","hour","Obs","nEDTAccident")]
+sum(y$Obs)
+sum(y$nEDTAccident)
+
+
 #######################################################
 # Visualization Only
 #######################################################
