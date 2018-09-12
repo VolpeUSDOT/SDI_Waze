@@ -374,6 +374,22 @@ append.hex2 <- function(hexname, data.to.add, state, na.action = c("omit", "keep
                 FATALS_SUM = sum(FATALS_SUM))
   }
   
+  # Expand VMT from month / day of week / hour to day of year / hour of day, for each grid cell
+  
+  if(length(grep("max_aadt_by_grid", data.to.add)) > 0){
+
+    # Create vectors in w for month of year, day of week, hour of day. Concatenate that, and similar in the vmt file. The join on the grid ID and time factors
+    
+    # Extract year from file name
+    yr = substr(hexname, 3, 6)
+    date = strptime(paste(yr, w$day, sep = "-"), "%Y-%j")
+    mo = as.numeric(format(date, "%m"))
+    dow = lubridate::wday(date) # 7  = saturday, 1 = sunday.
+    w$vmt_time = paste(mo, dow, w$hour, sep="_")
+    
+    dd$vmt_time = with(dd, paste(month, dayofweek, w$hour, sep="_"))
+    
+  }
   
   if(length(grep("routes_AADT_total_sum", data.to.add)) > 0){
     dd <- dd@data
@@ -417,6 +433,7 @@ append.hex2 <- function(hexname, data.to.add, state, na.action = c("omit", "keep
   }
   
   # End data type if statements, now merge with w data frame of Waze-EDT data
+  # join ----
   
   # Match with new grid ID 
   if(sum(dd$GRID_ID %in% w$GRID_ID) == 0 & substr(dd$GRID_ID[1], 1, 1)=="A"){
@@ -430,8 +447,19 @@ append.hex2 <- function(hexname, data.to.add, state, na.action = c("omit", "keep
     w$GRID_ID <- paste0(IDprefix, w$GRID_ID)
   }
   
+  dd$GRID_ID <- as.character(dd$GRID_ID)
   
-  w2 <- left_join(w, dd, by = "GRID_ID")
+  if(length(grep("max_aadt_by_grid", data.to.add)) > 0){
+    
+    # summary(w$GRID_ID %in% dd$GRID_ID) # should be all T, but there are 4516 F?
+    
+    
+    w2 <- left_join(w, dd, by = c("GRID_ID", "vmt_time"))
+    
+  } else {    
+    w2 <- left_join(w, dd, by = "GRID_ID")
+  }
+  
   # Consider assigning 0 to NA values after joining; e.g. no road info available, give 0 miles
   if(na.action == "fill0") { w2[is.na(w2)] = 0 }
   if(na.action == "omit") { w2 = w2[complete.cases(w2),] }
