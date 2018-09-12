@@ -377,17 +377,65 @@ append.hex2 <- function(hexname, data.to.add, state, na.action = c("omit", "keep
   # Expand VMT from month / day of week / hour to day of year / hour of day, for each grid cell
   
   if(length(grep("max_aadt_by_grid", data.to.add)) > 0){
+    # Check to see if these processing steps have been done yet; don't need to re-do for each month.
+    prepname = paste("Prepared", data.to.add, sep="_")
+    
+    if(!exists(prepname)) {
+    
+    # Spread for multiple columns by road functional class
+    
+    # dd.vol <- dd %>% 
+    #   group_by(GRID_ID, month, dayofweek, hour) %>%
+    #   tidyr::spread(key = F_SYSTEM_VN, value = volume, fill = 0, sep = "_")
+    
+    # Rows are uniquely described by grid id, month, dayofweek, hour, and road class
+    # summary(duplicated(with(dd, paste(GRID_ID, month, dayofweek, hour, F_SYSTEM_VN))))
+    
+    dd.summax <- dd %>%
+      group_by(GRID_ID, month, dayofweek, hour) %>%
+      select(GRID_ID, month, dayofweek, hour, F_SYSTEM_VN, SUM_MAX_AADT_VN) %>%
+      tidyr::spread(key = F_SYSTEM_VN, value = SUM_MAX_AADT_VN, fill = 0, sep = "_")
 
-    # Create vectors in w for month of year, day of week, hour of day. Concatenate that, and similar in the vmt file. The join on the grid ID and time factors
+    dd.hourmax <- dd %>%
+      group_by(GRID_ID, month, dayofweek, hour) %>%
+      select(GRID_ID, month, dayofweek, hour, F_SYSTEM_VN, HOURLY_MAX_AADT) %>%
+      tidyr::spread(key = F_SYSTEM_VN, value = HOURLY_MAX_AADT, fill = 0, sep = "_")
+
+    # Rename columns and join
+    dd.summax <- dd.summax %>% 
+      rename(SUM_MAX_AADT_1 = F_SYSTEM_VN_1,
+             SUM_MAX_AADT_2 = F_SYSTEM_VN_2,
+             SUM_MAX_AADT_3 = F_SYSTEM_VN_3,
+             SUM_MAX_AADT_4 = F_SYSTEM_VN_4,
+             SUM_MAX_AADT_5 = F_SYSTEM_VN_5)
+
+    dd.hourmax <- dd.hourmax %>% 
+      rename(HOURLY_MAX_AADT_1 = F_SYSTEM_VN_1,
+             HOURLY_MAX_AADT_2 = F_SYSTEM_VN_2,
+             HOURLY_MAX_AADT_3 = F_SYSTEM_VN_3,
+             HOURLY_MAX_AADT_4 = F_SYSTEM_VN_4,
+             HOURLY_MAX_AADT_5 = F_SYSTEM_VN_5)
     
-    # Extract year from file name
-    yr = substr(hexname, 3, 6)
-    date = strptime(paste(yr, w$day, sep = "-"), "%Y-%j")
-    mo = as.numeric(format(date, "%m"))
-    dow = lubridate::wday(date) # 7  = saturday, 1 = sunday.
-    w$vmt_time = paste(mo, dow, w$hour, sep="_")
+    dd <- full_join(dd.summax, dd.hourmax, by = c("GRID_ID", "month", "dayofweek", "hour"))
     
-    dd$vmt_time = with(dd, paste(month, dayofweek, w$hour, sep="_"))
+    dd$vmt_time = with(dd, paste(month, dayofweek, hour, sep="_"))
+    
+    # Save this to global environment for other months to use
+    assign(prepname, dd, envir = globalenv())
+    } else {
+      
+      # Create vectors in w for month of year, day of week, hour of day in w. This is used for joining on the grid ID and time factors
+      
+      # Extract year from file name
+      yr = substr(hexname, 3, 6)
+      date = strptime(paste(yr, w$day, sep = "-"), "%Y-%j")
+      mo = as.numeric(format(date, "%m"))
+      dow = lubridate::wday(date) # 7  = saturday, 1 = sunday.
+      w$vmt_time = paste(mo, dow, w$hour, sep="_")
+    
+      dd = get(prepname, envir = globalenv()) # Use the already prepared data if present in the working enviroment
+      
+  }
     
   }
   
@@ -443,7 +491,7 @@ append.hex2 <- function(hexname, data.to.add, state, na.action = c("omit", "keep
   
   # For Maryland! Match with old grid ID
   if(sum(dd$GRID_ID %in% w$GRID_ID) == 0 & substr(w$GRID_ID[1], 1, 1)=="A"){
-    cat("Appending", IDprefix, "to w.GRID_ID \n")
+    cat("Appending", IDprefix, "to w$GRID_ID \n")
     w$GRID_ID <- paste0(IDprefix, w$GRID_ID)
   }
   
@@ -451,10 +499,21 @@ append.hex2 <- function(hexname, data.to.add, state, na.action = c("omit", "keep
   
   if(length(grep("max_aadt_by_grid", data.to.add)) > 0){
     
-    # summary(w$GRID_ID %in% dd$GRID_ID) # should be all T, but there are 4516 F?
+    # summary(unique(w$GRID_ID) %in% unique(dd$GRID_ID)) # should be all T, but there are 1620 F in April?
+    # summary(w$vmt_time %in% dd$vmt_time) # all T
     
+    # month / day of week / hour of day is duplicated within GRID ID in w, which is expected
+    # summary(duplicated(paste(w$GRID_ID, w$vmt_time)))
+    # summary(duplicated(paste(dd$GRID_ID, dd$vmt_time))) # should be all F
+    # summary(duplicated(paste(dd$GRID_ID, dd$month, dd$dayofweek, dd$hour))) 
     
-    w2 <- left_join(w, dd, by = c("GRID_ID", "vmt_time"))
+    w2 <- left_join(w, dd %>% ungroup() %>% select(-month, -dayofweek, -hour), by = c("GRID_ID", "vmt_time")) 
+  
+    # check:
+    # 1Z-48, day 229 (August, dayofweek = 5) hour 16: max hourly 4 = 0.809305; 5 = 0.066670
+    # format(strptime("2017-229", "%Y-%j"), "%m") 
+    # lubridate::wday(strptime("2017-229", "%Y-%j")) 
+    # dd[dd$GRID_ID == "1Z-48" & dd$month == 8 & dd$dayofweek == 5 & dd$hour == 16,]
     
   } else {    
     w2 <- left_join(w, dd, by = "GRID_ID")

@@ -71,31 +71,36 @@ if(CHECKPLOT){
   rm(w.g, gs, grid_shp)
 }
 
-# Update this later after getting supplemental data ready
+# Update this later as supplemental data is prepared
 # Add FARS, AADT, HPMS, jobs
  na.action = "fill0"
-# for(w in c("w.04", "w.05", "w.06", "w.07","w.08", "w.09")){
-#   append.hex(hexname = w, data.to.add = "FARS_MD_2012_2016_sum_annual", na.action = na.action)
-    append.hex2(hexname = w, data.to.add = paste0("FARS_", state, "_2012_2016_sum_annual"), state = state, na.action = na.action)
-    
-    # VMT
-    append.hex2(hexname = w, data.to.add = paste0(state, "_max_aadt_by_grid_fc_urban_vmt_factored"), state = state, na.action = na.action)
-    
-    append.hex2(hexname = w, data.to.add = "hexagons_1mi_routes_AADT_total_sum", na.action = na.action)
 
+ monthfiles = paste("w", do.months, sep=".")
+ monthfiles = sub("-", "_", monthfiles)
+
+# Append supplmental data. This is now a time-intensive step, with hourly VMT; consider making this parallel
+ 
+for(w in monthfiles){ # w = "w.2017_04"
+  append.hex2(hexname = w, data.to.add = paste0("FARS_", state, "_2012_2016_sum_annual"), state = state, na.action = na.action)
+  
+  # VMT   
+  append.hex2(hexname = w, data.to.add = paste0(state, "_max_aadt_by_grid_fc_urban_vmt_factored"), state = state, na.action = na.action)
+  
+  #  append.hex2(hexname = w, data.to.add = "hexagons_1mi_routes_AADT_total_sum", na.action = na.action)
  #   append.hex(hexname = w, data.to.add = "hexagons_1mi_routes_sum", na.action = na.action)
-#   append.hex(hexname = w, data.to.add = "hexagons_1mi_bg_lodes_sum", na.action = na.action)
-#   append.hex(hexname = w, data.to.add = "hexagons_1mi_bg_rac_sum", na.action = na.action)
-#   }
+ #   append.hex(hexname = w, data.to.add = "hexagons_1mi_bg_lodes_sum", na.action = na.action)
+ #   append.hex(hexname = w, data.to.add = "hexagons_1mi_bg_rac_sum", na.action = na.action)
+}
 
 
-# Bind all months together
+# Bind all months together, and remove monthly files to save memory
 w.allmonths.named <- ls()[grep("^w.", ls())]
 
 w.allmonths <- vector()
 for(i in w.allmonths.named){
   w.allmonths <- rbind(w.allmonths, get(i))
 }
+rm(list = w.allmonths.named)
 
 # format(object.size(w.allmonths), "Gb")
 
@@ -110,7 +115,7 @@ rf.inputs = list(ntree.use = avail.cores * 50, avail.cores = avail.cores, mtry =
 keyoutputs = redo_outputs = list() # to store model diagnostics
 
 # Omit as predictors in this vector:
-alwaysomit = c(grep("GRID_ID", names(w.allmonths), value = T), "day", "hextime", "year", "weekday", 
+alwaysomit = c(grep("GRID_ID", names(w.allmonths), value = T), "day", "hextime", "year", "weekday", "vmt_time",
                "uniqWazeEvents", "nWazeRowsInMatch", 
                "nMatchWaze_buffer", "nNoMatchWaze_buffer",
                grep("EDT", names(w.allmonths), value = T))
@@ -128,9 +133,13 @@ response.var = "MatchEDT_buffer_Acc"
 # 23 Add all together
 
 # 60 base 30 - neighbors
-# 61 base 30 - AADT
-# 62 base 18 + VMT
-# 63 base 30 + VMT  
+# 61 base 30 - AADT: Erika's suggestion; I'm re-apprpropiting this number for
+# 61 base 18 + AADT new 
+# 62 base 18 + VMT 
+# 63 base 30 + VMT: Erika's suggestion; now using this number for
+# 63 base 18 + AADT + VMT
+
+# For MD,  can now compare 18, 61, 62, and 63
 
 starttime = Sys.time()
 
@@ -138,7 +147,8 @@ omits = c(alwaysomit,
           "wx",
           c("CRASH_SUM", "FATALS_SUM"), # FARS variables, 
           grep("F_SYSTEM", names(w.allmonths), value = T), # road class
-          c("MEAN_AADT", "SUM_AADT", "SUM_miles"), # AADT
+          grep("SUM_MAX_AADT", names(w.allmonths), value = T), # AADT
+          grep("HOURLY_MAX_AADT", names(w.allmonths), value = T), # Hourly VMT
           grep("WAC", names(w.allmonths), value = T), # Jobs workplace
           grep("RAC", names(w.allmonths), value = T), # Jobs residential
           grep("MagVar", names(w.allmonths), value = T), # direction of travel
@@ -152,10 +162,9 @@ modelno = "18"
 if(!REASSESS){
   keyoutputs[[modelno]] = do.rf(train.dat = w.allmonths, 
                                 omits, response.var = "MatchEDT_buffer_Acc", 
-                               # thin.dat = 0.01,
                                 model.no = modelno, rf.inputs = rf.inputs) 
   
-  save("keyoutputs", file = paste0("Output_to_", modelno))
+  save("keyoutputs", file = paste0("VMT_Output_to_", modelno))
   } else {
 
 redo_outputs[[modelno]] = reassess.rf(train.dat = w.allmonths, 
@@ -163,8 +172,96 @@ redo_outputs[[modelno]] = reassess.rf(train.dat = w.allmonths,
                               model.no = modelno, rf.inputs = rf.inputs) 
 }
 
+# 61: add AADT
+omits = c(alwaysomit,
+          "wx",
+          c("CRASH_SUM", "FATALS_SUM"), # FARS variables, 
+          grep("F_SYSTEM", names(w.allmonths), value = T), # road class
+    #      grep("SUM_MAX_AADT", names(w.allmonths), value = T), # AADT
+          grep("HOURLY_MAX_AADT", names(w.allmonths), value = T), # Hourly VMT
+          grep("WAC", names(w.allmonths), value = T), # Jobs workplace
+          grep("RAC", names(w.allmonths), value = T), # Jobs residential
+          grep("MagVar", names(w.allmonths), value = T), # direction of travel
+          grep("medLast", names(w.allmonths), value = T), # report rating, reliability, confidence
+          grep("nWazeAcc_", names(w.allmonths), value = T), # neighboring accidents
+          grep("nWazeJam_", names(w.allmonths), value = T) # neighboring jams
+)
 
-save("keyoutputs", file = paste0("Output_to_", modelno))
+modelno = "61"  
+
+if(!REASSESS){
+  keyoutputs[[modelno]] = do.rf(train.dat = w.allmonths, 
+                                omits, response.var = "MatchEDT_buffer_Acc", 
+                                model.no = modelno, rf.inputs = rf.inputs) 
+  
+  save("keyoutputs", file = paste0("VMT_Output_to_", modelno))
+} else {
+  
+  redo_outputs[[modelno]] = reassess.rf(train.dat = w.allmonths, 
+                                        omits, response.var = "MatchEDT_buffer_Acc", 
+                                        model.no = modelno, rf.inputs = rf.inputs) 
+}
+
+# 62: add VMT
+omits = c(alwaysomit,
+          "wx",
+          c("CRASH_SUM", "FATALS_SUM"), # FARS variables, 
+          grep("F_SYSTEM", names(w.allmonths), value = T), # road class
+          grep("SUM_MAX_AADT", names(w.allmonths), value = T), # AADT
+          #grep("HOURLY_MAX_AADT", names(w.allmonths), value = T), # Hourly VMT
+          grep("WAC", names(w.allmonths), value = T), # Jobs workplace
+          grep("RAC", names(w.allmonths), value = T), # Jobs residential
+          grep("MagVar", names(w.allmonths), value = T), # direction of travel
+          grep("medLast", names(w.allmonths), value = T), # report rating, reliability, confidence
+          grep("nWazeAcc_", names(w.allmonths), value = T), # neighboring accidents
+          grep("nWazeJam_", names(w.allmonths), value = T) # neighboring jams
+)
+
+modelno = "62"  
+
+if(!REASSESS){
+  keyoutputs[[modelno]] = do.rf(train.dat = w.allmonths, 
+                                omits, response.var = "MatchEDT_buffer_Acc", 
+                                model.no = modelno, rf.inputs = rf.inputs) 
+  
+  save("keyoutputs", file = paste0("VMT_Output_to_", modelno))
+} else {
+  redo_outputs[[modelno]] = reassess.rf(train.dat = w.allmonths, 
+                                        omits, response.var = "MatchEDT_buffer_Acc", 
+                                        model.no = modelno, rf.inputs = rf.inputs) }
+
+# 63: add Vboth AADT and MT
+omits = c(alwaysomit,
+          "wx",
+          c("CRASH_SUM", "FATALS_SUM"), # FARS variables, 
+          grep("F_SYSTEM", names(w.allmonths), value = T), # road class
+          #grep("SUM_MAX_AADT", names(w.allmonths), value = T), # AADT
+          #grep("HOURLY_MAX_AADT", names(w.allmonths), value = T), # Hourly VMT
+          grep("WAC", names(w.allmonths), value = T), # Jobs workplace
+          grep("RAC", names(w.allmonths), value = T), # Jobs residential
+          grep("MagVar", names(w.allmonths), value = T), # direction of travel
+          grep("medLast", names(w.allmonths), value = T), # report rating, reliability, confidence
+          grep("nWazeAcc_", names(w.allmonths), value = T), # neighboring accidents
+          grep("nWazeJam_", names(w.allmonths), value = T) # neighboring jams
+)
+
+modelno = "63"  
+
+if(!REASSESS){
+  keyoutputs[[modelno]] = do.rf(train.dat = w.allmonths, 
+                                omits, response.var = "MatchEDT_buffer_Acc", 
+                                model.no = modelno, rf.inputs = rf.inputs) 
+  
+  save("keyoutputs", file = paste0("VMT_Output_to_", modelno))
+} else {
+  redo_outputs[[modelno]] = reassess.rf(train.dat = w.allmonths, 
+                                        omits, response.var = "MatchEDT_buffer_Acc", 
+                                        model.no = modelno, rf.inputs = rf.inputs) }
+
+
+
+
+save("keyoutputs", file = paste0("VMT_Output_to_", modelno))
 
 timediff <- Sys.time() - starttime
 cat(round(timediff, 2), attr(timediff, "units"), "elapsed to model", modelno)
@@ -190,7 +287,7 @@ omits = c(alwaysomit, alert_subtypes
 if(!REASSESS){
   keyoutputs[[modelno]] = do.rf(train.dat = w.allmonths, omits, response.var = "MatchEDT_buffer_Acc",  
                                 model.no = modelno, rf.inputs = rf.inputs) 
-  save("keyoutputs", file = paste0("Output_to_", modelno))
+  save("keyoutputs", file = paste0("VMT_Output_to_", modelno))
 } else {
   redo_outputs[[modelno]] = reassess.rf(train.dat = w.allmonths,
                                         omits, response.var = "MatchEDT_buffer_Acc", 
