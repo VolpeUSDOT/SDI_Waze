@@ -17,7 +17,7 @@ source(file.path(codeloc, 'utility/get_packages.R')) # installs necessary packag
 HEXSIZE = 1 
 
 # <><><><><>
-state = 'MD'  #'UT' # Sets the state. UT, VA, MD are all options.
+state = 'CT' # 'MD'  #'UT' # Sets the state. UT, VA, MD are all options.
 # <><><><><>
 
 # Manually setting months to run here; could also scan S3 for months available for this state
@@ -73,10 +73,10 @@ if(CHECKPLOT){
 
 # Update this later as supplemental data is prepared
 # Add FARS, AADT, HPMS, jobs
- na.action = "fill0"
+na.action = "fill0"
 
- monthfiles = paste("w", do.months, sep=".")
- monthfiles = sub("-", "_", monthfiles)
+monthfiles = paste("w", do.months, sep=".")
+monthfiles = sub("-", "_", monthfiles)
 
 # Append supplmental data. This is now a time-intensive step, with hourly VMT; consider making this parallel
  
@@ -84,7 +84,7 @@ for(w in monthfiles){ # w = "w.2017_04"
   append.hex2(hexname = w, data.to.add = paste0("FARS_", state, "_2012_2016_sum_annual"), state = state, na.action = na.action)
   
   # VMT   
-  append.hex2(hexname = w, data.to.add = paste0(state, "_max_aadt_by_grid_fc_urban_vmt_factored"), state = state, na.action = na.action)
+#  append.hex2(hexname = w, data.to.add = paste0(state, "_max_aadt_by_grid_fc_urban_vmt_factored"), state = state, na.action = na.action)
   
   #  append.hex2(hexname = w, data.to.add = "hexagons_1mi_routes_AADT_total_sum", na.action = na.action)
  #   append.hex(hexname = w, data.to.add = "hexagons_1mi_routes_sum", na.action = na.action)
@@ -294,8 +294,18 @@ if(!REASSESS){
                                         model.no = modelno, rf.inputs = rf.inputs) 
 }
 
-# 60 
 
+# Save outputs to S3
+
+
+
+fn = paste0(state, "_VMT_Output_to_", modelno, ".RData")
+
+save("keyoutputs", file = fn)
+
+system(paste("aws s3 cp",
+             file.path(localdir, fn),
+             file.path(teambucket, state, fn)))
 
 timediff <- Sys.time() - starttime
 cat(round(timediff, 2), attr(timediff, "units"), "to complete script")

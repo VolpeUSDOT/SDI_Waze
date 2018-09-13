@@ -360,9 +360,11 @@ append.hex2 <- function(hexname, data.to.add, state, na.action = c("omit", "keep
       assign(data.to.add, read.csv(file = file.path(localdir, "AADT", paste0(data.to.add, ".txt"))),
              envir = globalenv())
       
-      } else { # Build this out lodes, aadt
-      assign(data.to.add, rgdal::readOGR(localdir, layer = data.to.add), envir = globalenv())
-    }
+      } 
+    
+    # { # Build this out lodes, aadt
+    #   assign(data.to.add, rgdal::readOGR(localdir, layer = data.to.add), envir = globalenv())
+    # }
   }
   
   dd <- get(data.to.add)
@@ -382,6 +384,7 @@ append.hex2 <- function(hexname, data.to.add, state, na.action = c("omit", "keep
     
     if(!exists(prepname)) {
     
+    cat("Preparing", data.to.add, "\n")
     # Spread for multiple columns by road functional class
     
     # dd.vol <- dd %>% 
@@ -422,20 +425,22 @@ append.hex2 <- function(hexname, data.to.add, state, na.action = c("omit", "keep
     
     # Save this to global environment for other months to use
     assign(prepname, dd, envir = globalenv())
-    } else {
+    
+      } else {
       
       # Create vectors in w for month of year, day of week, hour of day in w. This is used for joining on the grid ID and time factors
       
-      # Extract year from file name
-      yr = substr(hexname, 3, 6)
-      date = strptime(paste(yr, w$day, sep = "-"), "%Y-%j")
-      mo = as.numeric(format(date, "%m"))
-      dow = lubridate::wday(date) # 7  = saturday, 1 = sunday.
-      w$vmt_time = paste(mo, dow, w$hour, sep="_")
-    
+     
       dd = get(prepname, envir = globalenv()) # Use the already prepared data if present in the working enviroment
       
   }
+    
+    # Extract year from file name
+    yr = substr(hexname, 3, 6)
+    date = strptime(paste(yr, w$day, sep = "-"), "%Y-%j")
+    mo = as.numeric(format(date, "%m"))
+    dow = lubridate::wday(date) # 7  = saturday, 1 = sunday.
+    w$vmt_time = paste(mo, dow, w$hour, sep="_")
     
   }
   
@@ -499,7 +504,7 @@ append.hex2 <- function(hexname, data.to.add, state, na.action = c("omit", "keep
   
   if(length(grep("max_aadt_by_grid", data.to.add)) > 0){
     
-    # summary(unique(w$GRID_ID) %in% unique(dd$GRID_ID)) # should be all T, but there are 1620 F in April?
+    # summary(unique(w$GRID_ID) %in% unique(dd$GRID_ID)) # should be all T, but there are 1620 F in April MD? 
     # summary(w$vmt_time %in% dd$vmt_time) # all T
     
     # month / day of week / hour of day is duplicated within GRID ID in w, which is expected
