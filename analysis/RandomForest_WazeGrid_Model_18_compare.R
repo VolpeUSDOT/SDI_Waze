@@ -76,6 +76,8 @@ for(state in states){
   
 } # End state data prep for comparison. Now have <state>_w.allmonths data frames for each state
 
+stopifnot(identical(names(MD_w.allmonths), names(CT_w.allmonths)))
+
 # format(object.size(w.allmonths), "Gb")
 
 avail.cores = parallel::detectCores()
@@ -110,15 +112,15 @@ starttime = Sys.time()
 omits = c(alwaysomit,
           "wx",
           c("CRASH_SUM", "FATALS_SUM"), # FARS variables, 
-          grep("F_SYSTEM", names(w.allmonths), value = T), # road class
-          grep("SUM_MAX_AADT", names(w.allmonths), value = T), # AADT
-          grep("HOURLY_MAX_AADT", names(w.allmonths), value = T), # Hourly VMT
-          grep("WAC", names(w.allmonths), value = T), # Jobs workplace
-          grep("RAC", names(w.allmonths), value = T), # Jobs residential
-          grep("MagVar", names(w.allmonths), value = T), # direction of travel
-          grep("medLast", names(w.allmonths), value = T), # report rating, reliability, confidence
-          grep("nWazeAcc_", names(w.allmonths), value = T), # neighboring accidents
-          grep("nWazeJam_", names(w.allmonths), value = T) # neighboring jams
+          grep("F_SYSTEM", names(MD_w.allmonths), value = T), # road class
+          grep("SUM_MAX_AADT", names(MD_w.allmonths), value = T), # AADT
+          grep("HOURLY_MAX_AADT", names(MD_w.allmonths), value = T), # Hourly VMT
+          grep("WAC", names(MD_w.allmonths), value = T), # Jobs workplace
+          grep("RAC", names(MD_w.allmonths), value = T), # Jobs residential
+          grep("MagVar", names(MD_w.allmonths), value = T), # direction of travel
+          grep("medLast", names(MD_w.allmonths), value = T), # report rating, reliability, confidence
+          grep("nWazeAcc_", names(MD_w.allmonths), value = T), # neighboring accidents
+          grep("nWazeJam_", names(MD_w.allmonths), value = T) # neighboring jams
 )
 
 modelno = "18"
@@ -126,23 +128,149 @@ modelno = "18"
 keyoutputs[[paste("MD", modelno, sep="_")]] = do.rf(train.dat = MD_w.allmonths, 
                                 omits, response.var = "MatchEDT_buffer_Acc", 
                                 model.no = modelno, rf.inputs = rf.inputs) 
-  
-  
 
 # Run CT Model 18
 
-# Run MD Model 18 on CT data
+keyoutputs[[paste("CT", modelno, sep="_")]] = do.rf(train.dat = CT_w.allmonths, 
+                                                    omits, response.var = "MatchEDT_buffer_Acc", 
+                                                    model.no = modelno, rf.inputs = rf.inputs) 
 
-# Run CT Model 18 on MD data
+fn = paste0("Model_18_Output_to_CT.RData")
+
+save("keyoutputs", file = file.path(outputdir, fn))
+
+# Run MD Model 18 on CT data ----
+
+# Read model from local (pull down from S3 if not present). rf.out is the model, class randomForest
+
+load(file.path(outputdir, "MD_Model_18_RandomForest_Output.RData"))
+
+train.dat = MD_w.allmonths
+test.dat = CT_w.allmonths # run on all months of CT for now
+
+cutoff = c(0.775, 0.225)
+fitvars <- names(train.dat)[is.na(match(names(train.dat), omits))]
+cc <- complete.cases(test.dat[,fitvars])
+test.dat <- test.dat[cc,]
+
+MD_mod_CT_dat.pred <- predict(rf.out, test.dat[fitvars], cutoff = cutoff)
+MD_mod_CT_dat.prob <- predict(rf.out, test.dat[fitvars],  type = "prob", cutoff = cutoff)
+
+predtab <- table(test.dat[,response.var], MD_mod_CT_dat.pred)
+
+reference.vec <- test.dat[,response.var]
+levels(reference.vec) = c("NoCrash", "Crash")
+levels(MD_mod_CT_dat.pred) = c("NoCrash","Crash")
+
+reference.vec <-as.factor(as.character(reference.vec))
+MD_mod_CT_dat.pred <-as.factor(as.character(MD_mod_CT_dat.pred))
+
+(predtab <- table(MD_mod_CT_dat.pred, reference.vec, 
+                  dnn = c("Predicted","Observed"))) 
+bin.mod.diagnostics(predtab)
+
+model_auc <- pROC::auc(test.dat[,response.var], MD_mod_CT_dat.prob[,colnames(MD_mod_CT_dat.prob)=="1"])
+
+out.df <- data.frame(test.dat[, c("GRID_ID", "day", "hour", response.var)], MD_mod_CT_dat.pred, MD_mod_CT_dat.prob)
+out.df$day <- as.numeric(out.df$day)
+names(out.df)[4:7] <- c("Obs", "Pred", "Prob.Noncrash", "Prob.Crash")
+out.df = data.frame(out.df,
+                    TN = out.df$Obs == 0 &  out.df$Pred == "NoCrash",
+                    FP = out.df$Obs == 0 &  out.df$Pred == "Crash",
+                    FN = out.df$Obs == 1 &  out.df$Pred == "NoCrash",
+                    TP = out.df$Obs == 1 &  out.df$Pred == "Crash")
+
+savelist = c("rf.out", "rf.pred", "rf.prob", "out.df") 
+
+fn = paste("Model_18_MD_mod_CT_dat_RandomForest_Output.RData", sep= "_")
+
+save(list = savelist, file = file.path(outputdir, fn))
+
+# Copy to S3
+system(paste("aws s3 cp",
+             file.path(outputdir, fn),
+             file.path(teambucket, "MD", fn)))
+
+outlist =  list(predtab, diag = bin.mod.diagnostics(predtab), 
+                mse = mean(as.numeric(as.character(test.dat[,response.var])) - 
+                             as.numeric(MD_mod_CT_dat.prob[,"1"]))^2,
+                auc = as.numeric(model_auc) 
+) 
+
+keyoutputs[["Model_18_MD_mod_CT"]] = outlist
+
+fn = paste0("Model_18_MD_mod_CT_data_Output.RData")
+
+save("keyoutputs", file = file.path(outputdir, fn))
+
+# Run CT Model 18 on MD data ----
+
+load(file.path(outputdir, "CT_Model_18_RandomForest_Output.RData"))
+
+train.dat = CT_w.allmonths
+test.dat = MD_w.allmonths # run on all months of CT for now
+
+cutoff = c(0.775, 0.225)
+fitvars <- names(train.dat)[is.na(match(names(train.dat), omits))]
+cc <- complete.cases(test.dat[,fitvars])
+test.dat <- test.dat[cc,]
+
+CT_mod_MD_dat.pred <- predict(rf.out, test.dat[fitvars], cutoff = cutoff)
+CT_mod_MD_dat.prob <- predict(rf.out, test.dat[fitvars],  type = "prob", cutoff = cutoff)
+
+predtab <- table(test.dat[,response.var], CT_mod_MD_dat.pred)
+
+reference.vec <- test.dat[,response.var]
+levels(reference.vec) = c("NoCrash", "Crash")
+levels(CT_mod_MD_dat.pred) = c("NoCrash","Crash")
+
+reference.vec <-as.factor(as.character(reference.vec))
+CT_mod_MD_dat.pred <-as.factor(as.character(CT_mod_MD_dat.pred))
+
+(predtab <- table(CT_mod_MD_dat.pred, reference.vec, 
+                  dnn = c("Predicted","Observed"))) 
+bin.mod.diagnostics(predtab)
+
+model_auc <- pROC::auc(test.dat[,response.var], CT_mod_MD_dat.prob[,colnames(CT_mod_MD_dat.prob)=="1"])
+
+out.df <- data.frame(test.dat[, c("GRID_ID", "day", "hour", response.var)], CT_mod_MD_dat.pred, CT_mod_MD_dat.prob)
+out.df$day <- as.numeric(out.df$day)
+names(out.df)[4:7] <- c("Obs", "Pred", "Prob.Noncrash", "Prob.Crash")
+out.df = data.frame(out.df,
+                    TN = out.df$Obs == 0 &  out.df$Pred == "NoCrash",
+                    FP = out.df$Obs == 0 &  out.df$Pred == "Crash",
+                    FN = out.df$Obs == 1 &  out.df$Pred == "NoCrash",
+                    TP = out.df$Obs == 1 &  out.df$Pred == "Crash")
+
+savelist = c("rf.out", "rf.pred", "rf.prob", "out.df") 
+
+fn = paste("Model_18_CT_mod_MD_dat_RandomForest_Output.RData", sep= "_")
+
+save(list = savelist, file = file.path(outputdir, fn))
+
+# Copy to S3
+system(paste("aws s3 cp",
+             file.path(outputdir, fn),
+             file.path(teambucket, "CT", fn)))
+
+outlist =  list(predtab, diag = bin.mod.diagnostics(predtab), 
+                mse = mean(as.numeric(as.character(test.dat[,response.var])) - 
+                             as.numeric(CT_mod_MD_dat.prob[,"1"]))^2,
+                auc = as.numeric(model_auc) 
+) 
+
+keyoutputs[["Model_18_CT_mod_MD_dat"]] = outlist
+
+fn = paste0("Model_18_CT_mod_MD_data_Output.RData")
+
+save("keyoutputs", file = file.path(outputdir, fn))
+
 
 # Save outputs to S3
-fn = paste0(state, "_VMT_Output_to_", modelno, ".RData")
-
-save("keyoutputs", file = fn)
 
 system(paste("aws s3 cp",
-             file.path(localdir, fn),
-             file.path(teambucket, state, fn)))
+             file.path(outputdir, fn),
+             file.path(teambucket, "CT", fn)))
 
 timediff <- Sys.time() - starttime
 cat(round(timediff, 2), attr(timediff, "units"), "to complete script")
