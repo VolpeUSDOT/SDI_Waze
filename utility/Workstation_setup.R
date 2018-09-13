@@ -237,6 +237,43 @@ for(i in fars.ls){
   
 
 
+# Re-organizing export model outputs for new system ----
+
+EXPORTREORG = F
+
+if(EXPORTREORG){
+  system(paste("aws s3 ls", file.path(teambucket, 'export_requests/')))
+  
+  system(paste("aws s3 ls", file.path(teambucket, 'MD/')))
+ 
+
+  outputdir = '~/workingdata/Random_Forest_Output'
+  
+  system(paste(
+    'zip ~/workingdata/RandomForest_Outputs_2018-09-13.zip',
+    '~/workingdata/VMT_Output_to_63',
+    '~/workingdata/MD_VMT_Output_to_30.RData',
+    file.path(outputdir, 'Model_18_Output_to_CT.RData'),
+    file.path(outputdir, 'Model_18_CT_mod_MD_data_Output.RData'),
+    file.path(outputdir, 'Model_18_CT_mod_MD_dat_RandomForest_Output.RData'),
+    file.path(outputdir, 'Model_18_MD_mod_CT_data_Output.RData'),
+    file.path(outputdir, 'Model_18_MD_mod_CT_dat_RandomForest_Output.RData'),
+    file.path(outputdir, 'MD_Model_63_RandomForest_Output.RData'),
+    file.path(outputdir, 'MD_Model_62_RandomForest_Output.RData'),
+    file.path(outputdir, 'MD_Model_61_RandomForest_Output.RData'),
+    file.path(outputdir, 'CT_Model_18_RandomForest_Output.RData'),
+    file.path(outputdir, 'MD_Model_18_RandomForest_Output.RData')
+  ))
+
+  system(paste(
+    'aws s3 cp',
+    '~/workingdata/RandomForest_Outputs_2018-09-13.zip',
+    file.path(teambucket, 'export_requests', 'RandomForest_Outputs_2018-09-13.zip')
+  ))
+  
+  
+}
+
 
 # Team bucket organization ----
 # one time work, saving here for posterity
@@ -247,10 +284,10 @@ if(REORG){
 
 system(paste("aws s3 ls", teambucket))
 
-  
 system(paste("aws s3 rm", 
              file.path(teambucket, 'FARS_CT_2015_2016_sum_fclass.shp')))
   
+
 # Organize EDT data
 system(paste("aws s3 mv", 
              file.path(teambucket, "Maryland_april2017_to_present.csv"),
