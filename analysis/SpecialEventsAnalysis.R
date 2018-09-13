@@ -7,13 +7,14 @@ source(file.path(codeloc, 'utility/get_packages.R'))
 library(tidyverse)
 library(sp)
 library(maps) # for mapping base layers
-library(rgdal) # for readOGR(), needed for reading in ArcM shapefiles
+library(rgdal) # for readOGR(),writeOGR () needed for reading/writing in ArcM shapefiles
 library(foreach)
 library(doParallel)
 library(rgeos) #gintersection
 library(lubridate)
 library(ggplot2)
 require(spatialEco) # point.in.poly() function
+library(scales)
 
 localdir <- "C:/Users/Jessie.Yang.CTR/Downloads/OST/Waze project"
 # edtdir <- "/home/daniel/workingdata/" # full path for readOGR, Jessie don't have this folder.
