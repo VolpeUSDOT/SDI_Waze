@@ -237,7 +237,7 @@ for(i in fars.ls){
   
 
 
-# Re-organizing export model outputs for new system ----
+# Re-organizing export of model outputs for new system ----
 
 EXPORTREORG = F
 
@@ -246,8 +246,13 @@ if(EXPORTREORG){
   
   system(paste("aws s3 ls", file.path(teambucket, 'MD/')))
  
-
   outputdir = '~/workingdata/Random_Forest_Output'
+  
+  # Using system zip:
+  # system(paste('zip ~/workingdata/zipfilename.zip ~/path/to/your/file'))
+  
+  # More simple, use R wrapper:
+  # zip(zipfilename, files = c(file1, file2))
   
   system(paste(
     'zip ~/workingdata/RandomForest_Outputs_2018-09-13.zip',
@@ -274,6 +279,18 @@ if(EXPORTREORG){
   
 }
 
+# Check contents of upload directory
+
+CHECKUPLOAD = F
+
+if(CHECKUPLOAD){
+system(paste(
+  'aws s3 ls',
+  file.path(teambucket, system('whoami', intern = T), 'uploaded_files/')
+))
+
+
+}
 
 # Team bucket organization ----
 # one time work, saving here for posterity
@@ -284,15 +301,28 @@ if(REORG){
 
 system(paste("aws s3 ls", teambucket))
 
+  system(paste("aws s3 ls", file.path(teambucket, 'Test_from_Dan/')))
+  system(paste("aws s3 rm", file.path(teambucket, 'Test_from_Dan')))
+  
+# Examples of how to remove individual files or folders
 system(paste("aws s3 rm", 
              file.path(teambucket, 'FARS_CT_2015_2016_sum_fclass.shp')))
-  
+system(paste("aws s3 rm", file.path( teambucket, 'HomeFolderData/'), '--recursive'))
+
+# Move multiple files
+system(paste('aws s3 mv', 
+             paste0(teambucket, "/"),
+             file.path(teambucket, "MD/"),
+             '--dryrun --include "MD_2017*"')
+)
+
 
 # Organize EDT data
 system(paste("aws s3 mv", 
              file.path(teambucket, "Maryland_april2017_to_present.csv"),
              file.path(teambucket, "EDT", "Maryland_april2017_to_present.csv"))
        )
+
 
 system(paste("aws s3 mv", 
              file.path(teambucket, "EDTsubset_april2017_to_present.zip"),

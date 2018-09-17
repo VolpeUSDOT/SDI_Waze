@@ -1,0 +1,235 @@
+---
+title: ''
+output:
+  html_document:
+    df_print: paged
+    toc: yes
+    toc_depth: 2
+    toc_float:
+      collapsed: yes
+      smooth_scroll: yes
+---
+
+```{r setup, include=FALSE, echo = FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+
+HEXSIZE = "1"
+
+codeloc <- "~/SDI_Waze" 
+inputdir <- paste0("WazeEDT_Agg", HEXSIZE, "mile_Rdata_Input")
+outputdir <- paste0("WazeEDT_Agg", HEXSIZE, "mile_RandForest_Output")
+teambucket <- "s3://prod-sdc-sdi-911061262852-us-east-1-bucket"
+user <- paste0( "/home/", system("whoami", intern = TRUE)) # the user directory to use
+localdir <- paste0(user, "/workingdata") # full path for readOGR
+outputdir <- file.path(localdir, 'Random_Forest_Output')
+
+library(tidyverse)
+library(knitr)
+library(kableExtra)
+library(randomForest)
+library(pander)
+library(DT)
+# Run this if you don't have these packages:
+# source(file.path(codeloc, 'utility/get_packages.R'))
+
+knitr::opts_knit$set(root.dir = localdir)
+
+# read utility functions
+source(file.path(codeloc, 'utility/wazefunctions.R'))
+
+# read random forest functions
+source(file.path(codeloc, "analysis/RandomForest_WazeGrid_Fx.R"))
+
+# models <- read.csv(file.path(localdir, "Model_Descriptions.csv")) # Source: \\vntscex.local\DFS\Projects\PROJ-OR02A2\SDI\Model_Output
+
+```
+
+```{r getfiles}
+
+# Pull down model outputs from S3 if necessary
+md.files <-  c(
+  'Model_18_MD_mod_CT_data_Output.RData',
+  'Model_18_MD_mod_CT_dat_RandomForest_Output.RData',
+  'MD_Model_18_RandomForest_Output.RData')
+
+# MD files
+#  system(paste("aws s3 ls", file.path(teambucket, 'MD/')))
+
+ct.files <- c('Model_18_Output_to_CT.RData',
+  'Model_18_CT_mod_MD_data_Output.RData',
+  'Model_18_CT_mod_MD_dat_RandomForest_Output.RData',
+  'CT_Model_18_RandomForest_Output.RData')
+
+# CT files
+#  system(paste("aws s3 ls", file.path(teambucket, 'CT/')))
+
+# Test if any of these are present, if not then grab 
+
+for(i in md.files){
+  if(length(grep(i, dir(outputdir))) == 0){
+    system(paste("aws s3 cp",
+                 file.path(teambucket, "MD", i),
+                 file.path(outputdir, i)))
+  }
+}
+
+
+for(i in ct.files){
+  if(length(grep(i, dir(outputdir))) == 0){
+    system(paste("aws s3 cp",
+                 file.path(teambucket, "CT", i),
+                 file.path(outputdir, i)))
+  }
+}
+
+```
+
+# Multi-state comparison overview
+
+- Comparing models run on Connecticut and Maryland
+
+There are multiple criteria for evaluating classification and regression models. For all the models, we used two different data sets to train and test the model. *Training* refers to fitting the model parameters with a large set of known EDT crashes and associated Waze events and other predictors, while *testing* refers to applying the fitted model parameters to a new set of Waze events and other predictors, generating estimated EDT crashes. The estimated EDT crashes are then compared to the known, observed EDT crashes in the test data set to evaluate model performance.
+
+Here we use three criteria, each of which can also be applied to the regularized regression models in the next phase:
+
+### 1. Diagnostics from a confusion matrix
+
+  For binary classification models, it is possible to create a 2x2 table where columns are observed negative and positive, and rows are predicted negative and positive. This is know as a *confusion matrix*, and shows four quantities to represent model performance:
+
+```{r diagtable, results = "asis"}
+tabl <- "
+ |          |        |       OBSERVED     |
+ |----------|--------|:-------:|:--------:| 
+ |          |        | Positive|  Negative|
+ |<b>PREDICTED |Positive|   TP    |    FP |
+ |          |Negative|   FN    |    TN    |
+"
+pander::pander(tabl, style = "rmarkdown")
+```
+
+False positives (FP) can be considered Type I errors, and false negatives (FN) can be considered Type II errors. 
+
+  - *Accuracy* = TN + TP / All observations 
+    + True positives and true negatives divided by all observations. A high value indicates that the observed occurrences and absences of EDT crashes are correctly being estimated. 
+  
+  - *Precision* = TP / FP + TP 
+     + True positives divided by all predicted positives. A high value indicates that there are relatively few false positives (locations and times where a crash is estimated, but did not actually occur).
+  
+  - *Recall* = TP / FN + TP
+    + True positives divided by all observed positives. This is also called *Sensitivity*, or the *true postitive rate*. A high value indicates that there are relatively few false negatives (locations and times where a crash was not estimated, but did actually occur).
+  
+  - *False Positive Rate* = FP / TN + FP
+    + False positives divided by all observed negatives. A low value indicates that there are relatively few false positives compared to all observed absences of EDT crashes.
+
+
+### 2. Area under Reciever-Operator Characteristic Curve (AUROC, ROC curve)
+
+For a binary model, we can additionally calculate one other quantity:
+
+  - *Specificity* = TN / TN + FP
+  + True negatives divided by all observed negatives, also called the true negative rate. For the SDI Waze analysis, most observations are "0", meaning no EDT crashes occurred, so much of the model performance is driven by accurately predicting these "0" (no crash) values.
+
+Balancing between high specificity (where false positives are avoided) and high sensitivity (where false negatives are avoided) is an important decision point in evaluating a model. High sensitivity (i.e., recall or true positive rate) with high specificity (low false positive rate) is ideal. Plotting the false positive rate versus the true positive rate allows a visualization of this balance, and is known the 'receiver-operator characteristic (ROC) curve'. The larger the area under the ROC curve, the more high specificity is maximized with low loss of sensitivity. An area of 0.5 is equivalent to flipping a coin; and area of 1 is perfect estimation, with no false positives or false negatives. As a rule of thumb, areas of 0.6 or greater are generally considered to represent useful classification models; areas of 0.9 or greater are considered to represent very good classification models.
+
+
+```{r roc, echo=FALSE, fig.cap="ROC curves, [CC BY-SA 3.0 Wikimedia](https://commons.wikimedia.org/w/index.php?curid=44059691)", out.width = '50%', , fig.align='center'}
+knitr::include_graphics("ROC_curves.png")
+```
+
+# CT models
+
+### Input data
+
+- April - September 2017, complete data used, test on 30% of data randomly held back
+
+```{r CTmods, echo = F}
+
+tabl <- vector()
+for(i in c("01", "08")){ tabl <- rbind(tabl, c(100*keyoutputs1[[i]]$diag, round(keyoutputs1[[i]]$auc, 4)))}
+
+colnames(tabl)[1:5] = c("Accuracy", "Precision", "Recall", "False Positive Rate", "AUC")
+rownames(tabl) = c("01 - 1 mile", "08 - 1 mile, Neighbors")
+
+datatable(tabl, filter = 'top',
+          caption = "Phase 1 model diagnostics for April 2017, Maryland, with neighboring grid cells as predictors.",
+          rownames = T,
+          options = list(dom = "t",
+                         order = list(list(5, 'desc')),
+                         pageLength = 5)
+          ) %>% formatCurrency(2:4, currency = "", digits = 2) %>%
+          formatStyle(1, background = styleEqual(max(tabl[,1]), 'lightgreen'))%>%
+          formatStyle(2, background = styleEqual(max(tabl[,2]), 'lightgreen'))%>%
+          formatStyle(3, background = styleEqual(max(tabl[,3]), 'lightgreen'))%>%
+          formatStyle(4, background = styleEqual(min(tabl[,4]), 'lightgreen'))%>%
+          formatStyle(5, background = styleEqual(max(tabl[,5]), 'lightgreen'))
+
+# 03, 09 - April+May, test on June
+tabl <- vector()
+for(i in c("03", "09")){ tabl <- rbind(tabl, c(100*keyoutputs1[[i]]$diag, round(keyoutputs1[[i]]$auc, 4)))}
+colnames(tabl)[1:5] = c("Accuracy", "Precision", "Recall", "False Positive Rate", "AUC")
+rownames(tabl) = c("03 - 1 mile", "09 - 1 mile, Neighbors")
+
+datatable(tabl, filter = 'top',
+          caption = "Phase 1 model diagnostics for April-May, test on June 2017, Maryland, with neighboring grid cells as predictors.",
+          rownames = T,
+          options = list(dom = "t",
+                         order = list(list(5, 'desc')),
+                         pageLength = 5)
+          ) %>% formatCurrency(2:4, currency = "", digits = 2) %>%
+          formatStyle(1, background = styleEqual(max(tabl[,1]), 'lightgreen'))%>%
+          formatStyle(2, background = styleEqual(max(tabl[,2]), 'lightgreen'))%>%
+          formatStyle(3, background = styleEqual(max(tabl[,3]), 'lightgreen'))%>%
+          formatStyle(4, background = styleEqual(min(tabl[,4]), 'lightgreen'))%>%
+          formatStyle(5, background = styleEqual(max(tabl[,5]), 'lightgreen'))
+  
+```   
+
+
+```{r bestphaseI, eval=T, fig.height=6, fig.width=6, fig.align='center'}
+modelno = "17"
+
+if(ONLOCAL) {load(file.path(outputdir1, paste("Model", modelno, "RandomForest_Output_04.RData", sep= "_")))} else {s3load(object = file.path(outputdir, paste("Model", modelno, "RandomForest_Output.RData", sep= "_")), bucket = waze.bucket)}
+
+imp.tab <- data.frame(round(rf.out$importance[order(rf.out$importance, decreasing = T)[1:15],], 2))
+colnames(imp.tab) = "Gini importance"
+
+# kable(imp.tab, row.names = T,
+#       caption = "Variance importance for the highest recall plot in phase I, Model 17. Top 15 of 74 predictors shown.") %>% 
+#   kableExtra::kable_styling(bootstrap_options = "striped")
+
+varImpPlot(rf.out,
+           main = "Model 17 Variable Importance \n April+May, test on June",
+           n.var = 20, 
+           cex = 0.9)
+
+```
+
+## CT models summary 
+What we learned from this testing is the following:
+
+- All models showed very high accuracy and excellent performance according to ROC curves. 
+- Even a single month of data presents a rich source of information for building an accurate EDT crash estimation model. For the Maryland data, going to longer time frames and testing on novel data (training on April + May, testing on June) showed similar overall model performance as the more simple single month of data (April only).
+- 1 mi grid size is most practical, although there is some gain from the smaller grid size. That performance gain needs to be weighed against the higher computational resources needed for data aggregation and modeling.
+- Neighboring grid cells added some additional predictive power.
+- Additional data improved different aspects of the model: using the larger April + May data, weather data reduced false positives, while road functional class and jobs data reduced false negatives.
+
+
+
+
+
+# CT / MD model comparison
+
+
+
+```{r Diagframe2a}
+load(file.path(localdir, "Output_to_44b"))
+keyoutputs2 <- keyoutputs; rm(keyoutputs)
+```
+
+
+## A: All Waze 
+
+Set A consisted of the following models:
+
+- 18 Base: All Waze features from event type (but not the counts of all Waze events together)
+
