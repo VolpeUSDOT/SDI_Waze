@@ -4,7 +4,7 @@ output:
   html_document:
     df_print: paged
     toc: yes
-    toc_depth: 2
+    toc_depth: 3
     toc_float:
       collapsed: yes
       smooth_scroll: yes
@@ -41,10 +41,9 @@ source(file.path(codeloc, 'utility/wazefunctions.R'))
 source(file.path(codeloc, "analysis/RandomForest_WazeGrid_Fx.R"))
 
 # models <- read.csv(file.path(localdir, "Model_Descriptions.csv")) # Source: \\vntscex.local\DFS\Projects\PROJ-OR02A2\SDI\Model_Output
-
 ```
 
-```{r getfiles}
+```{r getfiles, message=FALSE, warning=FALSE}
 
 # Pull down model outputs from S3 if necessary
 md.files <-  c(
@@ -81,14 +80,166 @@ for(i in ct.files){
                  file.path(outputdir, i)))
   }
 }
+```
+
+# Connecticut Waze Crash Models
+
+In the first phase of the SDI Waze project, Maryland was selected as the focal state. Maryland contributes crash data to the Electronic Data Transfer (EDT) system, which crash location data being high quality and with high availability. The six-month period from April - September, 2017 was used to assess the fitness of the Waze data for estimating police-reportable crashes. Those models showed high accuracy, with over 99% of locations and times being correctly identified has having a police-reportable crash or not. In that first phase, the unit of analysis was 1 square mile grid cells, for each hour of the time period between the beginning of April and end of September, 2017.
+
+A number of supplemental data sources were found to improve recall and accuracy to some extent, but overall accuracy was already high without these supplemental features. These supplemental data sources included the following:
+
+- Average annual daily traffic (AADT), by sum of the AADT in the roads in a grid cell, from HPMS
+- Fatal Accident Reporting System (FARS) counts of fatal accidents from 2012-2016 for each grid cell
+- Weather: Reflectivity from the [NEXRAD](https://www.ncdc.noaa.gov/data-access/radar-data/nexrad) radar network, pulled hourly and merged with gridded data.
+- Road functional class: Miles of roads of each functional class, from [HPMS](https://www.fhwa.dot.gov/policyinformation/hpms.cfm).
+- Economic data from [Longidtinal Employer-Household Dynamics](https://lehd.ces.census.gov/) data set: Number of jobs, and number of workers, for firms of different ages and sizes.
+
+To extend the work of the first phase to additional states, Connecticut was selected in the second phase of the SDI Waze project. Like Maryland, crashes are reported in the EDT system for Connecticut, and spatial data are high quality and high coverage across crashes (i.e., relatively few crashes have no spatial data).
+
+As a test of the approach taken in the first phase, a model of police-reportable crashes using just Waze data features (without supplemental data) was applied to Connecticut, for the same April - September 2017 time period. We then compare this Connecticut model to the Maryland model. There are three questions to ask in this comparison:
+
+1. Do the Connecticut and Maryland models have similar accuracy, precision, recall, and false positive rates?
+    
+2. Do the Connecticut and Maryland models have similar variables identified as the most important?
+
+3. When applying models fitted to one state on to data from another state, how much does the accuracy and other model diagnostic information change?
+
+For both Maryland and Connecticut, there are two key data sets:
+
+- EDT data, April - September 2017
+- Waze data, April - September 2017 
+
+For the random forest models, the model was fitted using 70% of the data (by grid cell and hour). Then, again within each state, 30% of data was used to test the fitted model. Observed EDT crashes are compared to estimated EDT crashes produced by the model. 
+
+### Question 1: Do the Connecticut and Maryland models have similar accuracy, precision, recall, and false positive rates?
+
+
+Both states models show high accuracy. The Connecticut model also shows higher precision and recall; overall, AUC is high for both state models, but slightly higher for Connecticut (0.98 versus 0.96 for Maryland).
+
+```{r CT_MD_metrics, echo = F}
+# Get outputs
+
+load(file.path(outputdir, "Model_18_Output_to_CT.RData"))
+
+tabl <- vector()
+for(i in c("MD_18", "CT_18")){ tabl <- rbind(tabl, c(100*keyoutputs[[i]]$diag, round(keyoutputs[[i]]$auc, 4)))}
+
+colnames(tabl)[1:5] = c("Accuracy", "Precision", "Recall", "False Positive Rate", "AUC")
+rownames(tabl) = c("Maryland, April-September Waze model", "Connecticut, April-September Waze model")
+
+datatable(tabl, 
+          caption = "Maryland and Connecticut Waze-EDT model comparison",
+          rownames = T,
+          options = list(dom = "t",
+                         order = list(list(5, 'desc')),
+                         pageLength = 5)
+          ) %>% formatCurrency(1:6, currency = "", digits = 2) %>%
+          formatStyle(1, background = styleEqual(max(tabl[,1]), 'lightgreen'))%>%
+          formatStyle(2, background = styleEqual(max(tabl[,2]), 'lightgreen'))%>%
+          formatStyle(3, background = styleEqual(max(tabl[,3]), 'lightgreen'))%>%
+          formatStyle(4, background = styleEqual(min(tabl[,4]), 'lightgreen'))%>%
+          formatStyle(5, background = styleEqual(max(tabl[,5]), 'lightgreen'))
+```   
+
+### Question 2. Do the Connecticut and Maryland models have similar variables identified as the most imporant?
+
+Comparing the variables used in the individual state models, the single most important variable for both states was the number of Waze accidents reported in a grid cell, in an hour. This confirms the strong link between user-reported crashes (called 'accidents' in the Waze data) and police-reported crashes. The strength of importance is measured with Gini importance, which reflects how much the inclusion of this variable improves the classification of the outcome variable, number of estimated EDT crashes. The units of importance 
+
+
+```{r CT_MD_varimp_table, eval=T}
+load(file.path(outputdir, "CT_Model_18_RandomForest_Output.RData"))
+CT_rf.out = rf.out
+
+load(file.path(outputdir, "MD_Model_18_RandomForest_Output.RData"))
+MD_rf.out = rf.out
+
+nimp = 25
+
+CT_rf.out$importance = CT_rf.out$importance / sum(CT_rf.out$importance)
+MD_rf.out$importance = MD_rf.out$importance / sum(MD_rf.out$importance)
+
+CT_imp = CT_rf.out$importance[order(CT_rf.out$importance, decreasing = T)[1:nimp],]
+MD_imp = MD_rf.out$importance[order(MD_rf.out$importance, decreasing = T)[1:nimp],]
+
+CT_imp = data.frame(var = names(CT_imp),
+                    CT_rank = 1:nimp,
+                    CT_Importance = 100*CT_imp)
+
+MD_imp = data.frame(var = names(MD_imp),
+                    MD_rank = 1:nimp,
+                    MD_Importance = 100*MD_imp)
+
+CT_MD_imp = full_join(CT_imp, MD_imp, by = "var")
+
+datatable(CT_MD_imp, filter = 'top',
+          caption = "Maryland and Connecticut Waze-EDT model percent variable importance",
+          rownames = T,
+          options = list(dom = "ftp",
+                         order = list(list(5, 'desc')),
+                         pageLength = 5)
+          ) %>% formatCurrency(c(3, 5), currency = "", digits = 2)
 
 ```
 
-# Multi-state comparison overview
 
-- Comparing models run on Connecticut and Maryland
+```{r CT_MD_varimp, fig.height=8, fig.width=10, fig.align='center', fig.caption='Variable importance for Connecticut and Maryland Waze models'}
+par(mfrow=c(1,2))
+varImpPlot(CT_rf.out,
+           main = "Connecticut Waze model",
+           n.var = 20, 
+           cex = 0.9)
+varImpPlot(MD_rf.out,
+           main = "Maryland Waze model",
+           n.var = 20, 
+           cex = 0.9)
+```
 
-There are multiple criteria for evaluating classification and regression models. For all the models, we used two different data sets to train and test the model. *Training* refers to fitting the model parameters with a large set of known EDT crashes and associated Waze events and other predictors, while *testing* refers to applying the fitted model parameters to a new set of Waze events and other predictors, generating estimated EDT crashes. The estimated EDT crashes are then compared to the known, observed EDT crashes in the test data set to evaluate model performance.
+
+### Question 3. When applying models fitted to one state on to data from another state, how much does the accuracy and other model diagnostic information change?
+
+To answer this question, we used models trained on one state (e.g., Maryland) and applied it to the full set of data from the other state (e.g., Connecticut). This process would be similar to what would be done if applying this approach to estimating police-reportable crashes for states where EDT data are not available. 
+
+The performance of models trained one state and applied to the other was high; using accuracy and AUC metrics, there was no decrease in performance at all, but in fact some increase in AUC. Since both models had highly similar importance of individual variables (the top six variables being identical in both models), it is not surprising that the performance is similar. These results demonstrate that the relationship between the crowdsourced Waze data and police-reportable crashes is consistent and can be used with confidence when EDT data are not available.
+
+Interestingly, the Maryland model applied to Connecticut data performed very well, with higher recall and precision than the Connecticut model. However, using the Connecticut model on Maryland data did show trade-off between lower precision and higher recall, which is also reflected in the higher false positive rate. This indicates that the Connecticut model is slightly more 'generous' than the Maryland model, meaning that the Connecticut model is slightly more likely to determine that a police-reportable crash has occurred in a given grid cell in an hour, given the combination of Waze predictor variables used.
+
+```{r CT_MD_data_swap_table, eval = F}
+
+rm(keyoutputs)
+load(file.path(outputdir, "Model_18_CT_mod_MD_data_Output.RData"))
+
+tabl <- vector()
+for(i in c("Model_18_MD_mod_CT", "Model_18_CT_mod_MD_dat")){ tabl <- rbind(tabl, c(100*keyoutputs[[i]]$diag, round(keyoutputs[[i]]$auc, 4)))}
+
+colnames(tabl)[1:5] = c("Accuracy", "Precision", "Recall", "False Positive Rate", "AUC")
+rownames(tabl) = c("MD Waze model on CT data, April-September", "CT Waze model on MD data, April-September")
+
+datatable(tabl, 
+          caption = "Maryland and Connecticut Waze-EDT model comparison",
+          rownames = T,
+          options = list(dom = "t",
+                         order = list(list(5, 'desc')),
+                         pageLength = 5)
+          ) %>% formatCurrency(1:6, currency = "", digits = 2) %>%
+          formatStyle(1, background = styleEqual(max(tabl[,1]), 'lightgreen'))%>%
+          formatStyle(2, background = styleEqual(max(tabl[,2]), 'lightgreen'))%>%
+          formatStyle(3, background = styleEqual(max(tabl[,3]), 'lightgreen'))%>%
+          formatStyle(4, background = styleEqual(min(tabl[,4]), 'lightgreen'))%>%
+          formatStyle(5, background = styleEqual(max(tabl[,5]), 'lightgreen'))
+
+```
+
+## CT / MD models summary 
+
+What we learned from this testing is the following:
+
+1. All models showed very high accuracy and excellent performance according to model diagnostics, especially accuracy and AUC. 
+2. Connecticut and Maryland models fitted with the Waze data showed very similar order and level of importance for the input variables.
+3. Applying the Connecticut model to Maryland data and vice versa showed similar model performance, giving confidence that the relationships between the crowdsourced crash reports and police-reported crashes are robust. In addition, the Waze data can be used as inputs for a crash-estimation model across states, even when EDT data may not be available.
+
+## Appendix: Model comparison metrics
+
+There are multiple criteria for evaluating classification models like random forests. For all the models, we used two different data sets to train and test the model. *Training* refers to fitting the model parameters with a large set of known EDT crashes and associated Waze events and other predictors, while *testing* refers to applying the fitted model parameters to a new set of Waze events and other predictors, generating estimated EDT crashes. The estimated EDT crashes are then compared to the known, observed EDT crashes in the test data set to evaluate model performance.
 
 Here we use three criteria, each of which can also be applied to the regularized regression models in the next phase:
 
@@ -136,100 +287,4 @@ Balancing between high specificity (where false positives are avoided) and high 
 knitr::include_graphics("ROC_curves.png")
 ```
 
-# CT models
-
-### Input data
-
-- April - September 2017, complete data used, test on 30% of data randomly held back
-
-```{r CTmods, echo = F}
-
-tabl <- vector()
-for(i in c("01", "08")){ tabl <- rbind(tabl, c(100*keyoutputs1[[i]]$diag, round(keyoutputs1[[i]]$auc, 4)))}
-
-colnames(tabl)[1:5] = c("Accuracy", "Precision", "Recall", "False Positive Rate", "AUC")
-rownames(tabl) = c("01 - 1 mile", "08 - 1 mile, Neighbors")
-
-datatable(tabl, filter = 'top',
-          caption = "Phase 1 model diagnostics for April 2017, Maryland, with neighboring grid cells as predictors.",
-          rownames = T,
-          options = list(dom = "t",
-                         order = list(list(5, 'desc')),
-                         pageLength = 5)
-          ) %>% formatCurrency(2:4, currency = "", digits = 2) %>%
-          formatStyle(1, background = styleEqual(max(tabl[,1]), 'lightgreen'))%>%
-          formatStyle(2, background = styleEqual(max(tabl[,2]), 'lightgreen'))%>%
-          formatStyle(3, background = styleEqual(max(tabl[,3]), 'lightgreen'))%>%
-          formatStyle(4, background = styleEqual(min(tabl[,4]), 'lightgreen'))%>%
-          formatStyle(5, background = styleEqual(max(tabl[,5]), 'lightgreen'))
-
-# 03, 09 - April+May, test on June
-tabl <- vector()
-for(i in c("03", "09")){ tabl <- rbind(tabl, c(100*keyoutputs1[[i]]$diag, round(keyoutputs1[[i]]$auc, 4)))}
-colnames(tabl)[1:5] = c("Accuracy", "Precision", "Recall", "False Positive Rate", "AUC")
-rownames(tabl) = c("03 - 1 mile", "09 - 1 mile, Neighbors")
-
-datatable(tabl, filter = 'top',
-          caption = "Phase 1 model diagnostics for April-May, test on June 2017, Maryland, with neighboring grid cells as predictors.",
-          rownames = T,
-          options = list(dom = "t",
-                         order = list(list(5, 'desc')),
-                         pageLength = 5)
-          ) %>% formatCurrency(2:4, currency = "", digits = 2) %>%
-          formatStyle(1, background = styleEqual(max(tabl[,1]), 'lightgreen'))%>%
-          formatStyle(2, background = styleEqual(max(tabl[,2]), 'lightgreen'))%>%
-          formatStyle(3, background = styleEqual(max(tabl[,3]), 'lightgreen'))%>%
-          formatStyle(4, background = styleEqual(min(tabl[,4]), 'lightgreen'))%>%
-          formatStyle(5, background = styleEqual(max(tabl[,5]), 'lightgreen'))
-  
-```   
-
-
-```{r bestphaseI, eval=T, fig.height=6, fig.width=6, fig.align='center'}
-modelno = "17"
-
-if(ONLOCAL) {load(file.path(outputdir1, paste("Model", modelno, "RandomForest_Output_04.RData", sep= "_")))} else {s3load(object = file.path(outputdir, paste("Model", modelno, "RandomForest_Output.RData", sep= "_")), bucket = waze.bucket)}
-
-imp.tab <- data.frame(round(rf.out$importance[order(rf.out$importance, decreasing = T)[1:15],], 2))
-colnames(imp.tab) = "Gini importance"
-
-# kable(imp.tab, row.names = T,
-#       caption = "Variance importance for the highest recall plot in phase I, Model 17. Top 15 of 74 predictors shown.") %>% 
-#   kableExtra::kable_styling(bootstrap_options = "striped")
-
-varImpPlot(rf.out,
-           main = "Model 17 Variable Importance \n April+May, test on June",
-           n.var = 20, 
-           cex = 0.9)
-
-```
-
-## CT models summary 
-What we learned from this testing is the following:
-
-- All models showed very high accuracy and excellent performance according to ROC curves. 
-- Even a single month of data presents a rich source of information for building an accurate EDT crash estimation model. For the Maryland data, going to longer time frames and testing on novel data (training on April + May, testing on June) showed similar overall model performance as the more simple single month of data (April only).
-- 1 mi grid size is most practical, although there is some gain from the smaller grid size. That performance gain needs to be weighed against the higher computational resources needed for data aggregation and modeling.
-- Neighboring grid cells added some additional predictive power.
-- Additional data improved different aspects of the model: using the larger April + May data, weather data reduced false positives, while road functional class and jobs data reduced false negatives.
-
-
-
-
-
-# CT / MD model comparison
-
-
-
-```{r Diagframe2a}
-load(file.path(localdir, "Output_to_44b"))
-keyoutputs2 <- keyoutputs; rm(keyoutputs)
-```
-
-
-## A: All Waze 
-
-Set A consisted of the following models:
-
-- 18 Base: All Waze features from event type (but not the counts of all Waze events together)
 
