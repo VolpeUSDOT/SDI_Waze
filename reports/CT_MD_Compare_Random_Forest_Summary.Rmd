@@ -84,12 +84,12 @@ for(i in ct.files){
 
 # Connecticut Waze Crash Models
 
-In the first phase of the SDI Waze project, Maryland was selected as the focal state. Maryland contributes crash data to the Electronic Data Transfer (EDT) system, which crash location data being high quality and with high availability. The six-month period from April - September, 2017 was used to assess the fitness of the Waze data for estimating police-reportable crashes. Those models showed high accuracy, with over 99% of locations and times being correctly identified has having a police-reportable crash or not. In that first phase, the unit of analysis was 1 square mile grid cells, for each hour of the time period between the beginning of April and end of September, 2017.
+In the first phase of the SDI Waze project, Maryland was selected as the focal state. Maryland contributes crash data to the Electronic Data Transfer (EDT) system, with crash location data being high quality and with high availability. The six-month period from April - September, 2017 was used to assess the fitness of the Waze data for estimating police-reportable crashes. Those models showed high accuracy, with over 99% of locations and times being correctly identified has having a police-reportable crash or not. In that first phase, the unit of analysis was 1 square mile grid cells, for each hour of the time period between the beginning of April and end of September, 2017.
 
 A number of supplemental data sources were found to improve recall and accuracy to some extent, but overall accuracy was already high without these supplemental features. These supplemental data sources included the following:
 
-- Average annual daily traffic (AADT), by sum of the AADT in the roads in a grid cell, from HPMS
-- Fatal Accident Reporting System (FARS) counts of fatal accidents from 2012-2016 for each grid cell
+- Average annual daily traffic (AADT), by sum of the AADT in the roads in a grid cell, from HPMS.
+- Fatal Accident Reporting System (FARS) counts of fatal accidents from 2012-2016 for each grid cell.
 - Weather: Reflectivity from the [NEXRAD](https://www.ncdc.noaa.gov/data-access/radar-data/nexrad) radar network, pulled hourly and merged with gridded data.
 - Road functional class: Miles of roads of each functional class, from [HPMS](https://www.fhwa.dot.gov/policyinformation/hpms.cfm).
 - Economic data from [Longidtinal Employer-Household Dynamics](https://lehd.ces.census.gov/) data set: Number of jobs, and number of workers, for firms of different ages and sizes.
@@ -114,7 +114,7 @@ For the random forest models, the model was fitted using 70% of the data (by gri
 ### Question 1: Do the Connecticut and Maryland models have similar accuracy, precision, recall, and false positive rates?
 
 
-Both states models show high accuracy. The Connecticut model also shows higher precision and recall; overall, AUC is high for both state models, but slightly higher for Connecticut (0.98 versus 0.96 for Maryland).
+Both states models show high accuracy; see Appendix below for model diagnostic definitions. The Connecticut model also shows higher precision and recall; overall, AUC is high for both state models, but slightly higher for Connecticut (0.98 versus 0.96 for Maryland).
 
 ```{r CT_MD_metrics, echo = F}
 # Get outputs
@@ -143,7 +143,9 @@ datatable(tabl,
 
 ### Question 2. Do the Connecticut and Maryland models have similar variables identified as the most imporant?
 
-Comparing the variables used in the individual state models, the single most important variable for both states was the number of Waze accidents reported in a grid cell, in an hour. This confirms the strong link between user-reported crashes (called 'accidents' in the Waze data) and police-reported crashes. The strength of importance is measured with Gini importance, which reflects how much the inclusion of this variable improves the classification of the outcome variable, number of estimated EDT crashes. The units of importance 
+Comparing the variables used in the individual state models, the single most important variable for both states was the number of Waze accidents reported in a grid cell, in an hour. This confirms the strong link between user-reported crashes (called 'accidents' in the Waze data) and police-reported crashes. The strength of importance is measured with Gini importance, which reflects how much the inclusion of this variable improves the classification of the outcome variable, number of estimated EDT crashes. The units of importance have been normalized across all 32 variables used in these models. 
+
+The variable with the most explanatory power, `nWazeAccident`, accounted for 60.5% and 56.8% of the variation in estimated EDT crashes in the Connecticut and Maryland models, respectively. The top six variables are the same for both states, and the importance values for these variables are nearly the same. Besides the Waze accident variables, the amount of freeways (road type 3, `nWazeRT3`), hour of day, and amount of primary roads (road type 6, `nWazeRT6`) were the most important variables, in the same order, for both states.
 
 
 ```{r CT_MD_varimp_table, eval=T}
@@ -155,24 +157,24 @@ MD_rf.out = rf.out
 
 nimp = 25
 
-CT_rf.out$importance = CT_rf.out$importance / sum(CT_rf.out$importance)
-MD_rf.out$importance = MD_rf.out$importance / sum(MD_rf.out$importance)
+CT_rf.out$importance = 100*CT_rf.out$importance / sum(CT_rf.out$importance)
+MD_rf.out$importance = 100*MD_rf.out$importance / sum(MD_rf.out$importance)
 
 CT_imp = CT_rf.out$importance[order(CT_rf.out$importance, decreasing = T)[1:nimp],]
 MD_imp = MD_rf.out$importance[order(MD_rf.out$importance, decreasing = T)[1:nimp],]
 
 CT_imp = data.frame(var = names(CT_imp),
                     CT_rank = 1:nimp,
-                    CT_Importance = 100*CT_imp)
+                    CT_Importance = CT_imp)
 
 MD_imp = data.frame(var = names(MD_imp),
                     MD_rank = 1:nimp,
-                    MD_Importance = 100*MD_imp)
+                    MD_Importance = MD_imp)
 
 CT_MD_imp = full_join(CT_imp, MD_imp, by = "var")
 
 datatable(CT_MD_imp, filter = 'top',
-          caption = "Maryland and Connecticut Waze-EDT model percent variable importance",
+          caption = "Maryland and Connecticut Waze-EDT model percent variable importance. Rank of importance for each state model and percent of Gini importance accounted for by each variable shown.",
           rownames = T,
           options = list(dom = "ftp",
                          order = list(list(5, 'desc')),
@@ -182,16 +184,16 @@ datatable(CT_MD_imp, filter = 'top',
 ```
 
 
-```{r CT_MD_varimp, fig.height=8, fig.width=10, fig.align='center', fig.caption='Variable importance for Connecticut and Maryland Waze models'}
+```{r CT_MD_varimp, fig.height=8, fig.width=11, fig.align='center', fig.caption='Variable importance for Connecticut and Maryland Waze models. '}
 par(mfrow=c(1,2))
 varImpPlot(CT_rf.out,
            main = "Connecticut Waze model",
            n.var = 20, 
-           cex = 0.9)
+           cex = 0.8)
 varImpPlot(MD_rf.out,
            main = "Maryland Waze model",
            n.var = 20, 
-           cex = 0.9)
+           cex = 0.8)
 ```
 
 
@@ -241,7 +243,7 @@ What we learned from this testing is the following:
 
 There are multiple criteria for evaluating classification models like random forests. For all the models, we used two different data sets to train and test the model. *Training* refers to fitting the model parameters with a large set of known EDT crashes and associated Waze events and other predictors, while *testing* refers to applying the fitted model parameters to a new set of Waze events and other predictors, generating estimated EDT crashes. The estimated EDT crashes are then compared to the known, observed EDT crashes in the test data set to evaluate model performance.
 
-Here we use three criteria, each of which can also be applied to the regularized regression models in the next phase:
+Here we use two criteria:
 
 ### 1. Diagnostics from a confusion matrix
 
@@ -273,7 +275,7 @@ False positives (FP) can be considered Type I errors, and false negatives (FN) c
     + False positives divided by all observed negatives. A low value indicates that there are relatively few false positives compared to all observed absences of EDT crashes.
 
 
-### 2. Area under Reciever-Operator Characteristic Curve (AUROC, ROC curve)
+### 2. Area under Reciever-Operator Characteristic Curve (AUC, AUROC, ROC curve)
 
 For a binary model, we can additionally calculate one other quantity:
 
