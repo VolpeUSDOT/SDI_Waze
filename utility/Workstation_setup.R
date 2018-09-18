@@ -254,26 +254,32 @@ if(EXPORTREORG){
   # More simple, use R wrapper:
   # zip(zipfilename, files = c(file1, file2))
   
-  system(paste(
-    'zip ~/workingdata/RandomForest_Outputs_2018-09-13.zip',
-    '~/workingdata/VMT_Output_to_63',
-    '~/workingdata/MD_VMT_Output_to_30.RData',
-    file.path(outputdir, 'Model_18_Output_to_CT.RData'),
-    file.path(outputdir, 'Model_18_CT_mod_MD_data_Output.RData'),
-    file.path(outputdir, 'Model_18_CT_mod_MD_dat_RandomForest_Output.RData'),
-    file.path(outputdir, 'Model_18_MD_mod_CT_data_Output.RData'),
-    file.path(outputdir, 'Model_18_MD_mod_CT_dat_RandomForest_Output.RData'),
+  zipname = 'RandomForest_Outputs_2018-09-18.zip'
+  
+  system(paste('zip', file.path('~/workingdata', zipname),
+    file.path(outputdir, 'MD_VMT_Output_to_30.RData'),
+    file.path(outputdir, 'CT_VMT_Output_to_30.RData'),
+    # file.path(outputdir, 'Model_18_Output_to_CT.RData'),
+    # file.path(outputdir, 'Model_18_CT_mod_MD_data_Output.RData'),
+    # file.path(outputdir, 'Model_18_CT_mod_MD_dat_RandomForest_Output.RData'),
+    # file.path(outputdir, 'Model_18_MD_mod_CT_data_Output.RData'),
+    # file.path(outputdir, 'Model_18_MD_mod_CT_dat_RandomForest_Output.RData'),
     file.path(outputdir, 'MD_Model_63_RandomForest_Output.RData'),
     file.path(outputdir, 'MD_Model_62_RandomForest_Output.RData'),
     file.path(outputdir, 'MD_Model_61_RandomForest_Output.RData'),
-    file.path(outputdir, 'CT_Model_18_RandomForest_Output.RData'),
-    file.path(outputdir, 'MD_Model_18_RandomForest_Output.RData')
+    file.path(outputdir, 'MD_Model_30_RandomForest_Output.RData'),
+    file.path(outputdir, 'CT_Model_63_RandomForest_Output.RData'),
+    file.path(outputdir, 'CT_Model_62_RandomForest_Output.RData'),
+    file.path(outputdir, 'CT_Model_61_RandomForest_Output.RData'),
+    file.path(outputdir, 'CT_Model_30_RandomForest_Output.RData')
+    # file.path(outputdir, 'CT_Model_18_RandomForest_Output.RData'),
+    # file.path(outputdir, 'MD_Model_18_RandomForest_Output.RData')
   ))
 
   system(paste(
     'aws s3 cp',
-    '~/workingdata/RandomForest_Outputs_2018-09-13.zip',
-    file.path(teambucket, 'export_requests', 'RandomForest_Outputs_2018-09-13.zip')
+    file.path('~/workingdata', zipname),
+    file.path(teambucket, 'export_requests', zipname)
   ))
   
   

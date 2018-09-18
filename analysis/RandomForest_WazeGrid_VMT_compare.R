@@ -17,7 +17,7 @@ source(file.path(codeloc, 'utility/get_packages.R')) # installs necessary packag
 HEXSIZE = 1 
 
 # <><><><><>
-state = 'CT' # 'MD'  #'UT' # Sets the state. UT, VA, MD are all options.
+state = 'MD' # 'MD'  #'UT' # Sets the state. UT, VA, MD are all options.
 # <><><><><>
 
 # Manually setting months to run here; could also scan S3 for months available for this state
@@ -84,7 +84,7 @@ for(w in monthfiles){ # w = "w.2017_04"
   append.hex2(hexname = w, data.to.add = paste0("FARS_", state, "_2012_2016_sum_annual"), state = state, na.action = na.action)
   
   # VMT   
-#  append.hex2(hexname = w, data.to.add = paste0(state, "_max_aadt_by_grid_fc_urban_vmt_factored"), state = state, na.action = na.action)
+  append.hex2(hexname = w, data.to.add = paste0(state, "_max_aadt_by_grid_fc_urban_vmt_factored"), state = state, na.action = na.action)
   
   #  append.hex2(hexname = w, data.to.add = "hexagons_1mi_routes_AADT_total_sum", na.action = na.action)
  #   append.hex(hexname = w, data.to.add = "hexagons_1mi_routes_sum", na.action = na.action)
@@ -102,7 +102,7 @@ for(i in w.allmonths.named){
 }
 rm(list = w.allmonths.named)
 
-# format(object.size(w.allmonths), "Gb")
+# format(object.size(w.allmonths), "Gb") # CT 2017 04-09, 1 Gb, 1,359,333 rows.
 
 avail.cores = parallel::detectCores()
 
@@ -164,7 +164,7 @@ if(!REASSESS){
                                 omits, response.var = "MatchEDT_buffer_Acc", 
                                 model.no = modelno, rf.inputs = rf.inputs) 
   
-  save("keyoutputs", file = paste0("VMT_Output_to_", modelno))
+  save("keyoutputs", file = paste0(state, "_VMT_Output_to_", modelno))
   } else {
 
 redo_outputs[[modelno]] = reassess.rf(train.dat = w.allmonths, 
@@ -194,7 +194,7 @@ if(!REASSESS){
                                 omits, response.var = "MatchEDT_buffer_Acc", 
                                 model.no = modelno, rf.inputs = rf.inputs) 
   
-  save("keyoutputs", file = paste0("VMT_Output_to_", modelno))
+  save("keyoutputs", file = paste0(state, "_VMT_Output_to_", modelno))
 } else {
   
   redo_outputs[[modelno]] = reassess.rf(train.dat = w.allmonths, 
@@ -224,7 +224,7 @@ if(!REASSESS){
                                 omits, response.var = "MatchEDT_buffer_Acc", 
                                 model.no = modelno, rf.inputs = rf.inputs) 
   
-  save("keyoutputs", file = paste0("VMT_Output_to_", modelno))
+  save("keyoutputs", file = paste0(state, "_VMT_Output_to_", modelno))
 } else {
   redo_outputs[[modelno]] = reassess.rf(train.dat = w.allmonths, 
                                         omits, response.var = "MatchEDT_buffer_Acc", 
@@ -252,7 +252,7 @@ if(!REASSESS){
                                 omits, response.var = "MatchEDT_buffer_Acc", 
                                 model.no = modelno, rf.inputs = rf.inputs) 
   
-  save("keyoutputs", file = paste0("VMT_Output_to_", modelno))
+  save("keyoutputs", file = paste0(state, "_VMT_Output_to_", modelno))
 } else {
   redo_outputs[[modelno]] = reassess.rf(train.dat = w.allmonths, 
                                         omits, response.var = "MatchEDT_buffer_Acc", 
@@ -261,7 +261,7 @@ if(!REASSESS){
 
 
 
-save("keyoutputs", file = paste0("VMT_Output_to_", modelno))
+save("keyoutputs", file = paste0(state, "_VMT_Output_to_", modelno))
 
 timediff <- Sys.time() - starttime
 cat(round(timediff, 2), attr(timediff, "units"), "elapsed to model", modelno)
@@ -287,7 +287,7 @@ omits = c(alwaysomit, alert_subtypes
 if(!REASSESS){
   keyoutputs[[modelno]] = do.rf(train.dat = w.allmonths, omits, response.var = "MatchEDT_buffer_Acc",  
                                 model.no = modelno, rf.inputs = rf.inputs) 
-  save("keyoutputs", file = paste0("VMT_Output_to_", modelno))
+  save("keyoutputs", file = paste0(state, "_VMT_Output_to_", modelno))
 } else {
   redo_outputs[[modelno]] = reassess.rf(train.dat = w.allmonths,
                                         omits, response.var = "MatchEDT_buffer_Acc", 

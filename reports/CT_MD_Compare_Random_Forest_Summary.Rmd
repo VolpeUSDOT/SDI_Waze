@@ -205,7 +205,7 @@ The performance of models trained one state and applied to the other was high; u
 
 Interestingly, the Maryland model applied to Connecticut data performed very well, with higher recall and precision than the Connecticut model. However, using the Connecticut model on Maryland data did show trade-off between lower precision and higher recall, which is also reflected in the higher false positive rate. This indicates that the Connecticut model is slightly more 'generous' than the Maryland model, meaning that the Connecticut model is slightly more likely to determine that a police-reportable crash has occurred in a given grid cell in an hour, given the combination of Waze predictor variables used.
 
-```{r CT_MD_data_swap_table, eval = F}
+```{r CT_MD_data_swap_table, eval = T}
 
 rm(keyoutputs)
 load(file.path(outputdir, "Model_18_CT_mod_MD_data_Output.RData"))

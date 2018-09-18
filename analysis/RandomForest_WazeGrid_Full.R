@@ -18,7 +18,7 @@ source(file.path(codeloc, 'utility/get_packages.R')) # installs necessary packag
 HEXSIZE = 1 #c("1", "4", "05")[1] # Change the value in the bracket to use 1, 4, or 0.5 sq mi hexagon grids
 
 # <><><><><>
-state = 'CT'  #'UT' # Sets the state. UT, VA, MD will all be options.
+state = 'MD' #'CT'  #'UT' # Sets the state. UT, VA, MD will all be options.
 # <><><><><>
 
 # Manually setting months to run here; could also scan S3 for months available for this state
