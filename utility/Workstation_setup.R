@@ -210,7 +210,7 @@ for(i in aadt.ls){
 # LODES_LEHD ----
 
 
-lodes.ls = c('LODES_LEHD_CT_UT.zip')
+lodes.ls = c('LODES_LEHD_CT_MD_UT_VA.zip')
 
 for(i in lodes.ls){
   system(paste("aws s3 cp",
@@ -355,9 +355,13 @@ system(paste("aws s3 mv",
              file.path(teambucket, "FARS", "FARS_CT_MD_UT.zip"))
 )
 
+# View uploaded files
+system(paste("aws s3 ls", 
+             file.path(teambucket, system('whoami', intern = T), "uploaded_files/")))
+
 system(paste("aws s3 mv", 
-             file.path(teambucket, "LODES_LEHD_CT_UT.zip"),
-             file.path(teambucket, "LODES_LEHD", "LODES_LEHD_CT_UT.zip"))
+             file.path(teambucket, system('whoami', intern = T), "uploaded_files", "LODES_LEHD_CT_MD_UT_VA.zip"),
+             file.path(teambucket, "LODES_LEHD", "LODES_LEHD_CT_MD_UT_VA.zip"))
 )
 
 }

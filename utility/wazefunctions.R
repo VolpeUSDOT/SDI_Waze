@@ -362,6 +362,11 @@ append.hex2 <- function(hexname, data.to.add, state, na.action = c("omit", "keep
       
       } 
     
+    if(length(grep("bg_wac", data.to.add)) > 0 | length(grep("bg_rac", data.to.add)) > 0 ){
+      assign(data.to.add, foreign::read.dbf(file = file.path(localdir, "LODES_LEHD", state, paste0(data.to.add, ".dbf"))),
+             envir = globalenv())
+      
+    } 
     # { # Build this out lodes, aadt
     #   assign(data.to.add, rgdal::readOGR(localdir, layer = data.to.add), envir = globalenv())
     # }
@@ -457,7 +462,7 @@ append.hex2 <- function(hexname, data.to.add, state, na.action = c("omit", "keep
 
   if(length(grep("bg_rac_", data.to.add)) > 0){
     
-    dd <- dd@data 
+    #dd <- dd@data 
     dd <- dd[c("GRID_ID", 
                "SUM_C000",                                                            # Total jobs
                #               "SUM_CA01", "SUM_CA02", "SUM_CA03",                                    # By age category
@@ -469,9 +474,9 @@ append.hex2 <- function(hexname, data.to.add, state, na.action = c("omit", "keep
     
   }
   
-  if(length(grep("bg_lodes_", data.to.add)) > 0){
+  if(length(grep("bg_wac_", data.to.add)) > 0){
     
-    dd <- dd@data 
+    #dd <- dd 
     dd <- dd[c("GRID_ID", 
                "SUM_C000",                                                            # Total jobs
                #               "SUM_CA01", "SUM_CA02", "SUM_CA03",                                    # By age category

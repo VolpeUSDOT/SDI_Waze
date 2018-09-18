@@ -82,14 +82,9 @@ monthfiles = sub("-", "_", monthfiles)
  
 for(w in monthfiles){ # w = "w.2017_04"
   append.hex2(hexname = w, data.to.add = paste0("FARS_", state, "_2012_2016_sum_annual"), state = state, na.action = na.action)
-  
-  # VMT   
   append.hex2(hexname = w, data.to.add = paste0(state, "_max_aadt_by_grid_fc_urban_vmt_factored"), state = state, na.action = na.action)
-  
-  #  append.hex2(hexname = w, data.to.add = "hexagons_1mi_routes_AADT_total_sum", na.action = na.action)
- #   append.hex(hexname = w, data.to.add = "hexagons_1mi_routes_sum", na.action = na.action)
- #   append.hex(hexname = w, data.to.add = "hexagons_1mi_bg_lodes_sum", na.action = na.action)
- #   append.hex(hexname = w, data.to.add = "hexagons_1mi_bg_rac_sum", na.action = na.action)
+  append.hex2(hexname = w, data.to.add = paste0(state, "_hexagons_1mi_bg_wac_sum"), state = state, na.action = na.action)
+  append.hex2(hexname = w, data.to.add = paste0(state, "_hexagons_1mi_bg_rac_sum"), state = state, na.action = na.action)  
 }
 
 

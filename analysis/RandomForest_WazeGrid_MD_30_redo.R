@@ -61,25 +61,23 @@ for(mo in do.months){
 
 # Update this later after getting supplemental data ready
 # Add FARS, AADT, HPMS, jobs
- na.action = "fill0"
-for(w in c("w.2017_04", "w.2017_05", "w.2017_06", "w.2017_07","w.2017_08", "w.2017_09")){
-  append.hex2(hexname = w, data.to.add = "FARS_MD_2012_2016_sum_annual", state=state, na.action = na.action)
-  
-  # VMT   
+na.action = "fill0"
+
+monthfiles = paste("w", do.months, sep=".")
+monthfiles = sub("-", "_", monthfiles)
+ 
+for(w in monthfiles){
+  append.hex2(hexname = w, data.to.add = paste0("FARS_", state, "_2012_2016_sum_annual"), state = state, na.action = na.action)
   append.hex2(hexname = w, data.to.add = paste0(state, "_max_aadt_by_grid_fc_urban_vmt_factored"), state = state, na.action = na.action)
-  # append.hex2(hexname = w, data.to.add = "hexagons_1mi_routes_AADT_total_sum", na.action = na.action)
-  # append.hex2(hexname = w, data.to.add = "hexagons_1mi_routes_sum", na.action = na.action)
-  # append.hex2(hexname = w, data.to.add = "hexagons_1mi_bg_lodes_sum", na.action = na.action)
-  # append.hex2(hexname = w, data.to.add = "hexagons_1mi_bg_rac_sum", na.action = na.action)
-  # 
+  append.hex2(hexname = w, data.to.add = paste0(state, "_hexagons_1mi_bg_wac_sum"), state = state, na.action = na.action)
+  append.hex2(hexname = w, data.to.add = paste0(state, "_hexagons_1mi_bg_rac_sum"), state = state, na.action = na.action)   
   }
 
 
 # Bind all months together
-w.allmonths.named <- ls()[grep("^w.", ls())]
 
 w.allmonths <- vector()
-for(i in w.allmonths.named){
+for(i in monthfiles){
   w.allmonths <- rbind(w.allmonths, get(i))
 }
 
@@ -99,6 +97,7 @@ alert_subtypes = c("nHazardOnRoad", "nHazardOnShoulder" ,"nHazardWeather", "nWaz
 response.var = "MatchEDT_buffer_Acc"
 
 omits = c(alwaysomit, alert_subtypes)
+          
 
 # Read model from local (pull down from S3 if not present). rf.out is the model, class randomForest
 
@@ -156,11 +155,11 @@ grp  <- as.factor(w.group$group)
 
 identical(test.dat$GRID_ID, out.df$GRID_ID)
 
-dd <- data.frame(out.df, Pred.grp = grp, test.dat[c("nMatchEDT_buffer_Acc", fitvars)]) 
+dd <- data.frame(out.df, Pred.grp = grp, test.dat[c("nMatchEDT_buffer_Acc", fitvars, alert_subtypes)]) 
 
 write.csv(dd, "All_Model_30.csv", row.names = F)
 
-savelist = c("rf.out", "rf.pred", "rf.prob", "out.df", "dd") 
+savelist = c("rf.out", "rf.pred", "rf.prob", "out.df", "w.allmonths") 
 
 fn = paste("Model_18_MD_mod_30_all_RandomForest_Output.RData", sep= "_")
 
