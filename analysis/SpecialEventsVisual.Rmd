@@ -276,10 +276,19 @@ Dave's feedback 8/29/2018:
 loc = "SE1"
 buf = 5
 dt <- GridDataSE(loc,buf,alldays,col.names)
-weekday = "Saturday"
+weekday = "Sunday"
 metrics = "EDT Accident"
-plotDateHeatMap(dt, loc, weekday, metrics)
+plotDateHeatMap(dt, loc, weekday, metrics) # average values
+plotDateHeatMap(dt, loc, weekday, "Waze Jam")
 
+loc = "SE2"
+buf = 5
+dt <- GridDataSE(loc,buf,alldays,col.names)
+plotDateHeatMap(dt, loc, weekday, "EDT Accident")
+
+# make the bars shorterly
+# weekday/weekend classification - baseball only.
+# Fedex field: football
 ```
 
 ## Example Days in Presentation
@@ -287,7 +296,7 @@ plotDateHeatMap(dt, loc, weekday, metrics)
 ### 5 mile buffer zone - Total
 ```{r eval = T}
 loc = "SE1"
-buf = 5
+buf = 3 # both 3 and 5 miles buffer
 dt <- GridDataSE(loc,buf,alldays,col.names)
 days = c("2017-09-10","2017-09-17")
 statistic = "Total" #c("Total","Average","Maximum")
@@ -302,6 +311,8 @@ plotDay(dt, loc, days, statistic, "EDT Fatals")
 plotDay(dt, loc, days, statistic, "EDT Crashes with Ped or Bike Involvement")
 plotDay(dt, loc, days, statistic, "EDT Crashes with School Bus Involvement")
 plotDay(dt, loc, days, statistic, "EDT Vehicle Counts")
+
+# stackle plots in another orientation, on top of each other.
 
 ```
 

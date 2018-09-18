@@ -43,8 +43,8 @@ makelink <- function(accfile = edt.april, incfile = waze.april,
     # d.sp: Waze events. inctimevar2 is the *end* of the event and inctimevar1 is the *start* of the event. We look to see if the end of the event is greater than EDT event -60 minutes and see if the start of the Waze event is less than the EDT event +60 minutes.
     d.t <- d.sp[d.sp[,inctimevar2] >= ei[,acctimevar]-60*60 & d.sp[,inctimevar1] <= ei[,acctimevar]+60*60,] 
     
-    id.accident <- rep(as.character(ei[,accidvar]), nrow(d.t))
-    id.incidents <- as.character(d.t[,incidvar])
+    id.accident <- rep(as.character(ei[,accidvar]), nrow(d.t)) # Waze
+    id.incidents <- as.character(d.t[,incidvar]) # EDT
     
     if(i %% 50000 == 0) {
       timediff <- round(Sys.time()-starttime, 2)
@@ -58,10 +58,10 @@ makelink <- function(accfile = edt.april, incfile = waze.april,
   
   stopCluster(cl) # stop the cluster.
   
-  linktable
+  linktable # Give all Waze accident IDs with EDT incident IDs
   }
   
-
+# Non-parallel
 makelink.nonpar <- function(accfile = edt.april, incfile = waze.april,
                        acctimevar = "CrashDate_Local",
                        inctimevar1 = "time",
