@@ -27,7 +27,7 @@ for (i in toplevel){
 # Create directories within 'workingdata' 
 
 workinglevel = c('census', 'EDT', 'Figures', 'Hex', 'Link', 'Overlay', 'Random_Forest_Output',
-                 'AADT', 'FARS', 'LODES_LEHD')
+                 'AADT', 'FARS', 'LODES_LEHD', 'SpecialEvents')
 
 for (i in workinglevel){
   system(paste('mkdir -p', file.path("~", "workingdata", i)))
@@ -235,6 +235,17 @@ for(i in fars.ls){
                                               file.path('~', 'workingdata', 'FARS/')))
 }
   
+# Special events ----
+
+special.ls = c('SpecialEvents_MD_AprilToSept_2017.csv')
+
+for(i in special.ls){
+  system(paste("aws s3 cp",
+               file.path(teambucket, 'SpecialEvents', i),
+               file.path('~', 'workingdata', 'SpecialEvents', i)))
+  if(length(grep('zip$', i))!=0) system(paste('unzip -o', file.path('~', 'workingdata', 'SpecialEvents', i), '-d',
+                                              file.path('~', 'workingdata', 'SpecialEvents/')))
+}
 
 
 # Re-organizing export of model outputs for new system ----
@@ -320,6 +331,12 @@ system(paste('aws s3 mv',
              paste0(teambucket, "/"),
              file.path(teambucket, "MD/"),
              '--dryrun --include "MD_2017*"')
+)
+
+# Organize special events
+system(paste("aws s3 mv", 
+             file.path(teambucket, system('whoami', intern = T), "uploaded_files", "SpecialEvents_MD_AprilToSept_2017.csv"),
+             file.path(teambucket, "SpecialEvents", "SpecialEvents_MD_AprilToSept_2017.csv"))
 )
 
 

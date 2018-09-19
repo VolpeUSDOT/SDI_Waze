@@ -1,7 +1,8 @@
 # Identify special events with the Waze data
+# Set up for SDC now
 
 #### Set up ####
-codeloc <- "~/Github/SDI_Waze"
+codeloc <- "~/SDI_Waze"
 source(file.path(codeloc, 'utility/get_packages.R'))
 
 library(tidyverse)
@@ -13,31 +14,20 @@ library(doParallel)
 library(rgeos) #gintersection
 library(lubridate)
 library(ggplot2)
-require(spatialEco) # point.in.poly() function
+require(spatialEco) # point.in.poly() function. # install.packages('spatialEco')
+
+# if fails, follow this: https://github.com/r-quantities/units
+# as ec2-user in Terminal: sudo yum install udunits2-devel
+
 library(scales)
 
-localdir <- "C:/Users/Jessie.Yang.CTR/Downloads/OST/Waze project"
-# edtdir <- "/home/daniel/workingdata/" # full path for readOGR, Jessie don't have this folder.
-# edtdir <- normalizePath(file.path(localdir, "EDT"))
-# wazedir <- "~/tempout" # has State_Year-mo.RData files. Grab from S3 if necessary
-wazedir <- "//vntscex.local/DFS/Projects/PROJ-OS62A1/SDI Waze Phase 2"
-output.loc <- file.path(wazedir, "WazeEDT Pilot Phase1 Archive/Model_Output")
-data.loc <- file.path(wazedir, "WazeEDT Pilot Phase1 Archive/Data")
+user <- paste0( "/home/", system("whoami", intern = TRUE)) # the user directory to use
+localdir <- paste0(user, "/workingdata") # full path for readOGR
 
 teambucket <- "s3://prod-sdc-sdi-911061262852-us-east-1-bucket"
 
 source(file.path(codeloc, "utility/wazefunctions.R")) 
-
-states = c("CT", "UT", "VA", "MD")
-
-# Time zone picker:
-tzs <- data.frame(states, 
-                  tz = c("US/Eastern",
-                         "US/Mountain",
-                         "US/Eastern",
-                         "US/Eastern"),
-                  stringsAsFactors = F)
-
+source(file.path(codeloc, "utility/Workstation_setup.R")) # will set up your workstation and download necessary data files 
 
 # Project to Albers equal area conic 102008. Check comparision with USGS version, WKID: 102039
 proj <- showP4(showWKT("+init=epsg:102008"))
@@ -81,31 +71,30 @@ hm_to_num <- function(x){
 # Read shapefiles and apply coordinate reference system of hexagons (USGS version of Albers equal area) to Urban Areas and counties using uproj.USGS
 
 # Read in US state shapefile
-ua <- readOGR(file.path(data.loc,"Census4Waze"), layer = "cb_2016_us_ua10_500k")
+ua <- readOGR(file.path(localdir,"census"), layer = "cb_2016_us_ua10_500k")
 ua <- spTransform(ua, CRS(proj.USGS))
 
 # Read in county shapefile 
-co <- readOGR(file.path(data.loc,"Census4Waze"), layer = "cb_2015_us_county_500k")
+co <- readOGR(file.path(localdir,"census"), layer = "cb_2017_us_county_500k")
 co <- spTransform(co, CRS(proj.USGS))
 
-md <- readOGR(file.path(data.loc,"Census4Waze"), layer = "MD_outline")
+md <- readOGR(file.path(localdir,"census"), layer = "MD_buffered")
 md <- spTransform(md, CRS(proj.USGS))
 # md@data # check the data table in SpatialPolygonsDataFrame class
 
 # Read in hexagon shapefile
-grid <- readOGR(file.path(data.loc,"MD_hexagons_shapefiles"), layer = "MD_hexagons_1mi_newExtent_neighbors")
+grid <- readOGR(file.path(localdir,"MD_hexagons_shapefiles"), layer = "MD_hexagons_1mi_newExtent_neighbors")
 grid <- spTransform(grid, CRS(proj.USGS))
 
 # Read in model output and independent variables used in the model
-# GridCount <- read.csv(paste0(output.loc, "/Waze_04-09_GridCounts.csv")) #623,251*14
-AllModel30 <- read.csv(paste0(output.loc, "/All_Model_30.csv")) # 617,338*124
+AllModel30 <- read.csv(file.path(localdir, "All_Model_30.csv")) # 2,2xx,060 x 94, was 617,338*124
 
 # Convert day of year to date
 # GridCount$date <- as.Date(GridCount$day, origin = "2016-12-31")
 AllModel30$date <- as.Date(AllModel30$day, origin = "2016-12-31")
 # as.Date(91, origin = "2016-12-31") # "2017-04-01", the origin needs to be the last day of 2016.
 
-length(unique(AllModel30$GRID_ID)) # 5880
+length(unique(AllModel30$GRID_ID)) # was 5880, now 7172
 # length(unique(GridCount$GRID_ID)) # 5176
 
 # Verify the date range
@@ -114,19 +103,27 @@ length(unique(AllModel30$GRID_ID)) # 5880
 max(AllModel30$date) # Sept 30
 min(AllModel30$date) # April 1, 2017
 
+# Trim to April - September, will need to double check
+
+AllModel30 = AllModel30 %>% filter(day > 90 & day  < 274)
+
+# create weekday
+
+AllModel30$weekday = lubridate::wday(AllModel30$date)
 # subset AllModel30
+
 var <- c("GRID_ID","day","date","hour","Obs","Pred","Prob.Noncrash","Prob.Crash","weekday","nWazeAccident","nWazeJam","nHazardOnShoulder","nHazardOnRoad","nHazardWeather")
 AllModel30_sub <- AllModel30[, var]
 
 # Read special event data and convert it to spatial data format
-SpecialEvents <- read.csv(file = paste0(wazedir,"/Data/SpecialEvents/SpecialEvents_MD_AprilToSept_2017.csv"))
+SpecialEvents <- read.csv(file = file.path(localdir, "SpecialEvents", "SpecialEvents_MD_AprilToSept_2017.csv"))
 # SpecialEvents_SP <- SpatialPointsDataFrame(SpecialEvents[c("Lon", "Lat")], SpecialEvents, proj4string = CRS("+proj=longlat +datum=WGS84"))  #  make sure Waze data is a SPDF
 # SpecialEvents_SP <-spTransform(SpecialEvents_SP, CRS(proj.USGS)) # create spatial point data frame
 # plot(SpecialEvents_SP)
 
 #### Process EDT data ####
 # Read EDT Data
-edt <- read.delim(file = paste0(wazedir, "/Data/EDT/CTMDUTVA_20170401_20180731.txt"),header = TRUE,sep = "\t")
+edt <- read.delim(file = file.path(localdir, "EDT", "CTMDUTVA_20170401_20180731.txt"), header = TRUE, sep = "\t")
 table(edt$StudyYear) # total two years, 2017 - 2018
 table(edt$CrashState) # total four states: Connecticut    Maryland        Utah    Virginia 
 
@@ -225,13 +222,13 @@ for (i in c(1:nrow(uniquelocbuf))){
 SpecialEventsExpand <- SpecialEventsExpand %>% left_join(uniquelocbuf, by = c("Location.ID","Buffer_Miles"))
 
 # Save expanded data to shared drive
-write.csv(SpecialEventsExpand, file = paste0(wazedir,"/Data/SpecialEvents/SpecialEventsExpand_MD_AprilToSept_2017.csv"), row.names = F)
+write.csv(SpecialEventsExpand, file = file.path(localdir,"SpecialEvents", "SpecialEventsExpand_MD_AprilToSept_2017.csv"), row.names = F)
 
 # Save necessary objects as Rdata for easy access for visualization
-save(list = c("co","AllModel30_sub","SpecialEventsExpand","SpecialEvents","edt.sum","md","ua","grid"), file = paste0(wazedir,"/Data/SpecialEvents/SpecialEvents_MD_AprilToSept_2017.Rdata"))
+save(list = c("co","AllModel30_sub","SpecialEventsExpand","SpecialEvents","edt.sum","md","ua","grid"), file = file.path(localdir,"SpecialEvents", "SpecialEvents_MD_AprilToSept_2017.Rdata"))
 
 #### Data for Time Series ####
-load(file = paste0(wazedir,"/Data/SpecialEvents/SpecialEvents_MD_AprilToSept_2017.Rdata"))
+load(file = file.path(localdir,"SpecialEvents", "SpecialEvents_MD_AprilToSept_2017.Rdata"))
 
 # To recover the grid_ids for 3 mile buffer of location SE1
 # loc = "SE1" # loc can be only be one location
@@ -309,16 +306,31 @@ buflist = c(5,3,2,1,0.75,0.5,0.25)
   
 widetb <- long_to_wide(multipleLocBuf(loclist, buflist))
 
-write.csv(widetb, file = paste0(wazedir,"/Data/SpecialEvents/DT_All_MileBuffer_MD_AprilToSept_2017.csv"), row.names = F) # save the 3 mile and 1 mile buffer as CVS for Michelle.
+write.csv(widetb, file = file.path(localdir,"SpecialEvents", "DT_All_MileBuffer_MD_AprilToSept_2017.csv"), row.names = F) # save the 3 mile and 1 mile buffer as CVS for Michelle.
+
+# Save to S3, both to SpecialEvents and export_requests ----
+zipname = paste0('SpecialEvents_MD_AprilToSept_2017_', Sys.Date(),'.zip')
+
+zipfiles = dir(file.path('~/workingdata', 'SpecialEvents'))
+
+system(paste('zip', file.path('~/workingdata', 'SpecialEvents', zipname),
+             paste0(file.path('~/workingdata', 'SpecialEvents/'), zipfiles)))
+
+system(paste(
+  'aws s3 cp',
+  file.path('~/workingdata', 'SpecialEvents', zipname),
+  file.path(teambucket, 'export_requests', zipname)
+))
 
 
 
 #### EDT accidents do not match model Obs ####
-wazedir <- "//vntscex.local/DFS/Projects/PROJ-OS62A1/SDI Waze Phase 2"
-load(file = paste0(wazedir,"/Data/SpecialEvents/SpecialEvents_MD_AprilToSept_2017.Rdata"))
+
+load(file = file.path(localdir,"SpecialEvents", "SpecialEvents_MD_AprilToSept_2017.Rdata"))
 x <- AllModel30_sub[AllModel30_sub$Obs != AllModel30_sub$nEDTAccident, c("GRID_ID","date","hour","Obs","nEDTAccident")]
-sum(x$Obs)
-sum(x$nEDTAccident)
+
+sum(x$Obs) # 11,395
+sum(x$nEDTAccident) # 333,063
 
 AllModel30_sub$Waze_avail <- ifelse(AllModel30_sub$nWazeAccident >0 | 
                                       AllModel30_sub$nWazeJam > 0 |
@@ -410,7 +422,7 @@ dt_Sun <- dt %>% filter(DayofWeek == "Sun") %>% mutate(EventDay = ifelse(EventTy
                                nWazeAccident = mean(nWazeAccident),
                                nHazardOnShoulder = mean(nHazardOnShoulder),
                                nHazardOnRoad = mean(nHazardOnRoad),
-                               nHazardWeather = mean(nHazardWeather),
+                               nHazardWeather = mean(nHazardWeather)
 )
 
 ggplot(dt_Sun, aes(x = hour, y = nWazeJam)) + geom_point() + geom_line() + facet_wrap(~ EventDay) + ylab("Average Waze Jam") + ggtitle(paste(loc, buf,"mile buffer","Sunday"))
@@ -476,7 +488,7 @@ SpecialEvents <- data.frame(location = c("Fedex Field", "Fedex Field"),
                             lon = c(-76.864535, -76.864535),
                             lat = c(38.907794,38.907794),
                             buffer = 3) # FedEx Field
-write.csv(SpecialEvents, paste0(localdir, "/Special Events/SpecielEvents.csv"), row.names = F)
+write.csv(SpecialEvents, file.path(localdir,"SpecialEvents", "SpecielEvents.csv"), row.names = F)
 
 SpecialEvents_SP <- SpatialPointsDataFrame(SpecialEvents[c("Lon", "Lat")], SpecialEvents, proj4string = CRS("+proj=longlat +datum=WGS84"))  #  make sure Waze data is a SPDF
 SpecialEvents_SP <-spTransform(SpecialEvents_SP, CRS(proj.USGS)) # create spatial point data frame
@@ -531,7 +543,7 @@ t.test(y1$nWazeAccident,y2$nWazeAccident,paired=TRUE) # if buffer = 2 mile, p-va
 # Time series plot
 y_sum <- y %>% group_by(event, hour) %>% summarize(nWazeAccident = mean(nWazeAccident))
 ggplot(y_sum, aes( x = hour, y = nWazeAccident)) + geom_point() + geom_line() + facet_wrap(~ event) + ylab("Average Waze Accident")
-ggsave(paste0(wazedir,"/Output/visualizations/Special_event_example1.png"))
+ggsave(file.path(localdir,"SpecialEvents", "/Output/visualizations/Special_event_example1.png"))
 
 # Other variables
 col.names <- c("nWazeJam")
@@ -552,6 +564,6 @@ t.test(y1$nWazeJam,y2$nWazeJam,paired=TRUE) #  buffer = 3 mile, p-value=0.2326
 # Time series plot
 y_sum <- y %>% group_by(event, hour) %>% summarize(nWazeJam = mean(nWazeJam))
 ggplot(y_sum, aes( x = hour, y = nWazeJam)) + geom_point() + geom_line() + facet_wrap(~ event) + ylab("Average Waze Jam")
-ggsave(paste0(wazedir,"/Output/visualizations/Special_event_example1_Jam.png"))
+ggsave(file.path(localdir,"SpecialEvents", "/Output/visualizations/Special_event_example1_Jam.png"))
 
 
