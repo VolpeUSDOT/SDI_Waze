@@ -98,7 +98,7 @@ grid <- spTransform(grid, CRS(proj.USGS))
 
 # Read in model output and independent variables used in the model
 # GridCount <- read.csv(paste0(output.loc, "/Waze_04-09_GridCounts.csv")) #623,251*14
-AllModel30 <- read.csv(paste0(output.loc, "/All_Model_30.csv")) # 617,338*124
+AllModel30 <- read.csv(file.path(wazedir, "Data","SpecialEvents","Model_30_MD_All","All_Model_30.csv")) # 2,217,060*63
 
 # Convert day of year to date
 # GridCount$date <- as.Date(GridCount$day, origin = "2016-12-31")
@@ -116,7 +116,7 @@ min(AllModel30$date) # April 1, 2017
 
 # subset AllModel30
 var <- c("GRID_ID","day","date","hour","Obs","Pred","Prob.Noncrash","Prob.Crash","weekday","nWazeAccident","nWazeJam","nHazardOnShoulder","nHazardOnRoad","nHazardWeather")
-AllModel30_sub <- AllModel30[, var]
+AllModel30_sub <- AllModel30 %>% mutate(weekday = as.numeric(format(date, format = "%u"))) %>% select(var)
 
 # Read special event data and convert it to spatial data format
 SpecialEvents <- read.csv(file = paste0(wazedir,"/Data/SpecialEvents/SpecialEvents_MD_AprilToSept_2017.csv"))
