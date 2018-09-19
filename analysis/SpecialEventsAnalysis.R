@@ -160,9 +160,9 @@ pts.poly <- point.in.poly(edt_SP, grid)
 head(pts.poly@data)
 dim(pts.poly@data) # 88786*65
 
-# Plot the points on the 
-plot(grid)
-points(edt_SP, pch=20, col = "red")
+# # Plot the points 
+# plot(grid)
+# points(edt_SP, pch=20, col = "red")
 
 # Variables to consider
 table(edt$SchoolBusRelated) # binary variable - residential crash indicator, occasionally will happen on highway.
@@ -309,7 +309,7 @@ buflist = c(5,3,2,1,0.75,0.5,0.25)
   
 widetb <- long_to_wide(multipleLocBuf(loclist, buflist))
 
-write.csv(widetb, file = paste0(wazedir,"/Data/SpecialEvents/DT_All_MileBuffer_MD_AprilToSept_2017.csv"), row.names = F) # save the 3 mile and 1 mile buffer as CVS for Michelle.
+write.csv(widetb, file = paste0(wazedir,"/Data/SpecialEvents/Model_30_MD_All/DT_All_MileBuffer_MD_AprilToSept_2017.csv"), row.names = F) # save the 3 mile and 1 mile buffer as CVS for Michelle.
 
 
 
