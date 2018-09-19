@@ -314,12 +314,19 @@ zipname = paste0('SpecialEvents_MD_AprilToSept_2017_', Sys.Date(),'.zip')
 zipfiles = dir(file.path('~/workingdata', 'SpecialEvents'))
 
 system(paste('zip', file.path('~/workingdata', 'SpecialEvents', zipname),
-             paste0(file.path('~/workingdata', 'SpecialEvents/'), zipfiles)))
+             paste0(file.path('~/workingdata', 'SpecialEvents/'), zipfiles, collapse = " ")))
 
 system(paste(
   'aws s3 cp',
   file.path('~/workingdata', 'SpecialEvents', zipname),
   file.path(teambucket, 'export_requests', zipname)
+))
+
+
+system(paste(
+  'aws s3 cp',
+  file.path('~/workingdata', 'SpecialEvents', zipname),
+  file.path(teambucket, 'SpecialEvents', zipname)
 ))
 
 
