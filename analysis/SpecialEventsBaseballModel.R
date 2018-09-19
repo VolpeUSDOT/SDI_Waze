@@ -1,15 +1,132 @@
 
-## Set up
+# ## Set up
+# 
+# source2 <- function(file, start, end, ...) {
+#   file.lines <- scan(file, what=character(), skip=start-1, nlines=end-start+1, sep='\n')
+#   file.lines.collapsed <- paste(file.lines, collapse='\n')
+#   source(textConnection(file.lines.collapsed), ...)
+# }
+# 
+# source2("SpecialEventsAnalysis.R", 3, 79) # "Set up" section in SpecielEventsAnalysis.R
+# source2("SpecialEventsAnalysis.R", 233, 272) # partial "Data for Time Series" section in SpecielEventsAnalysis.R
+# 
 
-source2 <- function(file, start, end, ...) {
-  file.lines <- scan(file, what=character(), skip=start-1, nlines=end-start+1, sep='\n')
-  file.lines.collapsed <- paste(file.lines, collapse='\n')
-  source(textConnection(file.lines.collapsed), ...)
+#### Set up ####
+codeloc <- "~/Github/SDI_Waze"
+source(file.path(codeloc, 'utility/get_packages.R'))
+
+library(tidyverse)
+library(sp)
+library(maps) # for mapping base layers
+library(rgdal) # for readOGR(),writeOGR () needed for reading/writing in ArcM shapefiles
+library(foreach)
+library(doParallel)
+library(rgeos) #gintersection
+library(lubridate)
+library(ggplot2)
+require(spatialEco) # point.in.poly() function
+library(scales)
+
+localdir <- "C:/Users/Jessie.Yang.CTR/Downloads/OST/Waze project"
+# edtdir <- "/home/daniel/workingdata/" # full path for readOGR, Jessie don't have this folder.
+# edtdir <- normalizePath(file.path(localdir, "EDT"))
+# wazedir <- "~/tempout" # has State_Year-mo.RData files. Grab from S3 if necessary
+wazedir <- "//vntscex.local/DFS/Projects/PROJ-OS62A1/SDI Waze Phase 2"
+output.loc <- file.path(wazedir, "WazeEDT Pilot Phase1 Archive/Model_Output")
+data.loc <- file.path(wazedir, "WazeEDT Pilot Phase1 Archive/Data")
+
+teambucket <- "s3://prod-sdc-sdi-911061262852-us-east-1-bucket"
+
+source(file.path(codeloc, "utility/wazefunctions.R")) 
+
+states = c("CT", "UT", "VA", "MD")
+
+# Time zone picker:
+tzs <- data.frame(states, 
+                  tz = c("US/Eastern",
+                         "US/Mountain",
+                         "US/Eastern",
+                         "US/Eastern"),
+                  stringsAsFactors = F)
+
+
+# Project to Albers equal area conic 102008. Check comparision with USGS version, WKID: 102039
+proj <- showP4(showWKT("+init=epsg:102008"))
+# USGS version, used for producing hexagons: 
+proj.USGS <- "+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs +ellps=GRS80 +towgs84=0,0,0"
+
+# ggplot format
+theme_set(theme_bw(base_size = 12) +
+            theme(plot.background = element_blank(),
+                  panel.grid.major = element_blank(),
+                  panel.grid.minor = element_blank(),
+                  panel.border = element_blank(),
+                  text = element_text(family="Gill Sans MT", size=12,colour = "#666666"),
+                  legend.text = element_text(family="Gill Sans MT", size=10, colour = "#666666"),
+                  plot.title = element_text(size = rel(1),
+                                            colour = "#666666", vjust=2, hjust=0.5, face="bold",family="Gill Sans MT"),
+                  strip.text.x = element_text(size = 11,colour = "#666666",family="Gill Sans MT"),
+                  axis.text.x=element_text(size=11, angle = 0, hjust = 0.5,family="Gill Sans MT",colour = "#666666"),
+                  axis.text.y=element_text(size=11, angle = 0, hjust = 1,family="Gill Sans MT",colour = "#666666"))
+)
+
+# function to convert military time to HH:MM
+mil_to_hm <- function(x){
+  format(strptime(substr(as.POSIXct(sprintf("%04.0f", x), 
+                                    format="%H%M"), 
+                         12, 16), '%H:%M')
+         , '%H:%M')
 }
 
-source2("SpecialEventsAnalysis.R", 3, 79) # "Set up" section in SpecielEventsAnalysis.R
-source2("SpecialEventsAnalysis.R", 233, 272) # partial "Data for Time Series" section in SpecielEventsAnalysis.R
+# function to convert HH:MM to decimals
+hm_to_num <- function(x){
+  sapply(strsplit(x,":"),
+         function(x) {
+           x <- as.numeric(x)
+           x[1]+x[2]/60
+         }
+  )
+}
 
+#### Data for Time Series ####
+load(file = paste0(wazedir,"/Data/SpecialEvents/Model_30_MD_All/SpecialEvents_MD_AprilToSept_2017.Rdata"))
+
+# To recover the grid_ids for 3 mile buffer of location SE1
+# loc = "SE1" # loc can be only be one location
+# buf = 1 # buf can only be one location
+
+# Get all combinations of grid_id, hour, and day
+alldays = seq(from = min(AllModel30_sub$date), to = max(AllModel30_sub$date), by = "days") # get all days during April - Sep
+
+# Numeric variables if missing, can be replaced using zeros
+col.names <- c("Obs","nWazeAccident","nWazeJam","nHazardOnShoulder","nHazardOnRoad","nHazardWeather","nEDTFatal","nEDTCrashWPedBikeInv","nEDTCrashWSchoolBusInv","nEDTVehCount")
+
+# Function to create GridData joined with Special events, the special events are linked to date, not hours.
+GridDataSE <- function(loc,buf,alldays,col.names){
+  # recover the grid_ids from column GRID_ID
+  grid_id <- unlist(strsplit(unique(SpecialEventsExpand$GRID_ID[SpecialEventsExpand$Buffer_Miles == buf & SpecialEventsExpand$Location.ID == loc]), split = ",")
+  ) # an example of extracting grib_id of the largest buffer
+  
+  daterange = alldays
+  # [as.numeric(format(alldays, format = "%u")) %in% unique(SpecialEventsExpand$DayofWeekN[SpecialEventsExpand$Location.ID == loc])] # get all Sundays, Saturdays, Tuesdays, and Wednesdays that had special events for SE1, now once we added the baseball events, we are testing all days now.
+  
+  # all possible combinations
+  gridcom <- expand.grid(Location.ID = loc, GRID_ID = grid_id, hour = c(0:23), date = daterange) # for example, if daterange include 105 days, then row number 105840 = 105 days*24 hour*42 grid_id
+  
+  # create new variables
+  gridcom <- gridcom %>% mutate(day = yday(date), # convert day to date
+                                weekday = as.numeric(format(date, format = "%u")), # convert weekday
+                                DayofWeek = weekdays(date) #wday(date, label = T) returns a full week of day name
+  )
+  
+  # grid cells in the model
+  grid_cells_model <- unique(AllModel30_sub$GRID_ID)
+  
+  # left_join the Event Type to the model output data
+  dt <- gridcom %>% left_join(AllModel30_sub, by = c("GRID_ID", "day", "hour","date", "weekday")) %>% mutate_if(colnames(.) %in% col.names,funs(replace(., which(is.na(.)), 0))) %>% left_join(SpecialEvents[SpecialEvents$Location.ID == loc,c("Day","EventType","StartTime","EndTime")], by =  c("day" = "Day")) %>% mutate_if(colnames(.) %in% c("EventType"),funs(replace(., which(is.na(.)), "NoEvent"))) %>% mutate(Grid_In_Model = ifelse(GRID_ID %in% grid_cells_model, "Yes", "No"))
+  
+  dt
+}
 
 #######################################################
 # Visualization Only

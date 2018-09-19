@@ -153,7 +153,7 @@ plotDateHeatMap <- function(dt, loc, weekday, metrics){
                        mid = "white", 
                        high = muted("midnightblue"), 
                        midpoint = 0) + # determine the colour
-            ggtitle(paste0(location)) + xlab("Hour") + ylab("Event Type") +
+            ggtitle(paste(location,",",buf, "Buffer", weekday)) + xlab("Hour") + ylab("Event Type") +
             theme(legend.title=element_text(face="bold", size=14)) + 
             labs(fill= paste0(metrics))
 }
