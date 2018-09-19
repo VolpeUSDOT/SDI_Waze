@@ -119,7 +119,7 @@ var <- c("GRID_ID","day","date","hour","Obs","Pred","Prob.Noncrash","Prob.Crash"
 AllModel30_sub <- AllModel30 %>% mutate(weekday = as.numeric(format(date, format = "%u"))) %>% select(var)
 
 # Read special event data and convert it to spatial data format
-SpecialEvents <- read.csv(file = paste0(wazedir,"/Data/SpecialEvents/SpecialEvents_MD_AprilToSept_2017.csv"))
+SpecialEvents <- read.csv(file = paste0(wazedir,"/Data/SpecialEvents/Model_30_MD_All/SpecialEvents_MD_AprilToSept_2017.csv"))
 # SpecialEvents_SP <- SpatialPointsDataFrame(SpecialEvents[c("Lon", "Lat")], SpecialEvents, proj4string = CRS("+proj=longlat +datum=WGS84"))  #  make sure Waze data is a SPDF
 # SpecialEvents_SP <-spTransform(SpecialEvents_SP, CRS(proj.USGS)) # create spatial point data frame
 # plot(SpecialEvents_SP)
@@ -225,13 +225,13 @@ for (i in c(1:nrow(uniquelocbuf))){
 SpecialEventsExpand <- SpecialEventsExpand %>% left_join(uniquelocbuf, by = c("Location.ID","Buffer_Miles"))
 
 # Save expanded data to shared drive
-write.csv(SpecialEventsExpand, file = paste0(wazedir,"/Data/SpecialEvents/SpecialEventsExpand_MD_AprilToSept_2017.csv"), row.names = F)
+write.csv(SpecialEventsExpand, file = paste0(wazedir,"/Data/SpecialEvents/Model_30_MD_All/SpecialEventsExpand_MD_AprilToSept_2017.csv"), row.names = F)
 
 # Save necessary objects as Rdata for easy access for visualization
-save(list = c("co","AllModel30_sub","SpecialEventsExpand","SpecialEvents","edt.sum","md","ua","grid"), file = paste0(wazedir,"/Data/SpecialEvents/SpecialEvents_MD_AprilToSept_2017.Rdata"))
+save(list = c("co","AllModel30_sub","SpecialEventsExpand","SpecialEvents","edt.sum","md","ua","grid"), file = paste0(wazedir,"/Data/SpecialEvents/Model_30_MD_All/SpecialEvents_MD_AprilToSept_2017.Rdata"))
 
 #### Data for Time Series ####
-load(file = paste0(wazedir,"/Data/SpecialEvents/SpecialEvents_MD_AprilToSept_2017.Rdata"))
+load(file = paste0(wazedir,"/Data/SpecialEvents/Model_30_MD_All/SpecialEvents_MD_AprilToSept_2017.Rdata"))
 
 # To recover the grid_ids for 3 mile buffer of location SE1
 # loc = "SE1" # loc can be only be one location
