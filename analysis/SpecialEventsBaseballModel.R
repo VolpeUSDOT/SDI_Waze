@@ -373,9 +373,18 @@ lm_fitEDTObsAcc <- lm(logObs ~ EventType + weekday, data = dt_EventType)
 summary(lm_fitEDTObsAcc)
 
 #chi square
-chiTable <- table(dt_EventType$EventType, dt_EventType$Obs)
-chisq <- chisq.test(table(dt_EventType$EventType))
-chisq
+chiTableEDT <- table(dt_EventType$Obs, dt_EventType$EventType)
+chisqEDT <- chisq.test(chiTableEDT)
+chisqEDT
+
+chiTableWaze <- table(dt_EventType$nWazeAccident, dt_EventType$EventType)
+chisqWaze <- chisq.test(chiTableWaze)
+chisqWaze
+
+chiWaze <- dt_EventType %>% group_by(EventType) %>% summarize(nWazeAccTotal = sum(nWazeAccident))
+chiWaze <- chiWaze%>%
+      as.data.frame()
+
 
 
 ggplot(dt_EventType, aes(x = hour, y = nWazeJam)) + geom_point() + geom_line() + facet_wrap(~ EventType) + ylab("Average Waze Jam") + ggtitle(paste(loc, buf,"mile buffer"))
