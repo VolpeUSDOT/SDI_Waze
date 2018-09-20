@@ -241,6 +241,14 @@ prep.hex <- function(hexname, state, month, s3 = T, bucket = teambucket){
   wte$MatchEDT_buffer_Acc[wte$MatchEDT_buffer_Acc > 0] = 1 
   wte$MatchEDT_buffer_Acc <- as.factor(wte$MatchEDT_buffer_Acc)
   
+  
+  # Omit grid cell x day combinations which are outside of this particular month (Waze road closures)
+  yr = substr(mo, 1, 4)
+  month.2 = substr(mo, 6, 7)
+  yrday = strptime(paste(yr, formatC(wte$day, width =3, flag = 0), sep="-"), "%Y-%j")
+  month.1 = format(yrday, "%m")
+  wte = wte[month.1 %in% month.2,]
+  
   mo <- sub("-", "_", mo) # change e.g. from 2017-04 to 2017_04 for R object naming
   
   assign(paste("w", mo, sep="."), wte, envir = globalenv()) 

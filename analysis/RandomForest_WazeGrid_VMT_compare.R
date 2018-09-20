@@ -17,7 +17,7 @@ source(file.path(codeloc, 'utility/get_packages.R')) # installs necessary packag
 HEXSIZE = 1 
 
 # <><><><><>
-state = 'UT' # 'MD'  #'UT' # Sets the state. UT, VA, MD are all options.
+states = c('MD','CT','UT','VA') # 'MD'  #'UT' # Sets the state. UT, VA, MD are all options.
 # <><><><><>
 
 # Manually setting months to run here; could also scan S3 for months available for this state
@@ -51,6 +51,8 @@ if(length(dir(localdir)[grep("aadt_by_grid", dir(file.path(localdir, 'AADT')))])
 
 # View the files available in S3 for this state: system(paste0('aws s3 ls ', teambucket, '/', state, '/'))
 
+for(state in states){ # start state loop ----
+  
 # Check to see if this state/month combination has already been prepared, if not do the prep steps
 
 if(length(grep(paste0(state, '_', do.months[1], '_to_', do.months[length(do.months)], '.RData'), dir(localdir)))==0){
@@ -313,6 +315,12 @@ system(paste("aws s3 cp",
              file.path(teambucket, state, fn)))
 
 timediff <- Sys.time() - starttime
-cat(round(timediff, 2), attr(timediff, "units"), "to complete script")
+cat(round(timediff, 2), attr(timediff, "units"), "to complete", state, "\n\n\n")
 
+} # end state loop ----
+
+
+
+timediff <- Sys.time() - starttime
+cat(round(timediff, 2), attr(timediff, "units"), "to complete script")
 

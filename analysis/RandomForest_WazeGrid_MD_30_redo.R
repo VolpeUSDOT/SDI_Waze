@@ -52,35 +52,41 @@ if(length(dir(localdir)[grep("aadt_by_grid", dir(file.path(localdir, 'AADT')))])
 
 # View the files available in S3 for this state: system(paste0('aws s3 ls ', teambucket, '/', state, '/'))
 
-# rename data files by month. For each month, prep time and response variables
-# See prep.hex() in wazefunctions.R for details.
-for(mo in do.months){
-  prep.hex(paste0("WazeTimeEdtHexAll_", mo, "_", HEXSIZE, "mi_", state,".RData"), state = state, month = mo)
-}
+# Check to see if this state/month combination has already been prepared, if not do the prep steps
 
-
-# Update this later after getting supplemental data ready
-# Add FARS, AADT, HPMS, jobs
-na.action = "fill0"
-
-monthfiles = paste("w", do.months, sep=".")
-monthfiles = sub("-", "_", monthfiles)
- 
-for(w in monthfiles){
-  append.hex2(hexname = w, data.to.add = paste0("FARS_", state, "_2012_2016_sum_annual"), state = state, na.action = na.action)
-  append.hex2(hexname = w, data.to.add = paste0(state, "_max_aadt_by_grid_fc_urban_vmt_factored"), state = state, na.action = na.action)
-  append.hex2(hexname = w, data.to.add = paste0(state, "_hexagons_1mi_bg_wac_sum"), state = state, na.action = na.action)
-  append.hex2(hexname = w, data.to.add = paste0(state, "_hexagons_1mi_bg_rac_sum"), state = state, na.action = na.action)   
+if(length(grep(paste0(state, '_', do.months[1], '_to_', do.months[length(do.months)], '.RData'), dir(localdir)))==0){
+  # Data prep ----
+  
+  # rename data files by month. For each month, prep time and response variables
+  # See prep.hex() in wazefunctions.R for details.
+  for(mo in do.months){
+    prep.hex(paste0("WazeTimeEdtHexAll_", mo, "_", HEXSIZE, "mi_", state,".RData"), state = state, month = mo)
   }
-
-
-# Bind all months together
-
-w.allmonths <- vector()
-for(i in monthfiles){
-  w.allmonths <- rbind(w.allmonths, get(i))
+  
+  # Add FARS, AADT, HPMS, jobs
+  na.action = "fill0"
+  
+  monthfiles = paste("w", do.months, sep=".")
+  monthfiles = sub("-", "_", monthfiles)
+   
+  for(w in monthfiles){
+    append.hex2(hexname = w, data.to.add = paste0("FARS_", state, "_2012_2016_sum_annual"), state = state, na.action = na.action)
+    append.hex2(hexname = w, data.to.add = paste0(state, "_max_aadt_by_grid_fc_urban_vmt_factored"), state = state, na.action = na.action)
+    append.hex2(hexname = w, data.to.add = paste0(state, "_hexagons_1mi_bg_wac_sum"), state = state, na.action = na.action)
+    append.hex2(hexname = w, data.to.add = paste0(state, "_hexagons_1mi_bg_rac_sum"), state = state, na.action = na.action)   
+    }
+  
+  # Bind all months together
+  
+  w.allmonths <- vector()
+  for(i in monthfiles){
+    w.allmonths <- rbind(w.allmonths, get(i))
+  }
+  # end data prep
+  } else {
+    load(file.path(localdir, paste0(state, '_', do.months[1], '_to_', do.months[length(do.months)], '.RData')))
 }
-
+  
 
 # Omit as predictors in this vector:
 alwaysomit = c(grep("GRID_ID", names(w.allmonths), value = T), "day", "hextime", "year", "weekday", 
