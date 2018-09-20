@@ -85,28 +85,194 @@ for(i in ct.files){
 
 - VMT: Volume of traffic distributed by hour of day, day of week, and month of year from ATR data. Approximately 5,000 stations on the National Highway System (NHS). Hour of year VMT is the product of hour of year volume and HPMS segment length.
 
+#### Maryland VMT model comparisons
 
-```{r CT_MD_VMT_metrics, echo = F}
+```{r MD_VMT_metrics, echo = F}
 # Get outputs
-
 load(file.path(outputdir, "MD_VMT_Output_to_30.RData"))
 
 tabl <- vector()
-for(i in c("61", "62", "63")){ tabl <- rbind(tabl, c(100*keyoutputs[[i]]$diag, round(keyoutputs[[i]]$auc, 4)))}
+for(i in c("18", "61", "62", "30")){ tabl <- rbind(tabl, c(100*keyoutputs[[i]]$diag, round(keyoutputs[[i]]$auc, 4)))}
 
 colnames(tabl)[1:5] = c("Accuracy", "Precision", "Recall", "False Positive Rate", "AUC")
-rownames(tabl) =  c("61 - AADT", "62 - VMT", "63 - AADT + VMT")
+rownames(tabl) =  c("18 - Simple", "61 - AADT", "62 - VMT", "30 - Full with VMT")
 datatable(tabl, 
-          caption = "VMT model comparisons",
+          caption = "Maryland VMT model comparisons",
           rownames = T,
           options = list(dom = "t",
                          order = list(list(5, 'desc')),
                          pageLength = 5)
-          ) %>% formatCurrency(1:6, currency = "", digits = 2) %>%
+          ) %>% formatCurrency(1:4, currency = "", digits = 2) %>% formatCurrency(5, currency = "", digits = 3) %>%
           formatStyle(1, background = styleEqual(max(tabl[,1]), 'lightgreen'))%>%
           formatStyle(2, background = styleEqual(max(tabl[,2]), 'lightgreen'))%>%
           formatStyle(3, background = styleEqual(max(tabl[,3]), 'lightgreen'))%>%
           formatStyle(4, background = styleEqual(min(tabl[,4]), 'lightgreen'))%>%
           formatStyle(5, background = styleEqual(max(tabl[,5]), 'lightgreen'))
 ```   
+
+#### Connecticut VMT model comparisons
+
+
+```{r CT_VMT_metrics, echo = F}
+# Get outputs
+
+load(file.path(localdir, "CT_VMT_Output_to_18"))
+k_18 = keyoutputs
+load(file.path(outputdir, "CT_VMT_Output_to_30.RData"))
+keyoutputs[['18']] = k_18[['18']]
+
+tabl <- vector()
+for(i in c("18","61", "62",  "30")){ tabl <- rbind(tabl, c(100*keyoutputs[[i]]$diag, round(keyoutputs[[i]]$auc, 4)))}
+
+colnames(tabl)[1:5] = c("Accuracy", "Precision", "Recall", "False Positive Rate", "AUC")
+rownames(tabl) =  c("18 - Simple", "61 - AADT", "62 - VMT",  "30 - Full with VMT")
+datatable(tabl, 
+          caption = "Connecticut VMT model comparisons",
+          rownames = T,
+          options = list(dom = "t",
+                         order = list(list(5, 'desc')),
+                         pageLength = 5)
+          ) %>% formatCurrency(1:4, currency = "", digits = 2) %>% 
+                formatCurrency(5, currency = "", digits = 3) %>%
+          formatStyle(1, background = styleEqual(max(tabl[,1]), 'lightgreen'))%>%
+          formatStyle(2, background = styleEqual(max(tabl[,2]), 'lightgreen'))%>%
+          formatStyle(3, background = styleEqual(max(tabl[,3]), 'lightgreen'))%>%
+          formatStyle(4, background = styleEqual(min(tabl[,4]), 'lightgreen'))%>%
+          formatStyle(5, background = styleEqual(max(tabl[,5]), 'lightgreen'))
+```   
+
+
+#### Utah VMT model comparisons
+
+```{r UT_VMT_metrics, echo = F}
+# Get outputs
+load(file.path(localdir, "UT_VMT_Output_to_30.RData"))
+
+tabl <- vector()
+for(i in c("18","61", "62", "30")){ tabl <- rbind(tabl, c(100*keyoutputs[[i]]$diag, round(keyoutputs[[i]]$auc, 4)))}
+
+colnames(tabl)[1:5] = c("Accuracy", "Precision", "Recall", "False Positive Rate", "AUC")
+rownames(tabl) =  c("18 - Simple", "61 - AADT", "62 - VMT",  "30 - Full with VMT")
+datatable(tabl, 
+          caption = "Utah VMT model comparisons",
+          rownames = T,
+          options = list(dom = "t",
+                         order = list(list(5, 'desc')),
+                         pageLength = 5)
+          ) %>% formatCurrency(1:4, currency = "", digits = 2) %>% 
+                formatCurrency(5, currency = "", digits = 3) %>%
+          formatStyle(1, background = styleEqual(max(tabl[,1]), 'lightgreen'))%>%
+          formatStyle(2, background = styleEqual(max(tabl[,2]), 'lightgreen'))%>%
+          formatStyle(3, background = styleEqual(max(tabl[,3]), 'lightgreen'))%>%
+          formatStyle(4, background = styleEqual(min(tabl[,4]), 'lightgreen'))%>%
+          formatStyle(5, background = styleEqual(max(tabl[,5]), 'lightgreen'))
+```   
+
+
+#### Virginia VMT model comparisons
+
+```{r VA_VMT_metrics, echo = F}
+# Get outputs
+load(file.path(localdir, "VA_VMT_Output_to_30.RData"))
+
+tabl <- vector()
+for(i in c("18","61", "62", "30")){ tabl <- rbind(tabl, c(100*keyoutputs[[i]]$diag, round(keyoutputs[[i]]$auc, 4)))}
+
+colnames(tabl)[1:5] = c("Accuracy", "Precision", "Recall", "False Positive Rate", "AUC")
+rownames(tabl) =  c("18 - Simple", "61 - AADT", "62 - VMT",  "30 - Full with VMT")
+datatable(tabl, 
+          caption = "Virginia VMT model comparisons",
+          rownames = T,
+          options = list(dom = "t",
+                         order = list(list(5, 'desc')),
+                         pageLength = 5)
+          ) %>% formatCurrency(1:4, currency = "", digits = 2) %>% 
+                formatCurrency(5, currency = "", digits = 3) %>%
+          formatStyle(1, background = styleEqual(max(tabl[,1]), 'lightgreen'))%>%
+          formatStyle(2, background = styleEqual(max(tabl[,2]), 'lightgreen'))%>%
+          formatStyle(3, background = styleEqual(max(tabl[,3]), 'lightgreen'))%>%
+          formatStyle(4, background = styleEqual(min(tabl[,4]), 'lightgreen'))%>%
+          formatStyle(5, background = styleEqual(max(tabl[,5]), 'lightgreen'))
+```   
+
+
+
+## Importance of VMT variables
+
+
+
+```{r CT_MD_varimp_table, eval=T}
+load(file.path(outputdir, "CT_Model_30_RandomForest_Output.RData"))
+CT_rf.out = rf.out
+
+load(file.path(outputdir, "MD_Model_30_RandomForest_Output.RData"))
+MD_rf.out = rf.out
+
+load(file.path(outputdir, "UT_Model_30_RandomForest_Output.RData"))
+UT_rf.out = rf.out
+
+load(file.path(outputdir, "VA_Model_30_RandomForest_Output.RData"))
+VA_rf.out = rf.out
+
+nimp = 100
+
+CT_rf.out$importance = 100*CT_rf.out$importance / sum(CT_rf.out$importance)
+MD_rf.out$importance = 100*MD_rf.out$importance / sum(MD_rf.out$importance)
+UT_rf.out$importance = 100*UT_rf.out$importance / sum(UT_rf.out$importance)
+VA_rf.out$importance = 100*VA_rf.out$importance / sum(VA_rf.out$importance)
+
+CT_imp = CT_rf.out$importance[order(CT_rf.out$importance, decreasing = T)[1:nimp],]
+MD_imp = MD_rf.out$importance[order(MD_rf.out$importance, decreasing = T)[1:nimp],]
+UT_imp = UT_rf.out$importance[order(UT_rf.out$importance, decreasing = T)[1:nimp],]
+VA_imp = VA_rf.out$importance[order(VA_rf.out$importance, decreasing = T)[1:nimp],]
+
+CT_imp = data.frame(var = names(CT_imp),
+                    CT_rank = 1:nimp,
+                    CT_Importance = CT_imp)
+
+MD_imp = data.frame(var = names(MD_imp),
+                    MD_rank = 1:nimp,
+                    MD_Importance = MD_imp)
+
+UT_imp = data.frame(var = names(UT_imp),
+                    UT_rank = 1:nimp,
+                    UT_Importance = UT_imp)
+VA_imp = data.frame(var = names(VA_imp),
+                    VA_rank = 1:nimp,
+                    VA_Importance = VA_imp)
+
+
+CT_MD_imp = full_join(CT_imp, MD_imp, by = "var")
+All_imp = full_join(CT_MD_imp, UT_imp, by = "var")
+All_imp = full_join(All_imp, VA_imp, by = "var")
+
+# Get rank of VMT variables
+VMT_table = All_imp[grep("HOURLY", All_imp$var),]
+
+VMT_table = VMT_table[order(VMT_table$var),]
+VMT_table$var = c("Hourly VMT - 1 Interstate",
+                  "Hourly VMT - 2 Principal Arterial - Freeway and Expressway",
+                  "Hourly VMT - 3 Principal Arterial",
+                  "Hourly VMT - 4 Minor Arterial",
+                  "Hourly VMT - 5 Major Collector"
+                  )
+
+datatable(VMT_table,
+          rownames = FALSE,
+          colnames = c("VMT Variable", "CT Rank", "CT Importance",
+                       "MD Rank", "MD Importance",
+                       "UT Rank", "UT Importance",
+                       "VA Rank", "VA Importance"),
+          caption = "Importance of VMT variables for the four focal states.",
+           options = list(dom = "t",
+                          order = list(0, 'asc'),
+                          autoWidth = T)
+          ) %>% formatCurrency(c(3, 5, 7, 9), currency = "", digits = 2)
+
+```
+
+
+### Estimated crashes with and without VMT variables
+
+
 
