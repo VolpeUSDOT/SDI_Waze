@@ -39,8 +39,6 @@ source(file.path(codeloc, 'utility/wazefunctions.R'))
 
 # read random forest functions
 source(file.path(codeloc, "analysis/RandomForest_WazeGrid_Fx.R"))
-
-# models <- read.csv(file.path(localdir, "Model_Descriptions.csv")) # Source: \\vntscex.local\DFS\Projects\PROJ-OR02A2\SDI\Model_Output
 ```
 
 ```{r getfiles, message=FALSE, warning=FALSE}
@@ -49,7 +47,10 @@ source(file.path(codeloc, "analysis/RandomForest_WazeGrid_Fx.R"))
 md.files <-  c(
   'Model_18_MD_mod_CT_data_Output.RData',
   'Model_18_MD_mod_CT_dat_RandomForest_Output.RData',
-  'MD_Model_18_RandomForest_Output.RData')
+  'MD_Model_18_RandomForest_Output.RData',
+  'Model_30_MD_mod_CT_data_Output.RData',
+  'Model_30_MD_mod_CT_dat_RandomForest_Output.RData',
+  'MD_Model_30_RandomForest_Output.RData')
 
 # MD files
 #  system(paste("aws s3 ls", file.path(teambucket, 'MD/')))
@@ -57,7 +58,11 @@ md.files <-  c(
 ct.files <- c('Model_18_Output_to_CT.RData',
   'Model_18_CT_mod_MD_data_Output.RData',
   'Model_18_CT_mod_MD_dat_RandomForest_Output.RData',
-  'CT_Model_18_RandomForest_Output.RData')
+  'CT_Model_18_RandomForest_Output.RData',
+  #'Model_30_Output_to_CT.RData',
+  'Model_30_CT_mod_MD_data_Output.RData',
+  'Model_30_CT_mod_MD_dat_RandomForest_Output.RData',
+  'CT_Model_30_RandomForest_Output.RData')
 
 # CT files
 #  system(paste("aws s3 ls", file.path(teambucket, 'CT/')))
@@ -92,9 +97,9 @@ A number of supplemental data sources were found to improve recall and accuracy 
 - Fatal Accident Reporting System (FARS) counts of fatal accidents from 2012-2016 for each grid cell.
 - Weather: Reflectivity from the [NEXRAD](https://www.ncdc.noaa.gov/data-access/radar-data/nexrad) radar network, pulled hourly and merged with gridded data.
 - Road functional class: Miles of roads of each functional class, from [HPMS](https://www.fhwa.dot.gov/policyinformation/hpms.cfm).
-- Economic data from [Longidtinal Employer-Household Dynamics](https://lehd.ces.census.gov/) data set: Number of jobs, and number of workers, for firms of different ages and sizes.
+- Economic data from [Longidtinal Employer-Household Dynamics (LEHD)](https://lehd.ces.census.gov/) data set: Number of jobs, and number of workers, for firms of different ages and sizes.
 
-To extend the work of the first phase to additional states, Connecticut was selected in the second phase of the SDI Waze project. Like Maryland, crashes are reported in the EDT system for Connecticut, and spatial data are high quality and high coverage across crashes (i.e., relatively few crashes have no spatial data).
+To extend the work of the first phase to additional states, Connecticut was selected in the second phase of the SDI Waze project. Like Maryland, crashes are reported in the EDT system for Connecticut, and spatial data are high quality and high coverage across crashes (i.e., relatively few crashes have no spatial data). Two sets of models were applied, a *simple* model using only Waze variables (32 different variables), and a *full* model with an additional 26 variables from AADT, vehicle miles traveled (VMT) by road functional class, FARS, and LEHD economic variables.
 
 As a test of the approach taken in the first phase, a model of police-reportable crashes using just Waze data features (without supplemental data) was applied to Connecticut, for the same April - September 2017 time period. We then compare this Connecticut model to the Maryland model. There are three questions to ask in this comparison:
 
@@ -113,27 +118,38 @@ For the random forest models, the model was fitted using 70% of the data (by gri
 
 ### Question 1: Do the Connecticut and Maryland models have similar accuracy, precision, recall, and false positive rates?
 
-
-Both states models show high accuracy; see Appendix below for model diagnostic definitions. The Connecticut model also shows higher precision and recall; overall, AUC is high for both state models, but slightly higher for Connecticut (0.98 versus 0.96 for Maryland).
+Both sets states models show high accuracy; see Appendix below for model diagnostic definitions. The Connecticut model also shows higher precision and recall; overall, AUC is high for both state models, but slightly higher for Connecticut (0.98 versus 0.96 for Maryland). Including the full set of variables increased accuracy, recall, and AUC in both states. 
 
 ```{r CT_MD_metrics, echo = F}
 # Get outputs
 
+# Get individual state model 30 outputs
+load(file.path(outputdir, "CT_VMT_Output_to_30.RData"))
+CT_30_keyoutputs = keyoutputs
+
+load(file.path(outputdir, "MD_VMT_Output_to_30.RData"))
+MD_30_keyoutputs = keyoutputs
+
 load(file.path(outputdir, "Model_18_Output_to_CT.RData"))
 
+keyoutputs[['MD_30']] = MD_30_keyoutputs[['30']]
+keyoutputs[['CT_30']] = CT_30_keyoutputs[['30']]
+
 tabl <- vector()
-for(i in c("MD_18", "CT_18")){ tabl <- rbind(tabl, c(100*keyoutputs[[i]]$diag, round(keyoutputs[[i]]$auc, 4)))}
+for(i in c("MD_18", "CT_18", "MD_30", "CT_30")){ tabl <- rbind(tabl, c(100*keyoutputs[[i]]$diag, round(keyoutputs[[i]]$auc, 4)))}
 
 colnames(tabl)[1:5] = c("Accuracy", "Precision", "Recall", "False Positive Rate", "AUC")
-rownames(tabl) = c("Maryland, April-September Waze model", "Connecticut, April-September Waze model")
+rownames(tabl) = c("Maryland, simple Waze model", "Connecticut, simple Waze model",
+                   "Maryland, full Waze model", "Connecticut, full Waze model")
 
 datatable(tabl, 
           caption = "Maryland and Connecticut Waze-EDT model comparison",
           rownames = T,
           options = list(dom = "t",
-                         order = list(list(5, 'desc')),
+                         #order = list(list(5, 'desc')),
                          pageLength = 5)
-          ) %>% formatCurrency(1:6, currency = "", digits = 2) %>%
+          ) %>% formatCurrency(1:4, currency = "", digits = 2) %>%
+                formatCurrency(5, currency = "", digits = 3) %>%
           formatStyle(1, background = styleEqual(max(tabl[,1]), 'lightgreen'))%>%
           formatStyle(2, background = styleEqual(max(tabl[,2]), 'lightgreen'))%>%
           formatStyle(3, background = styleEqual(max(tabl[,3]), 'lightgreen'))%>%
@@ -143,10 +159,13 @@ datatable(tabl,
 
 ### Question 2. Do the Connecticut and Maryland models have similar variables identified as the most imporant?
 
-Comparing the variables used in the individual state models, the single most important variable for both states was the number of Waze accidents reported in a grid cell, in an hour. This confirms the strong link between user-reported crashes (called 'accidents' in the Waze data) and police-reported crashes. The strength of importance is measured with Gini importance, which reflects how much the inclusion of this variable improves the classification of the outcome variable, number of estimated EDT crashes. The units of importance have been normalized across all 32 variables used in these models. 
+Comparing the variables used in the individual state models, the single most important variable for both states was the number of Waze accidents reported in a grid cell, in an hour. This confirms the strong link between user-reported crashes (called 'accidents' in the Waze data) and police-reported crashes. The strength of importance is measured with Gini importance, which reflects how much the inclusion of this variable improves the classification of the outcome variable, number of estimated EDT crashes. The units of importance have been normalized across all variables used in these models (32 variables in the simple model, 58 in the full model). 
 
-The variable with the most explanatory power, `nWazeAccident`, accounted for 60.5% and 56.8% of the variation in estimated EDT crashes in the Connecticut and Maryland models, respectively. The top six variables are the same for both states, and the importance values for these variables are nearly the same. Besides the Waze accident variables, the amount of freeways (road type 3, `nWazeRT3`), hour of day, and amount of primary roads (road type 6, `nWazeRT6`) were the most important variables, in the same order, for both states.
+In the simple model, the variable with the most explanatory power, `nWazeAccident`, accounted for 60.5% and 56.8% of the variation in estimated EDT crashes in the Connecticut and Maryland models, respectively. The top six variables are the same for both states, and the importance values for these variables are nearly the same. Besides the Waze accident variables, the amount of freeways (road type 3, `nWazeRT3`), hour of day, and amount of primary roads (road type 6, `nWazeRT6`) were the most important variables, in the same order, for both states.
 
+For the full model, using VMT and other supplemental variables, the identity of the top seven variables was the same for both states, but the order slightly different. In the full model, number of jams reported was the second most important variable in Maryland, while in Connecticut that was the fourth most important variable. Hourly VMT and economic variables were important in both states.
+
+#### Simple model
 
 ```{r CT_MD_varimp_table, eval=T}
 load(file.path(outputdir, "CT_Model_18_RandomForest_Output.RData"))
@@ -174,7 +193,7 @@ MD_imp = data.frame(var = names(MD_imp),
 CT_MD_imp = full_join(CT_imp, MD_imp, by = "var")
 
 datatable(CT_MD_imp, filter = 'top',
-          caption = "Maryland and Connecticut Waze-EDT model percent variable importance. Rank of importance for each state model and percent of Gini importance accounted for by each variable shown.",
+          caption = "Maryland and Connecticut simple Waze-EDT model percent variable importance. Rank of importance for each state model and percent of Gini importance accounted for by each variable shown.",
           rownames = T,
           options = list(dom = "ftp",
                          order = list(list(5, 'desc')),
@@ -187,11 +206,62 @@ datatable(CT_MD_imp, filter = 'top',
 ```{r CT_MD_varimp, fig.height=8, fig.width=11, fig.align='center', fig.caption='Variable importance for Connecticut and Maryland Waze models. '}
 par(mfrow=c(1,2))
 varImpPlot(CT_rf.out,
-           main = "Connecticut Waze model",
+           main = "Connecticut simple Waze model",
            n.var = 20, 
            cex = 0.8)
 varImpPlot(MD_rf.out,
-           main = "Maryland Waze model",
+           main = "Maryland simple Waze model",
+           n.var = 20, 
+           cex = 0.8)
+```
+
+#### Full model
+
+
+```{r CT_MD_varimp_table_full, eval=T}
+load(file.path(outputdir, "CT_Model_30_RandomForest_Output.RData"))
+CT_rf.out = rf.out
+
+load(file.path(outputdir, "MD_Model_30_RandomForest_Output.RData"))
+MD_rf.out = rf.out
+
+nimp = 25
+
+CT_rf.out$importance = 100*CT_rf.out$importance / sum(CT_rf.out$importance)
+MD_rf.out$importance = 100*MD_rf.out$importance / sum(MD_rf.out$importance)
+
+CT_imp = CT_rf.out$importance[order(CT_rf.out$importance, decreasing = T)[1:nimp],]
+MD_imp = MD_rf.out$importance[order(MD_rf.out$importance, decreasing = T)[1:nimp],]
+
+CT_imp = data.frame(var = names(CT_imp),
+                    CT_rank = 1:nimp,
+                    CT_Importance = CT_imp)
+
+MD_imp = data.frame(var = names(MD_imp),
+                    MD_rank = 1:nimp,
+                    MD_Importance = MD_imp)
+
+CT_MD_imp = full_join(CT_imp, MD_imp, by = "var")
+
+datatable(CT_MD_imp, filter = 'top',
+          caption = "Maryland and Connecticut full Waze-EDT model percent variable importance. Rank of importance for each state model and percent of Gini importance accounted for by each variable shown.",
+          rownames = T,
+          options = list(dom = "ftp",
+                         order = list(list(5, 'desc')),
+                         pageLength = 5)
+          ) %>% formatCurrency(c(3, 5), currency = "", digits = 2)
+
+```
+
+
+```{r CT_MD_varimp_full, fig.height=8, fig.width=11, fig.align='center', fig.caption='Variable importance for Connecticut and Maryland Waze models. '}
+par(mfrow=c(1,2))
+varImpPlot(CT_rf.out,
+           main = "Connecticut full Waze model",
+           n.var = 20, 
+           cex = 0.8)
+varImpPlot(MD_rf.out,
+           main = "Maryland full Waze model",
            n.var = 20, 
            cex = 0.8)
 ```
@@ -203,26 +273,33 @@ To answer this question, we used models trained on one state (e.g., Maryland) an
 
 The performance of models trained one state and applied to the other was high; using accuracy and AUC metrics, there was no decrease in performance at all, but in fact some increase in AUC. Since both models had highly similar importance of individual variables (the top six variables being identical in both models), it is not surprising that the performance is similar. These results demonstrate that the relationship between the crowdsourced Waze data and police-reportable crashes is consistent and can be used with confidence when EDT data are not available.
 
-Interestingly, the Maryland model applied to Connecticut data performed very well, with higher recall and precision than the Connecticut model. However, using the Connecticut model on Maryland data did show trade-off between lower precision and higher recall, which is also reflected in the higher false positive rate. This indicates that the Connecticut model is slightly more 'generous' than the Maryland model, meaning that the Connecticut model is slightly more likely to determine that a police-reportable crash has occurred in a given grid cell in an hour, given the combination of Waze predictor variables used.
+Interestingly, the Maryland model applied to Connecticut data performed very well, with higher recall and precision than the Connecticut model. However, using the Connecticut model on Maryland data did show trade-off between lower precision and higher recall, which is also reflected in the higher false positive rates in both the simple and full models. This indicates that the Connecticut models are slightly more 'generous' than the Maryland model, meaning that the Connecticut models are more likely to determine that a police-reportable crash has occurred in a given grid cell in an hour, given the combination of Waze predictor variables used.
 
 ```{r CT_MD_data_swap_table, eval = T}
 
 rm(keyoutputs)
+load(file.path(outputdir, "Model_30_CT_mod_MD_data_Output.RData"))
+keyoutputs_30 = keyoutputs
 load(file.path(outputdir, "Model_18_CT_mod_MD_data_Output.RData"))
 
+keyoutputs[['Model_30_MD_mod_CT']] = keyoutputs_30[['Model_30_MD_mod_CT']]
+keyoutputs[['Model_30_CT_mod_MD_dat']] = keyoutputs_30[['Model_30_CT_mod_MD_dat']]
+
 tabl <- vector()
-for(i in c("Model_18_MD_mod_CT", "Model_18_CT_mod_MD_dat")){ tabl <- rbind(tabl, c(100*keyoutputs[[i]]$diag, round(keyoutputs[[i]]$auc, 4)))}
+for(i in c("Model_18_MD_mod_CT", "Model_18_CT_mod_MD_dat","Model_30_MD_mod_CT", "Model_30_CT_mod_MD_dat")){ tabl <- rbind(tabl, c(100*keyoutputs[[i]]$diag, round(keyoutputs[[i]]$auc, 4)))}
 
 colnames(tabl)[1:5] = c("Accuracy", "Precision", "Recall", "False Positive Rate", "AUC")
-rownames(tabl) = c("MD Waze model on CT data, April-September", "CT Waze model on MD data, April-September")
+rownames(tabl) = c("MD Waze model on CT data, simple", "CT Waze model on MD data, simple",
+                   "MD Waze model on CT data, full", "CT Waze model on MD data, full")
 
 datatable(tabl, 
           caption = "Maryland and Connecticut Waze-EDT model comparison",
           rownames = T,
           options = list(dom = "t",
-                         order = list(list(5, 'desc')),
+                      #   order = list(list(5, 'desc')),
                          pageLength = 5)
-          ) %>% formatCurrency(1:6, currency = "", digits = 2) %>%
+          ) %>% formatCurrency(1:4, currency = "", digits = 2) %>%
+                formatCurrency(1:5, currency = "", digits = 3) %>%
           formatStyle(1, background = styleEqual(max(tabl[,1]), 'lightgreen'))%>%
           formatStyle(2, background = styleEqual(max(tabl[,2]), 'lightgreen'))%>%
           formatStyle(3, background = styleEqual(max(tabl[,3]), 'lightgreen'))%>%
