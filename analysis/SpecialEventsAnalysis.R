@@ -80,28 +80,23 @@ grid <- readOGR(file.path(localdir,"MD_hexagons_shapefiles"), layer = "MD_hexago
 grid <- spTransform(grid, CRS(proj.USGS))
 
 # Read in model output and independent variables used in the model
-AllModel30 <- read.csv(file.path(localdir, "All_Model_30.csv")) # 2,2xx,060 x 94, was 617,338*124
+AllModel30 <- read.csv(file.path(localdir, "MD_All_Model_30.csv")) # 1,576,531 x 94, was 617,338*124
+
+# Check to make sure GRID_ID x day x hour is unique. Must be true.
+stopifnot(sum(duplicated(with(AllModel30, paste(GRID_ID, day, hour))))==0)
 
 # Convert day of year to date
 # GridCount$date <- as.Date(GridCount$day, origin = "2016-12-31")
 AllModel30$date <- as.Date(AllModel30$day, origin = "2016-12-31")
 # as.Date(91, origin = "2016-12-31") # "2017-04-01", the origin needs to be the last day of 2016.
 
-length(unique(AllModel30$GRID_ID)) # was 5880, now 7172
-# length(unique(GridCount$GRID_ID)) # 5176
+length(unique(AllModel30$GRID_ID)) # was 5880, now 6875
 
 # Verify the date range
-# max(GridCount$date) # Sept 30
-# min(GridCount$date) # April 1
 max(AllModel30$date) # Sept 30
 min(AllModel30$date) # April 1, 2017
 
-# Trim to April - September, will need to double check
-
-AllModel30 = AllModel30 %>% filter(day > 90 & day  < 274)
-
 # create weekday
-
 AllModel30$weekday = lubridate::wday(AllModel30$date)
 # subset AllModel30
 
@@ -148,11 +143,11 @@ edt_SP <- spTransform(edt_SP, CRS(proj.USGS)) # create spatial point data frame
 # match crash locations with GRID_ID
 pts.poly <- point.in.poly(edt_SP, grid)
 head(pts.poly@data)
-dim(pts.poly@data) # 88786*65
+dim(pts.poly@data) # 88777*65
 
-# Plot the points on the 
-plot(grid)
-points(edt_SP, pch=20, col = "red")
+# Plot the points 
+# plot(grid)
+# points(edt_SP, pch=20, col = "red")
 
 # Variables to consider
 table(edt$SchoolBusRelated) # binary variable - residential crash indicator, occasionally will happen on highway.
@@ -330,7 +325,7 @@ load(file = file.path(localdir,"SpecialEvents", "SpecialEvents_MD_AprilToSept_20
 x <- AllModel30_sub[AllModel30_sub$Obs != AllModel30_sub$nEDTAccident, c("GRID_ID","date","hour","Obs","nEDTAccident")]
 
 sum(x$Obs) # 11,395
-sum(x$nEDTAccident) # 333,063
+sum(x$nEDTAccident) # 44,078
 
 AllModel30_sub$Waze_avail <- ifelse(AllModel30_sub$nWazeAccident >0 | 
                                       AllModel30_sub$nWazeJam > 0 |
@@ -345,7 +340,7 @@ sum(y$nEDTAccident)
 
 
 #######################################################
-# Visualization Only
+# Visualization Only ----
 #######################################################
 #### Special Events Time Series Plots ####
 loc = "SE1"
