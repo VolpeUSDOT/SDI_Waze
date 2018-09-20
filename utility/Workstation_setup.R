@@ -195,7 +195,7 @@ for(state in states){
 # AADT ----
 
 
-aadt.ls = c('vmt_max_aadt_by_grid_fc_urban_factored.txt', 'AADT_CT_MD.zip')
+aadt.ls = c('vmt_max_aadt_by_grid_fc_urban_factored.txt', 'AADT_CT_MD_UT_VA.zip')
   
 for(i in aadt.ls){
   system(paste("aws s3 cp",
@@ -225,7 +225,7 @@ for(i in lodes.ls){
 
 
 
-fars.ls = c('FARS_CT_MD_UT.zip')
+fars.ls = c('FARS_CT_MD_UT_VA.zip')
 
 for(i in fars.ls){
   system(paste("aws s3 cp",
@@ -346,13 +346,13 @@ system(paste("aws s3 mv",
 )
 
 system(paste("aws s3 mv", 
-             file.path(teambucket, "AADT_CT_MD.zip"),
-             file.path(teambucket, "AADT", "AADT_CT_MD.zip"))
+             file.path(teambucket, system('whoami', intern = T), "uploaded_files", "AADT_CT_MD_UT_VA.zip"),
+             file.path(teambucket, "AADT", "AADT_CT_MD_UT_VA.zip"))
 )
 
 system(paste("aws s3 mv", 
-             file.path(teambucket, "FARS_CT_MD_UT.zip"),
-             file.path(teambucket, "FARS", "FARS_CT_MD_UT.zip"))
+             file.path(teambucket, system('whoami', intern = T), "uploaded_files", "FARS_CT_MD_UT_VA.zip"),
+             file.path(teambucket, "FARS", "FARS_CT_MD_UT_VA.zip"))
 )
 
 # View uploaded files

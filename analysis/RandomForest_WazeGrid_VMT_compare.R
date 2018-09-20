@@ -17,7 +17,7 @@ source(file.path(codeloc, 'utility/get_packages.R')) # installs necessary packag
 HEXSIZE = 1 
 
 # <><><><><>
-state = 'MD' # 'MD'  #'UT' # Sets the state. UT, VA, MD are all options.
+state = 'UT' # 'MD'  #'UT' # Sets the state. UT, VA, MD are all options.
 # <><><><><>
 
 # Manually setting months to run here; could also scan S3 for months available for this state
@@ -51,53 +51,62 @@ if(length(dir(localdir)[grep("aadt_by_grid", dir(file.path(localdir, 'AADT')))])
 
 # View the files available in S3 for this state: system(paste0('aws s3 ls ', teambucket, '/', state, '/'))
 
-# rename data files by month. For each month, prep time and response variables
-# See prep.hex() in wazefunctions.R for details.
-for(mo in do.months){
-  prep.hex(paste0("WazeTimeEdtHexAll_", mo, "_", HEXSIZE, "mi_", state,".RData"), state = state, month = mo)
-}
+# Check to see if this state/month combination has already been prepared, if not do the prep steps
 
-# Plot to check grid IDs. Requires shapefiles to be present in ~/workingdata/Hex, download from S3 if not there.
-# This was useful when testing different grid sizes, to make sure everything was matching correctly.
-CHECKPLOT = F
-if(CHECKPLOT){
-  grid_shp <- rgdal::readOGR(file.path(localdir, "Hex"), paste0(state, "_hexagons_1mi_neighbors"))
+if(length(grep(paste0(state, '_', do.months[1], '_to_', do.months[length(do.months)], '.RData'), dir(localdir)))==0){
+  # Data prep ----
   
-  w.g <- match(w.2017_04$GRID_ID, grid_shp$GRID_ID)
-  w.g <- w.g[!is.na(w.g)]
-  gs <- grid_shp[w.g,]
+  # rename data files by month. For each month, prep time and response variables
+  # See prep.hex() in wazefunctions.R for details.
+  for(mo in do.months){
+    prep.hex(paste0("WazeTimeEdtHexAll_", mo, "_", HEXSIZE, "mi_", state,".RData"), state = state, month = mo)
+  }
   
-  plot(gs, col = "red")
-  rm(w.g, gs, grid_shp)
-}
+  # Plot to check grid IDs. Requires shapefiles to be present in ~/workingdata/Hex, download from S3 if not there.
+  # This was useful when testing different grid sizes, to make sure everything was matching correctly.
+  CHECKPLOT = F
+  if(CHECKPLOT){
+    grid_shp <- rgdal::readOGR(file.path(localdir, "Hex"), paste0(state, "_hexagons_1mi_neighbors"))
+    
+    w.g <- match(w.2017_04$GRID_ID, grid_shp$GRID_ID)
+    w.g <- w.g[!is.na(w.g)]
+    gs <- grid_shp[w.g,]
+    
+    plot(gs, col = "red")
+    rm(w.g, gs, grid_shp)
+  }
+  
+  # Adding FARS, AADT, VMT, jobs
+  na.action = "fill0"
+  
+  monthfiles = paste("w", do.months, sep=".")
+  monthfiles = sub("-", "_", monthfiles)
+  
+  # Append supplmental data. This is now a time-intensive step, with hourly VMT; consider making this parallel
+   
+  for(w in monthfiles){ # w = "w.2017_04"
+    append.hex2(hexname = w, data.to.add = paste0("FARS_", state, "_2012_2016_sum_annual"), state = state, na.action = na.action)
+    append.hex2(hexname = w, data.to.add = paste0(state, "_max_aadt_by_grid_fc_urban_vmt_factored"), state = state, na.action = na.action)
+    append.hex2(hexname = w, data.to.add = paste0(state, "_hexagons_1mi_bg_wac_sum"), state = state, na.action = na.action)
+    append.hex2(hexname = w, data.to.add = paste0(state, "_hexagons_1mi_bg_rac_sum"), state = state, na.action = na.action)  
+  }
+  
+  
+  # Bind all months together, and remove monthly files to save memory
+  
+  w.allmonths <- vector()
+  for(i in monthfiles){
+    w.allmonths <- rbind(w.allmonths, get(i))
+  }
+  rm(list = monthfiles)
+  
+  save("w.allmonths", file = file.path(localdir, paste0(state, '_', do.months[1], '_to_', do.months[length(do.months)], '.RData')))
+  # end data prep
+  } else {
+    load(file.path(localdir, paste0(state, '_', do.months[1], '_to_', do.months[length(do.months)], '.RData')))
+  }
 
-# Update this later as supplemental data is prepared
-# Add FARS, AADT, HPMS, jobs
-na.action = "fill0"
-
-monthfiles = paste("w", do.months, sep=".")
-monthfiles = sub("-", "_", monthfiles)
-
-# Append supplmental data. This is now a time-intensive step, with hourly VMT; consider making this parallel
- 
-for(w in monthfiles){ # w = "w.2017_04"
-  append.hex2(hexname = w, data.to.add = paste0("FARS_", state, "_2012_2016_sum_annual"), state = state, na.action = na.action)
-  append.hex2(hexname = w, data.to.add = paste0(state, "_max_aadt_by_grid_fc_urban_vmt_factored"), state = state, na.action = na.action)
-  append.hex2(hexname = w, data.to.add = paste0(state, "_hexagons_1mi_bg_wac_sum"), state = state, na.action = na.action)
-  append.hex2(hexname = w, data.to.add = paste0(state, "_hexagons_1mi_bg_rac_sum"), state = state, na.action = na.action)  
-}
-
-
-# Bind all months together, and remove monthly files to save memory
-w.allmonths.named <- ls()[grep("^w.", ls())]
-
-w.allmonths <- vector()
-for(i in w.allmonths.named){
-  w.allmonths <- rbind(w.allmonths, get(i))
-}
-rm(list = w.allmonths.named)
-
-# format(object.size(w.allmonths), "Gb") # CT 2017 04-09, 1 Gb, 1,359,333 rows.
+# format(object.size(w.allmonths), "Gb") # CT 2017 04-09, 1 Gb, 1,359,333 rows. MD: 1.9 Gb, 2,217,060 rows.
 
 avail.cores = parallel::detectCores()
 
@@ -266,11 +275,12 @@ cat(round(timediff, 2), attr(timediff, "units"), "elapsed to model", modelno)
 
 # 30 Add all (but not Waze event subtypes or sub-subtypes)
 modelno = "30"
-omits = c(alwaysomit, alert_subtypes
+omits = c(alwaysomit, alert_subtypes,
           #"wx",
           #c("CRASH_SUM", "FATALS_SUM"), # FARS variables, added in 19
           #grep("F_SYSTEM", names(w.allmonths), value = T), # road class
-          #c("MEAN_AADT", "SUM_AADT", " SUM_miles"), # AADT
+          grep("SUM_MAX_AADT", names(w.allmonths), value = T) # AADT
+          #grep("HOURLY_MAX_AADT", names(w.allmonths), value = T), # Hourly VMT
           #grep("WAC", names(w.allmonths), value = T), # Jobs workplace
           #grep("RAC", names(w.allmonths), value = T), # Jobs residential
           #grep("MagVar", names(w.allmonths), value = T), # direction of travel
