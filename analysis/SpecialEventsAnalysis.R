@@ -98,7 +98,7 @@ grid <- spTransform(grid, CRS(proj.USGS))
 
 # Read in model output and independent variables used in the model
 # GridCount <- read.csv(paste0(output.loc, "/Waze_04-09_GridCounts.csv")) #623,251*14
-AllModel30 <- read.csv(file.path(wazedir, "Data","SpecialEvents","Model_30_MD_All","All_Model_30.csv")) # 2,217,060*63
+AllModel30 <- read.csv(file.path(wazedir, "Output","Random_Forest_Output","MD_All_Model_30.csv")) # *63
 
 # Convert day of year to date
 # GridCount$date <- as.Date(GridCount$day, origin = "2016-12-31")
@@ -270,9 +270,9 @@ GridDataSE <- function(loc,buf,alldays,col.names){
   dt
 }
 
-loc = c("SE2")
-buf = c(3)
-dt <- GridDataSE(loc,buf,alldays,col.names) # SE1: 105840 + 180072 (183*41*24) = 285912, however, the results does not equal, so we need a different approach
+# loc = c("SE2")
+# buf = c(3)
+# dt <- GridDataSE(loc,buf,alldays,col.names) # SE1: 105840 + 180072 (183*41*24) = 285912, however, the results does not equal, so we need a different approach
 
 ## What if we want multiple locations and multiple buffer zone?
 multipleLocBuf <- function(loclist, buflist){
@@ -331,6 +331,76 @@ y <- AllModel30_sub[AllModel30_sub$Obs != AllModel30_sub$nEDTAccident & (AllMode
 sum(y$Obs)
 sum(y$nEDTAccident)
 
+#### presentation ####
+# How many grid cells in each buffer
+buf = 5
+loc = "SE2"
+grid_id <- unlist(strsplit(unique(SpecialEventsExpand$GRID_ID[SpecialEventsExpand$Buffer_Miles == buf & SpecialEventsExpand$Location.ID == loc]), split = ","))
+length(grid_id)
+
+## Summary stats in the presentation
+loc = "SE2"
+buf = 3
+dt <- GridDataSE(loc,buf,alldays,col.names)
+location <- unique(SpecialEvents$Location[SpecialEvents$Location.ID == loc])
+
+dt_Date <- dt %>% group_by(Location.ID, date, hour) %>% 
+  summarize(nWazeJam = mean(nWazeJam),
+            Obs = mean(Obs),
+            nWazeAccident = mean(nWazeAccident),
+            nHazardOnShoulder = mean(nHazardOnShoulder),
+            nHazardOnRoad = mean(nHazardOnRoad),
+            nHazardWeather = mean(nHazardWeather),
+            nEDTFatal = mean(nEDTFatal),
+            nEDTCrashWPedBikeInv = mean(nEDTCrashWPedBikeInv),
+            nEDTCrashWSchoolBusInv = mean(nEDTCrashWSchoolBusInv),
+            nEDTVehCount = mean(nEDTVehCount)
+  )
+hist(dt_Date$nWazeAccident, main="Camden Yards", xlab = "Waze Accidents Per Grid Cell")
+
+histPercent <- function(x, ...) {
+  H <- hist(x, plot = FALSE, breaks=10)
+  H$density <- with(H, 100 * density* diff(breaks)[1])
+  labs <- paste(round(H$density), "%", sep="")
+  invisible(return(list(plot(H, freq = FALSE, labels = labs, ylim=c(0, 1.08*max(H$density)), ...),
+                        H)))
+}
+
+dt_Date <- dt %>% group_by(Location.ID, date, hour) %>% 
+  summarize(nWazeJam = sum(nWazeJam),
+            Obs = sum(Obs),
+            nWazeAccident = sum(nWazeAccident),
+            nHazardOnShoulder = sum(nHazardOnShoulder),
+            nHazardOnRoad = sum(nHazardOnRoad),
+            nHazardWeather = sum(nHazardWeather),
+            nEDTFatal = sum(nEDTFatal),
+            nEDTCrashWPedBikeInv = sum(nEDTCrashWPedBikeInv),
+            nEDTCrashWSchoolBusInv = sum(nEDTCrashWSchoolBusInv),
+            nEDTVehCount = sum(nEDTVehCount)
+  )
+histPercent(dt_Date$nWazeAccident, main="Camden Yards", xlab = "Waze Accidents in 3 mile buffer")
+table(dt_Date$nWazeAccident)
+
+library("reshape2")
+dt_Date <- dt %>% group_by(Location.ID, hour) %>% 
+  summarize(nWazeJam = sum(nWazeJam)/length(unique(date)),
+            nEDTAccident = sum(Obs)/length(unique(date)),
+            nWazeAccident = sum(nWazeAccident)/length(unique(date)),
+            nHazardOnShoulder = sum(nHazardOnShoulder)/length(unique(date)),
+            nHazardOnRoad = sum(nHazardOnRoad)/length(unique(date)),
+            # nHazardWeather = sum(nHazardWeather),
+            # nEDTFatal = sum(nEDTFatal),
+            # nEDTCrashWPedBikeInv = sum(nEDTCrashWPedBikeInv),
+            # nEDTCrashWSchoolBusInv = sum(nEDTCrashWSchoolBusInv),
+            # nEDTVehCount = sum(nEDTVehCount)
+  )
+dt_Date <- melt(dt_Date, id=c("Location.ID","hour"))
+dt_Date$variable <-  factor(dt_Date$variable, levels=c("nWazeJam", "nEDTAccident", "nWazeAccident", "nHazardOnShoulder","nHazardOnRoad"), labels=c("Waze Jam", "EDT Accident", "Waze Accident","Hazard on Shoulder","Hazard on Road"))
+
+ggplot(dt_Date, aes(x = hour, y = value, color = variable)) + 
+  geom_line() + theme(legend.title=element_blank()) + 
+  ylab("Total Counts") + xlab("Hour")+
+  ggtitle(paste0(location, ", ", buf, " Mile Buffer"))
 
 #######################################################
 # Visualization Only

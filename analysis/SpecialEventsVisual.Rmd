@@ -24,7 +24,7 @@ source2 <- function(file, start, end, ...) {
 }
 
 source2("SpecialEventsAnalysis.R", 3, 79) # setting
-source2("SpecialEventsAnalysis.R", 233, 272) # Data process
+source2("SpecialEventsAnalysis.R", 233,306) # Data process
 
 # Plotting functions.
 meanfun <- function(dt){
@@ -159,9 +159,10 @@ plotWeekdayHeatMap <- function(dt, loc, metrics){
             labs(fill= paste0(metrics))
 }
 
+
 plotWeekdayendHeatMap <- function(dt, loc, metrics){
   
-        location <- unique(SpecialEvents$Location[SpecialEvents$Location.ID == loc]
+        location <- unique(SpecialEvents$Location[SpecialEvents$Location.ID == loc])
         
         dt$WeekDayEnd <- ifelse(dt$DayofWeek %in% c("Monday" ,"Tuesday" ,"Wednesday" ,"Thursday" , "Friday"), "Weekday","Weekend")
           
@@ -288,12 +289,56 @@ plotDate <- function(dt, loc, weekday, statistic, metrics){
             # geom_point(alpha = 0.5, color = "red") +
             geom_line(alpha = 0.5) +
             geom_rect(data = dt_visual,aes(xmin = ave(dt_visual$StartTime, dt_visual$date, FUN = function(x) mean(x)),xmax = ave(dt_visual$EndTime, dt_visual$date, FUN = function(x) mean(x)), ymin = -Inf,ymax=Inf), fill = dt_visual$background_col, alpha= 0.2/100, inherit.aes = FALSE) +
-            facet_wrap(~ Date, ncol= 1) +
+            facet_wrap(~ Date) +
             xlab("Hour of Day") +
             ylab(paste(statistic, metrics)) +
             scale_color_manual(name = NULL, values=c("NoEvent" = "#999999", "Football" = "#E69F00", "Concert" = "#56B4E9", "Soccer" = "chartreuse4", "Baseball" = "red")) +
             ggtitle(paste(location,",", buf,"Mile Buffer,", weekday)) 
 }
+
+plotDayMile <- function(dt,buflist, loclist, days, metrics){
+        
+        location <- unique(SpecialEvents$Location[SpecialEvents$Location.ID == loclist])
+        dt_Date <- dt %>% group_by(Location.ID, Mile_Buffer, date, hour) %>% 
+            summarize(nWazeJam = sum(nWazeJam),
+                      Obs = sum(Obs),
+                      nWazeAccident = sum(nWazeAccident),
+                      nHazardOnShoulder = sum(nHazardOnShoulder),
+                      nHazardOnRoad = sum(nHazardOnRoad),
+                      nHazardWeather = sum(nHazardWeather),
+                      nEDTFatal = sum(nEDTFatal),
+                      nEDTCrashWPedBikeInv = sum(nEDTCrashWPedBikeInv),
+                      nEDTCrashWSchoolBusInv = sum(nEDTCrashWSchoolBusInv),
+                      nEDTVehCount = sum(nEDTVehCount)
+                      )
+            
+          # Process data to include more information of the date and event
+         dt_Date <- dt_Date %>% mutate(DayofWeek = weekdays(date), Date = paste(date, DayofWeek), Month = month(date)) %>%  left_join(unique(dt[, c("date","EventType","StartTime","EndTime")]), by = "date") %>% mutate(DayofWeek = weekdays(date)) %>% mutate(background_col = ifelse(EventType == "NoEvent", NA,ifelse(EventType == "Football","#E69F00",ifelse(EventType == "Concert", "#56B4E9", ifelse(EventType == "Soccer", "chartreuse4","red")))))
+          
+          dt_Date$Month <- factor(dt_Date$Month) 
+          levels(dt_Date$Month) <- list("April" = 4, "May" = 5, "June" = 6, "July" = 7, "August" = 8, "September" = 9)
+          
+          # Military time to regular HH:MM, and then to decimals.
+          dt_Date$StartTime <- hm_to_num(mil_to_hm(dt_Date$StartTime))
+          dt_Date$EndTime <- hm_to_num(mil_to_hm(dt_Date$EndTime))
+          
+          dt_visual <-  dt_Date %>% filter(date %in% as.Date(days))
+          
+          # Choose data
+          p <- if(metrics == "EDT Accident") ggplot(dt_visual, aes(x = hour, y = Obs, color = Mile_Buffer, group = Mile_Buffer)) else if (metrics == "Waze Jam") ggplot(dt_visual, aes(x = hour, y = nWazeJam, color = Mile_Buffer, group = Mile_Buffer)) else if (metrics == "Waze Accident") ggplot(dt_visual, aes(x = hour, y = nWazeAccident, color = Mile_Buffer, group = Mile_Buffer))  else if (metrics == "Waze Hazard On Shoulder") ggplot(dt_visual, aes(x = hour, y = nHazardOnShoulder, color = Mile_Buffer, group = Mile_Buffer)) else if (metrics == "Waze Hazard On Road") ggplot(dt_visual, aes(x = hour, y = nHazardOnRoad, color = Mile_Buffer, group = Mile_Buffer)) else if (metrics == "EDT Fatals") ggplot(dt_visual, aes(x = hour, y = nEDTFatal, color = Mile_Buffer, group = Mile_Buffer)) else if (metrics == "EDT Crashes with Ped or Bike Involvement") ggplot(dt_visual, aes(x = hour, y = nEDTCrashWPedBikeInv, color = Mile_Buffer, group = Mile_Buffer))  else if (metrics == "EDT Crashes with School Bus Involvement") ggplot(dt_visual, aes(x = hour, y = nEDTCrashWSchoolBusInv, color = Mile_Buffer, group = Mile_Buffer)) else  ggplot(dt_visual, aes(x = hour, y = nEDTVehCount, color = Mile_Buffer, group = Mile_Buffer))
+
+          p + 
+            # geom_point(alpha = 0.5, color = "red") +
+            geom_line(alpha = 0.5) +
+            geom_rect(data = dt_visual,aes(xmin = ave(dt_visual$StartTime, dt_visual$date, FUN = function(x) mean(x)),xmax = ave(dt_visual$EndTime, dt_visual$date, FUN = function(x) mean(x)), ymin = -Inf,ymax=Inf), fill = dt_visual$background_col, alpha= 0.2/100, inherit.aes = FALSE) +
+            facet_wrap(~ EventType + date, ncol = 1) +
+            xlab("Hour of Day") +
+            ylab(paste(statistic, metrics)) +
+            scale_color_gradient(low = "#56B1F7", high = "#132B43") +
+            # scale_color_manual(name = NULL, values=c("NoEvent" = "#999999", "Football" = "#E69F00", "Concert" = "#56B4E9", "Soccer" = "chartreuse4", "Baseball" = "red")) +
+            ggtitle(paste0(location)) 
+}
+
 
 plotDay <- function(dt, loc, days, statistic, metrics){
         
@@ -301,7 +346,7 @@ plotDay <- function(dt, loc, days, statistic, metrics){
         dt_Date <- if (statistic == "Total") sumfun(dt) else if (statistic == "Average") meanfun(dt) else maxfun(dt)
             
           # Process data to include more information of the date and event
-         dt_Date <- dt_Date %>% mutate(DayofWeek = weekdays(date), Date = paste(date, DayofWeek), Month = month(date)) %>%  left_join(unique(dt[, c("date","EventType","StartTime","EndTime")]), by = "date") %>% mutate(background_col = ifelse(EventType == "NoEvent", NA,ifelse(EventType == "Football","#E69F00",ifelse(EventType == "Concert", "#56B4E9", ifelse(EventType == "Soccer", "chartreuse4","red")))))
+         dt_Date <- dt_Date %>% mutate(DayofWeek = weekdays(date), Date = paste(date, DayofWeek), Month = month(date)) %>%  left_join(unique(dt[, c("date","EventType","StartTime","EndTime")]), by = "date") %>% mutate(DayofWeek = weekdays(date)) %>% mutate(background_col = ifelse(EventType == "NoEvent", NA,ifelse(EventType == "Football","#E69F00",ifelse(EventType == "Concert", "#56B4E9", ifelse(EventType == "Soccer", "chartreuse4","red")))))
           
           dt_Date$Month <- factor(dt_Date$Month) 
           levels(dt_Date$Month) <- list("April" = 4, "May" = 5, "June" = 6, "July" = 7, "August" = 8, "September" = 9)
@@ -323,7 +368,7 @@ plotDay <- function(dt, loc, days, statistic, metrics){
             xlab("Hour of Day") +
             ylab(paste(statistic, metrics)) +
             scale_color_manual(name = NULL, values=c("NoEvent" = "#999999", "Football" = "#E69F00", "Concert" = "#56B4E9", "Soccer" = "chartreuse4", "Baseball" = "red")) +
-            ggtitle(paste(location,",", buf,"Mile Buffer")) 
+            ggtitle(paste0(location,", ", buf," Mile Buffer")) 
           
 }
 
@@ -376,10 +421,11 @@ Dave's feedback 8/29/2018:
 
 ## HeatMap
 
-### 5 mile buffer zone
+### 3 mile buffer zone
 ```{r eval = T}
+## Fedex Field
 loc = "SE1"
-buf = 5
+buf = 3
 weekday = "Sunday"
 dt <- GridDataSE(loc,buf,alldays,col.names)
 plotDateHeatMap(dt, loc, weekday, "EDT Accident") # average values
@@ -390,31 +436,49 @@ plotWeekdayHeatMap(dt, loc, "Waze Jam")
 plotWeekdayHeatMap(dt, loc, "EDT Accident")
 plotWeekdayHeatMap(dt, loc, "Waze Accident")
 
+## Camden Yards
 loc = "SE2"
-buf = 5
+buf = 3
 weekday = "Sunday"
+dt <- GridDataSE(loc,buf,alldays,col.names)
 plotDateHeatMap(dt, loc, weekday, "EDT Accident")
 plotDateHeatMap(dt, loc, weekday, "Waze Jam")
 
-# plotWeekdayHeatMap(dt, loc, "Waze Jam")
-# plotWeekdayHeatMap(dt, loc, "EDT Accident")
-# plotWeekdayHeatMap(dt, loc, "Waze Accident")
+plotWeekdayHeatMap(dt, loc, "Waze Jam")
+plotWeekdayHeatMap(dt, loc, "EDT Accident")
+plotWeekdayHeatMap(dt, loc, "Waze Accident")
 
 plotWeekdayendHeatMap(dt, loc, "Waze Jam")
 plotWeekdayendHeatMap(dt, loc, "EDT Accident")
 plotWeekdayendHeatMap(dt, loc, "Waze Accident")
-
-# make the bars shorter
-# weekday/weekend classification - baseball only.
-# Fedex field: football
 ```
+### 3 mile buffer zone
+```{r eval = T}
+## Fedex Field
+loclist = "SE1"
+buflist = c(3,1,0.5)
+days = c("2017-09-10","2017-09-17","2017-06-15")
+dt <- multipleLocBuf(loclist, buflist)
+
+plotDayMile(dt, buflist, loclist, days, "Waze Accident")
+plotDayMile(dt, buflist, loclist, days, "Waze Jam")
+plotDayMile(dt, buflist, loclist, days, "Waze Hazard On Shoulder")
+plotDayMile(dt, buflist, loclist, days, "Waze Hazard On Road")
+plotDayMile(dt, buflist, loclist, days,"EDT Accident")
+plotDayMile(dt, buflist, loclist, days, "EDT Fatals")
+plotDayMile(dt, buflist, loclist, days, "EDT Crashes with Ped or Bike Involvement")
+plotDayMile(dt, buflist, loclist, days, "EDT Crashes with School Bus Involvement")
+plotDayMile(dt, buflist, loclist, days, "EDT Vehicle Counts")
+
+```
+
 
 ## Example Days in Presentation
 
 ### 5 mile buffer zone - Total
 ```{r eval = T}
 loc = "SE1"
-buf = 5 # both 3 and 5 miles buffer
+buf = 3 # both 3 and 5 miles buffer
 dt <- GridDataSE(loc,buf,alldays,col.names)
 days = c("2017-09-10","2017-09-17")
 statistic = "Total" #c("Total","Average","Maximum")
@@ -503,7 +567,7 @@ plotMonth(dt, loc, weekday, statistic, "EDT Vehicle Counts")
 
 ```{r, fig.width=12, fig.height=12}
 loc = "SE2"
-buf = 5
+buf = 3
 dt <- GridDataSE(loc,buf,alldays,col.names)
 weekday = "Saturday"
 statistic = "Total" #c("Total","Average","Maximum")
