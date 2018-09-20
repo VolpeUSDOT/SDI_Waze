@@ -163,11 +163,11 @@ identical(test.dat$GRID_ID, out.df$GRID_ID)
 
 dd <- data.frame(out.df, Pred.grp = grp, test.dat[c("nMatchEDT_buffer_Acc", fitvars, alert_subtypes)]) 
 
-write.csv(dd, "All_Model_30.csv", row.names = F)
+write.csv(dd, paste0(state, "_All_Model_30.csv"), row.names = F)
 
 savelist = c("rf.out", "rf.pred", "rf.prob", "out.df", "w.allmonths") 
 
-fn = paste("Model_18_MD_mod_30_all_RandomForest_Output.RData", sep= "_")
+fn = paste(state, "Model_30_all_RandomForest_Output.RData", sep= "_")
 
 save(list = savelist, file = file.path(outputdir, fn))
 
@@ -179,11 +179,11 @@ system(paste("aws s3 cp",
 
 # Zip with All_Model_30.csv and put in export
 
-zipname = 'RandomForest_Model_30_MD_All_Output_2018-09-18.zip'
+zipname = paste0('RandomForest_Model_30_', state, '_All_Output_', Sys.Date(), '.zip')
 
 system(paste('zip', file.path('~/workingdata', zipname),
-             file.path(outputdir, 'Model_18_MD_mod_30_all_RandomForest_Output.RData'),
-             file.path('~/workingdata', 'All_Model_30.csv')))
+             file.path(outputdir, fn),
+             file.path('~/workingdata', paste0(state, "_All_Model_30.csv"))))
 
 system(paste(
   'aws s3 cp',

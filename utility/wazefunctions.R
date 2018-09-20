@@ -404,9 +404,10 @@ append.hex2 <- function(hexname, data.to.add, state, na.action = c("omit", "keep
     #   group_by(GRID_ID, month, dayofweek, hour) %>%
     #   tidyr::spread(key = F_SYSTEM_VN, value = volume, fill = 0, sep = "_")
     
-    # Rows are uniquely described by grid id, month, dayofweek, hour, and road class
+    # Rows ahave to be uniquely described by grid id, month, dayofweek, hour, and road class
     # summary(duplicated(with(dd, paste(GRID_ID, month, dayofweek, hour, F_SYSTEM_VN))))
-    
+    dd <- dd[!duplicated(with(dd, paste(GRID_ID, month, dayofweek, hour, F_SYSTEM_VN))),]
+      
     dd.summax <- dd %>%
       group_by(GRID_ID, month, dayofweek, hour) %>%
       select(GRID_ID, month, dayofweek, hour, F_SYSTEM_VN, SUM_MAX_AADT_VN) %>%

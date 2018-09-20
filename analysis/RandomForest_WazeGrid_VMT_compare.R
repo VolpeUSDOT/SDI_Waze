@@ -23,6 +23,9 @@ states = c('MD','CT','UT','VA') # 'MD'  #'UT' # Sets the state. UT, VA, MD are a
 # Manually setting months to run here; could also scan S3 for months available for this state
 do.months = paste("2017", c("04","05","06","07","08","09"), sep="-")
 
+monthfiles = paste("w", do.months, sep=".")
+monthfiles = sub("-", "_", monthfiles)
+
 REASSESS = F # re-assess model fit and diagnostics using reassess.rf instead of do.rf
 
 teambucket <- "s3://prod-sdc-sdi-911061262852-us-east-1-bucket"
@@ -51,7 +54,11 @@ if(length(dir(localdir)[grep("aadt_by_grid", dir(file.path(localdir, 'AADT')))])
 
 # View the files available in S3 for this state: system(paste0('aws s3 ls ', teambucket, '/', state, '/'))
 
+
 for(state in states){ # start state loop ----
+
+  # Remove w.2017_04 or similar if exists from previous states
+  if(exists(monthfiles[1])) {rm(list = monthfiles)}
   
 # Check to see if this state/month combination has already been prepared, if not do the prep steps
 
@@ -81,8 +88,6 @@ if(length(grep(paste0(state, '_', do.months[1], '_to_', do.months[length(do.mont
   # Adding FARS, AADT, VMT, jobs
   na.action = "fill0"
   
-  monthfiles = paste("w", do.months, sep=".")
-  monthfiles = sub("-", "_", monthfiles)
   
   # Append supplmental data. This is now a time-intensive step, with hourly VMT; consider making this parallel
    
