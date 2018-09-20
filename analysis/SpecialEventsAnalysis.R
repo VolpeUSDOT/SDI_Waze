@@ -27,7 +27,12 @@ localdir <- paste0(user, "/workingdata") # full path for readOGR
 teambucket <- "s3://prod-sdc-sdi-911061262852-us-east-1-bucket"
 
 source(file.path(codeloc, "utility/wazefunctions.R")) 
-source(file.path(codeloc, "utility/Workstation_setup.R")) # will set up your workstation and download necessary data files 
+# Workstation setup. Runs if missing VMT data in the AADT folder on workingdata
+if(length(dir(localdir)[grep("aadt_by_grid", dir(file.path(localdir, 'AADT')))]) == 0){
+  source(file.path(codeloc, "utility/Workstation_setup.R"))
+  # move any files which are in an unnecessary "shapefiles" folder up to the top level of the localdir
+  system("mv -v ~/workingdata/shapefiles/* ~/workingdata/")
+}
 
 # Project to Albers equal area conic 102008. Check comparision with USGS version, WKID: 102039
 proj <- showP4(showWKT("+init=epsg:102008"))
@@ -69,18 +74,6 @@ hm_to_num <- function(x){
 
 #### Read shapefiles and data ####
 # Read shapefiles and apply coordinate reference system of hexagons (USGS version of Albers equal area) to Urban Areas and counties using uproj.USGS
-
-# Read in US state shapefile
-ua <- readOGR(file.path(localdir,"census"), layer = "cb_2016_us_ua10_500k")
-ua <- spTransform(ua, CRS(proj.USGS))
-
-# Read in county shapefile 
-co <- readOGR(file.path(localdir,"census"), layer = "cb_2017_us_county_500k")
-co <- spTransform(co, CRS(proj.USGS))
-
-md <- readOGR(file.path(localdir,"census"), layer = "MD_buffered")
-md <- spTransform(md, CRS(proj.USGS))
-# md@data # check the data table in SpatialPolygonsDataFrame class
 
 # Read in hexagon shapefile
 grid <- readOGR(file.path(localdir,"MD_hexagons_shapefiles"), layer = "MD_hexagons_1mi_newExtent_neighbors")
@@ -225,7 +218,7 @@ SpecialEventsExpand <- SpecialEventsExpand %>% left_join(uniquelocbuf, by = c("L
 write.csv(SpecialEventsExpand, file = file.path(localdir,"SpecialEvents", "SpecialEventsExpand_MD_AprilToSept_2017.csv"), row.names = F)
 
 # Save necessary objects as Rdata for easy access for visualization
-save(list = c("co","AllModel30_sub","SpecialEventsExpand","SpecialEvents","edt.sum","md","ua","grid"), file = file.path(localdir,"SpecialEvents", "SpecialEvents_MD_AprilToSept_2017.Rdata"))
+save(list = c("AllModel30_sub","SpecialEventsExpand","SpecialEvents","edt.sum","grid"), file = file.path(localdir,"SpecialEvents", "SpecialEvents_MD_AprilToSept_2017.Rdata"))
 
 #### Data for Time Series ####
 load(file = file.path(localdir,"SpecialEvents", "SpecialEvents_MD_AprilToSept_2017.Rdata"))
