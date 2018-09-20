@@ -106,54 +106,159 @@ plotMonth <- function(dt, loc, weekday, statistic, metrics){
             ggtitle(paste(location,",", buf,"Mile Buffer,", weekday)) 
 }
 
+plotWeekdayHeatMap <- function(dt, loc, metrics){
+  
+        location <- unique(SpecialEvents$Location[SpecialEvents$Location.ID == loc])
+        
+        dt_Date <- dt %>% group_by(Location.ID, DayofWeek, EventType, hour) %>% 
+            summarize(numDay = length(unique(date)),
+                      nWazeJam = ifelse(sum(nWazeJam) == 0, NA, sum(nWazeJam)/numDay),
+                      Obs = ifelse(sum(Obs) == 0, NA, sum(Obs)/numDay),
+                      nWazeAccident = ifelse(sum(nWazeAccident) == 0, NA,sum(nWazeAccident)/numDay),
+                      nHazardOnShoulder = ifelse(sum(nHazardOnShoulder) == 0, NA,sum(nHazardOnShoulder)/numDay),
+                      nHazardOnRoad = ifelse(sum(nHazardOnRoad) == 0, NA,sum(nHazardOnRoad)/numDay),
+                      nHazardWeather = ifelse(sum(nHazardWeather) == 0, NA,sum(nHazardWeather)/numDay),
+                      nEDTFatal = ifelse(sum(nEDTFatal) == 0, NA,sum(nEDTFatal)/numDay),
+                      nEDTCrashWPedBikeInv = ifelse(sum(nEDTCrashWPedBikeInv) == 0, NA,sum(nEDTCrashWPedBikeInv)/numDay),
+                      nEDTCrashWSchoolBusInv = ifelse(sum(nEDTCrashWSchoolBusInv) == 0, NA,sum(nEDTCrashWSchoolBusInv)/numDay),
+                      nEDTVehCount = ifelse(sum(nEDTVehCount) == 0, NA,sum(nEDTVehCount)/numDay)
+                      )
+          
+          dt_Date$DayofWeek <- factor(dt_Date$DayofWeek) 
+          levels(dt_Date$DayofWeek) <- list("Monday" = "Monday","Tuesday" = "Tuesday","Wednesday" = "Wednesday","Thursday" = "Thursday", "Friday" = "Friday", "Saturday" = "Saturday", "Sunday" = "Sunday")
+          
+          dt_visual <-  dt_Date 
+          # %>% filter(DayofWeek == weekday)
+         
+          # Heatmap
+          p <- if (metrics == "EDT Accident") {
+            ggplot(dt_visual, aes(x = hour, y = EventType, fill = Obs)) 
+            # + geom_text(aes(label = round(ifelse(Obs > 0, Obs, NA)))) 
+          } else if (metrics == "Waze Jam") {ggplot(dt_visual, aes(x = hour, y = EventType, fill = nWazeJam)) 
+            # + geom_text(aes(label = round(ifelse(nWazeJam > 0, nWazeJam, NA)))) 
+          } else if (metrics == "Waze Accident") {ggplot(dt_visual, aes(x = hour, y = EventType, fill = nWazeAccident)) 
+            # + geom_text(aes(label = round(ifelse(nWazeAccident > 0, nWazeAccident, NA))))
+          } else if (metrics == "Waze Hazard On Shoulder") {ggplot(dt_visual, aes(x = hour, y = EventType, fill = nHazardOnShoulder)) 
+            # + geom_text(aes(label = round(ifelse(nHazardOnShoulder > 0, nHazardOnShoulder, NA)))) 
+          } else if (metrics == "Waze Hazard On Road") {ggplot(dt_visual, aes(x = hour, y = EventType, fill = nHazardOnRoad)) 
+            # +  geom_text(aes(label = round(ifelse(nHazardOnRoad > 0, nHazardOnRoad, NA))))
+          } else if (metrics == "EDT Fatals") {ggplot(dt_visual, aes(x = hour, y = EventType, fill = nEDTFatal)) 
+            # + geom_text(aes(label = round(ifelse(nEDTFatal > 0, nEDTFatal, NA))))
+          } else if (metrics == "EDT Crashes with Ped or Bike Involvement") {ggplot(dt_visual, aes(x = hour, y = EventType, fill = nEDTCrashWPedBikeInv)) 
+            # + geom_text(aes(label = round(ifelse(nEDTCrashWPedBikeInv > 0, nEDTCrashWPedBikeInv, NA))))
+          } else if (metrics == "EDT Crashes with School Bus Involvement") {ggplot(dt_visual, aes(x = hour, y = EventType, fill = nEDTCrashWSchoolBusInv)) 
+            # + geom_text(aes(label = round(ifelse(nEDTCrashWSchoolBusInv > 0, nEDTCrashWSchoolBusInv, NA))))
+         } else  {ggplot(dt_visual, aes(x = hour, y = EventType, fill = nEDTVehCount)) 
+           # + geom_text(aes(label = round(ifelse(nEDTVehCount > 0, nEDTVehCount, NA))))
+           }
+         p + geom_tile(color = "white", aes(height = 0.5)) + # background colours are mapped according to the value column
+            scale_fill_gradient(low = "#fee08b", high = "#d53e4f", na.value = "white", space = "Lab", guide = "colourbar") + # determine the colour
+            facet_wrap(~ DayofWeek) +
+            ggtitle(paste0(location,", ",buf, " Mile Buffer")) + xlab("Hour") + ylab("") +
+            theme(legend.title=element_text(face="bold", size=14)) + 
+            labs(fill= paste0(metrics))
+}
+
+plotWeekdayendHeatMap <- function(dt, loc, metrics){
+  
+        location <- unique(SpecialEvents$Location[SpecialEvents$Location.ID == loc]
+        
+        dt$WeekDayEnd <- ifelse(dt$DayofWeek %in% c("Monday" ,"Tuesday" ,"Wednesday" ,"Thursday" , "Friday"), "Weekday","Weekend")
+          
+        dt_Date <- dt %>% group_by(Location.ID, WeekDayEnd, EventType, hour) %>% 
+            summarize(numDay = length(unique(date)),
+                      nWazeJam = ifelse(sum(nWazeJam) == 0, NA, sum(nWazeJam)/numDay),
+                      Obs = ifelse(sum(Obs) == 0, NA, sum(Obs)/numDay),
+                      nWazeAccident = ifelse(sum(nWazeAccident) == 0, NA,sum(nWazeAccident)/numDay),
+                      nHazardOnShoulder = ifelse(sum(nHazardOnShoulder) == 0, NA,sum(nHazardOnShoulder)/numDay),
+                      nHazardOnRoad = ifelse(sum(nHazardOnRoad) == 0, NA,sum(nHazardOnRoad)/numDay),
+                      nHazardWeather = ifelse(sum(nHazardWeather) == 0, NA,sum(nHazardWeather)/numDay),
+                      nEDTFatal = ifelse(sum(nEDTFatal) == 0, NA,sum(nEDTFatal)/numDay),
+                      nEDTCrashWPedBikeInv = ifelse(sum(nEDTCrashWPedBikeInv) == 0, NA,sum(nEDTCrashWPedBikeInv)/numDay),
+                      nEDTCrashWSchoolBusInv = ifelse(sum(nEDTCrashWSchoolBusInv) == 0, NA,sum(nEDTCrashWSchoolBusInv)/numDay),
+                      nEDTVehCount = ifelse(sum(nEDTVehCount) == 0, NA,sum(nEDTVehCount)/numDay)
+                      )
+          
+          dt_visual <-  dt_Date 
+          # %>% filter(DayofWeek == weekday)
+         
+          # Heatmap
+          # Heatmap
+          p <- if (metrics == "EDT Accident") {
+            ggplot(dt_visual, aes(x = hour, y = EventType, fill = Obs)) 
+            # + geom_text(aes(label = round(ifelse(Obs > 0, Obs, NA)))) 
+          } else if (metrics == "Waze Jam") {ggplot(dt_visual, aes(x = hour, y = EventType, fill = nWazeJam)) 
+            # + geom_text(aes(label = round(ifelse(nWazeJam > 0, nWazeJam, NA)))) 
+          } else if (metrics == "Waze Accident") {ggplot(dt_visual, aes(x = hour, y = EventType, fill = nWazeAccident)) 
+            # + geom_text(aes(label = round(ifelse(nWazeAccident > 0, nWazeAccident, NA))))
+          } else if (metrics == "Waze Hazard On Shoulder") {ggplot(dt_visual, aes(x = hour, y = EventType, fill = nHazardOnShoulder)) 
+            # + geom_text(aes(label = round(ifelse(nHazardOnShoulder > 0, nHazardOnShoulder, NA)))) 
+          } else if (metrics == "Waze Hazard On Road") {ggplot(dt_visual, aes(x = hour, y = EventType, fill = nHazardOnRoad)) 
+            # +  geom_text(aes(label = round(ifelse(nHazardOnRoad > 0, nHazardOnRoad, NA))))
+          } else if (metrics == "EDT Fatals") {ggplot(dt_visual, aes(x = hour, y = EventType, fill = nEDTFatal)) 
+            # + geom_text(aes(label = round(ifelse(nEDTFatal > 0, nEDTFatal, NA))))
+          } else if (metrics == "EDT Crashes with Ped or Bike Involvement") {ggplot(dt_visual, aes(x = hour, y = EventType, fill = nEDTCrashWPedBikeInv)) 
+            # + geom_text(aes(label = round(ifelse(nEDTCrashWPedBikeInv > 0, nEDTCrashWPedBikeInv, NA))))
+          } else if (metrics == "EDT Crashes with School Bus Involvement") {ggplot(dt_visual, aes(x = hour, y = EventType, fill = nEDTCrashWSchoolBusInv)) 
+            # + geom_text(aes(label = round(ifelse(nEDTCrashWSchoolBusInv > 0, nEDTCrashWSchoolBusInv, NA))))
+         } else  {ggplot(dt_visual, aes(x = hour, y = EventType, fill = nEDTVehCount)) 
+           # + geom_text(aes(label = round(ifelse(nEDTVehCount > 0, nEDTVehCount, NA))))
+           }
+         p + geom_tile(color = "white", aes(height = 0.5)) + # background colours are mapped according to the value column
+            scale_fill_gradient(low = "#fee08b", high = "#d53e4f", na.value = "white", space = "Lab", guide = "colourbar") + # determine the colour
+            facet_wrap(~ WeekDayEnd, ncol= 1) +
+            ggtitle(paste0(location,", ",buf, " Mile Buffer")) + xlab("Hour") + ylab("") +
+            theme(legend.title=element_text(face="bold", size=14)) + 
+            labs(fill= paste0(metrics))
+}
+
+
 
 plotDateHeatMap <- function(dt, loc, weekday, metrics){
   
         location <- unique(SpecialEvents$Location[SpecialEvents$Location.ID == loc])
+        
         dt_Date <- dt %>% group_by(Location.ID, DayofWeek, EventType, hour) %>% 
             summarize(numDay = length(unique(date)),
-                      nWazeJam = sum(nWazeJam)/numDay,
-                      Obs = sum(Obs)/numDay,
-                      nWazeAccident = sum(nWazeAccident)/numDay,
-                      nHazardOnShoulder = sum(nHazardOnShoulder)/numDay,
-                      nHazardOnRoad = sum(nHazardOnRoad)/numDay,
-                      nHazardWeather = sum(nHazardWeather)/numDay,
-                      nEDTFatal = sum(nEDTFatal)/numDay,
-                      nEDTCrashWPedBikeInv = sum(nEDTCrashWPedBikeInv)/numDay,
-                      nEDTCrashWSchoolBusInv = sum(nEDTCrashWSchoolBusInv)/numDay,
-                      nEDTVehCount = sum(nEDTVehCount)/numDay
+                      nWazeJam = ifelse(sum(nWazeJam) == 0, NA, sum(nWazeJam)/numDay),
+                      Obs = ifelse(sum(Obs) == 0, NA, sum(Obs)/numDay),
+                      nWazeAccident = ifelse(sum(nWazeAccident) == 0, NA,sum(nWazeAccident)/numDay),
+                      nHazardOnShoulder = ifelse(sum(nHazardOnShoulder) == 0, NA,sum(nHazardOnShoulder)/numDay),
+                      nHazardOnRoad = ifelse(sum(nHazardOnRoad) == 0, NA,sum(nHazardOnRoad)/numDay),
+                      nHazardWeather = ifelse(sum(nHazardWeather) == 0, NA,sum(nHazardWeather)/numDay),
+                      nEDTFatal = ifelse(sum(nEDTFatal) == 0, NA,sum(nEDTFatal)/numDay),
+                      nEDTCrashWPedBikeInv = ifelse(sum(nEDTCrashWPedBikeInv) == 0, NA,sum(nEDTCrashWPedBikeInv)/numDay),
+                      nEDTCrashWSchoolBusInv = ifelse(sum(nEDTCrashWSchoolBusInv) == 0, NA,sum(nEDTCrashWSchoolBusInv)/numDay),
+                      nEDTVehCount = ifelse(sum(nEDTVehCount) == 0, NA,sum(nEDTVehCount)/numDay)
                       )
-          
-          
-          dt_visual <-  dt_Date %>% filter(DayofWeek == weekday)
-          
+        
+          dt_visual <-  dt_Date  %>% filter(DayofWeek == weekday)
+         
           # Heatmap
           p <- if (metrics == "EDT Accident") {
-            ggplot(dt_visual, aes(x = hour, y = EventType, fill = Obs)) + 
-            geom_text(aes(label = round(ifelse(Obs > 0, Obs, NA)))) 
-          } else if (metrics == "Waze Jam") {ggplot(dt_visual, aes(x = hour, y = EventType, fill = nWazeJam)) + 
-            geom_text(aes(label = round(ifelse(nWazeJam > 0, nWazeJam, NA)))) 
-          } else if (metrics == "Waze Accident") {ggplot(dt_visual, aes(x = hour, y = EventType, fill = nWazeAccident)) + 
-            geom_text(aes(label = round(ifelse(nWazeAccident > 0, nWazeAccident, NA))))
-          } else if (metrics == "Waze Hazard On Shoulder") {ggplot(dt_visual, aes(x = hour, y = EventType, fill = nHazardOnShoulder)) + 
-            geom_text(aes(label = round(ifelse(nHazardOnShoulder > 0, nHazardOnShoulder, NA)))) 
-          } else if (metrics == "Waze Hazard On Road") {ggplot(dt_visual, aes(x = hour, y = EventType, fill = nHazardOnRoad)) + 
-            geom_text(aes(label = round(ifelse(nHazardOnRoad > 0, nHazardOnRoad, NA))))
-          } else if (metrics == "EDT Fatals") {ggplot(dt_visual, aes(x = hour, y = EventType, fill = nEDTFatal)) + 
-            geom_text(aes(label = round(ifelse(nEDTFatal > 0, nEDTFatal, NA))))
-          } else if (metrics == "EDT Crashes with Ped or Bike Involvement") {ggplot(dt_visual, aes(x = hour, y = EventType, fill = nEDTCrashWPedBikeInv)) + 
-            geom_text(aes(label = round(ifelse(nEDTCrashWPedBikeInv > 0, nEDTCrashWPedBikeInv, NA))))
-          } else if (metrics == "EDT Crashes with School Bus Involvement") {ggplot(dt_visual, aes(x = hour, y = EventType, fill = nEDTCrashWSchoolBusInv)) + 
-            geom_text(aes(label = round(ifelse(nEDTCrashWSchoolBusInv > 0, nEDTCrashWSchoolBusInv, NA))))
-         } else  {ggplot(dt_visual, aes(x = hour, y = EventType, fill = nEDTVehCount)) + 
-            geom_text(aes(label = round(ifelse(nEDTVehCount > 0, nEDTVehCount, NA))))}
+            ggplot(dt_visual, aes(x = hour, y = EventType, fill = Obs)) 
+            # + geom_text(aes(label = round(ifelse(Obs > 0, Obs, NA)))) 
+          } else if (metrics == "Waze Jam") {ggplot(dt_visual, aes(x = hour, y = EventType, fill = nWazeJam)) 
+            # + geom_text(aes(label = round(ifelse(nWazeJam > 0, nWazeJam, NA)))) 
+          } else if (metrics == "Waze Accident") {ggplot(dt_visual, aes(x = hour, y = EventType, fill = nWazeAccident)) 
+            # + geom_text(aes(label = round(ifelse(nWazeAccident > 0, nWazeAccident, NA))))
+          } else if (metrics == "Waze Hazard On Shoulder") {ggplot(dt_visual, aes(x = hour, y = EventType, fill = nHazardOnShoulder)) 
+            # + geom_text(aes(label = round(ifelse(nHazardOnShoulder > 0, nHazardOnShoulder, NA)))) 
+          } else if (metrics == "Waze Hazard On Road") {ggplot(dt_visual, aes(x = hour, y = EventType, fill = nHazardOnRoad)) 
+            # +  geom_text(aes(label = round(ifelse(nHazardOnRoad > 0, nHazardOnRoad, NA))))
+          } else if (metrics == "EDT Fatals") {ggplot(dt_visual, aes(x = hour, y = EventType, fill = nEDTFatal)) 
+            # + geom_text(aes(label = round(ifelse(nEDTFatal > 0, nEDTFatal, NA))))
+          } else if (metrics == "EDT Crashes with Ped or Bike Involvement") {ggplot(dt_visual, aes(x = hour, y = EventType, fill = nEDTCrashWPedBikeInv)) 
+            # + geom_text(aes(label = round(ifelse(nEDTCrashWPedBikeInv > 0, nEDTCrashWPedBikeInv, NA))))
+          } else if (metrics == "EDT Crashes with School Bus Involvement") {ggplot(dt_visual, aes(x = hour, y = EventType, fill = nEDTCrashWSchoolBusInv)) 
+            # + geom_text(aes(label = round(ifelse(nEDTCrashWSchoolBusInv > 0, nEDTCrashWSchoolBusInv, NA))))
+         } else  {ggplot(dt_visual, aes(x = hour, y = EventType, fill = nEDTVehCount)) 
+           # + geom_text(aes(label = round(ifelse(nEDTVehCount > 0, nEDTVehCount, NA))))
+           }
 
-         p + geom_tile() + # background colours are mapped according to the value column
-            scale_fill_gradient2(low = muted("darkred"), 
-                       mid = "white", 
-                       high = muted("midnightblue"), 
-                       midpoint = 0) + # determine the colour
-            ggtitle(paste0(location)) + xlab("Hour") + ylab("Event Type") +
+         p + geom_tile(color = "white", aes(height = 0.5)) + # background colours are mapped according to the value column
+            scale_fill_gradient(low = "#fee08b", high = "#d53e4f", na.value = "white", space = "Lab", guide = "colourbar") + # determine the colour
+            ggtitle(paste0(location,", ",buf, " Mile Buffer, ", weekday)) + xlab("Hour") + ylab("") +
             theme(legend.title=element_text(face="bold", size=14)) + 
             labs(fill= paste0(metrics))
 }
@@ -183,7 +288,7 @@ plotDate <- function(dt, loc, weekday, statistic, metrics){
             # geom_point(alpha = 0.5, color = "red") +
             geom_line(alpha = 0.5) +
             geom_rect(data = dt_visual,aes(xmin = ave(dt_visual$StartTime, dt_visual$date, FUN = function(x) mean(x)),xmax = ave(dt_visual$EndTime, dt_visual$date, FUN = function(x) mean(x)), ymin = -Inf,ymax=Inf), fill = dt_visual$background_col, alpha= 0.2/100, inherit.aes = FALSE) +
-            facet_wrap(~ Date) +
+            facet_wrap(~ Date, ncol= 1) +
             xlab("Hour of Day") +
             ylab(paste(statistic, metrics)) +
             scale_color_manual(name = NULL, values=c("NoEvent" = "#999999", "Football" = "#E69F00", "Concert" = "#56B4E9", "Soccer" = "chartreuse4", "Baseball" = "red")) +
@@ -214,7 +319,7 @@ plotDay <- function(dt, loc, days, statistic, metrics){
             # geom_point(alpha = 0.5, color = "red") +
             geom_line(alpha = 0.5) +
             geom_rect(data = dt_visual,aes(xmin = ave(dt_visual$StartTime, dt_visual$date, FUN = function(x) mean(x)),xmax = ave(dt_visual$EndTime, dt_visual$date, FUN = function(x) mean(x)), ymin = -Inf,ymax=Inf), fill = dt_visual$background_col, alpha= 0.2/100, inherit.aes = FALSE) +
-            facet_wrap(~ date) +
+            facet_wrap(~ date, ncol = 1) +
             xlab("Hour of Day") +
             ylab(paste(statistic, metrics)) +
             scale_color_manual(name = NULL, values=c("NoEvent" = "#999999", "Football" = "#E69F00", "Concert" = "#56B4E9", "Soccer" = "chartreuse4", "Baseball" = "red")) +
@@ -275,18 +380,31 @@ Dave's feedback 8/29/2018:
 ```{r eval = T}
 loc = "SE1"
 buf = 5
-dt <- GridDataSE(loc,buf,alldays,col.names)
 weekday = "Sunday"
-metrics = "EDT Accident"
-plotDateHeatMap(dt, loc, weekday, metrics) # average values
+dt <- GridDataSE(loc,buf,alldays,col.names)
+plotDateHeatMap(dt, loc, weekday, "EDT Accident") # average values
 plotDateHeatMap(dt, loc, weekday, "Waze Jam")
+plotDateHeatMap(dt, loc, weekday, "Waze Accident")
+
+plotWeekdayHeatMap(dt, loc, "Waze Jam")
+plotWeekdayHeatMap(dt, loc, "EDT Accident")
+plotWeekdayHeatMap(dt, loc, "Waze Accident")
 
 loc = "SE2"
 buf = 5
-dt <- GridDataSE(loc,buf,alldays,col.names)
+weekday = "Sunday"
 plotDateHeatMap(dt, loc, weekday, "EDT Accident")
+plotDateHeatMap(dt, loc, weekday, "Waze Jam")
 
-# make the bars shorterly
+# plotWeekdayHeatMap(dt, loc, "Waze Jam")
+# plotWeekdayHeatMap(dt, loc, "EDT Accident")
+# plotWeekdayHeatMap(dt, loc, "Waze Accident")
+
+plotWeekdayendHeatMap(dt, loc, "Waze Jam")
+plotWeekdayendHeatMap(dt, loc, "EDT Accident")
+plotWeekdayendHeatMap(dt, loc, "Waze Accident")
+
+# make the bars shorter
 # weekday/weekend classification - baseball only.
 # Fedex field: football
 ```
@@ -296,7 +414,7 @@ plotDateHeatMap(dt, loc, weekday, "EDT Accident")
 ### 5 mile buffer zone - Total
 ```{r eval = T}
 loc = "SE1"
-buf = 3 # both 3 and 5 miles buffer
+buf = 5 # both 3 and 5 miles buffer
 dt <- GridDataSE(loc,buf,alldays,col.names)
 days = c("2017-09-10","2017-09-17")
 statistic = "Total" #c("Total","Average","Maximum")
