@@ -50,10 +50,13 @@ if(length(dir(localdir)[grep("aadt_by_grid", dir(file.path(localdir, 'AADT')))])
 # Loop over months to prepare for comparison
 
 # <><><><><>
-states = c('CT', 'MD', 'UT','VA')  #'UT' # Sets the state. UT, VA, MD are all options.
+states = c('CT', 'MD', 'UT','VA')  #
+cutoff.crash = c(0.35, 0.225, 0.215, 0.225) # See Plotting_RF_diagnostics.R
 # <><><><><>
 
 filestozip = vector()
+
+counter = 1
 
 for(state in states){
   # Load prepared input data
@@ -83,7 +86,7 @@ for(state in states){
   train.dat = w.allmonths
   test.dat = w.allmonths # run on all hours of this time period, not 30% sample
   
-  cutoff = c(0.775, 0.225)
+  cutoff = c(1-cutoff.crash[counter], cutoff.crash[counter])
   cc <- complete.cases(test.dat[,fitvars])
   test.dat <- test.dat[cc,]
   
@@ -165,16 +168,17 @@ for(state in states){
     scale_y_continuous(labels = "", breaks = 1) +
     scale_x_continuous(labels = labs,
                        breaks= seq(0, 23, 2)) +
-  ggtitle("Model 30: Estimated EDT crashes / observed \n By hour of day")
+    ggtitle(paste(state, "Model 30: Estimated EDT crashes / observed \n By hour of day"))
   ggsave(file = paste0(state, "_Obs_Est_rose.jpg"), device = 'jpeg', path = "~/workingdata/Figures")
   
   write.csv(d2, file.path(outputdir, paste0(state, "_Obs_Est_EDT_Model_30_by_hour.csv")), row.names = F)
   write.csv(dd, file.path(outputdir, paste0(state, "_All_Model_30.csv")), row.names = F)
-
+  
   filestozip = c(filestozip,
                  file.path(outputdir, paste0(state, "_Obs_Est_EDT_Model_30_by_hour.csv")),
                  file.path(outputdir, paste0(state, "_All_Model_30.csv")))
   
+  counter = counter + 1
 } # end state loop ----  
 
 
@@ -182,6 +186,18 @@ zipname = paste0('Multi-state_Model_', modelno, '_All_Output_', Sys.Date(), '.zi
 
 system(paste('zip', file.path('~/workingdata', zipname),
              paste(filestozip, collapse = " ")))
+
+system(paste(
+  'aws s3 cp',
+  file.path('~/workingdata', zipname),
+  file.path(teambucket, 'export_requests', zipname)
+))
+
+zipname = paste0('Figures_', Sys.Date(), '.zip')
+
+# Use -j to ignore non-informative paths in zipped file
+system(paste('zip -r -j', file.path('~/workingdata', zipname),
+             '~/workingdata/Figures/*'))
 
 system(paste(
   'aws s3 cp',

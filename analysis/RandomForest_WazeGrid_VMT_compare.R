@@ -46,7 +46,7 @@ source(file.path(codeloc, "analysis/RandomForest_WazeGrid_Fx.R"))
 
 # check if already completed transfer of necessary supplemental data on this instance
 if(length(dir(localdir)[grep("aadt_by_grid", dir(file.path(localdir, 'AADT')))]) == 0){
-
+  
   source(file.path(codeloc, "utility/Workstation_setup.R"))
   # move any files which are in an unnecessary "shapefiles" folder up to the top level of the localdir
   system("mv -v ~/workingdata/shapefiles/* ~/workingdata/")
@@ -56,36 +56,36 @@ if(length(dir(localdir)[grep("aadt_by_grid", dir(file.path(localdir, 'AADT')))])
 
 
 for(state in states){ # start state loop ----
-
+  
   # Remove w.2017_04 or similar if exists from previous states
   if(exists(monthfiles[1])) {rm(list = monthfiles)}
   
-# Check to see if this state/month combination has already been prepared, if not do the prep steps
-
-if(length(grep(paste0(state, '_', do.months[1], '_to_', do.months[length(do.months)], '.RData'), dir(localdir)))==0){
-  # Data prep ----
+  # Check to see if this state/month combination has already been prepared, if not do the prep steps
   
-  # rename data files by month. For each month, prep time and response variables
-  # See prep.hex() in wazefunctions.R for details.
-  for(mo in do.months){
-    prep.hex(paste0("WazeTimeEdtHexAll_", mo, "_", HEXSIZE, "mi_", state,".RData"), state = state, month = mo)
-  }
-  
-  # Plot to check grid IDs. Requires shapefiles to be present in ~/workingdata/Hex, download from S3 if not there.
-  # This was useful when testing different grid sizes, to make sure everything was matching correctly.
-  CHECKPLOT = F
-  if(CHECKPLOT){
-    grid_shp <- rgdal::readOGR(file.path(localdir, "Hex"), paste0(state, "_hexagons_1mi_neighbors"))
+  if(length(grep(paste0(state, '_', do.months[1], '_to_', do.months[length(do.months)], '.RData'), dir(localdir)))==0){
+    # Data prep ----
     
-    w.g <- match(w.2017_04$GRID_ID, grid_shp$GRID_ID)
-    w.g <- w.g[!is.na(w.g)]
-    gs <- grid_shp[w.g,]
+    # rename data files by month. For each month, prep time and response variables
+    # See prep.hex() in wazefunctions.R for details.
+    for(mo in do.months){
+      prep.hex(paste0("WazeTimeEdtHexAll_", mo, "_", HEXSIZE, "mi_", state,".RData"), state = state, month = mo)
+    }
     
-    plot(gs, col = "red")
-    rm(w.g, gs, grid_shp)
-  }
-  
-  # Adding FARS, AADT, VMT, jobs
+    # Plot to check grid IDs. Requires shapefiles to be present in ~/workingdata/Hex, download from S3 if not there.
+    # This was useful when testing different grid sizes, to make sure everything was matching correctly.
+    CHECKPLOT = F
+    if(CHECKPLOT){
+      grid_shp <- rgdal::readOGR(file.path(localdir, "Hex"), paste0(state, "_hexagons_1mi_neighbors"))
+      
+      w.g <- match(w.2017_04$GRID_ID, grid_shp$GRID_ID)
+      w.g <- w.g[!is.na(w.g)]
+      gs <- grid_shp[w.g,]
+      
+      plot(gs, col = "red")
+      rm(w.g, gs, grid_shp)
+    }
+    
+    # Adding FARS, AADT, VMT, jobs
   na.action = "fill0"
   
   
