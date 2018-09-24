@@ -1,5 +1,5 @@
 # Plotting Precision/Recall tradeoff
-# Using RF model 30 as basis
+# Can select RF model, e.g. modelno = "30" 
 
 library(randomForest)
 library(foreach) # for parallel implementation
@@ -23,73 +23,31 @@ source(file.path(codeloc, 'utility/wazefunctions.R'))
 # read random forest function
 source(file.path(codeloc, "analysis/RandomForest_WazeGrid_Fx.R"))
 
-# Load model outputs ----
-# Get model 30 for each state
-# Pull down model outputs from S3 if necessary
-md.files <-  c(
-  'MD_VMT_Output_to_30.RData',
-  'MD_Model_30_RandomForest_Output.RData')
-  
-# MD files
-#  system(paste("aws s3 ls", file.path(teambucket, 'MD/')))
-for(i in md.files){
-  if(length(grep(i, dir(outputdir))) == 0){
-    system(paste("aws s3 cp",
-                 file.path(teambucket, "MD", i),
-                 file.path(outputdir, i)))
-  }
-}
-
-ct.files <-  c(
-  'CT_VMT_Output_to_30.RData',
-  'CT_Model_30_RandomForest_Output.RData')
-
-# CT files
-#  system(paste("aws s3 ls", file.path(teambucket, 'CT/')))
-
-for(i in ct.files){
-  if(length(grep(i, dir(outputdir))) == 0){
-    system(paste("aws s3 cp",
-                 file.path(teambucket, "CT", i),
-                 file.path(outputdir, i)))
-  }
-}
-
-ut.files <-  c(
-  'UT_VMT_Output_to_30.RData',
-  'UT_Model_30_RandomForest_Output.RData')
-
-# UT files
-#  system(paste("aws s3 ls", file.path(teambucket, 'UT/')))
-for(i in ut.files){
-  if(length(grep(i, dir(outputdir))) == 0){
-    system(paste("aws s3 cp",
-                 file.path(teambucket, "UT", i),
-                 file.path(outputdir, i)))
-  }
-}
-
-va.files <-  c(
-  'VA_VMT_Output_to_30.RData',
-  'VA_Model_30_RandomForest_Output.RData')
-
-# VA files
-#  system(paste("aws s3 ls", file.path(teambucket, 'VA/')))
-for(i in va.files){
-  if(length(grep(i, dir(outputdir))) == 0){
-    system(paste("aws s3 cp",
-                 file.path(teambucket, "VA", i),
-                 file.path(outputdir, i)))
-  }
-}
-
 # Loop over states to produce tradeoff plots ----
+# <><><><><><><>
 states = c('CT', 'MD', 'UT', 'VA')
-modelno = "30"
+modelno = 62 # "18" # "30"
 do.months = paste("2017", c("04","05","06","07","08","09"), sep="-")
+# <><><><><><><>
 
 for(state in states){ # state = 'CT'
-  cat(rep("<>", 10), "\n", state, "\n", rep("<>", 10), "\n")
+  cat("\n", rep("<>", 10), "\n", state, "\n\n")
+  
+  # Grab from S3 if necessary
+  s3.files <-  c(
+    #paste0(state, '_VMT_Output_to_', modelno, '.RData'),
+    paste0(state, '_Model_', modelno,'_RandomForest_Output.RData'))
+  
+  # State files
+  #  system(paste("aws s3 ls", paste0(teambucket,'/', state, '/')))
+  for(i in s3.files){
+    if(length(grep(i, dir(outputdir))) == 0){
+      system(paste("aws s3 cp",
+                   file.path(teambucket, state, i),
+                   file.path(outputdir, i)))
+    }
+  }
+  
   load(file.path(outputdir, paste0(state, "_Model_", modelno, "_RandomForest_Output.RData")))
   
   # Load prepared input data. Run one of the RF scripts, such as RandomForest_WazeGrid_VMT_compare.R to create the preapred data for each state if not present in ~/workingdata. This has one object, w.allmonths, a data frame of all GRID ID x day x hour rows and all variable columns
@@ -111,7 +69,7 @@ for(state in states){ # state = 'CT'
   pdf(file.path(localdir, "Figures", paste0(state, "_Variable_Importance_Model_", modelno, ".pdf")), width = 8, height = 8)
   
   varImpPlot(rf.out, 
-             main = paste(state, "Model 30 Variable Importance"),
+             main = paste(state, "Model",modelno,"Variable Importance"),
              bg = scales::alpha("midnightblue", 0.5),
              n.var = 15)
   
@@ -122,7 +80,7 @@ for(state in states){ # state = 'CT'
   out.df$CorrectPred = out.df$TN | out.df$TP
   levels(out.df$Obs) = c("Obs = NoCrash", "Obs = Crash")
   
-  ggplot(out.df, aes(Prob.Crash, fill = Obs)) + 
+  gp1 <- ggplot(out.df, aes(Prob.Crash, fill = Obs)) + 
     geom_histogram(alpha = 0.5, position = "identity", binwidth = 0.01) + 
     scale_y_continuous(limits=c(0,500), oob = scales::rescale_none) + 
     ggtitle("Probability of Waze event being categorized as EDT crash \n (Truncated at count = 500)") + 
@@ -132,7 +90,9 @@ for(state in states){ # state = 'CT'
     #theme_bw() + 
     scale_fill_brewer(palette="Set1")
   
-  ggplot(out.df, aes(Prob.Crash, fill = CorrectPred)) + 
+  print(gp1)
+  
+  gp2 <- ggplot(out.df, aes(Prob.Crash, fill = CorrectPred)) + 
     geom_histogram(alpha = 0.5, position = "identity", binwidth = 0.01) + 
     scale_y_continuous(limits=c(0, 500), oob = scales::rescale_none) + 
     geom_vline(xintercept = 0.225, linetype = 'dotted') +
@@ -141,6 +101,7 @@ for(state in states){ # state = 'CT'
     scale_fill_brewer(palette="Set1") +
     ggtitle("Frequency of classification as EDT crash by observed values \n (Truncated at count = 500; Max = 600,000)")
   
+  print(gp2)
   # Plotting historgram of difference from observed and estimated, by grid cell aggregated over time ----
   levels(out.df$Pred) = c(1, 0) # from Crash, NoCrash
   levels(out.df$Obs) = c(0, 1) # from Obs  =NoCrash, Obs = Crash
@@ -161,9 +122,9 @@ for(state in states){ # state = 'CT'
   pct.diff.table = as.data.frame(table(pct.diff.cut <- cut(pct.diff.grid$Pct.diff, breaks = c(-2000, -100, -50, -1, 0, 50, 100, 2000))))
   # https://drsimonj.svbtle.com/pretty-histograms-with-ggplot2. Trick is fill = cut()
   
-  levels(cut(pct.diff.grid$Pct.diff, 25)) # create manual colors to match tablesu 
+  # levels(cut(pct.diff.grid$Pct.diff, 25)) # create manual colors to match tablesu 
   
-  ggplot(pct.diff.grid, aes(Pct.diff, fill = cut(Pct.diff, 
+  gp3 <- ggplot(pct.diff.grid, aes(Pct.diff, fill = cut(Pct.diff, 
                                                  breaks = c(-1000, -100, -50, -25, 
                                                             0, 
                                                             25, 50, 100, 1000) ))) + 
@@ -175,10 +136,10 @@ for(state in states){ # state = 'CT'
   #
     #  scale_color_gradient(low = 'red', high = 'midnightblue')
 
+  print(gp3)
   # Choosing cutoffs ----
   # Low value is most greedy for non-crashes, high value is more greedy for crashes
-  omits = c(alwaysomit, alert_subtypes)
-  fitvars <- names(w.allmonths)[is.na(match(names(w.allmonths), omits))]
+  fitvars <- rownames(rf.out$importance)
   test.dat.use = w.allmonths[testrows,]
   reference.vec <- test.dat.use[,response.var]
   levels(reference.vec) = c("NoCrash", "Crash")
@@ -215,7 +176,7 @@ for(state in states){ # state = 'CT'
   prec.recall$Metric <- factor(prec.recall$Metric, labels = c("Accuracy", "Recall","Precision", "False Positive Rate"))
   names(prec.recall)[1:2] = c("Cutoff", "Value")
   
-  ggplot(prec.recall, aes(x = Cutoff, y = Value, group = Metric)) + 
+  gp4 <- ggplot(prec.recall, aes(x = Cutoff, y = Value, group = Metric)) + 
     geom_line(aes(color = Metric), size = 2) +
     ggtitle(paste0(state, "Crash classification tradeoffs, April-September 2017 \n Model ", modelno)) + 
     theme_bw() +
@@ -224,7 +185,7 @@ for(state in states){ # state = 'CT'
              y = c(0.95, 0.05, 0.46,0.81),
              hjust = 0,
              label = c("Accuracy", "False Positive Rate", "Precision", "Recall"))
-               
+  print(gp4)      
   
   dev.off()
   

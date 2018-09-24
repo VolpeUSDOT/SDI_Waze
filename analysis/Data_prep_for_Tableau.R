@@ -37,37 +37,37 @@ source(file.path(codeloc, 'utility/wazefunctions.R'))
 # read random forest function
 source(file.path(codeloc, "analysis/RandomForest_WazeGrid_Fx.R"))
 
-# check if already completed transfer of necessary supplemental data on this instance
-if(length(dir(localdir)[grep("aadt_by_grid", dir(file.path(localdir, 'AADT')))]) == 0){
-  
-  source(file.path(codeloc, "utility/Workstation_setup.R"))
-  # move any files which are in an unnecessary "shapefiles" folder up to the top level of the localdir
-  system("mv -v ~/workingdata/shapefiles/* ~/workingdata/")
-}
-
 # View the files available in S3 for this state: system(paste0('aws s3 ls ', teambucket, '/', state, '/'))
 
 # Loop over months to prepare for comparison
 
+
 # <><><><><>
-states = c('CT', 'MD', 'UT','VA')  #
-cutoff.crash = c(0.35, 0.225, 0.215, 0.225) # See Plotting_RF_diagnostics.R
+states = c('CT', 'MD', 'UT','VA')  
+
+# Option to use different cutoffs for different models
+cutoff.crash.30 = c(0.35, 0.225, 0.215, 0.225) # See Plotting_RF_diagnostics.R
+cutoff.crash.18 = c(0.3, 0.15, 0.15, 0.10) # Much less certain with model 18
+cutoff.crash.61 = c(0.35, 0.2, 0.2, 0.15) 
+cutoff.crash.62 = c(0.375, 0.2, 0.2, 0.15) 
+modelno = '62' #'61' #'18' #"30"
+cutoff.crash = get(paste("cutoff.crash", modelno, sep ="."))
+cutoff.crash = cutoff.crash.30 # to use same cutoffs across models within a state
 # <><><><><>
 
 filestozip = vector()
 
 counter = 1
 
-for(state in states){
+for(state in states){ # state = 'CT'
+  cat("\n", rep("<>", 10), "\n", state, modelno,"\n\n")
+  
   # Load prepared input data
   load(file.path(localdir, paste0(state, '_', do.months[1], '_to_', do.months[length(do.months)], '.RData')))
-  #assign(paste(state, "w.allmonths", sep="_"), w.allmonths)
-  #rm(w.allmonths)
-
-  # Load Model 30 outputs, April - September 2017 ----
-  # producing <state>_All_Model_30.csv
   
-  modelno = "30"
+  # Load Model <modelno> outputs ----
+  # producing <state>_All_Model_<modelno>.csv
+  
   response.var = "MatchEDT_buffer_Acc"
   # Omit as predictors in this vector:
   alwaysomit = c(grep("GRID_ID", names(w.allmonths), value = T), "day", "hextime", "year", "weekday", "vmt_time",
@@ -168,15 +168,15 @@ for(state in states){
     scale_y_continuous(labels = "", breaks = 1) +
     scale_x_continuous(labels = labs,
                        breaks= seq(0, 23, 2)) +
-    ggtitle(paste(state, "Model 30: Estimated EDT crashes / observed \n By hour of day"))
-  ggsave(file = paste0(state, "_Obs_Est_rose.jpg"), device = 'jpeg', path = "~/workingdata/Figures")
+    ggtitle(paste(state, "Model", modelno,": Estimated EDT crashes / observed \n By hour of day"))
+  ggsave(file = paste0(state, "_Obs_Est_", modelno, "_rose.jpg"), device = 'jpeg', path = "~/workingdata/Figures", width = 7, height = 7, units = 'in')
   
-  write.csv(d2, file.path(outputdir, paste0(state, "_Obs_Est_EDT_Model_30_by_hour.csv")), row.names = F)
-  write.csv(dd, file.path(outputdir, paste0(state, "_All_Model_30.csv")), row.names = F)
+  write.csv(d2, file.path(outputdir, paste0(state, "_Obs_Est_EDT_Model_",modelno,"_by_hour.csv")), row.names = F)
+  write.csv(dd, file.path(outputdir, paste0(state, "_All_Model_",modelno,".csv")), row.names = F)
   
   filestozip = c(filestozip,
-                 file.path(outputdir, paste0(state, "_Obs_Est_EDT_Model_30_by_hour.csv")),
-                 file.path(outputdir, paste0(state, "_All_Model_30.csv")))
+                 file.path(outputdir, paste0(state, "_Obs_Est_EDT_Model_",modelno,"_by_hour.csv")),
+                 file.path(outputdir, paste0(state, "_All_Model_",modelno,".csv")))
   
   counter = counter + 1
 } # end state loop ----  
@@ -184,7 +184,7 @@ for(state in states){
 
 zipname = paste0('Multi-state_Model_', modelno, '_All_Output_', Sys.Date(), '.zip')
 
-system(paste('zip', file.path('~/workingdata', zipname),
+system(paste('zip -j', file.path('~/workingdata', zipname),
              paste(filestozip, collapse = " ")))
 
 system(paste(
@@ -207,53 +207,79 @@ system(paste(
 
 
 
-# Average by day
 
-# remake day of week
-datetime <- strptime(paste("2017", dd$day, sep = "-"), format = "%Y-%j")
-dd$DayOfWeek <- as.numeric(format(datetime, "%w")) # Weekday as decimal number (0–6, Sunday is 0).
-dd$Month <- as.character(format(datetime, "%B"))  # Full month name
 
-d.day <- dd %>% 
-  group_by(DayOfWeek) %>%
-  summarize(N = n(),
-            TotalWazeAcc = sum(nWazeAccident),
-            TotalObservedEDT = sum(nMatchEDT_buffer_Acc),
-            TotalEstimated = sum(Pred == "Crash"),
-            Obs_Est_diff = TotalObservedEDT - TotalEstimated,
-            Pct_Obs_Est = 100 *TotalEstimated / TotalObservedEDT)
+SCRATCH = F
 
-d.day
+if(SCRATCH){
+  
+  state = 'CT'
+  modelno = '30'
+  dd <- read.csv(file.path(outputdir, paste0(state, "_All_Model_",modelno,".csv")))
+  
+  #### Performance by time of day plot
+  
+  dim(dd)
+  
+  d2 <- dd %>% select(-Hour) %>% 
+    group_by(hour) %>%
+    summarize(N = n(),
+              TotalWazeAcc = sum(nWazeAccident),
+              TotalObservedEDT = sum(nMatchEDT_buffer_Acc),
+              TotalEstimated = sum(Pred == 1),
+              Obs_Est_diff = TotalObservedEDT - TotalEstimated,
+              Pct_Obs_Est = 100 *TotalEstimated / TotalObservedEDT)
 
-keepcol = c("GRID_ID",
-            "day",
-            "hour",
-            "Month",
-            "DayOfWeek",
-            "Obs",
-            "Pred",
-            "Prob.Crash",
-            "FN",
-            "FP",
-            "TN",
-            "TP",
-            "Pred.grp",
-            "nMatchEDT_buffer_Acc",
-            "nWazeAccident")
+  # Average by day
 
-all(keepcol %in% names(dd))
+  # remake day of week
+  datetime <- strptime(paste("2017", dd$day, sep = "-"), format = "%Y-%j")
+  dd$DayOfWeek <- as.numeric(format(datetime, "%w")) # Weekday as decimal number (0–6, Sunday is 0).
+  dd$Month <- as.character(format(datetime, "%B"))  # Full month name
 
-write.csv(dd[keepcol], "Subset2_Model_30.csv", row.names = F)
+  d.day <- dd %>% 
+    group_by(DayOfWeek) %>%
+    summarize(N = n(),
+              TotalWazeAcc = sum(nWazeAccident),
+              TotalObservedEDT = sum(nMatchEDT_buffer_Acc),
+              TotalEstimated = sum(Pred == "1"),
+              Obs_Est_diff = TotalObservedEDT - TotalEstimated,
+              Pct_Obs_Est = 100 *TotalEstimated / TotalObservedEDT)
+  
+  d.day # Compare with day of week table in Tableau
+  
 
-dd$Pred_sum = 1 # to match previous Tableau prep
+  keepcol = c("GRID_ID",
+              "day",
+              "hour",
+              "Month",
+              "DayOfWeek",
+              "Obs",
+              "Pred",
+              "Prob.Crash",
+              "FN",
+              "FP",
+              "TN",
+              "TP",
+              "Pred.grp",
+              "nMatchEDT_buffer_Acc",
+              "nWazeAccident")
+  
+  all(keepcol %in% names(dd))
+  
+  write.csv(dd[keepcol], "Subset2_Model_30.csv", row.names = F)
+  
+  dd$Pred_sum = 1 # to match previous Tableau prep
+  
+  keepcol = c("GRID_ID",
+              "day",
+              "hour",
+              "DayOfWeek",
+              "Pred",
+              "Pred_sum",
+              "nMatchEDT_buffer_Acc",
+              "Month")
+  
+  write.csv(dd[keepcol], "Subset2_Model_30_byMONTH.csv", row.names = F)
 
-keepcol = c("GRID_ID",
-            "day",
-            "hour",
-            "DayOfWeek",
-            "Pred",
-            "Pred_sum",
-            "nMatchEDT_buffer_Acc",
-            "Month")
-
-write.csv(dd[keepcol], "Subset2_Model_30_byMONTH.csv", row.names = F)
+}
