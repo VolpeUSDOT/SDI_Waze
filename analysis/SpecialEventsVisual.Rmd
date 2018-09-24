@@ -441,6 +441,7 @@ loc = "SE2"
 buf = 3
 weekday = "Sunday"
 dt <- GridDataSE(loc,buf,alldays,col.names)
+plotDateHeatMap(dt, loc, weekday, "Waze Accident")
 plotDateHeatMap(dt, loc, weekday, "EDT Accident")
 plotDateHeatMap(dt, loc, weekday, "Waze Jam")
 
