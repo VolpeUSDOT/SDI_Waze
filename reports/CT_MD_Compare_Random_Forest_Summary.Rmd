@@ -98,13 +98,13 @@ knitr::include_graphics(logos)
 
 The Safety Data Initiative Waze project aims to estimate the patterns and processes driving roadway crashes, based on crowdsourced Waze predictors. The first phase of the effort focused on data available at that time, six months of data where geolocated EDT and Waze data are available, from March - September, 2017, for Maryland. The models were trained on the presence of an EDT crash (binary), in a 1 mile grid cell, for each hour of the study period. A large number of predictors from the Waze data, such as number of Waze accidents, the type of Waze events, number of Waze events in total, and other variables. 
 
-A random forest model trained on known data can then be employed on data for which only Waze data are provided. This would be the case if incoming Waze data is used to estimate the number and spatial/temporal pattern of EDT-level crashes for times or states when EDT data are not available. In the model development process, the testing is done for a subset of the data where the known EDT values are held back, and then the estimates produced by the model fit to training data can be compared to the known data. A goal of the SDI Waze project is to produce estimated EDT-level crash counts which best fit the observed data in terms of overall accuracy and precision in spatial and temporal patterns. 
+A random forest model trained on known data can then be employed on data for which only Waze data are provided. This would be the case if incoming Waze data is used to estimate the number and spatial/temporal pattern of EDT-level crashes for times or states when EDT data are not available. In the model development process, the model is first trained on a majority of the complete data. The remainder of the complete data is used to the model performance; the estimates produced by the model fit to training data can be compared to the known data. A goal of the SDI Waze project is to produce estimated EDT-level crash counts which best fit the observed data in terms of overall accuracy and precision in spatial and temporal patterns. 
 
-In the first phase of the SDI Waze project, Maryland was selected as the focal state. Maryland contributes crash data to the Electronic Data Transfer (EDT) system, with crash location data being high quality and with high availability. The six-month period from April - September, 2017 was used to assess the fitness of the Waze data for estimating police-reportable crashes. Those models showed high accuracy, with over 99% of locations and times being correctly identified has having a police-reportable crash or not. In that first phase, the unit of analysis was 1 square mile grid cells, for each hour of the time period between the beginning of April and end of September, 2017.
+In the first phase of the SDI Waze project, Maryland was selected as the focal state. Maryland contributes crash data to the Electronic Data Transfer (EDT) system, with crash location data being high quality and with high availability. The six-month period from April - September, 2017 was used to assess the fitness of the Waze data for estimating police-reportable crashes. Those models showed high accuracy, with over 99% of locations and times being correctly identified has having a police-reportable crash or not. In that first phase, the unit of analysis was 1 square mile hexagonal grid cells, for each hour of the time period between the beginning of April and end of September, 2017.
 
 A number of supplemental data sources were found to improve recall and accuracy to some extent, but overall accuracy was already high without these supplemental features. These supplemental data sources included the following:
 
-- Average annual daily traffic (AADT), by sum of the AADT in the roads in a grid cell, from HPMS.
+- Average annual daily traffic (AADT), summed for all the roads in a grid cell, from HPMS.
 - Fatal Accident Reporting System (FARS) counts of fatal accidents from 2012-2016 for each grid cell.
 - Weather: Reflectivity from the [NEXRAD](https://www.ncdc.noaa.gov/data-access/radar-data/nexrad) radar network, pulled hourly and merged with gridded data.
 - Road functional class: Miles of roads of each functional class, from [HPMS](https://www.fhwa.dot.gov/policyinformation/hpms.cfm).
@@ -114,7 +114,7 @@ A number of supplemental data sources were found to improve recall and accuracy 
 
 To extend the work of the first phase to additional states, Connecticut was selected in the second phase of the SDI Waze project. Like Maryland, crashes are reported in the EDT system for Connecticut, and spatial data are high quality and high coverage across crashes (i.e., relatively few crashes have no spatial data). Two sets of models were applied, a *simple* model using only Waze variables (32 different variables), and a *full* model with an additional 26 variables from AADT, vehicle miles traveled (VMT) by road functional class, FARS, and LEHD economic variables.
 
-As a test of the approach taken in the first phase, a model of police-reportable crashes using just Waze data features (without supplemental data) was applied to Connecticut, for the same April - September 2017 time period. We then compare this Connecticut model to the Maryland model. There are three questions to ask in this comparison:
+As a test of the approach taken in the first phase, a model of police-reportable crashes using just Waze data features (without supplemental data) was applied to Connecticut, for the same April - September 2017 time period (the simple model, below). We then compare this Connecticut model to the Maryland model, and repeat the test for the full model (with supplemental data). There are three questions to ask in this comparison:
 
 1. Do the Connecticut and Maryland models have similar accuracy, precision, recall, and false positive rates?
     
@@ -127,7 +127,7 @@ For both Maryland and Connecticut, there are two key data sets:
 - EDT data, April - September 2017
 - Waze data, April - September 2017 
 
-For the random forest models, the model was fitted using 70% of the data (by grid cell and hour). Then, again within each state, 30% of data was used to test the fitted model. Observed EDT crashes are compared to estimated EDT crashes produced by the model. 
+For both simple and full random forest models, models were fitted using 70% of the data (by grid cell and hour). Then, again within each state, 30% of data was used to test the fitted model. Observed EDT crashes are compared to estimated EDT crashes produced by the model. 
 
 ## Question 1: Do the Connecticut and Maryland models have similar accuracy, precision, recall, and false positive rates?
 
@@ -215,18 +215,20 @@ datatable(CT_MD_imp, filter = 'top',
 
 ```
 
-#### Variable Importance figure
+#### Variable Importance figure *(click to view)*
 
 ```{r CT_MD_varimp, fig.height=8, fig.width=11, fig.align='center', fig.caption='Variable importance for Connecticut and Maryland Waze models. '}
 par(mfrow=c(1,2))
 varImpPlot(CT_rf.out,
            main = "Connecticut simple Waze model",
            n.var = 20, 
-           cex = 0.8)
+           cex = 0.8, pt.cex = 1.2,
+           bg = scales::alpha("midnightblue", 0.5))
 varImpPlot(MD_rf.out,
            main = "Maryland simple Waze model",
            n.var = 20, 
-           cex = 0.8)
+           cex = 0.8, pt.cex = 1.2,
+           bg = scales::alpha("midnightblue", 0.5))
 ```
 
 ### Full model {.tabset .tabset-pills}
@@ -271,18 +273,20 @@ datatable(CT_MD_imp, filter = 'top',
 
 ```
 
-#### Variable importance figure
+#### Variable importance figure *(click to view)*
 
 ```{r CT_MD_varimp_full, fig.height=8, fig.width=11, fig.align='center', fig.caption='Variable importance for Connecticut and Maryland Waze models. '}
 par(mfrow=c(1,2))
 varImpPlot(CT_rf.out,
            main = "Connecticut full Waze model",
            n.var = 20, 
-           cex = 0.8)
+           cex = 0.8, pt.cex = 1.2,
+           bg = scales::alpha("midnightblue", 0.5))
 varImpPlot(MD_rf.out,
            main = "Maryland full Waze model",
            n.var = 20, 
-           cex = 0.8)
+           cex = 0.8, pt.cex = 1.2,
+           bg = scales::alpha("midnightblue", 0.5))
 ```
 
 ## Question 3. When applying models fitted to one state on to data from another state, how much does the accuracy and other model diagnostic information change?
@@ -357,16 +361,16 @@ pander::pander(tabl, style = "rmarkdown")
 
 False positives (FP) can be considered Type I errors, and false negatives (FN) can be considered Type II errors. 
 
-  - *Accuracy* = TN + TP / All observations 
+  - *Accuracy* = ( TN + TP ) / All observations 
     + True positives and true negatives divided by all observations. A high value indicates that the observed occurrences and absences of EDT crashes are correctly being estimated. 
   
-  - *Precision* = TP / FP + TP 
+  - *Precision* = TP / ( FP + TP ) 
      + True positives divided by all predicted positives. A high value indicates that there are relatively few false positives (locations and times where a crash is estimated, but did not actually occur).
   
-  - *Recall* = TP / FN + TP
+  - *Recall* = TP / ( FN + TP )
     + True positives divided by all observed positives. This is also called *Sensitivity*, or the *true postitive rate*. A high value indicates that there are relatively few false negatives (locations and times where a crash was not estimated, but did actually occur).
   
-  - *False Positive Rate* = FP / TN + FP
+  - *False Positive Rate* = FP / ( TN + FP )
     + False positives divided by all observed negatives. A low value indicates that there are relatively few false positives compared to all observed absences of EDT crashes.
 
 
@@ -374,7 +378,7 @@ False positives (FP) can be considered Type I errors, and false negatives (FN) c
 
 For a binary model, we can additionally calculate one other quantity:
 
-  - *Specificity* = TN / TN + FP
+  - *Specificity* = TN / ( TN + FP )
   + True negatives divided by all observed negatives, also called the true negative rate. For the SDI Waze analysis, most observations are "0", meaning no EDT crashes occurred, so much of the model performance is driven by accurately predicting these "0" (no crash) values.
 
 Balancing between high specificity (where false positives are avoided) and high sensitivity (where false negatives are avoided) is an important decision point in evaluating a model. High sensitivity (i.e., recall or true positive rate) with high specificity (low false positive rate) is ideal. Plotting the false positive rate versus the true positive rate allows a visualization of this balance, and is known the 'receiver-operator characteristic (ROC) curve'. The larger the area under the ROC curve, the more high specificity is maximized with low loss of sensitivity. An area of 0.5 is equivalent to flipping a coin; and area of 1 is perfect estimation, with no false positives or false negatives. As a rule of thumb, areas of 0.6 or greater are generally considered to represent useful classification models; areas of 0.9 or greater are considered to represent very good classification models.
