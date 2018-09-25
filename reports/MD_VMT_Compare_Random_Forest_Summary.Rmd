@@ -78,14 +78,19 @@ for(i in ct.files){
 
 ```
 
-# VMT versus AADT
+# Traffic volume measures
 
+The Safety Data Initiative Waze pilot project has focused on how crowdsourced roadway inicident reports from Waze can be used to estimate police-reportable crashes. A number of supplmental data sources were found to add value to the machine learning models of crashes, including average annual daily traffic (AADT). AADT values were extracted for all roads in the Highway Performance Monitoring System (HPMS) of FHWA, applied to the 1 sq mile grid cells used in the modeling approach. This variable substantially improved model performance, principally by better reducing the number of false negatives: grid cells and hours where crashes were reported in the EDT data, but the model did not identify that grid cell and hour as a crash. 
 
-- Average annual daily traffic (AADT), by sum of the AADT in the roads in a grid cell, from HPMS.
+While AADT is a useful variable, it is a single static for each road segment. As an alternative, we worked with researchers at Volpe and FHWA who have developed a method to apportion AADT values over the course of a year, applying adjustments to account for hour of day, day of week, and month of year. We refer to those values here as "hourly AADT shares". *Jonathan: is there a citation?*
+
+Using Maryland as the basis for testing the hourly AADT shares, two 
+
+by sum of the AADT in the roads in a grid cell, from HPMS.
 
 - VMT: Volume of traffic distributed by hour of day, day of week, and month of year from ATR data. Approximately 5,000 stations on the National Highway System (NHS). Hour of year VMT is the product of hour of year volume and HPMS segment length.
 
-#### Maryland VMT model comparisons
+#### Maryland hourly AADT shares model comparisons
 
 ```{r MD_VMT_metrics, echo = F}
 # Get outputs
@@ -95,9 +100,9 @@ tabl <- vector()
 for(i in c("18", "61", "62", "30")){ tabl <- rbind(tabl, c(100*keyoutputs[[i]]$diag, round(keyoutputs[[i]]$auc, 4)))}
 
 colnames(tabl)[1:5] = c("Accuracy", "Precision", "Recall", "False Positive Rate", "AUC")
-rownames(tabl) =  c("18 - Simple", "61 - AADT", "62 - VMT", "30 - Full with VMT")
+rownames(tabl) =  c("Simple model", "AADT", "Hourly AADT", "Full model")
 datatable(tabl, 
-          caption = "Maryland VMT model comparisons",
+          caption = "Maryland Hourly AADT model comparisons",
           rownames = T,
           options = list(dom = "t",
                          order = list(list(5, 'desc')),
@@ -110,7 +115,7 @@ datatable(tabl,
           formatStyle(5, background = styleEqual(max(tabl[,5]), 'lightgreen'))
 ```   
 
-#### Connecticut VMT model comparisons
+#### Connecticut Hourly AADT model comparisons
 
 
 ```{r CT_VMT_metrics, echo = F}
@@ -125,9 +130,9 @@ tabl <- vector()
 for(i in c("18","61", "62",  "30")){ tabl <- rbind(tabl, c(100*keyoutputs[[i]]$diag, round(keyoutputs[[i]]$auc, 4)))}
 
 colnames(tabl)[1:5] = c("Accuracy", "Precision", "Recall", "False Positive Rate", "AUC")
-rownames(tabl) =  c("18 - Simple", "61 - AADT", "62 - VMT",  "30 - Full with VMT")
+rownames(tabl) =  c("Simple model", "AADT", "Hourly AADT", "Full model")
 datatable(tabl, 
-          caption = "Connecticut VMT model comparisons",
+          caption = "Connecticut Hourly AADT model comparisons",
           rownames = T,
           options = list(dom = "t",
                          order = list(list(5, 'desc')),
@@ -142,7 +147,7 @@ datatable(tabl,
 ```   
 
 
-#### Utah VMT model comparisons
+#### Utah Hourly AADT model comparisons
 
 ```{r UT_VMT_metrics, echo = F}
 # Get outputs
@@ -152,9 +157,9 @@ tabl <- vector()
 for(i in c("18","61", "62", "30")){ tabl <- rbind(tabl, c(100*keyoutputs[[i]]$diag, round(keyoutputs[[i]]$auc, 4)))}
 
 colnames(tabl)[1:5] = c("Accuracy", "Precision", "Recall", "False Positive Rate", "AUC")
-rownames(tabl) =  c("18 - Simple", "61 - AADT", "62 - VMT",  "30 - Full with VMT")
+rownames(tabl) =  c("Simple model", "AADT", "Hourly AADT", "Full model")
 datatable(tabl, 
-          caption = "Utah VMT model comparisons",
+          caption = "Utah Hourly AADT model comparisons",
           rownames = T,
           options = list(dom = "t",
                          order = list(list(5, 'desc')),
@@ -169,7 +174,7 @@ datatable(tabl,
 ```   
 
 
-#### Virginia VMT model comparisons
+#### Virginia Hourly AADT model comparisons
 
 ```{r VA_VMT_metrics, echo = F}
 # Get outputs
@@ -179,9 +184,9 @@ tabl <- vector()
 for(i in c("18","61", "62", "30")){ tabl <- rbind(tabl, c(100*keyoutputs[[i]]$diag, round(keyoutputs[[i]]$auc, 4)))}
 
 colnames(tabl)[1:5] = c("Accuracy", "Precision", "Recall", "False Positive Rate", "AUC")
-rownames(tabl) =  c("18 - Simple", "61 - AADT", "62 - VMT",  "30 - Full with VMT")
+rownames(tabl) =  c("Simple model", "AADT", "Hourly AADT", "Full model")
 datatable(tabl, 
-          caption = "Virginia VMT model comparisons",
+          caption = "Virginia Hourly AADT model comparisons",
           rownames = T,
           options = list(dom = "t",
                          order = list(list(5, 'desc')),
@@ -197,7 +202,7 @@ datatable(tabl,
 
 
 
-## Importance of VMT variables
+## Importance of Hourly AADT variables
 
 
 
@@ -246,15 +251,15 @@ CT_MD_imp = full_join(CT_imp, MD_imp, by = "var")
 All_imp = full_join(CT_MD_imp, UT_imp, by = "var")
 All_imp = full_join(All_imp, VA_imp, by = "var")
 
-# Get rank of VMT variables
+# Get rank of Hourly AADT variables
 VMT_table = All_imp[grep("HOURLY", All_imp$var),]
 
 VMT_table = VMT_table[order(VMT_table$var),]
-VMT_table$var = c("Hourly VMT - 1 Interstate",
-                  "Hourly VMT - 2 Principal Arterial - Freeway and Expressway",
-                  "Hourly VMT - 3 Principal Arterial",
-                  "Hourly VMT - 4 Minor Arterial",
-                  "Hourly VMT - 5 Major Collector"
+VMT_table$var = c("Hourly Hourly AADT - 1 Interstate",
+                  "Hourly Hourly AADT - 2 Principal Arterial - Freeway and Expressway",
+                  "Hourly Hourly AADT - 3 Principal Arterial",
+                  "Hourly Hourly AADT - 4 Minor Arterial",
+                  "Hourly Hourly AADT - 5 Major Collector"
                   )
 
 datatable(VMT_table,
@@ -263,7 +268,7 @@ datatable(VMT_table,
                        "MD Rank", "MD Importance",
                        "UT Rank", "UT Importance",
                        "VA Rank", "VA Importance"),
-          caption = "Importance of VMT variables for the four focal states.",
+          caption = "Importance of Hourly AADT variables for the four focal states.",
            options = list(dom = "t",
                           order = list(0, 'asc'),
                           autoWidth = T)
@@ -272,7 +277,7 @@ datatable(VMT_table,
 ```
 
 
-### Estimated crashes with and without VMT variables
+### Estimated crashes with and without Hourly AADT variables
 
 
 
