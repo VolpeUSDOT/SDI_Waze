@@ -98,7 +98,7 @@ knitr::include_graphics(logos)
 
 #### Background 
 
-The Safety Data Initiative Waze project aims to estimate the patterns and processes associated with roadway crashes, based on crowdsourced Waze predictors. The first phase of the effort in early 2018 focused on data available at that time. Maryland contributes crash data to the Electronic Data Transfer (EDT) system, with high quality crash location data available for most records. Crash estimation models (random forests) were trained on the presence or absence of EDT crashes (binary), in each 1 mile grid cell, for each hour of the study period with reported Waze events. Combinations of a large number of predictors such as number of Waze accidents, the type of Waze events, number of Waze events in total, and other auxiliary variables were tested to identify the models that best estimated the presence and absence of EDT crashes.
+The Safety Data Initiative Waze project aims to estimate the patterns and processes associated with roadway crashes, based on crowdsourced Waze predictors. Maryland is one of several states that contributes crash data to the Electronic Data Transfer (EDT) system, with high quality crash location data available for most records. The first phase of the effort in early 2018 focused on estimating traffic crash counts using EDT and the six months of 2017 Waze data available for Maryland at that time. Crash estimation models (random forests) were trained on the presence or absence of EDT crashes (binary), in each 1 mile grid cell, for each hour of the study period with reported Waze events. Combinations of a large number of predictors such as number of Waze accidents, the type of Waze events, number of Waze events in total, and other auxiliary variables were tested to identify the models that best estimated the presence and absence of EDT crashes.
 
 A model trained on observed EDT crash data can be employed to estimate crash counts using Waze input variables to estimate the number and spatial/temporal pattern of EDT-level crashes for times or states when EDT data are not available. In the model development process, the model is first trained on a majority (e.g, 70%) of the complete data. The remainder of the complete data is used to assess the model performance; the estimates produced by the model fit to training data can be compared to the observed EDT data. A goal of the SDI Waze project is to produce estimated EDT-level crash counts which best fit the observed data in terms of overall accuracy and precision in spatial and temporal patterns.
 
@@ -131,7 +131,7 @@ For both simple and full random forest models, models were fitted using 70% of t
 
 ## Question 1: Do the Connecticut and Maryland models have similar accuracy, precision, recall, and false positive rates?
 
-Both sets states models show high accuracy; see Appendix below for model diagnostic definitions. The Connecticut model also shows higher precision and recall; overall, AUC is high for both state models, but slightly higher for Connecticut (0.98 versus 0.96 for Maryland). Including the full set of variables increased accuracy, recall, and AUC in both states. 
+Models for both states show high accuracy; see Appendix below for model diagnostic definitions. The Connecticut model also shows higher precision and recall; overall, AUC is high for both state models, but slightly higher for Connecticut (0.98 versus 0.96 for Maryland). Including the full set of variables increased accuracy, recall, and AUC in both states. 
 
 ```{r CT_MD_metrics, echo = F}
 # Get outputs
