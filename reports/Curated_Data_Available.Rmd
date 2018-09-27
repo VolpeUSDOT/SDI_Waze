@@ -1,6 +1,6 @@
 ---
 title: "Curated data coverage"
-date: Sys.Date()
+date: "`r Sys.Date()`"
 output:
   html_document:
     df_print: paged
@@ -66,63 +66,75 @@ Now looking in the contents of each month/state, counting objects and total size
 ```{r curatedavail2018prod_byday, message = F, warning=F}
 # Loop over states and months, to find which ones have complete days of data in 2018, using new production version.
 # Also track object number and size of month folder. 
-# Could make faster by making state/month commands pasted together and doing just one loop
-avail.mo = size.mo = obj.mo = vector()
 
-find.months = formatC(1:12, width = 2, flag = "0")
-use.states = sort(c(state.abb, c("DC", "CA1", "CA2", "CA3")))
-# use.states = c("AK", "SD")
+# Load previously run data if done for the recent few days
+today = Sys.Date()
+lastweek = as.Date(Sys.Date()-7)
+indir = dir()[grep("Curated_Data_2018_", dir())]; indir = indir[grep(".csv$", indir)]
+date.indir = as.Date(substr(indir, start = 19, stop = 28), format = "%Y-%m-%d")
+date.indir = date.indir[between(date.indir, lastweek, today)]
 
-statmo <- expand.grid(state = use.states, mo = find.months, stringsAsFactors = F)
-statmo <- statmo[order(statmo$state),]
+if(length(date.indir) > 0 ){ 
+  df <- readr::read_csv(paste0("Curated_Data_2018_", date.indir[1], ".csv"))
+} else {
 
-for(i in 1:nrow(statmo)){
-  # cat(state, "\n")  i = 1; 
-  mo = statmo[i, "mo"]; state = statmo[i, "state"]
-    cmd = paste0('aws s3 ls s3://prod-dot-sdc-curated-911061262852-us-east-1/waze/version=20180720/content/state=', state ,'/table=alert/projection=redshift/year=2018/month=', mo, "/")
-    mo_i <- system(cmd, intern = T)
-    avail.day_i <- substr(mo_i, start = nchar(mo_i[1])-2, stop = nchar(mo_i[1])-1)
-    
-    
-    size_cmd = paste0('aws s3 ls s3://prod-dot-sdc-curated-911061262852-us-east-1/waze/version=20180720/content/state=', state ,'/table=alert/projection=redshift/year=2018/month=', mo, "/ --recursive --summarize")
-    size_i <- system(size_cmd, intern = T)
-    
-    avail.mo = c(avail.mo, max(as.numeric(avail.day_i)))
-    size.mo = c(size.mo, as.numeric(gsub("^(\\s*)+Total Size: ", "", size_i[length(size_i)])))
-    obj.mo = c(obj.mo, gsub("^(\\s*)+Total Objects: ", "", size_i[length(size_i)-1]))
-
+  avail.mo = size.mo = obj.mo = vector()
   
-}
-
-avail.mo[avail.mo==-Inf] = NA
-
-
-df <- data.frame(State = rep(use.states, each = length(find.months)),
-                 Month = rep(find.months, times = length(use.states)),
-                 Days = as.numeric(avail.mo),
-                 Size = size.mo,
-                 Objects = as.numeric(obj.mo))
-
-size.h = vector()
-
-for(i in 1:length(size.mo)){
-  smi = size.mo[i]
-  class(smi) = 'object_size'
-  size.h = c(size.h, format(smi, units = "auto"))
-
+  find.months = formatC(1:12, width = 2, flag = "0")
+  use.states = sort(c(state.abb, c("DC", "CA1", "CA2", "CA3")))
+  # use.states = c("AK", "SD")
+  
+  statmo <- expand.grid(state = use.states, mo = find.months, stringsAsFactors = F)
+  statmo <- statmo[order(statmo$state),]
+  
+  for(i in 1:nrow(statmo)){
+    # cat(state, "\n")  i = 1; 
+    mo = statmo[i, "mo"]; state = statmo[i, "state"]
+      cmd = paste0('aws s3 ls s3://prod-dot-sdc-curated-911061262852-us-east-1/waze/version=20180720/content/state=', state ,'/table=alert/projection=redshift/year=2018/month=', mo, "/")
+      mo_i <- system(cmd, intern = T)
+      avail.day_i <- substr(mo_i, start = nchar(mo_i[1])-2, stop = nchar(mo_i[1])-1)
+      
+      
+      size_cmd = paste0('aws s3 ls s3://prod-dot-sdc-curated-911061262852-us-east-1/waze/version=20180720/content/state=', state ,'/table=alert/projection=redshift/year=2018/month=', mo, "/ --recursive --summarize")
+      size_i <- system(size_cmd, intern = T)
+      
+      avail.mo = c(avail.mo, max(as.numeric(avail.day_i)))
+      size.mo = c(size.mo, as.numeric(gsub("^(\\s*)+Total Size: ", "", size_i[length(size_i)])))
+      obj.mo = c(obj.mo, gsub("^(\\s*)+Total Objects: ", "", size_i[length(size_i)-1]))
+  
+    
   }
   
-df$Size.h = size.h
+  avail.mo[avail.mo==-Inf] = NA
+  
+  
+  df <- data.frame(State = rep(use.states, each = length(find.months)),
+                   Month = rep(find.months, times = length(use.states)),
+                   Days = as.numeric(avail.mo),
+                   Size = size.mo,
+                   Objects = as.numeric(obj.mo))
+  
+  size.h = vector()
+  
+  for(i in 1:length(size.mo)){
+    smi = size.mo[i]
+    class(smi) = 'object_size'
+    size.h = c(size.h, format(smi, units = "auto"))
+  
+    }
+    
+  df$Size.h = size.h
+  
+  df$Value = paste(df$Days, df$Size.h, format(df$Objects, big.mark = ","), sep = "  ")
+  df$Value[is.na(df$Days)] = NA
+ 
+  write.csv(df, file = paste0('Curated_Data_2018_', Sys.Date(), '.csv'), row.names = F)
+} 
 
-df$Value = paste(df$Days, df$Size.h, format(df$Objects, big.mark = ","), sep = "  ")
-df$Value[is.na(df$Days)] = NA
-
-df2 <- df %>% 
-  select(State, Month, Value) %>%
-  spread(key = Month, value = Value)
-
-write.csv(df, file = paste0('Curated_Data_', Sys.Date(), '.csv'), row.names = F)
-
+ df2 <- df %>% 
+    select(State, Month, Value) %>%
+    spread(key = Month, value = Value)
+ 
 DT::datatable(df2)# %>% formatStyle(2:13, color = styleEqual('<NA>', 'grey20'))
 ```
 
@@ -218,58 +230,69 @@ Now looking in the contents of each month/state, counting objects and total size
 ```{r curatedavail2017prod_byday, message = F, warning=F}
 # Loop over states and months, to find which ones have complete days of data in 2017, using new production version.
 # Also track object number and size of month folder. 
-# Could make faster by making state/month commands pasted together and doing just one loop
-avail.mo = size.mo = obj.mo = vector()
 
-statmo <- expand.grid(state = use.states, mo = find.months, stringsAsFactors = F)
-statmo <- statmo[order(statmo$state),]
+# Load previously run data if done for the recent few days
+today = Sys.Date()
+lastweek = as.Date(Sys.Date()-7)
+indir = dir()[grep("Curated_Data_2017_", dir())]; indir = indir[grep(".csv$", indir)]
+date.indir = as.Date(substr(indir, start = 19, stop = 28), format = "%Y-%m-%d")
+date.indir = date.indir[between(date.indir, lastweek, today)]
 
-for(i in 1:nrow(statmo)){
-  # cat(state, "\n")  i = 1; 
-  mo = statmo[i, "mo"]; state = statmo[i, "state"]
-    cmd = paste0('aws s3 ls s3://prod-dot-sdc-curated-911061262852-us-east-1/waze/version=20180720/content/state=', state ,'/table=alert/projection=redshift/year=2017/month=', mo, "/")
-    mo_i <- system(cmd, intern = T)
-    avail.day_i <- substr(mo_i, start = nchar(mo_i[1])-2, stop = nchar(mo_i[1])-1)
-    
-    
-    size_cmd = paste0('aws s3 ls s3://prod-dot-sdc-curated-911061262852-us-east-1/waze/version=20180720/content/state=', state ,'/table=alert/projection=redshift/year=2017/month=', mo, "/ --recursive --summarize")
-    size_i <- system(size_cmd, intern = T)
-    
-    avail.mo = c(avail.mo, max(as.numeric(avail.day_i)))
-    size.mo = c(size.mo, as.numeric(gsub("^(\\s*)+Total Size: ", "", size_i[length(size_i)])))
-    obj.mo = c(obj.mo, gsub("^(\\s*)+Total Objects: ", "", size_i[length(size_i)-1]))
-
+if(length(date.indir) > 0 ){ 
+  df <- readr::read_csv(paste0("Curated_Data_2017_", date.indir[1], ".csv"))
+} else {
+  avail.mo = size.mo = obj.mo = vector()
   
-}
-
-avail.mo[avail.mo==-Inf] = NA
-
-
-df <- data.frame(State = rep(use.states, each = length(find.months)),
-                 Month = rep(find.months, times = length(use.states)),
-                 Days = as.numeric(avail.mo),
-                 Size = size.mo,
-                 Objects = as.numeric(obj.mo))
-
-size.h = vector()
-
-for(i in 1:length(size.mo)){
-  smi = size.mo[i]
-  class(smi) = 'object_size'
-  size.h = c(size.h, format(smi, units = "auto"))
-
+  statmo <- expand.grid(state = use.states, mo = find.months, stringsAsFactors = F)
+  statmo <- statmo[order(statmo$state),]
+  
+  for(i in 1:nrow(statmo)){
+    # cat(state, "\n")  i = 1; 
+    mo = statmo[i, "mo"]; state = statmo[i, "state"]
+      cmd = paste0('aws s3 ls s3://prod-dot-sdc-curated-911061262852-us-east-1/waze/version=20180720/content/state=', state ,'/table=alert/projection=redshift/year=2017/month=', mo, "/")
+      mo_i <- system(cmd, intern = T)
+      avail.day_i <- substr(mo_i, start = nchar(mo_i[1])-2, stop = nchar(mo_i[1])-1)
+      
+      
+      size_cmd = paste0('aws s3 ls s3://prod-dot-sdc-curated-911061262852-us-east-1/waze/version=20180720/content/state=', state ,'/table=alert/projection=redshift/year=2017/month=', mo, "/ --recursive --summarize")
+      size_i <- system(size_cmd, intern = T)
+      
+      avail.mo = c(avail.mo, max(as.numeric(avail.day_i)))
+      size.mo = c(size.mo, as.numeric(gsub("^(\\s*)+Total Size: ", "", size_i[length(size_i)])))
+      obj.mo = c(obj.mo, gsub("^(\\s*)+Total Objects: ", "", size_i[length(size_i)-1]))
+  
+    
   }
   
-df$Size.h = size.h
-
-df$Value = paste(df$Days, df$Size.h, format(df$Objects, big.mark = ","), sep = "  ")
-df$Value[is.na(df$Days)] = NA
+  avail.mo[avail.mo==-Inf] = NA
+  
+  
+  df <- data.frame(State = rep(use.states, each = length(find.months)),
+                   Month = rep(find.months, times = length(use.states)),
+                   Days = as.numeric(avail.mo),
+                   Size = size.mo,
+                   Objects = as.numeric(obj.mo))
+  
+  size.h = vector()
+  
+  for(i in 1:length(size.mo)){
+    smi = size.mo[i]
+    class(smi) = 'object_size'
+    size.h = c(size.h, format(smi, units = "auto"))
+  
+    }
+    
+  df$Size.h = size.h
+  
+  df$Value = paste(df$Days, df$Size.h, format(df$Objects, big.mark = ","), sep = "  ")
+  df$Value[is.na(df$Days)] = NA
+  
+  write.csv(df, file = paste0('Curated_Data_2017_', Sys.Date(), '.csv'), row.names = F)
+  }
 
 df2 <- df %>% 
   select(State, Month, Value) %>%
   spread(key = Month, value = Value)
-
-write.csv(df, file = paste0('Curated_Data_2018', Sys.Date(), '.csv'), row.names = F)
 
 DT::datatable(df2)# %>% formatStyle(2:13, color = styleEqual('<NA>', 'grey20'))
 ```
@@ -343,7 +366,7 @@ ggplotly(gp.focal2, tooltip = "usetext")
 
 Same test, for 2017 curate data. 
 
-```{r curatedavail2017_new_old, message = F, warning=F}
+```{r curatedavail2017_new_old, message = F, warning=F, eval = F, include =F}
 # Loop over states to find which ones have month directories:
 # can also try previous version, 20171031
 avail.mo = vector()
@@ -363,7 +386,7 @@ DT::datatable(avail.mo) %>% formatStyle(2:13, background = styleEqual('TRUE', 'l
 ```
 
 
-```{r curatedavail2017prod_byday_old, message = F, warning=F}
+```{r curatedavail2017prod_byday_old, message = F, warning=F, eval=F, include=F}
 # Loop over states and months, to find which ones have complete days of data in 2018, using new production version.
 # Also track object number and size of month folder. 
 # Could make faster by making state/month commands pasted together and doing just one loop
@@ -428,7 +451,7 @@ DT::datatable(df2)# %>% formatStyle(2:13, color = styleEqual('<NA>', 'grey20'))
 
 ### Visual representation
 
-```{r visualchart_size_2017_old}
+```{r visualchart_size_2017_old, , eval=F, include=F}
 df$usetext <- with(df, paste(State, "\n", Month, "\n",  format(Objects, big.mark = ",", digits = 0, scientific = F), "Objects", "\n", Size.h))
 
 gp.focal <- ggplot(df %>% filter(State %in% c("AK", "AL", "CT", "DC", "FL", "IL", "IN", "MA", "MD", "NY", "PA", "TN", "TX", "UT", "WY")),
@@ -456,7 +479,7 @@ ggplotly(gp.focal2, tooltip = "usetext")
 <!--
 Scratch: older code, for looking at one state at a time. Looking first at Texas, see that only one month available (December) for TX in older version of curated data:
 
-```{r echo=TRUE, message=TRUE, warning=TRUE}
+```{r echo=TRUE, message=TRUE, warning=TRUE, , eval=F, include=F}
 cmd = "aws s3 ls s3://prod-dot-sdc-curated-911061262852-us-east-1/waze/version=20171031/content/state=TX/table=alert/projection=redshift/year=2017/"
 print(system(cmd, intern = T))
 
@@ -677,7 +700,7 @@ DT::datatable(avail.mo) %>% formatStyle(2:13, background = styleEqual('TRUE', 'l
 
 
 
-```{r checkcurrent, eval=F}
+```{r checkcurrent, eval=F, include=F}
 
 i = "07"
 for(state in use.states){
