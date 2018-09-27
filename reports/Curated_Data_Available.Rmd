@@ -1,9 +1,19 @@
 ---
 title: "Curated data coverage"
+date: Sys.Date()
 output:
   html_document:
     df_print: paged
+    toc: yes
+    toc_depth: 3
+    toc_float:
+      collapsed: yes
+      smooth_scroll: yes
 ---
+
+<!-- saved from url=(0014)about:internet -->
+<!-- This needs to be manually added to the second line of the html -->
+
 
 ```{r setup, echo = F, message = F, warning=F}
 knitr::opts_chunk$set(warning = FALSE, message = FALSE)
@@ -24,67 +34,17 @@ aws s3 ls s3://prod-dot-sdc-curated-911061262852-us-east-1/
 
 aws s3 ls s3://prod-dot-sdc-curated-911061262852-us-east-1/waze/version=20171031/content/state=TX/table=alert/projection=redshift/year=2017/
 ```
-<!--
-Looking first at Texas, see that only one month available (December) for TX in older version of curated data:
-
-```{r echo=TRUE, message=TRUE, warning=TRUE}
-cmd = "aws s3 ls s3://prod-dot-sdc-curated-911061262852-us-east-1/waze/version=20171031/content/state=TX/table=alert/projection=redshift/year=2017/"
-print(system(cmd, intern = T))
-
-```
-
-And only three months available in more recent version.
-
-```{r message=TRUE, warning=TRUE}
-cmd = "aws s3 ls s3://prod-dot-sdc-curated-911061262852-us-east-1/waze/version=20180331/content/state=TX/table=alert/projection=redshift/year=2017/"
-print(system(cmd, intern = T))
-```
-
-Same, but now compare with the recently-completed new ingestion/curation workflow, using the dev bucket. Only 2018 data is available, may and June. No 2017 yet available (2018-06-07).
 
 
-```{r echo=TRUE, message=TRUE, warning=TRUE}
-cmd = "aws s3 ls s3://dev-dot-sdc-curated-911061262852-us-east-1/waze/version=20180531/content/state=NY/table=alert/projection=redshift/year=2018/"
-print(system(cmd, intern = T))
+# 2018 Production
 
-```
-
-
-```{r echo=TRUE, message=TRUE, warning=TRUE}
-cmd = "aws s3 ls s3://dev-dot-sdc-curated-911061262852-us-east-1/waze/version=20180531/content/state=TX/table=alert/projection=redshift/year=2018/"
-print(system(cmd, intern = T))
-
-```
--->
-
-<!-- ## 2018 Dev -- not relevant anymore, just look at producion -->
-
-```{r curatedavail2018dev, eval=FALSE, message=F, warning=F, include=FALSE}
-# Loop over states to find which ones have complete data in 2018:
-avail.mo = vector()
-use.states = c(state.abb, c("DC", "CA1", "CA2", "CA3"))
-find.months = formatC(1:12, width = 2, flag = "0")
-for(i in use.states){
-  cmd = paste0('aws s3 ls s3://dev-dot-sdc-curated-911061262852-us-east-1/waze/version=20180531/content/state=', i ,'/table=alert/projection=redshift/year=2018/')
-  mo_i <- system(cmd, intern = T)
-  avail.mo_i <- substr(mo_i, start =nchar(mo_i[1])-2, stop = nchar(mo_i[1])-1)
-  
-  avail.mo = rbind(avail.mo, c(i, find.months %in% avail.mo_i))
-}
-
-avail.mo <- as.data.frame(avail.mo)
-colnames(avail.mo) = c("State", find.months)
-DT::datatable(avail.mo) %>% formatStyle(2:13, background = styleEqual('TRUE', 'lightgreen'))
-```
-
-## 2018 New Production
-
-Version as of 2018-07-20. First just tally which months have some content. 
+Version as of 2018-07-20. First just tally which months have some content. We expect to see green for each state, up to the month of today's date (`r Sys.Date()`).
 
 ```{r curatedavail2018prod, message = F, warning=F}
 # Loop over states to find which ones have complete data in 2018, using new production version
 avail.mo = vector()
 use.states = sort(c(state.abb, c("DC", "CA1", "CA2", "CA3")))
+# use.states %>% filter(-"CA")
 find.months = formatC(1:12, width = 2, flag = "0")
 
 for(i in use.states){
@@ -101,7 +61,7 @@ DT::datatable(avail.mo) %>% formatStyle(2:13, background = styleEqual('TRUE', 'l
 ```
 
 
-Now looking in the contents of each month/state, counting objects and total size of contents.
+Now looking in the contents of each month/state, counting objects and total size of contents. 
 
 ```{r curatedavail2018prod_byday, message = F, warning=F}
 # Loop over states and months, to find which ones have complete days of data in 2018, using new production version.
@@ -167,9 +127,12 @@ DT::datatable(df2)# %>% formatStyle(2:13, color = styleEqual('<NA>', 'grey20'))
 ```
 
 
-### Visual representation
+## Visual representation {.tabset .tabset-pills}
 
-```{r visualchart}
+
+### Plot of curated data by object count
+
+```{r visualchart_2018}
 library(plotly)
 #ggplot(df, aes(x = Month, y = Objects, fill = State)) +geom_dotplot(binaxis = "y", stackdir='center', position = 'dodge')
 
@@ -188,17 +151,17 @@ gp.focal2 <- gp.focal + geom_line(aes(color = State),
         axis.text.y = element_text(size=7, angle=45)) +
   ylab("Count of Objects in S3") +
   xlab(" ")  + 
-  guides(color=guide_legend(title="State"))
+  guides(color=guide_legend(title="State")) +
+  ggtitle("Count of objects in curated bucket for selected states \n 2018")
 #gp.focal2
 
 ggplotly(gp.focal2, tooltip = "usetext", hovermode="compare")
 ```
 
 
+### Plot of curated data by size *(click to view)*
 
-Same, but shown by size of month instead of number of objects.
-
-```{r visualchart_size}
+```{r visualchart_size_2018}
 library(plotly)
 #ggplot(df, aes(x = Month, y = Objects, fill = State)) +geom_dotplot(binaxis = "y", stackdir='center', position = 'dodge')
 
@@ -217,44 +180,170 @@ gp.focal2 <- gp.focal + geom_line(aes(color = State),
         axis.text.y = element_text(size=7, angle=45)) +
   ylab("Size (Mb) of monthly directory in S3") +
   xlab(" ")  + 
-  guides(color=guide_legend(title="State"))
+  guides(color=guide_legend(title="State"))  +
+  ggtitle("Size of monthly folders in curated bucket for selected states \n 2018")
 #gp.focal2
 
 ggplotly(gp.focal2, tooltip = "usetext")
 
 ```
-July data... what is being curated now?
 
-```{r checkcurrent, eval=F}
 
-i = "07"
-for(state in use.states){
-  cat(state, "\n")
-    cmd = paste0('aws s3 ls s3://prod-dot-sdc-curated-911061262852-us-east-1/waze/version=20180720/content/state=', state ,'/table=alert/projection=redshift/year=2018/month=', i, "/")
+# 2017 Production
+
+2017 curated data, version as of 2018-07-20. Same tests as above.
+
+```{r curatedavail2017prod, message = F, warning=F}
+# Loop over states to find which ones have complete data in 2017, using new production version
+avail.mo = vector()
+use.states = sort(c(state.abb, c("DC", "CA1", "CA2", "CA3")))
+find.months = formatC(1:12, width = 2, flag = "0")
+
+for(i in use.states){
+  cmd = paste0('aws s3 ls s3://prod-dot-sdc-curated-911061262852-us-east-1/waze/version=20180720/content/state=', i ,'/table=alert/projection=redshift/year=2017/')
+  mo_i <- system(cmd, intern = T)
+  avail.mo_i <- substr(mo_i, start =nchar(mo_i[1])-2, stop = nchar(mo_i[1])-1)
+  
+  avail.mo = rbind(avail.mo, c(i, find.months %in% avail.mo_i))
+}
+
+avail.mo <- as.data.frame(avail.mo)
+colnames(avail.mo) = c("State", find.months)
+DT::datatable(avail.mo) %>% formatStyle(2:13, background = styleEqual('TRUE', 'lightgreen'))
+```
+
+
+Now looking in the contents of each month/state, counting objects and total size of contents. 
+
+```{r curatedavail2017prod_byday, message = F, warning=F}
+# Loop over states and months, to find which ones have complete days of data in 2017, using new production version.
+# Also track object number and size of month folder. 
+# Could make faster by making state/month commands pasted together and doing just one loop
+avail.mo = size.mo = obj.mo = vector()
+
+statmo <- expand.grid(state = use.states, mo = find.months, stringsAsFactors = F)
+statmo <- statmo[order(statmo$state),]
+
+for(i in 1:nrow(statmo)){
+  # cat(state, "\n")  i = 1; 
+  mo = statmo[i, "mo"]; state = statmo[i, "state"]
+    cmd = paste0('aws s3 ls s3://prod-dot-sdc-curated-911061262852-us-east-1/waze/version=20180720/content/state=', state ,'/table=alert/projection=redshift/year=2017/month=', mo, "/")
     mo_i <- system(cmd, intern = T)
     avail.day_i <- substr(mo_i, start = nchar(mo_i[1])-2, stop = nchar(mo_i[1])-1)
     
     
-    size_cmd = paste0('aws s3 ls s3://prod-dot-sdc-curated-911061262852-us-east-1/waze/version=20180720/content/state=', state ,'/table=alert/projection=redshift/year=2018/month=', i, '/ --recursive --summarize --human-readable')
-    (size_i <- system(size_cmd, intern = T))
+    size_cmd = paste0('aws s3 ls s3://prod-dot-sdc-curated-911061262852-us-east-1/waze/version=20180720/content/state=', state ,'/table=alert/projection=redshift/year=2017/month=', mo, "/ --recursive --summarize")
+    size_i <- system(size_cmd, intern = T)
     
-    avail.mo = rbind(avail.mo, c(i, max(as.numeric(avail.day_i))))
-    size.mo = rbind(size.mo, gsub("^(\\s*)+Total Size: ", "", size_i[length(size_i)]))
-    obj.mo = rbind(obj.mo, gsub("^(\\s*)+Total Objects: ", "", size_i[length(size_i)-1]))
+    avail.mo = c(avail.mo, max(as.numeric(avail.day_i)))
+    size.mo = c(size.mo, as.numeric(gsub("^(\\s*)+Total Size: ", "", size_i[length(size_i)])))
+    obj.mo = c(obj.mo, gsub("^(\\s*)+Total Objects: ", "", size_i[length(size_i)-1]))
 
   
 }
 
 avail.mo[avail.mo==-Inf] = NA
 
+
+df <- data.frame(State = rep(use.states, each = length(find.months)),
+                 Month = rep(find.months, times = length(use.states)),
+                 Days = as.numeric(avail.mo),
+                 Size = size.mo,
+                 Objects = as.numeric(obj.mo))
+
+size.h = vector()
+
+for(i in 1:length(size.mo)){
+  smi = size.mo[i]
+  class(smi) = 'object_size'
+  size.h = c(size.h, format(smi, units = "auto"))
+
+  }
+  
+df$Size.h = size.h
+
+df$Value = paste(df$Days, df$Size.h, format(df$Objects, big.mark = ","), sep = "  ")
+df$Value[is.na(df$Days)] = NA
+
+df2 <- df %>% 
+  select(State, Month, Value) %>%
+  spread(key = Month, value = Value)
+
+write.csv(df, file = paste0('Curated_Data_2018', Sys.Date(), '.csv'), row.names = F)
+
+DT::datatable(df2)# %>% formatStyle(2:13, color = styleEqual('<NA>', 'grey20'))
 ```
 
 
+## Visual representation {.tabset .tabset-pills}
+
+
+### Plot of curated data by object count
+
+```{r visualchart_2017}
+library(plotly)
+#ggplot(df, aes(x = Month, y = Objects, fill = State)) +geom_dotplot(binaxis = "y", stackdir='center', position = 'dodge')
+
+df$usetext <- with(df, paste(State, "\n", Month, "\n",  format(Objects, big.mark = ",", digits = 0, scientific = F), "Objects", "\n", Size.h))
+
+gp.focal <- ggplot(df %>% filter(State %in% c("AK", "AL", "CT", "DC", "FL", "IL", "IN", "MA", "MD", "NY", "PA", "TN", "TX", "UT", "WY")),
+             aes(x = Month, 
+                 y = Objects,
+                 group = State,
+                 text = usetext)) + theme_bw()
+
+gp.focal2 <- gp.focal + geom_line(aes(color = State), 
+                                  alpha = 0.8,
+                                  size = 2) +
+  theme(axis.text.x = element_text(size=7, angle=45),
+        axis.text.y = element_text(size=7, angle=45)) +
+  ylab("Count of Objects in S3") +
+  xlab(" ")  + 
+  guides(color=guide_legend(title="State")) +
+  ggtitle("Count of objects in curated bucket for selected states \n 2017")
+#gp.focal2
+
+ggplotly(gp.focal2, tooltip = "usetext", hovermode="compare")
+```
+
+
+### Plot of curated data by size *(click to view)*
+
+```{r visualchart_size_2017}
+library(plotly)
+#ggplot(df, aes(x = Month, y = Objects, fill = State)) +geom_dotplot(binaxis = "y", stackdir='center', position = 'dodge')
+
+df$usetext <- with(df, paste(State, "\n", Month, "\n",  format(Objects, big.mark = ",", digits = 0, scientific = F), "Objects", "\n", Size.h))
+
+gp.focal <- ggplot(df %>% filter(State %in% c("AK", "AL", "CT", "DC", "FL", "IL", "IN", "MA", "MD", "NY", "PA", "TN", "TX", "UT", "WY")),
+             aes(x = Month, 
+                 y = Size/1000000,
+                 group = State,
+                 text = usetext)) + theme_bw()
+
+gp.focal2 <- gp.focal + geom_line(aes(color = State), 
+                                  alpha = 0.8,
+                                  size = 2) +
+  theme(axis.text.x = element_text(size=7, angle=45),
+        axis.text.y = element_text(size=7, angle=45)) +
+  ylab("Size (Mb) of monthly directory in S3") +
+  xlab(" ")  + 
+  guides(color=guide_legend(title="State"))  +
+  ggtitle("Size of monthly folders in curated bucket for selected states \n 2017")
+#gp.focal2
+
+ggplotly(gp.focal2, tooltip = "usetext")
+
+```
+
+
+
+<!-- old
 ## 2017
 
-Now looping across all 'states' in the curated data:
+Same test, for 2017 curate data. 
 
-```{r curatedavail2017_new, message = F, warning=F}
+```{r curatedavail2017_new_old, message = F, warning=F}
 # Loop over states to find which ones have month directories:
 # can also try previous version, 20171031
 avail.mo = vector()
@@ -274,7 +363,7 @@ DT::datatable(avail.mo) %>% formatStyle(2:13, background = styleEqual('TRUE', 'l
 ```
 
 
-```{r curatedavail2017prod_byday, message = F, warning=F}
+```{r curatedavail2017prod_byday_old, message = F, warning=F}
 # Loop over states and months, to find which ones have complete days of data in 2018, using new production version.
 # Also track object number and size of month folder. 
 # Could make faster by making state/month commands pasted together and doing just one loop
@@ -337,12 +426,9 @@ write.csv(df, file = paste0('Curated_Data_2017_', Sys.Date(), '.csv'), row.names
 DT::datatable(df2)# %>% formatStyle(2:13, color = styleEqual('<NA>', 'grey20'))
 ```
 
+### Visual representation
 
-
-```{r visualchart_size_2017}
-library(plotly)
-#ggplot(df, aes(x = Month, y = Objects, fill = State)) +geom_dotplot(binaxis = "y", stackdir='center', position = 'dodge')
-
+```{r visualchart_size_2017_old}
 df$usetext <- with(df, paste(State, "\n", Month, "\n",  format(Objects, big.mark = ",", digits = 0, scientific = F), "Objects", "\n", Size.h))
 
 gp.focal <- ggplot(df %>% filter(State %in% c("AK", "AL", "CT", "DC", "FL", "IL", "IN", "MA", "MD", "NY", "PA", "TN", "TX", "UT", "WY")),
@@ -362,8 +448,169 @@ gp.focal2 <- gp.focal + geom_line(aes(color = State),
 #gp.focal2
 
 ggplotly(gp.focal2, tooltip = "usetext")
+```
+-->
+
+
+
+<!--
+Scratch: older code, for looking at one state at a time. Looking first at Texas, see that only one month available (December) for TX in older version of curated data:
+
+```{r echo=TRUE, message=TRUE, warning=TRUE}
+cmd = "aws s3 ls s3://prod-dot-sdc-curated-911061262852-us-east-1/waze/version=20171031/content/state=TX/table=alert/projection=redshift/year=2017/"
+print(system(cmd, intern = T))
 
 ```
+
+And only three months available in more recent version.
+
+```{r message=TRUE, warning=TRUE}
+cmd = "aws s3 ls s3://prod-dot-sdc-curated-911061262852-us-east-1/waze/version=20180331/content/state=TX/table=alert/projection=redshift/year=2017/"
+print(system(cmd, intern = T))
+```
+
+Same, but now compare with the recently-completed new ingestion/curation workflow, using the dev bucket. Only 2018 data is available, may and June. No 2017 yet available (2018-06-07).
+
+
+```{r echo=TRUE, message=TRUE, warning=TRUE}
+cmd = "aws s3 ls s3://dev-dot-sdc-curated-911061262852-us-east-1/waze/version=20180531/content/state=NY/table=alert/projection=redshift/year=2018/"
+print(system(cmd, intern = T))
+
+```
+
+
+```{r echo=TRUE, message=TRUE, warning=TRUE}
+cmd = "aws s3 ls s3://dev-dot-sdc-curated-911061262852-us-east-1/waze/version=20180531/content/state=TX/table=alert/projection=redshift/year=2018/"
+print(system(cmd, intern = T))
+
+```
+
+
+### Look at the previous version of the database, from 2017-10-31:
+
+```{r curatedavail2017_previous_old, message = F, warning=F}
+# Loop over states to find which ones have month directories:
+# can also try previous version, 20171031
+avail.mo = vector()
+use.states = c(state.abb, c("DC", "CA1", "CA2", "CA3"))
+find.months = formatC(1:12, width = 2, flag = "0")
+for(i in use.states){
+  cmd = paste0('aws s3 ls s3://prod-dot-sdc-curated-911061262852-us-east-1/waze/version=20171031/content/state=', i ,'/table=alert/projection=redshift/year=2017/')
+  mo_i <- system(cmd, intern = T)
+  avail.mo_i <- substr(mo_i, start =nchar(mo_i[1])-2, stop = nchar(mo_i[1])-1)
+  
+  avail.mo = rbind(avail.mo, c(i, find.months %in% avail.mo_i))
+}
+
+avail.mo <- as.data.frame(avail.mo)
+colnames(avail.mo) = c("State", find.months)
+datatable(avail.mo) %>% formatStyle(2:13, background = styleEqual('TRUE', 'lightgreen'))
+```
+
+## 2018
+
+```{r curatedavail2018_old, message = F, warning=F}
+# Loop over states to find which ones have complete data in 2018:
+avail.mo = vector()
+use.states = c(state.abb, c("DC", "CA1", "CA2", "CA3"))
+find.months = formatC(1:12, width = 2, flag = "0")
+for(i in use.states){
+  cmd = paste0('aws s3 ls s3://prod-dot-sdc-curated-911061262852-us-east-1/waze/version=20180331/content/state=', i ,'/table=alert/projection=redshift/year=2018/')
+  mo_i <- system(cmd, intern = T)
+  avail.mo_i <- substr(mo_i, start =nchar(mo_i[1])-2, stop = nchar(mo_i[1])-1)
+  
+  avail.mo = rbind(avail.mo, c(i, find.months %in% avail.mo_i))
+}
+
+avail.mo <- as.data.frame(avail.mo)
+colnames(avail.mo) = c("State", find.months)
+DT::datatable(avail.mo) %>% formatStyle(2:13, background = styleEqual('TRUE', 'lightgreen'))
+```
+
+-->
+
+<!-- ## 2018 Dev -- not relevant anymore, just look at producion -->
+
+```{r curatedavail2018dev_old, eval=FALSE, message=F, warning=F, include=FALSE}
+# Loop over states to find which ones have complete data in 2018:
+avail.mo = vector()
+use.states = c(state.abb, c("DC", "CA1", "CA2", "CA3"))
+find.months = formatC(1:12, width = 2, flag = "0")
+for(i in use.states){
+  cmd = paste0('aws s3 ls s3://dev-dot-sdc-curated-911061262852-us-east-1/waze/version=20180531/content/state=', i ,'/table=alert/projection=redshift/year=2018/')
+  mo_i <- system(cmd, intern = T)
+  avail.mo_i <- substr(mo_i, start =nchar(mo_i[1])-2, stop = nchar(mo_i[1])-1)
+  
+  avail.mo = rbind(avail.mo, c(i, find.months %in% avail.mo_i))
+}
+
+avail.mo <- as.data.frame(avail.mo)
+colnames(avail.mo) = c("State", find.months)
+DT::datatable(avail.mo) %>% formatStyle(2:13, background = styleEqual('TRUE', 'lightgreen'))
+```
+
+
+
+```{r checkcurrent_old, eval=F, include=F}
+
+i = "07"
+for(state in use.states){
+  cat(state, "\n")
+    cmd = paste0('aws s3 ls s3://prod-dot-sdc-curated-911061262852-us-east-1/waze/version=20180720/content/state=', state ,'/table=alert/projection=redshift/year=2018/month=', i, "/")
+    mo_i <- system(cmd, intern = T)
+    avail.day_i <- substr(mo_i, start = nchar(mo_i[1])-2, stop = nchar(mo_i[1])-1)
+    
+    
+    size_cmd = paste0('aws s3 ls s3://prod-dot-sdc-curated-911061262852-us-east-1/waze/version=20180720/content/state=', state ,'/table=alert/projection=redshift/year=2018/month=', i, '/ --recursive --summarize --human-readable')
+    (size_i <- system(size_cmd, intern = T))
+    
+    avail.mo = rbind(avail.mo, c(i, max(as.numeric(avail.day_i))))
+    size.mo = rbind(size.mo, gsub("^(\\s*)+Total Size: ", "", size_i[length(size_i)]))
+    obj.mo = rbind(obj.mo, gsub("^(\\s*)+Total Objects: ", "", size_i[length(size_i)-1]))
+
+  
+}
+
+avail.mo[avail.mo==-Inf] = NA
+
+```
+
+
+
+
+
+<!--
+Scratch: older code, for looking at one state at a time. Looking first at Texas, see that only one month available (December) for TX in older version of curated data:
+
+```{r echo=TRUE, message=TRUE, warning=TRUE}
+cmd = "aws s3 ls s3://prod-dot-sdc-curated-911061262852-us-east-1/waze/version=20171031/content/state=TX/table=alert/projection=redshift/year=2017/"
+print(system(cmd, intern = T))
+
+```
+
+And only three months available in more recent version.
+
+```{r message=TRUE, warning=TRUE}
+cmd = "aws s3 ls s3://prod-dot-sdc-curated-911061262852-us-east-1/waze/version=20180331/content/state=TX/table=alert/projection=redshift/year=2017/"
+print(system(cmd, intern = T))
+```
+
+Same, but now compare with the recently-completed new ingestion/curation workflow, using the dev bucket. Only 2018 data is available, may and June. No 2017 yet available (2018-06-07).
+
+
+```{r echo=TRUE, message=TRUE, warning=TRUE}
+cmd = "aws s3 ls s3://dev-dot-sdc-curated-911061262852-us-east-1/waze/version=20180531/content/state=NY/table=alert/projection=redshift/year=2018/"
+print(system(cmd, intern = T))
+
+```
+
+
+```{r echo=TRUE, message=TRUE, warning=TRUE}
+cmd = "aws s3 ls s3://dev-dot-sdc-curated-911061262852-us-east-1/waze/version=20180531/content/state=TX/table=alert/projection=redshift/year=2018/"
+print(system(cmd, intern = T))
+
+```
+
 
 ### Look at the previous version of the database, from 2017-10-31:
 
@@ -404,5 +651,53 @@ for(i in use.states){
 avail.mo <- as.data.frame(avail.mo)
 colnames(avail.mo) = c("State", find.months)
 DT::datatable(avail.mo) %>% formatStyle(2:13, background = styleEqual('TRUE', 'lightgreen'))
+```
+
+-->
+
+<!-- ## 2018 Dev -- not relevant anymore, just look at producion -->
+
+```{r curatedavail2018dev, eval=FALSE, message=F, warning=F, include=FALSE}
+# Loop over states to find which ones have complete data in 2018:
+avail.mo = vector()
+use.states = c(state.abb, c("DC", "CA1", "CA2", "CA3"))
+find.months = formatC(1:12, width = 2, flag = "0")
+for(i in use.states){
+  cmd = paste0('aws s3 ls s3://dev-dot-sdc-curated-911061262852-us-east-1/waze/version=20180531/content/state=', i ,'/table=alert/projection=redshift/year=2018/')
+  mo_i <- system(cmd, intern = T)
+  avail.mo_i <- substr(mo_i, start =nchar(mo_i[1])-2, stop = nchar(mo_i[1])-1)
+  
+  avail.mo = rbind(avail.mo, c(i, find.months %in% avail.mo_i))
+}
+
+avail.mo <- as.data.frame(avail.mo)
+colnames(avail.mo) = c("State", find.months)
+DT::datatable(avail.mo) %>% formatStyle(2:13, background = styleEqual('TRUE', 'lightgreen'))
+```
+
+
+
+```{r checkcurrent, eval=F}
+
+i = "07"
+for(state in use.states){
+  cat(state, "\n")
+    cmd = paste0('aws s3 ls s3://prod-dot-sdc-curated-911061262852-us-east-1/waze/version=20180720/content/state=', state ,'/table=alert/projection=redshift/year=2018/month=', i, "/")
+    mo_i <- system(cmd, intern = T)
+    avail.day_i <- substr(mo_i, start = nchar(mo_i[1])-2, stop = nchar(mo_i[1])-1)
+    
+    
+    size_cmd = paste0('aws s3 ls s3://prod-dot-sdc-curated-911061262852-us-east-1/waze/version=20180720/content/state=', state ,'/table=alert/projection=redshift/year=2018/month=', i, '/ --recursive --summarize --human-readable')
+    (size_i <- system(size_cmd, intern = T))
+    
+    avail.mo = rbind(avail.mo, c(i, max(as.numeric(avail.day_i))))
+    size.mo = rbind(size.mo, gsub("^(\\s*)+Total Size: ", "", size_i[length(size_i)]))
+    obj.mo = rbind(obj.mo, gsub("^(\\s*)+Total Objects: ", "", size_i[length(size_i)-1]))
+
+  
+}
+
+avail.mo[avail.mo==-Inf] = NA
+
 ```
 
