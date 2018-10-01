@@ -10,16 +10,17 @@ library(DBI)
 #library(pool) # consider this for pooled connections
 library(RPostgres) 
 library(getPass)
-# Specify username and password manually, once:
-if(Sys.getenv("sdc_waze_username")==""){
-  cat("Please enter SDC Waze username and password manually, in the console, the first time accessing the Redshift database, using: \n Sys.setenv('sdc_waze_username' = <see email from SDC Administrator>) \n Sys.setenv('sdc_waze_password' = <see email from SDC Administrator>)")
 
-}
+# # Specify username and password manually, once:
+# if(Sys.getenv("sdc_waze_username")==""){
+#   cat("Please enter SDC Waze username and password manually, in the console, the first time accessing the Redshift database, using: \n Sys.setenv('sdc_waze_username' = <see email from SDC Administrator>) \n Sys.setenv('sdc_waze_password' = <see email from SDC Administrator>)")
+# 
+# }
 
 redshift_host <- "prod-dot-sdc-redshift-cluster.cctxatvt4w6t.us-east-1.redshift.amazonaws.com"
 redshift_port <- "5439"
-redshift_user <- Sys.getenv("sdc_waze_username")
-redshift_password <- Sys.getenv("sdc_waze_password")
+if(!exists("redshift_user")) redshift_user <- getPass("redshift_user") #Sys.getenv("sdc_waze_username")
+if(!exists("redshift_password")) redshift_password <- getPass("redshift_password") #Sys.getenv("sdc_waze_password")
 redshift_db <- "dot_sdc_redshift_db"
 
 #drv <- dbDriver("PostgreSQL")
@@ -27,8 +28,8 @@ conn <- dbConnect(
   RPostgres::Postgres(),
   host=redshift_host,
   port=redshift_port,
-  user=getPass("redshift_user"),
-  password=getPass("redshift_password"),
+  user=redshift_user,
+  password=redshift_password,
   dbname=redshift_db)
 
 if(TESTCONN){

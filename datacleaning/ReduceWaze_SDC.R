@@ -7,6 +7,7 @@
 # Check for package installations
 codeloc <- "~/SDI_Waze"
 source(file.path(codeloc, 'utility/get_packages.R')) #comment out unless needed for first setup, takes a long time to compile
+source(file.path(codeloc, 'utility/Workstation_setup.R')) # Download necessary files from S3
 
 VALIDATE = T # to display values from Redshift query for validataion in SQL Workbench
 
@@ -33,20 +34,15 @@ source(file.path(codeloc, 'utility/wazefunctions.R'))
 
 source(file.path(codeloc, 'utility/connect_redshift_pgsql.R'))
 
-## uncomment these lines and run with user redshift credentials filled in to resolve error if above line throws one.
-# Sys.setenv('sdc_waze_username' = <see email from SDC Administrator>) 
-# Sys.setenv('sdc_waze_password' = <see email from SDC Administrator>)
-
-
 # Query parameters
 # states with available EDT data for model testing
-states = c("CT", "UT", "VA", "MD")
+states = c("CT", "MD", "UT", "VA")
 
 # Time zone picker:
 tzs <- data.frame(states, 
                   tz = c("US/Eastern",
-                         "US/Mountain",
                          "US/Eastern",
+                         "US/Mountain",
                          "US/Eastern"),
                   stringsAsFactors = F)
 
@@ -57,7 +53,7 @@ tzs <- data.frame(states,
 # Get year/month, year/month/day, and last day of month vectors to create the SQL queries
 yearmonths = c(
   paste(2017, formatC(4:12, width = 2, flag = "0"), sep="-"),
-  paste(2018, formatC(1:7, width = 2, flag = "0"), sep="-")
+  paste(2018, formatC(1:8, width = 2, flag = "0"), sep="-")
 )
 yearmonths.1 <- paste(yearmonths, "01", sep = "-")
 lastdays <- days_in_month(as.POSIXct(yearmonths.1)) # from lubridate

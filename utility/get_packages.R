@@ -6,6 +6,7 @@ loadpacks <- c(
             "doParallel",
             "DT",
             "foreach", # for parallel implementation
+            "getPass",
             "kableExtra",
             "lubridate",
             "maps",

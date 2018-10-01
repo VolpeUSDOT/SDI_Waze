@@ -55,11 +55,12 @@ census.ls <- system(paste("aws s3 ls",
 census.ls <- unlist(lapply(strsplit(census.ls, " "), function(x) x[[length(x)]]))
 
 for(i in census.ls){
+  if(length(grep(i, dir(file.path('~', 'workingdata', 'census'))))==0){
     system(paste("aws s3 cp",
                file.path(teambucket, 'census', i),
                file.path('~', 'workingdata', 'census', i)))
   }
-
+}
 
 # EDT ----
 
@@ -68,12 +69,14 @@ edt.ls = c("EDTsubset_april2017_to_present.zip",
            'CTMDUTVA_20170401_20180731.txt')
 
 for(i in edt.ls){
-  system(paste("aws s3 cp",
+  if(length(grep(i, dir(file.path('~', 'workingdata', 'EDT'))))==0){
+    
+    system(paste("aws s3 cp",
                file.path(teambucket, 'EDT', i),
                file.path('~', 'workingdata', 'EDT', i)))
   if(length(grep('zip$', i))!=0) system(paste('unzip -o', file.path('~', 'workingdata', 'EDT', i), '-d',
                                               file.path('~', 'workingdata', 'EDT/')))
-  
+  }
 }
 
 # Rename Maryland to MD
@@ -93,12 +96,13 @@ hex.ls <- unlist(lapply(strsplit(hex.ls, " "), function(x) x[[length(x)]]))
 hex.ls <- hex.ls[!1:length(hex.ls) %in% grep("/", hex.ls)] # Omit directories
 
 for(i in hex.ls){
-  system(paste("aws s3 cp",
+  if(length(grep(i, dir(file.path('~', 'workingdata', 'Hex'))))==0){
+   system(paste("aws s3 cp",
                file.path(teambucket, 'Hex', i),
                file.path('~', 'workingdata', 'Hex', i)))
   if(length(grep('zip$', i))!=0) system(paste('unzip -o', file.path('~', 'workingdata', 'Hex', i), '-d',
                                               file.path('~', 'workingdata', 'Hex/')))
-  
+  }
 }
 
 
@@ -115,12 +119,14 @@ hex.ls <- unlist(lapply(strsplit(hex.ls, " "), function(x) x[[length(x)]]))
 hex.ls <- hex.ls[!1:length(hex.ls) %in% grep("/", hex.ls)] # Omit directories
 
 for(i in hex.ls){
+  if(length(grep(i, dir(file.path('~', 'workingdata', 'Hex', 'MD_hexagons_shapefiles'))))==0){
+    
   system(paste("aws s3 cp",
                file.path(teambucket, 'Hex', 'MD_hexagons_shapefiles', i),
                file.path('~', 'workingdata', 'Hex', 'MD_hexagons_shapefiles', i)))
   if(length(grep('zip$', i))!=0) system(paste('unzip -o', file.path('~', 'workingdata', 'Hex', 'MD_hexagons_shapefiles', i),
                                               '-d', file.path('~', 'workingdata', 'Hex/')))
-  
+  }
 }
 
 # Link ----
@@ -137,12 +143,14 @@ Link.ls <- unlist(lapply(strsplit(Link.ls, " "), function(x) x[[length(x)]]))
 Link.ls <- Link.ls[!1:length(Link.ls) %in% grep("/", Link.ls)] # Omit directories
 
 for(i in Link.ls){
+  if(length(grep(i, dir(file.path('~', 'workingdata', 'Link'))))==0){
+    
   system(paste("aws s3 cp",
                file.path(teambucket, 'Link', i),
                file.path('~', 'workingdata', 'Link', i)))
   if(length(grep('zip$', i))!=0) system(paste('unzip -o', file.path('~', 'workingdata', 'Link', i), -'d',
                                               file.path('~', 'workingdata', 'Link/')))
-  
+  }  
 }
 
 
@@ -162,11 +170,13 @@ for(state in states){
   Overlay.ls <- Overlay.ls[grep("^merged.waze.edt", Overlay.ls)] # get just merge files
   
   for(i in Overlay.ls){
-    system(paste("aws s3 cp",
+    if(length(grep(i, dir(file.path('~', 'workingdata', 'Overlay'))))==0){
+      
+     system(paste("aws s3 cp",
                  file.path(teambucket, state, i),
                  file.path('~', 'workingdata', 'Overlay', i)))
     if(length(grep('zip$', i))!=0) system(paste('unzip', file.path('~', 'workingdata', 'Overlay', i)))
-    
+    }
   }
 }
 
@@ -184,11 +194,13 @@ for(state in states){
   Random_Forest_Output.ls <- Random_Forest_Output.ls[grep("RandomForest_Output.RData$", Random_Forest_Output.ls)] # get just RF
   
   for(i in Random_Forest_Output.ls){
+    if(length(grep(i, dir(file.path('~', 'workingdata', 'Random_Forest_Output'))))==0){
+      
     system(paste("aws s3 cp",
                  file.path(teambucket, state, i),
                  file.path('~', 'workingdata', 'Random_Forest_Output', i)))
     if(length(grep('zip$', i))!=0) system(paste('unzip', file.path('~', 'workingdata', 'Random_Forest_Output', i)))
-    
+    }
   }
 }
 
@@ -198,12 +210,14 @@ for(state in states){
 aadt.ls = c('vmt_max_aadt_by_grid_fc_urban_factored.txt', 'AADT_CT_MD_UT_VA.zip')
   
 for(i in aadt.ls){
+  if(length(grep(i, dir(file.path('~', 'workingdata', 'AADT'))))==0){
+    
   system(paste("aws s3 cp",
                file.path(teambucket, 'AADT', i),
                file.path('~', 'workingdata', 'AADT', i)))
   if(length(grep('zip$', i))!=0) system(paste('unzip -o', file.path('~', 'workingdata', 'AADT', i),
                                               '-d', file.path('~', 'workingdata', 'AADT/')))
-  
+  }
 }
 
 
@@ -213,12 +227,14 @@ for(i in aadt.ls){
 lodes.ls = c('LODES_LEHD_CT_MD_UT_VA.zip')
 
 for(i in lodes.ls){
+  if(length(grep(i, dir(file.path('~', 'workingdata', 'LODES_LEHD'))))==0){
+    
   system(paste("aws s3 cp",
                file.path(teambucket, 'LODES_LEHD', i),
                file.path('~', 'workingdata', 'LODES_LEHD', i)))
   if(length(grep('zip$', i))!=0) system(paste('unzip', file.path('~', 'workingdata', 'LODES_LEHD', i), '-d',
                                               file.path('~', 'workingdata', 'LODES_LEHD/')))
-  
+  }
 }
 
 # FARS ----
@@ -228,13 +244,15 @@ for(i in lodes.ls){
 fars.ls = c('FARS_CT_MD_UT_VA.zip')
 
 for(i in fars.ls){
+  if(length(grep(i, dir(file.path('~', 'workingdata', 'FARS'))))==0){
+    
   system(paste("aws s3 cp",
                file.path(teambucket, 'FARS', i),
                file.path('~', 'workingdata', 'FARS', i)))
   if(length(grep('zip$', i))!=0) system(paste('unzip -o', file.path('~', 'workingdata', 'FARS', i), '-d',
                                               file.path('~', 'workingdata', 'FARS/')))
+  }
 }
-  
 
 
 # Re-organizing export of model outputs for new system ----
