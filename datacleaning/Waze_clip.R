@@ -53,12 +53,14 @@ for(i in states){ # i = "CT"
   }
   
   # ~ 1 min to read 3.4 Gb CT file
-  load(file.path(output.loc, statefiles[grep(paste0(i, "_Raw_"), statefiles)]))
+  # Sort for latest version
+  statefile = sort(statefiles[grep(paste0(i, "_Raw_"), statefiles)], decreasing = T)[1]
+  load(file.path(output.loc, statefile))
   
   cat(i, "loaded \n")
   
   # original file size in MB
-  orig.file.size <- round(file.info(file.path(output.loc, statefiles[grep(paste0(i, "_Raw_"), statefiles)]))$size/1000000, 2)
+  orig.file.size <- round(file.info(file.path(output.loc, statefile)]))$size/1000000, 2)
   orig.nrow <- nrow(results)
   
   # <><><><><><><><><><><><><><><><><><><><>

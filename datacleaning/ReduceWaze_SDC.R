@@ -152,8 +152,8 @@ for(i in states){ # i = "UT"
   dropvars = c("report_description", "pub_utc_epoch_week","jam_uuid", "num_thumbsup")
   d <- d[,!names(d) %in% dropvars]
 
-  # Manual 'loop' for MD. Have to re-make ym and also re-load for each half. Work on this to optimize when dataframe d is some % of available RAM 
-  # d <- d[ym %in% yearmonths[8:13],];  ym <- format(d$pub_utc_timestamp, "%Y-%m"); gc()
+  # Manual 'loop' for MD. Have to re-make ym and also re-load for each half. Work on this to optimize when dataframe d is some % of available RAM. Now split between 1:8 and 9:17. 5.8 Gb is too big to parallelize on 8 core 60 Gb instance.
+  # d <- d[ym %in% yearmonths[1:8],];  ym <- format(d$pub_utc_timestamp, "%Y-%m"); gc()
   
   # Set up cluster. 
   avail.cores <- parallel::detectCores()
