@@ -300,7 +300,7 @@ for(specialeventday in eventdays) {
     
     # 5. Difference of hot spots: TO DO
   
-    # dd.diff = dd - dd.e    
+    # dd.diff = dd - dd.e    S
     
     
   dev.off()

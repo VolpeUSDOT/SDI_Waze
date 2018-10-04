@@ -1,6 +1,8 @@
+# Step 2 of the data cleaning pipeline
 # Aggregates Waze files to monthly sets with unique UUIDs. 
 # Reading from Redshift in SDC. Modified to query multiple states
 # This now calls Waze_clip.R to subset to buffered state polygons before making monthly files by unique alert_uuid.
+# Output is monthly .RData files for each state, clipped to the buffered state polygon and reduced to unique UUIDs.
 
 # Setup ----
 
@@ -20,8 +22,6 @@ library(foreach)
 # Location of SDC SDI Waze team S3 bucket. Files will first be written to a temporary directory in this EC2 instance, then copied to the team bucket.
 teambucket <- "s3://prod-sdc-sdi-911061262852-us-east-1-bucket"
  
-# aws.s3::get_bucket(output.loc) # forbidden 403, as aws.s3 relies on credentials, which we are not using. see: aws.signature::locate_credentials()
-
 user <- paste0( "/home/", system("whoami", intern = TRUE)) #he user directory to use
 output.loc <- paste0(user, "/tempout")
 
@@ -149,11 +149,11 @@ for(i in states){ # i = "UT"
   ym <- format(d$pub_utc_timestamp, "%Y-%m")
   
   # Removed unneeded variables to save ram
-  dropvars = c("report_description", "pub_utc_epoch_week","jam_uuid", "num_thumbsup")
+  dropvars = c("report_description", "pub_utc_epoch_week", "num_thumbsup")
   d <- d[,!names(d) %in% dropvars]
 
   # Manual 'loop' for MD. Have to re-make ym and also re-load for each half. Work on this to optimize when dataframe d is some % of available RAM. Now split between 1:8 and 9:17. 5.8 Gb is too big to parallelize on 8 core 60 Gb instance.
-  d <- d[ym %in% yearmonths[1:8],];  ym <- format(d$pub_utc_timestamp, "%Y-%m"); gc()
+   d <- d[ym %in% yearmonths[9:17],];  ym <- format(d$pub_utc_timestamp, "%Y-%m"); gc()
   
   # Set up cluster. 
   avail.cores <- parallel::detectCores()
@@ -166,7 +166,7 @@ foreach(mo = unique(ym), .packages = c("dplyr", "tidyr")) %dopar% {
     # mo = "2018-04"
     dx <- d[ym == mo,]
     
-    # d.test = dx[1:5000,]
+    # dx = dx[1:5000,]
     
     ll <- dx %>%
       group_by(alert_uuid) %>%
@@ -177,7 +177,7 @@ foreach(mo = unique(ym), .packages = c("dplyr", "tidyr")) %dopar% {
         pubMillis = min(pub_millis),
         lon = median(location_lon),
         lat = median(location_lat),
-        last.time = max(pub_millis),
+        last.time = min(pub_millis)+(sum(total_occurences)-1)*120000, #  120,000 milliseconds in 2 minutes. Sum of total occurrances across uuid_versions for this alert_uuid is the number of times it occurred in the curated data. Add to pub_millis to get last time. Subtract 1 because we are only interested in occurrance after the first one.
         nrecord = n()
       )
     
