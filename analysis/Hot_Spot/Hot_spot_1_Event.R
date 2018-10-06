@@ -9,6 +9,7 @@ library(maps)
 library(sp)
 library(spatstat)
 library(rgdal)
+library(rgeos)
 library(RgoogleMaps)
 library(ks)
 library(scales)
@@ -106,8 +107,9 @@ SpecialEvents$DayofWeekN <- as.numeric(format(SpecialEvents$Date, format = "%u")
 
 
 # Check with a plot:
-plot(e, main = paste("EDT Waze Hot Spot overlay \n", state))
-plot(w, add = T, col = "red")
+plot(e, main = paste("EDT Waze Hot Spot overlay \n", state),
+     col = scales::alpha("grey20", 0.2))
+plot(w, add = T, col = scales::alpha("firebrick", 0.1))
 
 # Subset to area of interest only ---- 
 
@@ -127,10 +129,23 @@ ws = w[ws[,1] == TRUE,] # Make ws as a spatial points data frame of Waze events,
 es = gIntersects(zoom_box, e, byid = T)
 es = e[es[,1] == TRUE,] # Make es as a spatial points data frame of EDT crashes, for points intersecting the buffer
 
+
+# Save for plotting (will need to expand filename if doing multiple special events in a month) 
+# w   Waze events for selected month and state, as spatial points data frame
+# e   EDT crashes for selected month and state, SPDF
+# ws  Geographic zoom of Waze events 
+# es  Geographic zoom of EDT crahes
+# zoom_box  Bounding area for the geographic zoom
+# zoomll    Lat/long of special event location at center of bounding area
+
+save(list = c("w", "e", "ws", "es", "zoom_box", "zoomll"),
+     file = file.path(localdir, "SpecialEvents", paste0(state, "_", eventmo, "_SpecialEvent.RData")))
+
+
 pdf(file.path("Figures", "Hot_Spot_data_prep.pdf"), width = 8, height = 8)
 plot(zoom_box, main = 'Zooming to FedEx field, September 2017', sub='3 mile buffer')
-plot(ws, add =T)
-plot(es, add =T, col = 'red')
+plot(ws, add =T, col = scales::alpha("grey20", 0.2))
+plot(es, add =T, col = scales::alpha("firebrick", 0.9))
 legend('topleft', pch = "+", col = c('black', 'red'), legend = c('Waze events', 'EDT crashes'))
 dev.off()
 
@@ -146,12 +161,13 @@ bwidth = 0.5 # betwen 0 and 1
 
 par.reset = par(no.readonly = T)
 
-# Get a map for plotting. Save as object "mm", which we will use for convertting lat longs into plottable points 
+# Get a map for plotting. Save as object "mm", which we will use for convertting lat longs into plottable points. Change to get_stamenmap
 
 mm <- plotmap(lat = wp$lat, lon = wp$lon,
               pch = 1,
               col = alpha("white", 0),
-              maptype = "roadmap")
+              maptype = "roadmap",
+              destfile = file.path(localdir, "SpecialEvents", paste0(state, eventmo, 'Basemap')))
 
 # Convert from lat long to plot-able XY for mapping.
 
