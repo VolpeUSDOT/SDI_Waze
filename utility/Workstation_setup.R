@@ -27,7 +27,7 @@ for (i in toplevel){
 # Create directories within 'workingdata' 
 
 workinglevel = c('census', 'EDT', 'Figures', 'Hex', 'Link', 'Overlay', 'Random_Forest_Output',
-                 'AADT', 'FARS', 'LODES_LEHD')
+                 'AADT', 'FARS', 'LODES_LEHD', 'SpecialEvents')
 
 for (i in workinglevel){
   system(paste('mkdir -p', file.path("~", "workingdata", i)))
@@ -255,6 +255,22 @@ for(i in fars.ls){
 }
 
 
+# Special Events ----
+
+special.ls = c('SpecialEvents.zip')
+
+for(i in special.ls){
+  if(length(grep(i, dir(file.path('~', 'workingdata', 'SpecialEvents'))))==0){
+    
+    system(paste("aws s3 cp",
+                 file.path(teambucket, 'SpecialEvents', i),
+                 file.path('~', 'workingdata', 'SpecialEvents', i)))
+    if(length(grep('zip$', i))!=0) system(paste('unzip -o', file.path('~', 'workingdata', 'SpecialEvents', i), '-d',
+                                                file.path('~', 'workingdata', 'SpecialEvents/')))
+  }
+}
+
+
 # Re-organizing export of model outputs for new system ----
 
 EXPORTREORG = F
@@ -347,9 +363,10 @@ if(MOVEFROMUPLOAD){
   )
   
   system(paste("aws s3 mv", 
-               file.path(teambucket, system('whoami', intern = T), "uploaded_files", "Special_Events2.zip"),
-               file.path(teambucket, "SpecialEvents", "Speciail_Events2.zip"))
+               file.path(teambucket, system('whoami', intern = T), "uploaded_files", "SpecialEvents.zip"),
+               file.path(teambucket, "SpecialEvents", "SpecialEvents.zip"))
   )
+  
   
   
 }

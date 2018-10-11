@@ -1,33 +1,24 @@
-# Hot spot of a special event in Maryland
+# Hot spot of compiled special event in Maryland
 # Based on work with Mobileye data 
 # https://github.com/dflynn-volpe/Bus_Ped/blob/master/Route_12_kde2.R
+# And single-event mapping with analysis/Hot_Spot/Hot_spot_1_Event.R
 
 
 # Setup ----
-# If you don't have these packages: install.packages(c("maps", "sp","spatstat", "RgoogleMaps","ks","scales","tidyverse")) 
+# If you don't have these packages: install.packages(c("maps", "sp", "rgdal", "rgeos", "tidyverse")) 
 # ggmap: want development version: devtools::install_github("dkahle/ggmap")
 library(maps)
 library(sp)
-library(spatstat)
 library(rgdal)
 library(rgeos)
-library(RgoogleMaps)
 library(ggmap)
-library(ks)
-library(scales)
 library(tidyverse)
 
-
-# Event month and state
-eventmo = "2017-09"
-state = "MD"
 
 codeloc <- "~/SDI_Waze"
 source(file.path(codeloc, 'utility/get_packages.R'))
 
-
 user <- paste0( "/home/", system("whoami", intern = TRUE)) #the user directory to use
-
 localdir <- paste0(user, "/workingdata") # full path for readOGR
 
 wazedir <- "~/tempout" # has State_Year-mo.RData files. Grab from S3 if necessary
@@ -40,20 +31,19 @@ source(file.path(codeloc, 'utility/wazefunctions.R'))
 # Project to Albers equal area conic 102008. Check comparision wiht USGS version, WKID: 102039
 proj <- showP4(showWKT("+init=epsg:102008"))
 
-
 # load data ----
 
 # Read special event data and convert it to spatial data format
-SpecialEvents <- read.csv(file = file.path(localdir,"SpecialEvents", "SpecialEventsExpand_MD_AprilToSept_2017.csv"))
+SpecialEvents <- read.csv(file = file.path(localdir, "SpecialEvents", "SpecialEvents_MD_April17Sept_2018.csv"))
 
+# Event state
+state = "MD"
 
 wazemonthfiles <- dir(wazedir)[grep(state, dir(wazedir))]
 wazemonthfiles <- wazemonthfiles[grep("RData$", wazemonthfiles)]
 # omit _Raw_
 omit <- grep('_Raw_', wazemonthfiles)
 wazemonthfiles = wazemonthfiles[-omit]
-
-load(file.path(wazedir, wazemonthfiles[grep(eventmo, wazemonthfiles)])) # load dataframe mb
 
 # get EDT data for this state 
 e_i <- read.csv(file.path(edtdir, dir(edtdir)[grep(state, dir(edtdir))][1]),
@@ -78,9 +68,20 @@ e_i$CrashDate_Local <- with(e_i,
                                     HourofDay, MinuteofDay), format = "%Y-%m-%d %H %M", tz = use.tz)
 )
 
+# Compile events ----
 
+# Begin loop to compile Waze and EDT events for this special event location, for event day and non-event days
+# Will end up with four data frames, two each for Waze and EDT, for event day and non-event day
+# Columns for each: lat, long, time, {alert_type}
+
+# After compiling data frames, then carry out plotting.
+
+# (START HERE)
+
+
+# By month
+load(file.path(wazedir, wazemonthfiles[grep(eventmo, wazemonthfiles)])) # load dataframe mb
 # Subset to event month
-
 eb <- e_i[format(e_i$CrashDate_Local, "%Y-%m") == eventmo,]
 
 
