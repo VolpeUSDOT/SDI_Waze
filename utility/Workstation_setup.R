@@ -207,7 +207,7 @@ for(state in states){
 # AADT ----
 
 
-aadt.ls = c('vmt_max_aadt_by_grid_fc_urban_factored.txt', 'AADT_CT_MD_UT_VA.zip')
+aadt.ls = c('AADT_CT_MD_UT_VA.zip')
   
 for(i in aadt.ls){
   if(length(grep(i, dir(file.path('~', 'workingdata', 'AADT'))))==0){
@@ -232,7 +232,7 @@ for(i in lodes.ls){
   system(paste("aws s3 cp",
                file.path(teambucket, 'LODES_LEHD', i),
                file.path('~', 'workingdata', 'LODES_LEHD', i)))
-  if(length(grep('zip$', i))!=0) system(paste('unzip', file.path('~', 'workingdata', 'LODES_LEHD', i), '-d',
+  if(length(grep('zip$', i))!=0) system(paste('unzip -o', file.path('~', 'workingdata', 'LODES_LEHD', i), '-d',
                                               file.path('~', 'workingdata', 'LODES_LEHD/')))
   }
 }
@@ -314,6 +314,44 @@ system(paste(
 ))
 
 
+}
+
+# View uploaded files
+system(paste("aws s3 ls", 
+             file.path(teambucket, system('whoami', intern = T), "uploaded_files/")))
+
+# Moving from upload ----
+
+MOVEFROMUPLOAD = F
+
+if(MOVEFROMUPLOAD){
+  
+  system(paste("aws s3 mv", 
+               file.path(teambucket, system('whoami', intern = T), "uploaded_files", "AADT_CT_MD_UT_VA.zip"),
+               file.path(teambucket, "AADT", "AADT_CT_MD_UT_VA.zip"))
+  )
+  
+  system(paste("aws s3 mv", 
+               file.path(teambucket, system('whoami', intern = T), "uploaded_files", "FARS_CT_MD_UT_VA.zip"),
+               file.path(teambucket, "FARS", "FARS_CT_MD_UT_VA.zip"))
+  )
+  
+  system(paste("aws s3 mv", 
+               file.path(teambucket, system('whoami', intern = T), "uploaded_files", "LODES_LEHD_CT_MD_UT_VA.zip"),
+               file.path(teambucket, "LODES_LEHD", "LODES_LEHD_CT_MD_UT_VA.zip"))
+  )
+  
+  system(paste("aws s3 mv", 
+               file.path(teambucket, system('whoami', intern = T), "uploaded_files", "ct_md_ut_va_hexagons_1mi.zip"),
+               file.path(teambucket, "Hex", "ct_md_ut_va_hexagons_1mi.zip"))
+  )
+  
+  system(paste("aws s3 mv", 
+               file.path(teambucket, system('whoami', intern = T), "uploaded_files", "Special_Events2.zip"),
+               file.path(teambucket, "SpecialEvents", "Speciail_Events2.zip"))
+  )
+  
+  
 }
 
 # Team bucket organization ----
