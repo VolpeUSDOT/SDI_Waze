@@ -304,6 +304,7 @@ long_to_wide <- function(dt){
   widetb
 }
 
+# Test the function
 loclist = c("SE1","SE2")
 buflist = c(5,3,2,1,0.75,0.5,0.25)
   

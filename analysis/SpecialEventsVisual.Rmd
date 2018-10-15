@@ -23,10 +23,10 @@ source2 <- function(file, start, end, ...) {
     source(textConnection(file.lines.collapsed), ...)
 }
 
-source2("SpecialEventsAnalysis.R", 3, 79) # setting
-source2("SpecialEventsAnalysis.R", 233,306) # Data process
+source2("SpecialEventsAnalysis.R", 3, 79) # "Set up"" section in SpecialEventsAnalysis.R
+source2("SpecialEventsAnalysis.R", 233,306) # "Data for Time Series" section in SpecialEventsAnalysis.R 
 
-# Plotting functions.
+# Plotting functions
 meanfun <- function(dt){
   dt_Date <- dt %>% group_by(Location.ID, date, hour) %>% 
             summarize(nWazeJam = mean(nWazeJam),
@@ -213,8 +213,6 @@ plotWeekdayendHeatMap <- function(dt, loc, metrics){
             labs(fill= paste0(metrics))
 }
 
-
-
 plotDateHeatMap <- function(dt, loc, weekday, metrics){
   
         location <- unique(SpecialEvents$Location[SpecialEvents$Location.ID == loc])
@@ -263,7 +261,6 @@ plotDateHeatMap <- function(dt, loc, weekday, metrics){
             theme(legend.title=element_text(face="bold", size=14)) + 
             labs(fill= paste0(metrics))
 }
-
 
 plotDate <- function(dt, loc, weekday, statistic, metrics){
         
@@ -339,7 +336,6 @@ plotDayMile <- function(dt,buflist, loclist, days, metrics){
             ggtitle(paste0(location)) 
 }
 
-
 plotDay <- function(dt, loc, days, statistic, metrics){
         
         location <- unique(SpecialEvents$Location[SpecialEvents$Location.ID == loc])
@@ -374,21 +370,24 @@ plotDay <- function(dt, loc, days, statistic, metrics){
 
 
 ```
+# Introduction
 
-# Time Series Plots
+The objective of the special event analysis is to understand if EDT or Waze events are driven by locations and times with special events, for example, football and baseball events, that could potentially have huge impact on traffic flow on the road network.
 
-We used the AllModel30.csv output for this analysis.
+The data is based on the random forest model output (MD_All_Model_30.csv) of running a full dataset of Maryland beween April 1st to September 30th in 2017. The data include model estimates, model residuals, Waze jams, Hazards, and EDT accidents.
 
-Metrics we use include:
+After evaluate the data quality and availability of the data, we choose following metrics that we believe are best variables that we have to assess the travel patterns on the road:
 
 * Number of EDT Accidents (Model Dependent Variable)
 * Number of Waze Accidents
-* Number of Waze Jam
-* Number of Hazard On Shoulder (nHazardOnShoulder)
-* Number of Hazard On Road (nHazardOnRoad)
-* Number of Hazard Weather (nHazardWeather) - is it # of hazard or weather? According to Michelle, this should be one of the three categories of Waze event (Accidents, Jam, and Hazard/Weather). However, in the dataset, nHazardWeather is smaller than sum of the sub-categories (e.g., nHazardOnShoulder, nHazardOnRoad). This needs further investigation.
-* Probability of NonCrash and Crash - real prob from RF model (needs further investigation/decision making)
-The probability has converted to based on the threshold ~ 0.2 using the built-in function in RF.
+* Number of Waze Jams
+* Number of Hazards On Shoulder (nHazardOnShoulder)
+* Number of Hazards On Road (nHazardOnRoad)
+* Number of Hazards Weather (nHazardWeather)
+ According to Michelle, this should be one of the three categories of Waze event (Accidents, Jam, and Hazard/Weather). However, in the dataset, nHazardWeather is smaller than sum of the sub-categories (e.g., nHazardOnShoulder, nHazardOnRoad). This needs further investigation.
+* Probability of NonCrash and Crash
+real prob from RF model (needs further investigation/decision making)
+The probability has converted to based on the threshold ~ 0.2 using the built-in function in Random Forest.
 
 To do 8/23/2018:
 
@@ -418,6 +417,8 @@ Dave's feedback 8/29/2018:
 * Other types of metric, Hazards on the roads, car stopped on shoulders. Car stopped on shoulders.
 * Other location: for exmaple, University football games.
 * Can we try to make this a little more of hot spots, can we do this on a grid cell level.
+
+# Time Series Plots
 
 ## HeatMap
 
