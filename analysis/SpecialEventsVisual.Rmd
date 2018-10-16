@@ -14,6 +14,7 @@ This is an example of visuals that we can create visualizations for a specific l
 
 ```{r setup, include=FALSE}
 #set options
+library("reshape2")
 knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE, error = FALSE)
 options(scipen = 20)
 
@@ -27,6 +28,7 @@ source2("SpecialEventsAnalysis.R", 3, 79) # "Set up"" section in SpecialEventsAn
 source2("SpecialEventsAnalysis.R", 233,306) # "Data for Time Series" section in SpecialEventsAnalysis.R 
 
 # Plotting functions
+# function to calculate mean values of the metric in these grid cells within the buffer.
 meanfun <- function(dt){
   dt_Date <- dt %>% group_by(Location.ID, date, hour) %>% 
             summarize(nWazeJam = mean(nWazeJam),
@@ -43,6 +45,7 @@ meanfun <- function(dt){
   dt_Date
 }
 
+# function to calculate sum values of the metric in these grid cells within the buffer.
 sumfun <- function(dt){
   dt_Date <- dt %>% group_by(Location.ID, date, hour) %>% 
             summarize(nWazeJam = sum(nWazeJam),
@@ -59,6 +62,7 @@ sumfun <- function(dt){
   dt_Date
 }
 
+# function to calculate maximum values of the metric in these grid cells within the buffer.
 maxfun <- function(dt){
   dt_Date <- dt %>% group_by(Location.ID, date, hour) %>% 
             summarize(nWazeJam = max(nWazeJam),
@@ -75,6 +79,7 @@ maxfun <- function(dt){
   dt_Date
 }
 
+# function to 
 plotMonth <- function(dt, loc, weekday, statistic, metrics){
         
         location <- unique(SpecialEvents$Location[SpecialEvents$Location.ID == loc])
@@ -294,7 +299,8 @@ plotDate <- function(dt, loc, weekday, statistic, metrics){
 }
 
 plotDayMile <- function(dt,buflist, loclist, days, metrics){
-        
+  
+        statistic = "Total"
         location <- unique(SpecialEvents$Location[SpecialEvents$Location.ID == loclist])
         dt_Date <- dt %>% group_by(Location.ID, Mile_Buffer, date, hour) %>% 
             summarize(nWazeJam = sum(nWazeJam),
@@ -372,24 +378,80 @@ plotDay <- function(dt, loc, days, statistic, metrics){
 ```
 # Introduction
 
-The objective of the special event analysis is to understand if EDT or Waze events are driven by locations and times with special events, for example, football and baseball events, that could potentially have huge impact on traffic flow on the road network.
+The objective of the special event analysis is to understand if EDT or Waze events are driven by locations and times with special events, for example, football and baseball events, that could potentially have huge impact on traffic flow on the road network. We expect that a higer than normal traffic demand due to the attendance of the special events.
 
-The data is based on the random forest model output (MD_All_Model_30.csv) of running a full dataset of Maryland beween April 1st to September 30th in 2017. The data include model estimates, model residuals, Waze jams, Hazards, and EDT accidents.
+> Data
 
-After evaluate the data quality and availability of the data, we choose following metrics that we believe are best variables that we have to assess the travel patterns on the road:
+There are two types of data used in the analysis: Special events and metric data.
+
+__1. Special Events in two example locations in Maryland__
+
+* FedEx Field: NFL Stadium in Washington D.C. area
+Four football games in August and September (75k avg attendance)
+Major concerts in June and August (46k avg attendance)
+International Soccer game in July (49k in attendance)
+
+* Camden Yards: MLB stadium in Baltimore, MD 
+81 baseball games (25k avg attendance)
+
+__2. Metric Data__
+
+The metric data is based on the random forest model output (MD_All_Model_30.csv) of running a full dataset of Maryland beween April 1st to September 30th in 2017. The data include model estimates, model residuals, Waze jams, Hazards, and EDT accidents.
+
+After evaluating the data quality and availability of the data, we selected following metrics that are relatively good in representing the travel patterns on the road. We initially considered all six variables, but we only presented the first five in the special event presentation to the sponsors.
 
 * Number of EDT Accidents (Model Dependent Variable)
 * Number of Waze Accidents
 * Number of Waze Jams
 * Number of Hazards On Shoulder (nHazardOnShoulder)
 * Number of Hazards On Road (nHazardOnRoad)
-* Number of Hazards Weather (nHazardWeather)
- According to Michelle, this should be one of the three categories of Waze event (Accidents, Jam, and Hazard/Weather). However, in the dataset, nHazardWeather is smaller than sum of the sub-categories (e.g., nHazardOnShoulder, nHazardOnRoad). This needs further investigation.
-* Probability of NonCrash and Crash
-real prob from RF model (needs further investigation/decision making)
-The probability has converted to based on the threshold ~ 0.2 using the built-in function in Random Forest.
+* ~~Number of Hazards Weather (nHazardWeather)~~
+  According to Michelle Gilmore, this should be one of the three categories of Waze event (Accidents, Jam, and Hazard/Weather). However, in the dataset, nHazardWeather is smaller than sum of the sub-categories (e.g., nHazardOnShoulder, nHazardOnRoad). Due to the data quality issue of this variable, we did not use it in the analysis. 
+* ~~Probability of NonCrash and Crash~~
+  This is real probability from Random Forest model. The probability has converted to based on the threshold ~ 0.2 using the built-in function in Random Forest. We analyzed this variable in spreadsheet, but did not present the results to the sponsors.
 
-To do 8/23/2018:
+To understand relationship between special event and traffic patterns, used 3 buffer zones based on the distance from the event location:
+
+* 1 mile (8-9 grid cells)
+* 3 mile (41-42 grid cells)
+* 5 mile (96-100 grid cells)
+    * 12%  grid cells in FedEx Field 5 mile buffer have no data due to outside the Maryland state border (in DC area). 
+
+
+The plot followed compares the average daily total counts of the metrics of all grid cells for 3 mile buffer zone. 
+
+```{r eval = T}
+loc = "SE2"
+buf = 3
+dt <- GridDataSE(loc,buf,alldays,col.names)
+location <- unique(SpecialEvents$Location[SpecialEvents$Location.ID == loc])
+
+dt_Date <- dt %>% group_by(Location.ID, hour) %>% 
+  summarize(nWazeJam = sum(nWazeJam)/length(unique(date)),
+            nEDTAccident = sum(Obs)/length(unique(date)),
+            nWazeAccident = sum(nWazeAccident)/length(unique(date)),
+            nHazardOnShoulder = sum(nHazardOnShoulder)/length(unique(date)),
+            nHazardOnRoad = sum(nHazardOnRoad)/length(unique(date)),
+            # nHazardWeather = sum(nHazardWeather),
+            # nEDTFatal = sum(nEDTFatal),
+            # nEDTCrashWPedBikeInv = sum(nEDTCrashWPedBikeInv),
+            # nEDTCrashWSchoolBusInv = sum(nEDTCrashWSchoolBusInv),
+            # nEDTVehCount = sum(nEDTVehCount)
+  )
+dt_Date <- melt(dt_Date, id=c("Location.ID","hour"))
+dt_Date$variable <-  factor(dt_Date$variable, levels=c("nWazeJam", "nEDTAccident", "nWazeAccident", "nHazardOnShoulder","nHazardOnRoad"), labels=c("Waze Jam", "EDT Accident", "Waze Accident","Hazard on Shoulder","Hazard on Road"))
+
+ggplot(dt_Date, aes(x = hour, y = value, color = variable)) + 
+  geom_line() + theme(legend.title=element_blank()) + 
+  ylab("Total Counts") + xlab("Hour")+
+  ggtitle(paste0(location, ", ", buf, " Mile Buffer"))
+```  
+
+> Archived Notes
+
+Here are notes taken for iterative edits or comments from the team and the sponsor. Most of them have been addressed, there are still a few bullet points are placed in the parking lot for future analysis.
+
+__To do 8/23/2018:__
 
 * total/average/max (point/line) number of accidents/jams for every day (done)
     * plot on top of each other for the NoEvents with a different color. Use other colors for a type of special events. 4/23 (4/16 easter), 5/21 (5/29 memorial day, 5/14 mother's day), 7/02 weekends near holidays. 
@@ -408,7 +470,7 @@ To do 8/23/2018:
 * follow up with Erika tomorrow (done)
 * write one plot function in stead of multiple plot functions. (done)
 
-Dave's feedback 8/29/2018:
+__Dave's feedback 8/29/2018:__
 
 * try large buffer, e.g., 5 miles (Dan's suggestion: work with individual lag/lons instead of grid cells)
 * broader patterns - can we add baseball game,(Michelle's comments: baseball games are usually hosted in urban areas with intercity activities and good public transportation, less parking. Erika - How far aways is the parking. Look that the parking in the buffer).
@@ -418,11 +480,15 @@ Dave's feedback 8/29/2018:
 * Other location: for exmaple, University football games.
 * Can we try to make this a little more of hot spots, can we do this on a grid cell level.
 
-# Time Series Plots
+# Visualizations
 
 ## HeatMap
+The heatmaps specify the daily total events of all grid-cells within the buffer zone of a special event location, averaged through a specific weekday. Each weekday can be plotted separately, or we can plot all weekdays in one plot. 
 
-### 3 mile buffer zone
+### Heatmap Example 1
+
+The first example shows Fedex Field of Sundays (and all weekdays) of a 3 mile buffer zone. We observe a strong pattern for the higher # of Jam/Accident before and after event, this might also due to the fact that smaller # of special events are available in this location.
+
 ```{r eval = T}
 ## Fedex Field
 loc = "SE1"
@@ -430,206 +496,57 @@ buf = 3
 weekday = "Sunday"
 dt <- GridDataSE(loc,buf,alldays,col.names)
 plotDateHeatMap(dt, loc, weekday, "EDT Accident") # average values
-plotDateHeatMap(dt, loc, weekday, "Waze Jam")
-plotDateHeatMap(dt, loc, weekday, "Waze Accident")
+# plotDateHeatMap(dt, loc, weekday, "Waze Jam")
+# plotDateHeatMap(dt, loc, weekday, "Waze Accident")
 
-plotWeekdayHeatMap(dt, loc, "Waze Jam")
 plotWeekdayHeatMap(dt, loc, "EDT Accident")
-plotWeekdayHeatMap(dt, loc, "Waze Accident")
+# plotWeekdayHeatMap(dt, loc, "Waze Jam")
+# plotWeekdayHeatMap(dt, loc, "Waze Accident")
+```
 
+### Heatmap Example 2
+
+The second example shows Camden Yards of Sundays (and all weekdays) of a 3 mile buffer zone. As we observe much more densed activity compared to Fedex Field in the first example, we also plotted the weekday and weekend averages over days for comparison.
+
+There are 12 - 13 baseball events at each day of week during the season. For example, there are baseball games every other Saturday, a total of 13 baseball games on Saturdays.
+
+Takeaways:
+
+* There are significant differences between weekday and weekends.
+* No much difference between Events and Noevents during weekdays
+* The game does not attract much more traffic because 1) Camden Yards is located in urban area (Baltimore), with good public transportation/rideshare/bike/ped access to the stadium, and 2) regular commuting traffic might be reduced because people are trying to avoid the traffic during an event day.
+* If events happen in a regular basis, in this case, baseball games, the differences between events and non-event days are not strong any more.
+
+```{r eval = T}
 ## Camden Yards
 loc = "SE2"
 buf = 3
-weekday = "Sunday"
+weekday = "Saturday"
 dt <- GridDataSE(loc,buf,alldays,col.names)
 plotDateHeatMap(dt, loc, weekday, "Waze Accident")
-plotDateHeatMap(dt, loc, weekday, "EDT Accident")
-plotDateHeatMap(dt, loc, weekday, "Waze Jam")
+# plotDateHeatMap(dt, loc, weekday, "EDT Accident")
+# plotDateHeatMap(dt, loc, weekday, "Waze Jam")
 
 plotWeekdayHeatMap(dt, loc, "Waze Jam")
-plotWeekdayHeatMap(dt, loc, "EDT Accident")
-plotWeekdayHeatMap(dt, loc, "Waze Accident")
+# plotWeekdayHeatMap(dt, loc, "EDT Accident")
+# plotWeekdayHeatMap(dt, loc, "Waze Accident")
 
 plotWeekdayendHeatMap(dt, loc, "Waze Jam")
-plotWeekdayendHeatMap(dt, loc, "EDT Accident")
-plotWeekdayendHeatMap(dt, loc, "Waze Accident")
-```
-### 3 mile buffer zone
-```{r eval = T}
-## Fedex Field
-loclist = "SE1"
-buflist = c(3,1,0.5)
-days = c("2017-09-10","2017-09-17","2017-06-15")
-dt <- multipleLocBuf(loclist, buflist)
-
-plotDayMile(dt, buflist, loclist, days, "Waze Accident")
-plotDayMile(dt, buflist, loclist, days, "Waze Jam")
-plotDayMile(dt, buflist, loclist, days, "Waze Hazard On Shoulder")
-plotDayMile(dt, buflist, loclist, days, "Waze Hazard On Road")
-plotDayMile(dt, buflist, loclist, days,"EDT Accident")
-plotDayMile(dt, buflist, loclist, days, "EDT Fatals")
-plotDayMile(dt, buflist, loclist, days, "EDT Crashes with Ped or Bike Involvement")
-plotDayMile(dt, buflist, loclist, days, "EDT Crashes with School Bus Involvement")
-plotDayMile(dt, buflist, loclist, days, "EDT Vehicle Counts")
-
+# plotWeekdayendHeatMap(dt, loc, "EDT Accident")
+# plotWeekdayendHeatMap(dt, loc, "Waze Accident")
 ```
 
+## Time Series Plots
 
-## Example Days in Presentation
+### Time Series Plots of All Days
 
-### 5 mile buffer zone - Total
-```{r eval = T}
-loc = "SE1"
-buf = 3 # both 3 and 5 miles buffer
-dt <- GridDataSE(loc,buf,alldays,col.names)
-days = c("2017-09-10","2017-09-17")
-statistic = "Total" #c("Total","Average","Maximum")
-metrics = "EDT Accident" #c("EDT Accident","Waze Accident","Waze Jam","Waze Hazard On Shoulder","Waze Hazard On Road","EDT Fatals","EDT Crashes with Ped or Bike Involvement","EDT Crashes with School Bus Involvement","EDT Vehicle Counts")
-
-plotDay(dt, loc, days, statistic, "Waze Accident")
-plotDay(dt, loc, days, statistic, "Waze Jam")
-plotDay(dt, loc, days, statistic, "Waze Hazard On Shoulder")
-plotDay(dt, loc, days, statistic, "Waze Hazard On Road")
-plotDay(dt, loc, days, statistic, "EDT Accident")
-plotDay(dt, loc, days, statistic, "EDT Fatals")
-plotDay(dt, loc, days, statistic, "EDT Crashes with Ped or Bike Involvement")
-plotDay(dt, loc, days, statistic, "EDT Crashes with School Bus Involvement")
-plotDay(dt, loc, days, statistic, "EDT Vehicle Counts")
-
-# stackle plots in another orientation, on top of each other.
-
-```
-
-
-## Hourly By Event Type
-
-### 5 mile buffer zone - Total
-```{r eval = T}
-loc = "SE2"
-buf = 5
-dt <- GridDataSE(loc,buf,alldays,col.names)
-weekday = "Saturday"
-statistic = "Total" #c("Total","Average","Maximum")
-metrics = "EDT Accident" #c("EDT Accident","Waze Accident","Waze Jam","Waze Hazard On Shoulder","Waze Hazard On Road","EDT Fatals","EDT Crashes with Ped or Bike Involvement","EDT Crashes with School Bus Involvement","EDT Vehicle Counts")
-
-plotMonth(dt, loc, weekday, statistic, "Waze Accident")
-plotMonth(dt, loc, weekday, statistic, "Waze Jam")
-plotMonth(dt, loc, weekday, statistic, "Waze Hazard On Shoulder")
-plotMonth(dt, loc, weekday, statistic, "Waze Hazard On Road")
-plotMonth(dt, loc, weekday, statistic, "EDT Accident")
-plotMonth(dt, loc, weekday, statistic, "EDT Fatals")
-plotMonth(dt, loc, weekday, statistic, "EDT Crashes with Ped or Bike Involvement")
-plotMonth(dt, loc, weekday, statistic, "EDT Crashes with School Bus Involvement")
-plotMonth(dt, loc, weekday, statistic, "EDT Vehicle Counts")
-
-```
-
-### 3 mile buffer zone - Total
-```{r eval = T}
-loc = "SE2"
-buf = 3
-dt <- GridDataSE(loc,buf,alldays,col.names)
-weekday = "Saturday"
-statistic = "Total" #c("Total","Average","Maximum")
-metrics = "EDT Accident" #c("EDT Accident","Waze Accident","Waze Jam","Waze Hazard On Shoulder","Waze Hazard On Road")
-
-plotMonth(dt, loc, weekday, statistic, "Waze Accident")
-plotMonth(dt, loc, weekday, statistic, "Waze Jam")
-plotMonth(dt, loc, weekday, statistic, "Waze Hazard On Shoulder")
-plotMonth(dt, loc, weekday, statistic, "Waze Hazard On Road")
-plotMonth(dt, loc, weekday, statistic, "EDT Accident")
-plotMonth(dt, loc, weekday, statistic, "EDT Fatals")
-plotMonth(dt, loc, weekday, statistic, "EDT Crashes with Ped or Bike Involvement")
-plotMonth(dt, loc, weekday, statistic, "EDT Crashes with School Bus Involvement")
-plotMonth(dt, loc, weekday, statistic, "EDT Vehicle Counts")
-```
-
-### 1 mile buffer zone - Total
-```{r eval = T}
-loc = "SE2"
-buf = 1
-dt <- GridDataSE(loc,buf,alldays,col.names)
-weekday = "Saturday"
-statistic = "Total" #c("Total","Average","Maximum")
-metrics = "EDT Accident" #c("EDT Accident","Waze Accident","Waze Jam","Waze Hazard On Shoulder","Waze Hazard On Road")
-
-plotMonth(dt, loc, weekday, statistic, "Waze Accident")
-plotMonth(dt, loc, weekday, statistic, "Waze Jam")
-plotMonth(dt, loc, weekday, statistic, "Waze Hazard On Shoulder")
-plotMonth(dt, loc, weekday, statistic, "Waze Hazard On Road")
-plotMonth(dt, loc, weekday, statistic, "EDT Accident")
-plotMonth(dt, loc, weekday, statistic, "EDT Fatals")
-plotMonth(dt, loc, weekday, statistic, "EDT Crashes with Ped or Bike Involvement")
-plotMonth(dt, loc, weekday, statistic, "EDT Crashes with School Bus Involvement")
-plotMonth(dt, loc, weekday, statistic, "EDT Vehicle Counts")
-```
-
-
-### Hourly By Day of Week - 5 mile buffer
-
-```{r, fig.width=12, fig.height=12}
-loc = "SE2"
-buf = 3
-dt <- GridDataSE(loc,buf,alldays,col.names)
-weekday = "Saturday"
-statistic = "Total" #c("Total","Average","Maximum")
-metrics = "EDT Accident" #c("EDT Accident","Waze Accident","Waze Jam","Waze Hazard On Shoulder","Waze Hazard On Road")
-
-plotDate(dt, loc, weekday, statistic, "Waze Accident")
-plotDate(dt, loc, weekday, statistic, "Waze Jam")
-plotDate(dt, loc, weekday, statistic, "Waze Hazard On Shoulder")
-plotDate(dt, loc, weekday, statistic, "Waze Hazard On Road")
-plotDate(dt, loc, weekday, statistic, "EDT Accident")
-plotDate(dt, loc, weekday, statistic, "EDT Fatals")
-plotDate(dt, loc, weekday, statistic, "EDT Crashes with Ped or Bike Involvement")
-plotDate(dt, loc, weekday, statistic, "EDT Crashes with School Bus Involvement")
-plotDate(dt, loc, weekday, statistic, "EDT Vehicle Counts")
-```
-### Hourly By Day of Week - 3 mile buffer
-
-```{r, fig.width=12, fig.height=12}
-loc = "SE2"
-buf = 3
-dt <- GridDataSE(loc,buf,alldays,col.names)
-weekday = "Saturday"
-statistic = "Total" #c("Total","Average","Maximum")
-metrics = "EDT Accident" #c("EDT Accident","Waze Accident","Waze Jam","Waze Hazard On Shoulder","Waze Hazard On Road")
-
-plotDate(dt, loc, weekday, statistic, "Waze Accident")
-plotDate(dt, loc, weekday, statistic, "Waze Jam")
-plotDate(dt, loc, weekday, statistic, "Waze Hazard On Shoulder")
-plotDate(dt, loc, weekday, statistic, "Waze Hazard On Road")
-plotDate(dt, loc, weekday, statistic, "EDT Accident")
-plotDate(dt, loc, weekday, statistic, "EDT Fatals")
-plotDate(dt, loc, weekday, statistic, "EDT Crashes with Ped or Bike Involvement")
-plotDate(dt, loc, weekday, statistic, "EDT Crashes with School Bus Involvement")
-plotDate(dt, loc, weekday, statistic, "EDT Vehicle Counts")
-```
-
-### Hourly By Day of Week - 1 mile buffer
-
-```{r, fig.width=12, fig.height=12}
-loc = "SE2"
-buf = 1
-dt <- GridDataSE(loc,buf,alldays,col.names)
-weekday = "Saturday"
-statistic = "Total" #c("Total","Average","Maximum")
-metrics = "EDT Accident" #c("EDT Accident","Waze Accident","Waze Jam","Waze Hazard On Shoulder","Waze Hazard On Road")
-
-plotDate(dt, loc, weekday, statistic, "Waze Accident")
-plotDate(dt, loc, weekday, statistic, "Waze Jam")
-plotDate(dt, loc, weekday, statistic, "Waze Hazard On Shoulder")
-plotDate(dt, loc, weekday, statistic, "Waze Hazard On Road")
-plotDate(dt, loc, weekday, statistic, "EDT Accident")
-plotDate(dt, loc, weekday, statistic, "EDT Fatals")
-plotDate(dt, loc, weekday, statistic, "EDT Crashes with Ped or Bike Involvement")
-plotDate(dt, loc, weekday, statistic, "EDT Crashes with School Bus Involvement")
-plotDate(dt, loc, weekday, statistic, "EDT Vehicle Counts")
-```
-
-## Comparing all Matrics
+This sections display the time series plot of averages of every metric over all grid cells within 3 mile buffer area of Fedex Field.
 
 ```{r eval = F}
+loc = "SE2"
+buf = 3
+dt <- GridDataSE(loc,buf,alldays,col.names)
+
 dt_EventType <- dt %>% group_by(EventType, hour) %>% summarize(nWazeJam = mean(nWazeJam),
                                                          Obs = mean(Obs),
                                                          nWazeAccident = mean(nWazeAccident),
@@ -650,37 +567,102 @@ ggplot(dt_EventType, aes(x = hour, y = nHazardOnRoad)) + geom_point() + geom_lin
 ```
 
 
-<!-- ### 3 mile buffer zone - Average without zeros -->
-<!-- ```{r, eval = F} -->
-<!-- buf = 3 -->
-<!-- dt <- GridDataSE(loc,buf,alldays,col.names) -->
+### Time series plot of specific days
 
-<!-- # Mean -->
-<!-- dt_Date <- dt %>% group_by(Location.ID, date, hour) %>% summarize(nWazeJam = mean(nWazeJam), -->
-<!--                                                                Obs = mean(Obs), -->
-<!--                                                                nWazeAccident = mean(nWazeAccident), -->
-<!--                                                                nHazardOnShoulder = mean(nHazardOnShoulder), -->
-<!--                                                                nHazardOnRoad = mean(nHazardOnRoad), -->
-<!--                                                                nHazardWeather = mean(nHazardWeather) -->
-<!-- ) %>% mutate(DayofWeek = weekdays(date), Date = paste(date, DayofWeek), Month = month(date)) %>%  left_join(unique(dt[, c("date","EventType","StartTime","EndTime")]), by = "date") %>% mutate(background_col = ifelse(EventType == "NoEvent", NA,ifelse(EventType == "Football","#E69F00", "#56B4E9"))) %>% mutate_at(.vars = vars(Obs, nWazeAccident, nWazeJam,nHazardOnShoulder,nHazardOnRoad),.funs = funs(replace(., which(. == 0), NA))) -->
+Total/average/max (point/line) number of accidents/jams for all grid cells everyday, for two Sundays, one with event and another without special event: "2017-09-10","2017-09-17". We shaded the period of special events for better visualization of how the patterns changes across time of day.
 
-<!-- dt_Date$Month <- factor(dt_Date$Month)  -->
-<!-- levels(dt_Date$Month) <- list("April" = 4, "May" = 5, "June" = 6, "July" = 7, "August" = 8, "September" = 9) -->
+Key observations:
 
-<!-- # Military time to regular HH:MM, and then to decimals. -->
-<!-- dt_Date$StartTime <- hm_to_num(mil_to_hm(dt_Date$StartTime)) -->
-<!-- dt_Date$EndTime <- hm_to_num(mil_to_hm(dt_Date$EndTime)) -->
+* Traffic is typically worse before and after as people are entering and exiting event location.
+* Observed more Waze events and EDT accidents before and after the event period rather than during the event period.
 
-<!-- weekday = "Sunday" -->
-<!-- dt_visual <-  dt_Date %>% filter(DayofWeek == weekday) -->
+```{r eval = T}
+loc = "SE1"
+buf = 3 # both 3 and 5 miles buffer
+dt <- GridDataSE(loc,buf,alldays,col.names)
+days = c("2017-09-10","2017-09-17")
+statistic = "Total" #c("Total","Average","Maximum")
+metrics = "EDT Accident" #c("EDT Accident","Waze Accident","Waze Jam","Waze Hazard On Shoulder","Waze Hazard On Road","EDT Fatals","EDT Crashes with Ped or Bike Involvement","EDT Crashes with School Bus Involvement","EDT Vehicle Counts")
 
-<!-- ggplot(dt_visual, aes(x = hour, y = nWazeJam, color = EventType, group = date)) +  -->
-<!--   # geom_point(alpha = 0.5, color = "black") + -->
-<!--   geom_line(alpha = 0.5) + -->
-<!--   geom_rect(data = dt_visual,aes(xmin = ave(dt_visual$StartTime, dt_visual$date, FUN = function(x) mean(x)),xmax = ave(dt_visual$EndTime, dt_visual$date, FUN = function(x) mean(x)), ymin = -Inf,ymax=Inf), fill = dt_visual$background_col, alpha= 0.2/100, inherit.aes = FALSE) + -->
-<!--   facet_wrap(~ Month) + -->
-<!--   ylab("Average Waze Jam") + -->
-<!--   xlab("Hour of Day") + -->
-<!--   scale_color_manual(name = NULL, values=c("NoEvent" = "#999999", "Football" = "#E69F00", "Concert" = "#56B4E9")) + -->
-<!--   ggtitle(paste("Fedex Field,", buf,"Mile Buffer,", weekday))  -->
-<!-- ``` -->
+plotDay(dt, loc, days, statistic, "Waze Accident")
+plotDay(dt, loc, days, statistic, "Waze Jam")
+# plotDay(dt, loc, days, statistic, "Waze Hazard On Shoulder")
+# plotDay(dt, loc, days, statistic, "Waze Hazard On Road")
+plotDay(dt, loc, days, statistic, "EDT Accident")
+# plotDay(dt, loc, days, statistic, "EDT Fatals")
+# plotDay(dt, loc, days, statistic, "EDT Crashes with Ped or Bike Involvement")
+# plotDay(dt, loc, days, statistic, "EDT Crashes with School Bus Involvement")
+# plotDay(dt, loc, days, statistic, "EDT Vehicle Counts")
+```
+
+### Time Series Plots by Mile Buffers
+
+Daily total number of waze accidents within the buffer zone of Fedex Field, for two Sundays, one with event and another without event:
+"2017-09-10","2017-09-17". The color shade shows the event period for football, which has been labeled in both days.
+
+```{r eval = T}
+## Fedex Field
+loclist = "SE1"
+buflist = c(5,3,1)
+days = c("2017-09-10","2017-09-17","2017-06-15")
+dt <- multipleLocBuf(loclist, buflist)
+
+plotDayMile(dt, buflist, loclist, days, "Waze Accident")
+# plotDayMile(dt, buflist, loclist, days, "Waze Jam")
+# plotDayMile(dt, buflist, loclist, days, "Waze Hazard On Shoulder")
+# plotDayMile(dt, buflist, loclist, days, "Waze Hazard On Road")
+# plotDayMile(dt, buflist, loclist, days, "EDT Accident")
+# plotDayMile(dt, buflist, loclist, days, "EDT Fatals")
+# plotDayMile(dt, buflist, loclist, days, "EDT Crashes with Ped or Bike Involvement")
+# plotDayMile(dt, buflist, loclist, days, "EDT Crashes with School Bus Involvement")
+# plotDayMile(dt, buflist, loclist, days, "EDT Vehicle Counts")
+
+```
+
+
+### Time Series Plot by Month
+
+Use Camden Yards 3 mile buffer zone on Saturday as an example, the plot shows the total Waze accidents by months and the color represent the type of events. The shades are event period for however many special events available during all Saturdays of each month.
+
+```{r eval = T}
+loc = "SE2"
+buf = 3
+dt <- GridDataSE(loc,buf,alldays,col.names)
+weekday = "Saturday"
+statistic = "Total" #c("Total","Average","Maximum")
+metrics = "EDT Accident" #c("EDT Accident","Waze Accident","Waze Jam","Waze Hazard On Shoulder","Waze Hazard On Road","EDT Fatals","EDT Crashes with Ped or Bike Involvement","EDT Crashes with School Bus Involvement","EDT Vehicle Counts")
+
+plotMonth(dt, loc, weekday, statistic, "Waze Accident")
+# plotMonth(dt, loc, weekday, statistic, "Waze Jam")
+# plotMonth(dt, loc, weekday, statistic, "Waze Hazard On Shoulder")
+# plotMonth(dt, loc, weekday, statistic, "Waze Hazard On Road")
+# plotMonth(dt, loc, weekday, statistic, "EDT Accident")
+# plotMonth(dt, loc, weekday, statistic, "EDT Fatals")
+# plotMonth(dt, loc, weekday, statistic, "EDT Crashes with Ped or Bike Involvement")
+# plotMonth(dt, loc, weekday, statistic, "EDT Crashes with School Bus Involvement")
+# plotMonth(dt, loc, weekday, statistic, "EDT Vehicle Counts")
+```
+
+### Time Series Plot by Day
+
+Use Camden Yards 3 mile buffer zone on Saturday as an example, the plot shows the total Waze accidents by day and the color represent the type of events. The shades are event period for however many special events available during all Saturdays of each month.
+
+```{r, fig.width=12, fig.height=12}
+loc = "SE2"
+buf = 3
+dt <- GridDataSE(loc,buf,alldays,col.names)
+weekday = "Saturday"
+statistic = "Total" #c("Total","Average","Maximum")
+metrics = "EDT Accident" #c("EDT Accident","Waze Accident","Waze Jam","Waze Hazard On Shoulder","Waze Hazard On Road")
+
+plotDate(dt, loc, weekday, statistic, "Waze Accident")
+# plotDate(dt, loc, weekday, statistic, "Waze Jam")
+# plotDate(dt, loc, weekday, statistic, "Waze Hazard On Shoulder")
+# plotDate(dt, loc, weekday, statistic, "Waze Hazard On Road")
+# plotDate(dt, loc, weekday, statistic, "EDT Accident")
+# plotDate(dt, loc, weekday, statistic, "EDT Fatals")
+# plotDate(dt, loc, weekday, statistic, "EDT Crashes with Ped or Bike Involvement")
+# plotDate(dt, loc, weekday, statistic, "EDT Crashes with School Bus Involvement")
+# plotDate(dt, loc, weekday, statistic, "EDT Vehicle Counts")
+```
+
