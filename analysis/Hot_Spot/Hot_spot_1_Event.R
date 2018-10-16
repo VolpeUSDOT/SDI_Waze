@@ -227,17 +227,33 @@ for(specialeventday in eventdays) { # specialeventday = eventdays[1]
   # Relies on kernel density estimation with MASS::kde2d
   # dd <- MASS::kde2d(x = ll$lon, y = ll$lat) # values are density per degree; would like convert this to 
   # dd.proj <- MASS::kde2d(x = ll.proj$lon, y = ll.proj$lat); contour(dd.proj)
+  breaks = seq(250, 2500, by = 100)
   
   map1 <- ggmap(map_toner_hybrid_14, extent = 'device') + 
-   # geom_density2d(data = ll, aes(x = lon, y = lat)) +
     stat_density2d(data = ll, aes(x = lon, y = lat,
                                   fill = ..level.., alpha = ..level..),
                    size = 0.01, bins = 8, geom = 'polygon')
   
   print(map1 + ggtitle(paste0("Waze event density ", specialeventday))  +
     scale_fill_gradient(low = "blue", high = "red", 
-                        guide_legend(title = "Event density")) +
+                        guide_legend(title = "Event density"),
+                        limits = range(breaks)) +
     scale_alpha(range = c(0.1, 0.8), guide = FALSE) )
+  
+  
+  # Waze mapped, accident only
+  acc.breaks = seq(100, 2500, by = 100)
+  map1.acc <- ggmap(map_toner_hybrid_14, extent = 'device') + 
+    stat_density2d(data = ll  %>% filter(alert_type == "ACCIDENT"), aes(x = lon, y = lat,
+                                  fill = ..level.., alpha = ..level..),
+                   size = 0.01, bins = 8, geom = 'polygon')
+  
+  print(map1.acc + ggtitle(paste0("Waze accident density ", specialeventday))  +
+          scale_fill_gradient(low = "blue", high = "red", 
+                              guide_legend(title = "Event density"),
+                              limits = range(acc.breaks)) +
+          scale_alpha(range = c(0.1, 0.8), guide = FALSE) )
+  
   
   # 2. Waze unmapped with points
   plot(dd, add = F, 
@@ -270,9 +286,23 @@ for(specialeventday in eventdays) { # specialeventday = eventdays[1]
     
   print(map2 + ggtitle(paste0("Waze event density ", specialeventday))  +
     scale_fill_gradient(low = "blue", high = "red", 
-                        guide_legend(title = "Event density")) +
+                        guide_legend(title = "Event density"),
+                        limits = range(breaks)) +
     scale_alpha(range = c(0.1, 0.8), guide = FALSE)  + guides(color = 
                                                                 guide_legend(order = 2, title = "Waze alert type")))
+  
+  
+  map2.acc = map1.acc + 
+    geom_point(data = ll %>% filter(alert_type == "ACCIDENT"), 
+               aes(x = lon, y = lat, color = alert_type), 
+               pch = "+", cex = 3, stroke = 2) 
+  
+  print(map2.acc + ggtitle(paste0("Waze accident density ", specialeventday))  +
+          scale_fill_gradient(low = "blue", high = "red", 
+                              guide_legend(title = "Accident density"),
+                              limits = range(acc.breaks)) +
+          scale_alpha(range = c(0.1, 0.8), guide = FALSE)  + guides(color = 
+                                                                      guide_legend(order = 2, title = "Waze alert type")))
   
   
   # 3. Same, with EDT points
@@ -315,8 +345,22 @@ for(specialeventday in eventdays) { # specialeventday = eventdays[1]
                pch = "+", cex = 6, stroke = 2, color = "midnightblue") 
   
   print(map3 + ggtitle(paste0("Waze event density ", specialeventday))  +
+          scale_fill_gradient(low = "blue", high = "red", 
+                              guide_legend(title = "Event density"),
+                              limits = range(breaks)) +
+          scale_alpha(range = c(0.1, 0.8), guide = FALSE)  + 
+          guides(color = guide_legend(order = 2, title = "Waze alert type")))
+  
+  # Mapped version
+  map3.acc = map2.acc + 
+    geom_point(data = ll.e, 
+               aes(x = lon, y = lat), 
+               pch = "+", cex = 6, stroke = 2, color = "midnightblue") 
+  
+  print(map3.acc + ggtitle(paste0("Waze accident density ", specialeventday))  +
     scale_fill_gradient(low = "blue", high = "red", 
-                        guide_legend(title = "Event density")) +
+                        guide_legend(title = "Accident density"),
+                        limits = range(acc.breaks)) +
     scale_alpha(range = c(0.1, 0.8), guide = FALSE)  + 
     guides(color = guide_legend(order = 2, title = "Waze alert type")))
   

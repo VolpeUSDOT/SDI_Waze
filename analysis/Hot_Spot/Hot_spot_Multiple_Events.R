@@ -52,9 +52,9 @@ e_i <- read.csv(file.path(edtdir, dir(edtdir)[grep(state, dir(edtdir))][1]),
 
 # find rows with missing lat/long
 # Discard rows with no lat long
-cat(i, "EDT missing lat/long, FALSE TRUE: \n", summary(is.na(e_i$GPSLat)), "\n")
+cat(state, "EDT missing lat/long, FALSE TRUE: \n", summary(is.na(e_i$GPSLat)), "\n")
 e_i <- e_i[!is.na(e_i$GPSLat) & !is.na(e_i$GPSLong),]
-cat(i, "EDT lat/long marked 777, FALSE TRUE NA: \n", summary(e_i$GPSLat > 77 & e_i$GPSLong < -777), "\n")
+cat(state, "EDT lat/long marked 777, FALSE TRUE NA: \n", summary(e_i$GPSLat > 77 & e_i$GPSLong < -777), "\n")
 e_i <- e_i[!e_i$GPSLat > 77 & !e_i$GPSLong < -777,]
 
 # Make sure just this state represented
@@ -76,67 +76,130 @@ e_i$CrashDate_Local <- with(e_i,
 
 # After compiling data frames, then carry out plotting.
 
-# (START HERE)
+specialeventloc = "SE1" # see levels(SpecialEvents$Location.ID)
 
+se.use = SpecialEvents %>% 
+  filter(Location.ID == specialeventloc & EventType != "NoEvent") 
 
-# By month
-load(file.path(wazedir, wazemonthfiles[grep(eventmo, wazemonthfiles)])) # load dataframe mb
-# Subset to event month
-eb <- e_i[format(e_i$CrashDate_Local, "%Y-%m") == eventmo,]
+se.use$Date = as.Date(as.character(se.use$Date), "%m/%d/%Y") 
 
+# Add comparison non-event days
 
-# Make both Waze and EDT spatial data frame, only picking out relevant columns
-w <- SpatialPointsDataFrame(mb[c("lon", "lat")], mb, 
-                            proj4string = CRS("+proj=longlat +datum=WGS84"))  # from monthbind of Waze data, make sure it is a SPDF
+non.event.df = vector()
 
-w <- spTransform(w, CRS(proj))
+for(i in 1:nrow(se.use)){ # i = 1
+  non.event.date = se.use$Date[i] + 7
 
-e <- SpatialPointsDataFrame(eb[c("GPSLong", "GPSLat")], eb, 
+  # Test to make sure we get a day non in the special events data or otherise in non-event data
+  if(length(non.event.df)==0){  
+    while(non.event.date %in% se.use$Date) {
+      non.event.date = non.event.date + 7
+    }  
+  } else {
+    while(non.event.date %in% se.use$Date | non.event.date %in% non.event.df$Date) {
+      non.event.date = non.event.date + 7
+    }  
+  }  
+  
+  non.event.row = se.use[i,]
+  non.event.row$Date = non.event.date
+  non.event.row$EventType = "NonEvent"
+  non.event.row[c("StartTime","EndTime","Duration","Attendance")] = NA
+  non.event.df= rbind(non.event.df, non.event.row)
+}
+
+# Compile special event and non events together
+se.use = rbind(se.use, non.event.df)
+se.use$Date.mo = format(se.use$Date, "%Y-%m")
+
+# format time variables
+se.use$DayofWeekN <- as.numeric(format(se.use$Date, format = "%u"))
+se.use$Day <- as.numeric(format(se.use$Date, format = "%j"))
+se.use$DayofWeek <- format(se.use$Date, format = "%A")
+
+# Empty objects to store output, will rbind at the end of loop
+waze.ll = waze.ll.proj = edt.ll = edt.ll.proj = vector()
+
+for(i in 1:nrow(se.use)){ # Start event day loop; i = 1
+  eventmo = se.use$Date.mo[i]
+  
+  specialeventday = se.use$Date[i]
+  
+  if(length(wazemonthfiles[grep(eventmo, wazemonthfiles)]) > 0){
+
+      load(file.path(wazedir, wazemonthfiles[grep(eventmo, wazemonthfiles)])) # load dataframe mb
+  
+  # Make both Waze and EDT spatial data frame, only picking out relevant columns. w and e are SPDF of Waze and EDT data, for this month
+  w <- SpatialPointsDataFrame(mb[c("lon", "lat")], mb, 
+                              proj4string = CRS("+proj=longlat +datum=WGS84"))  # from monthbind of Waze data, make sure it is a SPDF
+  
+  w <- spTransform(w, CRS(proj))
+  # Subset to area of interest only ---- 
+  zoomll = se.use %>% select(Lon, Lat)
+  zoomll = zoomll[!duplicated(zoomll),]
+  
+  zoomll = SpatialPointsDataFrame(zoomll[c("Lon", "Lat")], zoomll, 
+                         proj4string = CRS("+proj=longlat +datum=WGS84"))
+  
+  zoomll <- spTransform(zoomll, CRS(proj))
+  
+  zoom_box = gBuffer(zoomll, width = 4827) # 3 mile circle around FedEx field
+  
+  zoom_box.ll = spTransform(zoom_box, CRS("+proj=longlat +datum=WGS84")) # Back to lat long for mapping
+  
+  # Step through Waze data to clip to special event buffer and day
+  ws = gIntersects(zoom_box, w, byid = T)
+  ws = w[ws[,1] == TRUE,] # Make ws as a spatial points data frame of Waze events, for points intersecting the buffer, in this month
+  ws.ll = spTransform(ws, CRS("+proj=longlat +datum=WGS84")) # Back to lat long for mapping
+ 
+  # Get data frames for plotting. wp and ep are data.frames of ws and es, with projected coordinates
+  wp <- data.frame(ws.ll@data, lat = coordinates(ws)[,2], lon = coordinates(ws)[,1])
+  
+  # Now subset to just the day of interest
+  selector = format(wp$time, "%Y-%m-%d") == specialeventday
+  
+  ll <- data.frame(lat = coordinates(ws.ll)[,2][selector], lon = coordinates(ws.ll)[,1][selector], alert_type = ws.ll$alert_type[selector], time = ws.ll$time[selector])
+  
+  ll.proj <- data.frame(lat = coordinates(ws)[,2][selector], lon = coordinates(ws)[,1][selector], alert_type = ws$alert_type[selector], time = ws$time[selector])
+  
+  # Compile
+  waze.ll = rbind(waze.ll, ll)
+  waze.ll.proj = rbind(waze.ll.proj, ll.proj)
+ 
+  # EDT ----
+  # Subset to event month
+  eb <- e_i[format(e_i$CrashDate_Local, "%Y-%m") == eventmo,]
+  
+  if(nrow(eb) > 0){
+  e <- SpatialPointsDataFrame(eb[c("GPSLong", "GPSLat")], eb, 
                               proj4string = CRS("+proj=longlat +datum=WGS84"))  #  make sure EDT data is a SPDF
+  e <- spTransform(e, CRS(proj))
+  
+  es = gIntersects(zoom_box, e, byid = T)
+  es = e[es[,1] == TRUE,] # Make es as a spatial points data frame of EDT crashes, for points intersecting the buffer, in this month
+  
+  es.ll = spTransform(es, CRS("+proj=longlat +datum=WGS84")) # Back to lat long for mapping
+  
+  ep <- data.frame(es.ll@data, lat = coordinates(es)[,2], lon = coordinates(es)[,1])
+  
+  selector.e = format(ep$CrashDate_Local, "%Y-%m-%d") == specialeventday
+  
+  ll.e <- data.frame(lat = coordinates(es.ll)[,2][selector.e], lon = coordinates(es.ll)[,1][selector.e],
+                     es.ll[selector.e,])
+  
+  ll.e.proj <- data.frame(lat = coordinates(es)[,2][selector.e], lon = coordinates(es)[,1][selector.e],
+                          es.ll[selector.e,])
+  
+  # Compile
+  edt.ll = rbind(edt.ll, ll.e)
+  edt.ll.proj = rbind(edt.ll.proj, ll.e.proj)
+  } # end if nrow(eb > 0)
+  
+  }
 
-e <-spTransform(e, CRS(proj))
+} # End special events day loop
 
 
-# Process special events ----
-# See SpecialEventsAnalysis.R
-# format date
-SpecialEvents$Date <- as.Date(SpecialEvents$Date, format = "%m/%d/%Y")
-
-# format day of week
-SpecialEvents$DayofWeekN <- as.numeric(format(SpecialEvents$Date, format = "%u"))
-
-
-# Zoom in to event location
-
-
-# Check with a plot:
-plot(e, main = paste("EDT Waze Hot Spot overlay \n", state),
-     col = scales::alpha("grey20", 0.2))
-plot(w, add = T, col = scales::alpha("firebrick", 0.1))
-
-# Subset to area of interest only ---- 
-
-zoomll = SpecialEvents %>% filter(Location == 'Fedex Field') %>% select(Lon, Lat)
-zoomll = zoomll[!duplicated(zoomll),]
-
-zoomll = SpatialPointsDataFrame(zoomll[c("Lon", "Lat")], zoomll, 
-                       proj4string = CRS("+proj=longlat +datum=WGS84"))
-
-zoomll <- spTransform(zoomll, CRS(proj))
-
-zoom_box = gBuffer(zoomll, width = 4827) # 3 mile circle around FedEx field
-
-zoom_box.ll = spTransform(zoom_box, CRS("+proj=longlat +datum=WGS84")) # Back to lat long for mapping
-
-ws = gIntersects(zoom_box, w, byid = T)
-ws = w[ws[,1] == TRUE,] # Make ws as a spatial points data frame of Waze events, for points intersecting the buffer
-
-ws.ll = spTransform(ws, CRS("+proj=longlat +datum=WGS84")) # Back to lat long for mapping
-
-es = gIntersects(zoom_box, e, byid = T)
-es = e[es[,1] == TRUE,] # Make es as a spatial points data frame of EDT crashes, for points intersecting the buffer
-
-es.ll = spTransform(es, CRS("+proj=longlat +datum=WGS84")) # Back to lat long for mapping
 
 # Save for plotting (will need to expand filename if doing multiple special events in a month) 
 # w   Waze events for selected month and state, as spatial points data frame
@@ -146,84 +209,53 @@ es.ll = spTransform(es, CRS("+proj=longlat +datum=WGS84")) # Back to lat long fo
 # zoom_box  Bounding area for the geographic zoom
 # zoomll    Lat/long of special event location at center of bounding area
 
-# *.ll versions indicate represented as lat long instead of projected in Albers Equal Area; this makes mapping with ggmap more convenient for now.
+# *.ll versions indicate represented as lat long instead of projected in Albers Equal Area; this makes mapping with ggmap more convenient for now. *.proj is projected versions
 
 save(list = c("w", "e", "ws", "es", "zoom_box", "zoomll",
-             "ws.ll", "es.ll", "zoom_box.ll"),
-     file = file.path(localdir, "SpecialEvents", paste0(state, "_", eventmo, "_SpecialEvent.RData")))
+              "ws.ll", "es.ll",
+              "ll.proj", "edt.ll.proj", "zoom_box.ll"),
+     file = file.path(localdir, "SpecialEvents", 
+                      paste0(state, "_", 
+                             paste0(min(se.use$Date), "_to_", max(se.use$Date)),
+                             "_SpecialEvents.RData")))
 
+# Plotting ----
 
-# Start plotting ---- 
-pdf(file.path("Figures", "Hot_Spot_data_prep.pdf"), width = 8, height = 8)
-  plot(zoom_box, main = 'Zooming to FedEx field, September 2017', sub='3 mile buffer')
-  plot(ws, add =T, col = scales::alpha("grey20", 0.2))
-  plot(es, add =T, col = scales::alpha("firebrick", 0.9))
-  legend('topleft', pch = "+", col = c('black', 'red'), legend = c('Waze events', 'EDT crashes'))
-dev.off()
+# Get a map for plotting.
 
-# Get data frames for plotting 
-wp <- data.frame(ws.ll@data, lat = coordinates(ws)[,2], lon = coordinates(ws)[,1])
-ep <- data.frame(es.ll@data, lat = coordinates(es)[,2], lon = coordinates(es)[,1])
+if(length(grep(paste0(state, "_Basemaps"), dir(file.path(localdir, "SpecialEvents")))) == 0){
+  map_terrain_14 <- get_stamenmap(bbox = as.vector(bbox(zoom_box.ll)), maptype = 'terrain', zoom = 14)
+  map_toner_hybrid_14 <- get_stamenmap(bbox = as.vector(bbox(zoom_box.ll)), maptype = 'toner-hybrid', zoom = 14)
+  map_toner_14 <- get_stamenmap(bbox = as.vector(bbox(zoom_box.ll)), maptype = 'toner', zoom = 14)
+  save(list = c("map_terrain_14", "map_toner_hybrid_14", "map_toner_14"),
+       file = file.path(localdir, "SpecialEvents", paste0(state, "_Basemaps.RData")))
+} else { load(file.path(localdir, "SpecialEvents", paste0(state, "_Basemaps.RData"))) }
 
-# Get a map for plotting. Save as object "mm", which we will use for convertting lat longs into plottable points. Change to get_stamenmap 
-
-# map_terrain_15 <- get_stamenmap(bbox = as.vector(bbox(zoom_box.ll)), maptype = 'terrain', zoom = 15)
-map_terrain_14 <- get_stamenmap(bbox = as.vector(bbox(zoom_box.ll)), maptype = 'terrain', zoom = 14)
-map_toner_hybrid_14 <- get_stamenmap(bbox = as.vector(bbox(zoom_box.ll)), maptype = 'toner-hybrid', zoom = 14)
-map_toner_14 <- get_stamenmap(bbox = as.vector(bbox(zoom_box.ll)), maptype = 'toner', zoom = 14)
 
 # ggmap(map_terrain_14)
 # ggmap(map_toner_hybrid_14)
 # ggmap(map_toner_14)
 
-# 7981
-
-# Kernal density ----
-
-# Settings
-kern = "epanechnikov" #  "gaussian" # options to try: gaussian, epanechnikov, quartic and disc
-bwidth = 0.5 # betwen 0 and 1
 
 par.reset = par(no.readonly = T)
-eventdays = c("2017-09-10", "2017-09-17")
-
-# loop over event / nonevent days..
 
 fignames = vector() # to store name of .PDF files, for zipping and export
 
+# First, make a combined heat map for all event day, all non-event days, and the difference.
+figname = file.path(localdir, 'Figures', paste0(state, "_Combined_Special_Event_Hot_Spot.pdf"))
 
-for(specialeventday in eventdays) { # specialeventday = eventdays[1]
-  selector = format(wp$time, "%Y-%m-%d") == specialeventday
-  selector.e = format(ep$CrashDate_Local, "%Y-%m-%d") == specialeventday
+
+
+
+# Second, plot individual event / nonevent day pairs.
+
+
+figname = file.path(localdir, 'Figures', paste0("Special_Event_Hot_Spot_", specialeventday,".pdf"))
+pdf(figname, height = 10, width = 10)
+
+for(specialeventday in se.use$Date) { # specialeventday = se.use$Date[1]
   
-  ll <- data.frame(lat = coordinates(ws.ll)[,2][selector], lon = coordinates(ws.ll)[,1][selector], 
-                   alert_type = ws.ll$alert_type[selector])
-  ll.proj <- data.frame(lat = coordinates(ws)[,2][selector], lon = coordinates(ws)[,1][selector])
-  
-  ll.e <- data.frame(lat = coordinates(es.ll)[,2][selector.e], lon = coordinates(es.ll)[,1][selector.e])
-  
-  # See ?kde. Normal kernel is default
-  dl <- data.frame(ll$lon, ll$lat)
-  dd <- kde(x = dl,
-            H = Hscv(dl),
-            adj.positive = 0.25)
-  
-  
-  dl <- data.frame(ll.e$lon, ll.e$lat)
-  dd.e <- kde(x = dl,
-              H = Hscv(dl),
-              adj.positive = 0.25)
-  
-  figname = file.path(localdir, 'Figures', paste0("Special_Event_Hot_Spot_", specialeventday,".pdf"))
-  pdf(figname, height = 10, width = 10)
-  
-  # 1. Waze unmapped
-  plot(dd, add = F, 
-       drawpoints = F,
-       display = "filled.contour",
-       pch = "+",
-       main = paste("Waze hot spot unmapped", specialeventday))
-  
+  # 1. 
   # Waze mapped. 
   # Relies on kernel density estimation with MASS::kde2d
   # dd <- MASS::kde2d(x = ll$lon, y = ll$lat) # values are density per degree; would like convert this to 
@@ -240,30 +272,7 @@ for(specialeventday in eventdays) { # specialeventday = eventdays[1]
                         guide_legend(title = "Event density")) +
     scale_alpha(range = c(0.1, 0.8), guide = FALSE) )
   
-  # 2. Waze unmapped with points
-  plot(dd, add = F, 
-       drawpoints = T,
-       display = "filled.contour",
-       pch= "+",
-       col.pt = scales::alpha("grey20", 0.3),
-       main = paste("Special Event",  specialeventday)
-  )
-  
-  # Get the contour levels
-  levs <- contourLevels(dd, prob = seq(0, 1, by = 0.25))
-  contcut <- cut(dd$cont, breaks = levs)
-  # select the first instance of each contour level
-  colordf <- data.frame(contcut, heat.colors(99))
-  legcol <- colordf[!duplicated(colordf[,1]),]
-  
-  legend("topleft",
-         title = "Waze Density (points per m2)",
-         legend = legcol$contcut,
-         fill = as.character(legcol$heat.colors.99))
-  
-  # Pixel values are estimated intensity values, expressed in "points per unit area".
-  
-  # Mapped version
+  # 2. Waze with points 
   map2 = map1 + 
               geom_point(data = ll, 
                          aes(x = lon, y = lat, color = alert_type), 
@@ -277,39 +286,6 @@ for(specialeventday in eventdays) { # specialeventday = eventdays[1]
   
   
   # 3. Same, with EDT points
-  
-  plot(dd, add = F, 
-       drawpoints = T,
-       display = "filled.contour",
-       pch= "+",
-       col.pt = scales::alpha("grey20", 0.3),
-       main = specialeventday
-  )
-  
-  points(dd.e$x,
-         pch= "+",
-         col = "blue", cex = 1.5)
-  
-  
-  # Get the contour levels
-  levs <- contourLevels(dd, prob = seq(0, 1, by = 0.25))
-  contcut <- cut(dd$cont, breaks = levs)
-  # select the first instance of each contour level
-  colordf <- data.frame(contcut, heat.colors(99))
-  legcol <- colordf[!duplicated(colordf[,1]),]
-  
-  legend("topleft",
-         title = "Waze Density",
-         legend = legcol$contcut,
-         fill = as.character(legcol$heat.colors.99))
-  
-  legend("topright",
-         title = "EDT",
-         legend = 'EDT Crash',
-         pch = "+", pt.cex = 1.5,
-         col = "blue")
-  
-  # Mapped version
   map3 = map2 + 
     geom_point(data = ll.e, 
                aes(x = lon, y = lat), 
@@ -322,68 +298,7 @@ for(specialeventday in eventdays) { # specialeventday = eventdays[1]
     guides(color = guide_legend(order = 2, title = "Waze alert type")))
   
   
-  # 4. EDT points and EDT hotspot
-  
-  # plot(dd, add = F, 
-  #      drawpoints = T,
-  #      display = "filled.contour",
-  #      pch= "+",
-  #      col.pt = scales::alpha("grey20", 0.3),
-  #      main = specialeventday
-  # )
-  # 
-  # plot(dd.e, add = T, 
-  #      drawpoints = F,
-  #      display = "filled.contour")
-  # points(dd.e$x,
-  #        pch= "+",
-  #        col = "blue", cex = 1.5)
-  # 
-  # 
-  # # Get the contour levels
-  # levs <- contourLevels(dd, prob = seq(0, 1, by = 0.25))
-  # contcut <- cut(dd$cont, breaks = levs)
-  # # select the first instance of each contour level
-  # colordf <- data.frame(contcut, heat.colors(99))
-  # legcol <- colordf[!duplicated(colordf[,1]),]
-  # 
-  # legend("topleft",
-  #        title = "Waze Density",
-  #        legend = legcol$contcut,
-  #        fill = as.character(legcol$heat.colors.99))
-  # 
-  # levs <- contourLevels(dd.e, prob = seq(0, 1, by = 0.25))
-  # contcut <- cut(dd.e$cont, breaks = levs)
-  # # select the first instance of each contour level
-  # colordf <- data.frame(contcut, heat.colors(99))
-  # legcol <- colordf[!duplicated(colordf[,1]),]
-  # 
-  # legend("topright",
-  #        title = "EDT Density",
-  #        legend = legcol$contcut,
-  #        fill = as.character(legcol$heat.colors.99))
-  # 
-  # 
-  # # Mapped version
-  # # Mapped version
-  # map4 = map3 + 
-  #   stat_density2d(data = ll.e, aes(x = lon, y = lat,
-  #                                 fill = ..level.., alpha = ..level..),
-  #                  size = 0.01, bins = 8, geom = 'polygon')
-  # 
-  # map4 + ggtitle(paste0("Waze event density ", specialeventday))  +
-  #   scale_fill_gradient(low = "blue", high = "red", 
-  #                       guide_legend(title = "Event density")) +
-  #   scale_alpha(range = c(0.1, 0.8), guide = FALSE)  + 
-  #   guides(color = guide_legend(order = 2, title = "Waze alert type"))
-  # 
-  # 
-  # 5. Difference of hot spots: TO DO
-  
-  # dd.diff = dd - dd.e    S
-  
-  
-  dev.off()
+   dev.off()
   
   
   # Save output
@@ -401,7 +316,7 @@ teambucket <- "s3://prod-sdc-sdi-911061262852-us-east-1-bucket"
 # Get figs and files to export
 
 
-zipname = paste0('Hot_Spot_Mapping_', paste(range(eventdays), collapse="_to_"), "__", Sys.Date(), '.zip')
+zipname = paste0('Hot_Spot_Mapping_Multiple_', paste(range(eventdays), collapse="_to_"), "__", Sys.Date(), '.zip')
 
 system(paste('zip -j', file.path('~/workingdata', zipname),
              fignames)
@@ -413,81 +328,5 @@ system(paste(
   file.path(teambucket, 'export_requests', zipname)
 ))
 
-
-# Difference between intensities ----
-# To do
-# 
-# selector = format(wp$time, "%p") == "AM" #  AM/PM 
-# ll <- LatLon2XY.centered(mm, lat = coordinates(d)[,2][selector], lon = coordinates(d)[,1][selector])
-# dp <- ppp(ll$newX, ll$newY, window = pwin)
-# dd.am <- density(dp, kernel = kern, adjust = bwidth, edge = T)
-# 
-# selector = format(wp$time, "%p") == "PM" # AM/PM 
-# ll <- LatLon2XY.centered(mm, lat = coordinates(d)[,2][selector], lon = coordinates(d)[,1][selector])
-# dp <- ppp(ll$newX, ll$newY, window = pwin)
-# dd.pm <- density(dp, kernel = kern, adjust = bwidth, edge = T)
-# 
-# dd.diff <- dd.pm - dd.am
-# 
-# par(par.reset)
-# plot(dd.diff, main = paste("PM - AM densities \n", kern, bwidth))
-# dev.print(device = png, 
-#           width = 600,
-#           height = 600,
-#           file = paste0(paste("Unmapped_PM-AM", kern, bwidth, sep = "_"), ".png"))
-
-
-# titleloc <- XY2LatLon(mm, 2.221, 277.31) # use locator() to find where to put title
-# TextOnStaticMap(mm, lat = titleloc[1], lon = titleloc[2], 
-#                 paste(dataset, kern, bwidth), 
-#                 add = T, pch = 2,
-#                 font = 2)
-
-
-# Using ppp version ----
-
-# 
-# 
-# dp <- ppp(ll$newX, ll$newY, window = pwin) # warning about duplicate points, double-check to make sure these are true duplicates
-# 
-# # See ?density.ppp
-# dd <- density(dp,
-#               kernel = kern,
-#               adjust = bwidth, # use this to change the bandwidth
-#               edge = T, # adjustment for edge of observation window, recommend T
-#               at = "pixels") # change to "points" to get the density exactly for each point
-# 
-# # Define the color map:
-# # make color map with increasing transparency at lower range
-# coln = 3*25 # make it divisible by 3 for following steps
-# col1 = rev(heat.colors(coln, alpha = 0.2))
-# col2 = rev(heat.colors(coln, alpha = 0.8))
-# col3 = rev(heat.colors(coln, alpha = 0.9))
-# 
-# col4 = c(col1[1:coln/3], col2[(coln/3+1):(2*coln/3)], col3[(1+2*coln/3):coln])
-# 
-# pc <- colourmap(col = col4, 
-#                 range = range(dd))
-# 
-# 
-# # Plotting ----
-# mm <- plotmap(lat = dc$lat, lon = dc$lon,
-#               pch = "+",
-#               cex = 0.8,
-#               col = alpha("grey20", 0.05),
-#               maptype = "roadmap")
-# plot(dd, add = T, col = pc)
-# 
-# # Get the contour levels
-# levs <- quantile(dd, c(0.85, 0.95, 0.99, 1))
-# # select the color for of each contour level
-# legcol <- pc(levs)
-# 
-# # Pixel values are estimated intensity values, expressed in "points per unit area".
-# 
-# legend("topleft",
-#        title = "Density",
-#        legend = round(levs, 4),
-#        fill = legcol)
 
 
