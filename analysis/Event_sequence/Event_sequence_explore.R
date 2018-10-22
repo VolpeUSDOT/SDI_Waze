@@ -10,10 +10,10 @@
 
 ## Load libraries
 library(tidyverse) # tidyverse install on SDC may require additional steps, see Package Installation Notes.Rmd 
-# library(aws.s3)
 library(lubridate)
 library(doParallel)
 library(foreach)
+library(sp)
 
 # Location of SDC SDI Waze team S3 bucket. Files will first be written to a temporary directory in this EC2 instance, then copied to the team bucket.
 teambucket <- "s3://prod-sdc-sdi-911061262852-us-east-1-bucket"
@@ -30,11 +30,6 @@ source(file.path(codeloc, 'utility/wazefunctions.R'))
 # Make connection to Redshift. Requires packages DBI and RPostgres entering username and password if prompted:
 
 source(file.path(codeloc, 'utility/connect_redshift_pgsql.R'))
-
-
-## uncomment these lines and run with user redshift credentials filled in to resolve error if above line throws one.
-# Sys.setenv('sdc_waze_username' = <see email from SDC Administrator>) 
-# Sys.setenv('sdc_waze_password' = <see email from SDC Administrator>)
 
 
 # Query parameters
@@ -99,7 +94,7 @@ my.acc <- filter(ct.data, alert_type=="ACCIDENT")
 
     
 ## build counts for "close" events in space
-library(sp)
+
 
 ## array elements too large in vectorized form.
 ## Distance matrix and HACM impractical (also too greedy)
@@ -118,6 +113,9 @@ dist.match <- function(pt){
 # distance clusters
 temp.dist <- apply(as.matrix(my.acc[,c(20,19)], nrow=nrow(my.acc), ncol=2), 1, dist.match)
 
+timediff = Sys.time() - starttime
+cat(rount(timediff, 2), attr(timediff, 'units'), 'elapsed for spatial distance calcuation \n')
+
 ## Time comparison between each accident and all other points (will include self)
 time.match <- function(pt){
   # difftime = time1 - time2
@@ -127,6 +125,9 @@ which(temp.time < 1 & temp.time >= 0) # keep antecedents within 1hr
 
 # time clusters
 time.matches <- apply(as.data.frame(my.acc[,c("pub_utc_timestamp")]), 1, time.match)
+
+timediff = Sys.time() - starttime
+cat(rount(timediff, 2), attr(timediff, 'units'), 'elapsed for time distance calcuation \n')
 
 # intersect IDs from distance and time clusters
 my.matches <- list()
@@ -192,6 +193,24 @@ weather.vis <- c("HAZARD_WEATHER_FOG", "HAZARD_WEATHER_HEAVY_RAIN", "HAZARD_WEAT
 weather.surf <- c("HAZARD_WEATHER_FREEZING_RAIN", "HAZARD_WEATHER_HEAVY_SNOW",
                   "HAZARD_WEATHER_HEAVY_RAIN")
 
+# Save to S3
+# Amend this when figure out all the objects to keep
+
+zipname = paste0('CT_Event_Sequence_Data_Prep_', Sys.Date(), '.zip')
+
+system(paste('zip -j', file.path('~/workingdata', zipname),
+             file.path(localdir, "space.time.match.CT.Rdata"),
+             file.path(localdir, "data.clusters.CT.Rdata"),
+             file.path(localdir, "street.clusters.CT.Rdata")
+             )
+)
+
+
+system(paste(
+  'aws s3 cp',
+  file.path('~/workingdata', zipname),
+  file.path(teambucket, 'SpecialEvents', zipname)
+))
 
 
 
@@ -266,12 +285,15 @@ hist(as.numeric(lapply(final.list, nrow)))
 ########################################################################################################
 ## Scraps from other code for reference
 
+SCRATCH  = F
+
+if(SCRATCH){
     # Copy to S3
     system(paste("aws s3 cp",
                  file.path(output.loc, fn),
                  file.path(teambucket, i, fn)))
     
-  }
+  
 
   # Set up cluster. 
   avail.cores <- parallel::detectCores()
@@ -279,5 +301,5 @@ hist(as.numeric(lapply(final.list, nrow)))
   cl <- makeCluster(avail.cores) 
   registerDoParallel(cl)
   
-
+}
 
