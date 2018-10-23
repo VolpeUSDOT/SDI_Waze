@@ -23,14 +23,10 @@ user <- paste0( "/home/", system("whoami", intern = TRUE)) #he user directory to
 output.loc <- paste0(user, "/tempout")
 
 localdir <- paste0(user, "/workingdata/") # full path for dumping intermediate outputs
+codeloc <- "~/SDI_Waze"
 
 # read functions from utility files (just in case)
 source(file.path(codeloc, 'utility/wazefunctions.R'))
-
-# Make connection to Redshift. Requires packages DBI and RPostgres entering username and password if prompted:
-
-source(file.path(codeloc, 'utility/connect_redshift_pgsql.R'))
-
 
 # Query parameters
 # states with available EDT data for model testing
@@ -59,9 +55,17 @@ yearmonths.end <- paste(yearmonths, lastdays, sep="-")
 
 starttime <- Sys.time()
 
+
 ############# Get Waze data for states
 ## Keep only CT at this point
 i = 'CT'
+
+PREPNEW = F # Flag for preparing new data from scratch, or reading from already prepared data. 
+
+if(PREPNEW) {  
+  
+  # Make connection to Redshift. Requires packages DBI and RPostgres entering username and password if prompted:
+  source(file.path(codeloc, 'utility/connect_redshift_pgsql.R'))
   
   # read data by state, across all query months for processing
   
@@ -93,8 +97,7 @@ ct.data <- filter(ct.data, is.na(street)==FALSE)
 my.acc <- filter(ct.data, alert_type=="ACCIDENT")
 
     
-## build counts for "close" events in space
-
+save(list = c("ct.data", "my.acc"), file = file.path(localdir, "CT_Event_Sequence.RData"))
 
 ## array elements too large in vectorized form.
 ## Distance matrix and HACM impractical (also too greedy)
@@ -114,7 +117,7 @@ dist.match <- function(pt){
 temp.dist <- apply(as.matrix(my.acc[,c(20,19)], nrow=nrow(my.acc), ncol=2), 1, dist.match)
 
 timediff = Sys.time() - starttime
-cat(rount(timediff, 2), attr(timediff, 'units'), 'elapsed for spatial distance calcuation \n')
+cat(round(timediff, 2), attr(timediff, 'units'), 'elapsed for spatial distance calcuation \n')
 
 ## Time comparison between each accident and all other points (will include self)
 time.match <- function(pt){
@@ -127,7 +130,7 @@ which(temp.time < 1 & temp.time >= 0) # keep antecedents within 1hr
 time.matches <- apply(as.data.frame(my.acc[,c("pub_utc_timestamp")]), 1, time.match)
 
 timediff = Sys.time() - starttime
-cat(rount(timediff, 2), attr(timediff, 'units'), 'elapsed for time distance calcuation \n')
+cat(round(timediff, 2), attr(timediff, 'units'), 'elapsed for time distance calcuation \n')
 
 # intersect IDs from distance and time clusters
 my.matches <- list()
@@ -157,7 +160,51 @@ for(i in 1:length(list.keep)){
   list.keep.street[[i]]["cluster.root"] <- ifelse(as.data.frame(list.keep.street[[i]]["alert_uuid"]) == my.acc$alert_uuid[i], 1, 0)
 }
 streets.size <- lapply(list.keep.street, nrow)
-save(list.keep.street, file = paste(localdir, "street.clusters.CT.Rdata", sep=""))
+save(list = c("list.keep.street","streets.size"), file = paste(localdir, "street.clusters.CT.Rdata", sep=""))
+
+
+# Save to S3
+# Amend this when figure out all the objects to keep
+# to add: ct.data, my.acc
+
+zipname = paste0('CT_Event_Sequence_Data_Prep_', Sys.Date(), '.zip')
+
+system(paste('zip -j', file.path('~/workingdata', zipname),
+             file.path(localdir, "space.time.match.CT.Rdata"),
+             file.path(localdir, "data.clusters.CT.Rdata"),
+             file.path(localdir, "street.clusters.CT.Rdata"),
+             file.path(localdir, "CT_Event_Sequence.RData")
+             )
+)
+
+
+system(paste(
+  'aws s3 cp',
+  file.path('~/workingdata', zipname),
+  file.path(teambucket, 'SpecialEvents', zipname)
+))
+
+} else { # End prep new if statement
+
+  zipname = dir(localdir)[grep("CT_Event_Sequence_Data_Prep_", dir(localdir))]
+  
+  if(length(zipname)== 0){
+    zipname = "CT_Event_Sequence_Data_Prep_2018-10-23.zip"
+    system(paste("aws s3 cp",
+                 file.path(teambucket, 'SpecialEvents', zipname),
+                 file.path('~', 'workingdata', zipname)))
+  }
+  
+  system(paste('unzip -o', file.path(localdir, zipname), '-d',
+         file.path(localdir, "SpecialEvents"))) # Unzip to SpecialEvents directory
+
+  load(file.path(localdir, 'SpecialEvents', 'space.time.match.CT.Rdata'))
+  load(file.path(localdir, 'SpecialEvents', 'data.clusters.CT.Rdata'))
+  load(file.path(localdir, 'SpecialEvents', 'street.clusters.CT.Rdata'))
+}
+
+################################################################################################################
+
 
 
 ## plot number of antecedents for each accident
@@ -193,29 +240,6 @@ weather.vis <- c("HAZARD_WEATHER_FOG", "HAZARD_WEATHER_HEAVY_RAIN", "HAZARD_WEAT
 weather.surf <- c("HAZARD_WEATHER_FREEZING_RAIN", "HAZARD_WEATHER_HEAVY_SNOW",
                   "HAZARD_WEATHER_HEAVY_RAIN")
 
-# Save to S3
-# Amend this when figure out all the objects to keep
-
-zipname = paste0('CT_Event_Sequence_Data_Prep_', Sys.Date(), '.zip')
-
-system(paste('zip -j', file.path('~/workingdata', zipname),
-             file.path(localdir, "space.time.match.CT.Rdata"),
-             file.path(localdir, "data.clusters.CT.Rdata"),
-             file.path(localdir, "street.clusters.CT.Rdata")
-             )
-)
-
-
-system(paste(
-  'aws s3 cp',
-  file.path('~/workingdata', zipname),
-  file.path(teambucket, 'SpecialEvents', zipname)
-))
-
-
-
-################################################################################################################
- 
 ## Identify alerts after accidents
 
 ## Time window for one hour after accidents in my.acc
