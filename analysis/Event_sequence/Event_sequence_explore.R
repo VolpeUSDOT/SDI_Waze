@@ -307,6 +307,8 @@ summary(as.numeric(lapply(follow.list, nrow))-1)
 ### Summarize frequencies
 length(list.keep.post)
 
+# ! missing 'final.list' and 'final.list.post'
+
 ## after accidents
 hist(as.numeric(lapply(final.list.post, nrow)))
 
