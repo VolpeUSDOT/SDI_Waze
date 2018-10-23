@@ -201,6 +201,8 @@ system(paste(
   load(file.path(localdir, 'SpecialEvents', 'space.time.match.CT.Rdata'))
   load(file.path(localdir, 'SpecialEvents', 'data.clusters.CT.Rdata'))
   load(file.path(localdir, 'SpecialEvents', 'street.clusters.CT.Rdata'))
+  load(file.path(localdir, 'SpecialEvents', 'CT_Event_Sequence.RData'))
+  
 }
 
 ################################################################################################################
