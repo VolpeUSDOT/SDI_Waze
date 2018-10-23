@@ -163,85 +163,6 @@ streets.size <- lapply(list.keep.street, nrow)
 save(list = c("list.keep.street","streets.size"), file = paste(localdir, "street.clusters.CT.Rdata", sep=""))
 
 
-# Save to S3
-# Amend this when figure out all the objects to keep
-# to add: ct.data, my.acc
-
-zipname = paste0('CT_Event_Sequence_Data_Prep_', Sys.Date(), '.zip')
-
-system(paste('zip -j', file.path('~/workingdata', zipname),
-             file.path(localdir, "space.time.match.CT.Rdata"),
-             file.path(localdir, "data.clusters.CT.Rdata"),
-             file.path(localdir, "street.clusters.CT.Rdata"),
-             file.path(localdir, "CT_Event_Sequence.RData")
-             )
-)
-
-
-system(paste(
-  'aws s3 cp',
-  file.path('~/workingdata', zipname),
-  file.path(teambucket, 'SpecialEvents', zipname)
-))
-
-} else { # End prep new if statement
-
-  zipname = dir(localdir)[grep("CT_Event_Sequence_Data_Prep_", dir(localdir))]
-  
-  if(length(zipname)== 0){
-    zipname = "CT_Event_Sequence_Data_Prep_2018-10-23.zip"
-    system(paste("aws s3 cp",
-                 file.path(teambucket, 'SpecialEvents', zipname),
-                 file.path('~', 'workingdata', zipname)))
-  }
-  
-  system(paste('unzip -o', file.path(localdir, zipname), '-d',
-         file.path(localdir, "SpecialEvents"))) # Unzip to SpecialEvents directory
-
-  load(file.path(localdir, 'SpecialEvents', 'space.time.match.CT.Rdata'))
-  load(file.path(localdir, 'SpecialEvents', 'data.clusters.CT.Rdata'))
-  load(file.path(localdir, 'SpecialEvents', 'street.clusters.CT.Rdata'))
-  load(file.path(localdir, 'SpecialEvents', 'CT_Event_Sequence.RData'))
-  
-}
-
-################################################################################################################
-
-
-
-## plot number of antecedents for each accident
-hist(as.numeric(streets.size) - 1, freq=F) # removes self
-# 32% of accidents have no antecedents within 1 mi. and 1 hr. on same street
-
-## build sublist of accidents without antecedents
-lone.vec <- as.numeric(lapply(list.keep.street, function(x) nrow(x)))
-## no antecedents
-loner.list <- list.keep.street[which(lone.vec==1)]
-# accidents with at least one antecedent
-ants.list <- list.keep.street[which(lone.vec!=1)]
-summary(as.numeric(lapply(ants.list, nrow))-1)
-
-## sample metrics
-metrics.frame <- data.frame(matrix(NA, nrow=length(list.keep.street), ncol=0))
-metrics.frame$Jam <- as.numeric(lapply(list.keep.street, function(x) length(which(x$alert_type=="JAM"))))
-metrics.frame$road.closed <- as.numeric(lapply(list.keep.street, function(x) length(which(x$alert_type=="ROAD_CLOSED"))))
-metrics.frame$weather <- as.numeric(lapply(list.keep.street, function(x) length(which(x$alert_type=="WEATHERHAZARD"))))
-boxplot(metrics.frame)
-
-## drill down into alert sub types
-# build groups - not fully disjoint
-
-## road conditions/access
-road.hazards <- c("HAZARD_ON_ROAD", "HAZARD_ON_ROAD_CAR_STOPPED", "HAZARD_ON_SHOULDER_ANIMALS")
-
-# visibility limitations
-weather.vis <- c("HAZARD_WEATHER_FOG", "HAZARD_WEATHER_HEAVY_RAIN", "HAZARD_WEATHER_HEAVY_SNOW",
-                 "HAZARD_WEATHER_MONSSON")
-
-# degredation of road surface - ice, snow, floods
-weather.surf <- c("HAZARD_WEATHER_FREEZING_RAIN", "HAZARD_WEATHER_HEAVY_SNOW",
-                  "HAZARD_WEATHER_HEAVY_RAIN")
-
 ## Identify alerts after accidents
 
 ## Time window for one hour after accidents in my.acc
@@ -285,6 +206,94 @@ streets.size <- lapply(list.keep.street.post, nrow)
 
 #final.size.post <- lapply(final.list.post, nrow)
 save(list.keep.street.post, file=paste(localdir, "final.clusters.CT.post.Rdata", sep=""))
+
+# Save entire working environment in one RData file now, to make sure all necessary objects are preserved
+
+save(list = ls(), 
+     file = file.path(localdir, "CT_Event_Sequence_Data_Prep.RData")
+     )
+
+# Save to S3
+# Amend this when figure out all the objects to keep
+# to add: ct.data, my.acc
+
+
+zipname = paste0('CT_Event_Sequence_Data_Prep_', Sys.Date(), '.zip')
+
+system(paste('zip -j', file.path('~/workingdata', zipname),
+             file.path(localdir, "CT_Event_Sequence_Data_Prep.RData")
+             # file.path(localdir, "space.time.match.CT.Rdata"),
+             # file.path(localdir, "data.clusters.CT.Rdata"),
+             # file.path(localdir, "street.clusters.CT.Rdata"),
+             # file.path(localdir, "CT_Event_Sequence.RData")
+             )
+)
+
+
+system(paste(
+  'aws s3 cp',
+  file.path('~/workingdata', zipname),
+  file.path(teambucket, 'SpecialEvents', zipname)
+))
+
+} else { # End prep new if statement
+
+  zipname = dir(localdir)[grep("CT_Event_Sequence_Data_Prep_", dir(localdir))]
+  
+  if(length(zipname)== 0){
+    zipname = "CT_Event_Sequence_Data_Prep_2018-10-23.zip"
+    system(paste("aws s3 cp",
+                 file.path(teambucket, 'SpecialEvents', zipname),
+                 file.path('~', 'workingdata', zipname)))
+  }
+  
+  system(paste('unzip -o', file.path(localdir, zipname), '-d',
+         file.path(localdir, "SpecialEvents"))) # Unzip to SpecialEvents directory
+
+  load(file.path(localdir, 'SpecialEvents', "CT_Event_Sequence_Data_Prep.RData"))
+  # load(file.path(localdir, 'SpecialEvents', 'space.time.match.CT.Rdata'))
+  # load(file.path(localdir, 'SpecialEvents', 'data.clusters.CT.Rdata'))
+  # load(file.path(localdir, 'SpecialEvents', 'street.clusters.CT.Rdata'))
+  # load(file.path(localdir, 'SpecialEvents', 'CT_Event_Sequence.RData'))
+  
+}
+
+################################################################################################################
+
+
+
+## plot number of antecedents for each accident
+hist(as.numeric(streets.size) - 1, freq=F) # removes self
+# 32% of accidents have no antecedents within 1 mi. and 1 hr. on same street
+
+## build sublist of accidents without antecedents
+lone.vec <- as.numeric(lapply(list.keep.street, function(x) nrow(x)))
+## no antecedents
+loner.list <- list.keep.street[which(lone.vec==1)]
+# accidents with at least one antecedent
+ants.list <- list.keep.street[which(lone.vec!=1)]
+summary(as.numeric(lapply(ants.list, nrow))-1)
+
+## sample metrics
+metrics.frame <- data.frame(matrix(NA, nrow=length(list.keep.street), ncol=0))
+metrics.frame$Jam <- as.numeric(lapply(list.keep.street, function(x) length(which(x$alert_type=="JAM"))))
+metrics.frame$road.closed <- as.numeric(lapply(list.keep.street, function(x) length(which(x$alert_type=="ROAD_CLOSED"))))
+metrics.frame$weather <- as.numeric(lapply(list.keep.street, function(x) length(which(x$alert_type=="WEATHERHAZARD"))))
+boxplot(metrics.frame)
+
+## drill down into alert sub types
+# build groups - not fully disjoint
+
+## road conditions/access
+road.hazards <- c("HAZARD_ON_ROAD", "HAZARD_ON_ROAD_CAR_STOPPED", "HAZARD_ON_SHOULDER_ANIMALS")
+
+# visibility limitations
+weather.vis <- c("HAZARD_WEATHER_FOG", "HAZARD_WEATHER_HEAVY_RAIN", "HAZARD_WEATHER_HEAVY_SNOW",
+                 "HAZARD_WEATHER_MONSSON")
+
+# degredation of road surface - ice, snow, floods
+weather.surf <- c("HAZARD_WEATHER_FREEZING_RAIN", "HAZARD_WEATHER_HEAVY_SNOW",
+                  "HAZARD_WEATHER_HEAVY_RAIN")
 
 
 ## no followers
