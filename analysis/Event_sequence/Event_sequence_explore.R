@@ -295,6 +295,21 @@ weather.vis <- c("HAZARD_WEATHER_FOG", "HAZARD_WEATHER_HEAVY_RAIN", "HAZARD_WEAT
 weather.surf <- c("HAZARD_WEATHER_FREEZING_RAIN", "HAZARD_WEATHER_HEAVY_SNOW",
                   "HAZARD_WEATHER_HEAVY_RAIN")
 
+### Build relative distance and time from each record to cluster root
+for(dex in 1:length(list.keep.street)){
+  # dex <- 1
+  list.keep.street[[dex]]$root.dist <- spDistsN1(as.matrix(list.keep.street[[dex]][,c(20,19)]), 
+                              as.matrix(list.keep.street[[dex]][which(list.keep.street[[dex]]$cluster.root==1), c(20,19)]), 
+                              longlat=TRUE)*0.6213712
+  
+  ## Build time from cluster root (in minutes)
+  list.keep.street[[dex]]$root.time <- difftime(list.keep.street[[dex]]$pub_utc_timestamp[which(list.keep.street[[dex]]$cluster.root==1)],
+                                                list.keep.street[[dex]]$pub_utc_timestamp, units="mins")
+  
+} # end for loop that builds relative distances (space, time) in each cluster
+
+
+
 
 ## no followers
 ## build sublist of accidents without antecedents
