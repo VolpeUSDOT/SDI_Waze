@@ -260,10 +260,24 @@ system(paste(
 
 ################################################################################################################
 
+### Investigate major roads for singletons
+major.roads <- c("I-95 N", "I-95 S", "I-84 E", "I-84 W", "I-91 S", "I-91 N", 
+                 "Merrit Pkwy N", "Merrit Pkwy S", "Wilbur Cross Pkwy S", "Wilbur Cross Pkwy N",
+                 "State Rte 8 N", "State Rte 8 S", "State Rte 9 N", "SR-2 W", "I-395 N",
+                 "SR-2 E", "State Rte 9 S", "I-395 S", "I-684 N", "I-691 E", "I-691 W", 
+                 "State Rte 15 S", "SR-8 S", "Berlin Tpke", "US-7 S", "State Rte 15 N", "US-7 N",
+                 "I-384 W", "I-291 W")
+
+for(dex in 1:length(list.keep.str)){
+  list.keep.street[[dex]]$major.road <- (list.keep.street[[dex]]$street %in% major.roads)*1 
+}
+
 
 
 ## plot number of antecedents for each accident
 hist(as.numeric(streets.size) - 1, freq=F) # removes self
+
+
 # 32% of accidents have no antecedents within 1 mi. and 1 hr. on same street
 
 ## build sublist of accidents without antecedents
@@ -273,6 +287,11 @@ loner.list <- list.keep.street[which(lone.vec==1)]
 # accidents with at least one antecedent
 ants.list <- list.keep.street[which(lone.vec!=1)]
 summary(as.numeric(lapply(ants.list, nrow))-1)
+
+## consider frequency of accidents preceding accidents
+length(loner.list) # 10385 singletons, .315
+acc.antecedent <- as.numeric(lapply(ants.list, function(x) length(which(x$alert_type=="ACCIDENT"))))
+length(which(acc.antecedent > 1)==TRUE) # 9192 antecedent accidents, .28
 
 ## compare accident times of singleton accidents to cluster observations
 singleton.times <- as.vector(as.numeric(lapply(loner.list, function(x) hour(x$pub_utc_timestamp))))
@@ -290,7 +309,10 @@ boxplot(metrics.frame)
 ## Need comparison to total CT events
 summary(as.factor(ct.data$alert_type))/nrow(ct.data)
 
-
+## Are singleton accidents on major roads? only 25% on major roads
+singleton.roads <- as.numeric(lapply(loner.list, function(x) length(which(x$major.road==1))))
+## Compared to accidents with antecedents, 68% on major roads
+cluster.roads <- as.numeric(lapply(ants.list, function(x) length(which(x$major.road[which(x$cluster.root==1)]==1))))
 
 ## drill down into alert sub types
 # build groups - not fully disjoint
