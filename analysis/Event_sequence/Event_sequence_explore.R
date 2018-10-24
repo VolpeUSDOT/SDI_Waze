@@ -274,12 +274,23 @@ loner.list <- list.keep.street[which(lone.vec==1)]
 ants.list <- list.keep.street[which(lone.vec!=1)]
 summary(as.numeric(lapply(ants.list, nrow))-1)
 
+## compare accident times of singleton accidents to cluster observations
+singleton.times <- as.vector(as.numeric(lapply(loner.list, function(x) hour(x$pub_utc_timestamp))))
+## accidents that have at least one antecedent
+ants.times <- as.vector(as.numeric(lapply(ants.list, function(x) hour(x$pub_utc_timestamp[which(x$cluster.root==1)]))))
+
 ## sample metrics
 metrics.frame <- data.frame(matrix(NA, nrow=length(list.keep.street), ncol=0))
 metrics.frame$Jam <- as.numeric(lapply(list.keep.street, function(x) length(which(x$alert_type=="JAM"))))
 metrics.frame$road.closed <- as.numeric(lapply(list.keep.street, function(x) length(which(x$alert_type=="ROAD_CLOSED"))))
 metrics.frame$weather <- as.numeric(lapply(list.keep.street, function(x) length(which(x$alert_type=="WEATHERHAZARD"))))
+metrics.frame$accident <- as.numeric(lapply(list.keep.street, function(x) length(which(x$alert_type=="ACCIDENT")) -1))
 boxplot(metrics.frame)
+
+## Need comparison to total CT events
+summary(as.factor(ct.data$alert_type))/nrow(ct.data)
+
+
 
 ## drill down into alert sub types
 # build groups - not fully disjoint
@@ -307,6 +318,9 @@ for(dex in 1:length(list.keep.street)){
                                                 list.keep.street[[dex]]$pub_utc_timestamp, units="mins")
   
 } # end for loop that builds relative distances (space, time) in each cluster
+
+
+
 
 
 
