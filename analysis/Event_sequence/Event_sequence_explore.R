@@ -306,6 +306,16 @@ metrics.frame$weather <- as.numeric(lapply(list.keep.street, function(x) length(
 metrics.frame$accident <- as.numeric(lapply(list.keep.street, function(x) length(which(x$alert_type=="ACCIDENT")) -1))
 boxplot(metrics.frame)
 
+### Lattice histograms
+par(mfrow=c(2,2))
+hist(metrics.frame$Jam, col="gray", xlim=c(0,10), main="",xlab = "Jam alerts in cluster")
+hist(metrics.frame$road.closed, col="gray", xlim=c(0,10), main="", xlab = "Road closure alerts in cluster")
+hist(metrics.frame$weather, col="gray", xlim=c(0,10), main="",xlab = "Weather alerts in cluster")
+hist(metrics.frame$accident, col="gray", xlim=c(0,10), main="", xlab = "Accident alerts in cluster")
+
+
+
+
 ## Need comparison to total CT events
 summary(as.factor(ct.data$alert_type))/nrow(ct.data)
 
