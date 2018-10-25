@@ -310,9 +310,10 @@ boxplot(metrics.frame)
 par(mfrow=c(2,2))
 hist(metrics.frame$Jam, col="gray", xlim=c(0,10), main="",xlab = "Jam alerts in cluster")
 hist(metrics.frame$road.closed, col="gray", xlim=c(0,10), main="", xlab = "Road closure alerts in cluster")
-hist(metrics.frame$weather, col="gray", xlim=c(0,10), main="",xlab = "Weather alerts in cluster")
+hist(metrics.frame$weather, col="gray", xlim=c(0,10), breaks=seq(1:10),main="",xlab = "Weather alerts in cluster")
 hist(metrics.frame$accident, col="gray", xlim=c(0,10), main="", xlab = "Accident alerts in cluster")
 
+summary(metrics.frame$Jam)
 
 
 
