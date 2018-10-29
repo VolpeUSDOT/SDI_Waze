@@ -119,7 +119,7 @@ se.use$DayofWeek <- format(se.use$Date, format = "%A")
 
 # Empty objects to store output, will rbind at the end of loop
 waze.ll = waze.ll.proj = edt.ll = edt.ll.proj = vector()
-
+  
 for(i in 1:nrow(se.use)){ # Start event day loop; i = 1
   eventmo = se.use$Date.mo[i]
   
@@ -158,9 +158,9 @@ for(i in 1:nrow(se.use)){ # Start event day loop; i = 1
   # Now subset to just the day of interest
   selector = format(wp$time, "%Y-%m-%d") == specialeventday
   
-  ll <- data.frame(lat = coordinates(ws.ll)[,2][selector], lon = coordinates(ws.ll)[,1][selector], alert_type = ws.ll$alert_type[selector], time = ws.ll$time[selector])
+  ll <- data.frame(lat = coordinates(ws.ll)[,2][selector], lon = coordinates(ws.ll)[,1][selector], alert_type = ws.ll$alert_type[selector], time = ws.ll$time[selector], roadclass = ws.ll$road_type[selector])
   
-  ll.proj <- data.frame(lat = coordinates(ws)[,2][selector], lon = coordinates(ws)[,1][selector], alert_type = ws$alert_type[selector], time = ws$time[selector])
+  ll.proj <- data.frame(lat = coordinates(ws)[,2][selector], lon = coordinates(ws)[,1][selector], alert_type = ws$alert_type[selector], time = ws$time[selector], roadclass = ws$road_type[selector])
   
   # Compile
   waze.ll = rbind(waze.ll, ll)

@@ -268,7 +268,9 @@ major.roads <- c("I-95 N", "I-95 S", "I-84 E", "I-84 W", "I-91 S", "I-91 N",
                  "State Rte 15 S", "SR-8 S", "Berlin Tpke", "US-7 S", "State Rte 15 N", "US-7 N",
                  "I-384 W", "I-291 W")
 
-for(dex in 1:length(list.keep.str)){
+# !!!! Ryan: I changed list.keep.str to list.keep.street !!!
+
+for(dex in 1:length(list.keep.street)){
   list.keep.street[[dex]]$major.road <- (list.keep.street[[dex]]$street %in% major.roads)*1 
 }
 
@@ -298,13 +300,51 @@ singleton.times <- as.vector(as.numeric(lapply(loner.list, function(x) hour(x$pu
 ## accidents that have at least one antecedent
 ants.times <- as.vector(as.numeric(lapply(ants.list, function(x) hour(x$pub_utc_timestamp[which(x$cluster.root==1)]))))
 
-## sample metrics
+## sample metrics.
+## List.keep.street: list of all 32,953 accidents in these data. Each element of the list is a data frame for the alerts which occurred within one hour and 1 mile of the accident. The code below builds a data frame, where each row is the count of alerts for each accident. For other acciidents, subratct 1, to exclude the root accident.
+
 metrics.frame <- data.frame(matrix(NA, nrow=length(list.keep.street), ncol=0))
 metrics.frame$Jam <- as.numeric(lapply(list.keep.street, function(x) length(which(x$alert_type=="JAM"))))
 metrics.frame$road.closed <- as.numeric(lapply(list.keep.street, function(x) length(which(x$alert_type=="ROAD_CLOSED"))))
 metrics.frame$weather <- as.numeric(lapply(list.keep.street, function(x) length(which(x$alert_type=="WEATHERHAZARD"))))
 metrics.frame$accident <- as.numeric(lapply(list.keep.street, function(x) length(which(x$alert_type=="ACCIDENT")) -1))
 boxplot(metrics.frame)
+
+# Better plot attempt
+library(ggplot2)
+mf <- metrics.frame %>%
+  gather(key = "Alert_Type", value = "Count")
+
+mf$Alert_Type <- factor(mf$Alert_Type, labels = c("Accident", "Jam", "Road Closed", "Weather/Hazard"))
+
+ggplot(mf, aes(x = Count, group = Alert_Type)) +
+  geom_histogram(bins = 25) + facet_wrap(~Alert_Type)
+
+
+gp1 <- ggplot(mf %>% filter(Alert_Type != 'Road Closed'), aes(x = Alert_Type, y = Count, fill = Alert_Type)) +
+  geom_boxplot(na.rm=T) +
+  ylab("Count of preceding alerts") +
+  xlab("Alert type") +
+  ggtitle("Mean count of preceding alerts for CT crashes") 
+
+mc <- mf %>% filter(Alert_Type != 'Road Closed') %>%
+  group_by(Alert_Type) %>%
+  summarize(mean = mean(Count))
+
+gp1 + annotate("text",
+               x = c(1,2,3), y = mc$mean, label = round(mc$mean,2))  +
+  
+
+
+
+mf.no.zero=mf
+mf.no.zero[mf.no.zero==0]=NA
+ggplot(mf.no.zero, aes(x = Alert_Type, y = Count)) +
+  geom_violin(na.rm=T, adjust = 3)
+
+
+ggplot(mf.no.zero, aes(x = Alert_Type, y = Count)) +
+  geom_boxplot(na.rm=T)
 
 ### Lattice histograms
 par(mfrow=c(2,2))
@@ -316,6 +356,62 @@ hist(metrics.frame$accident, col="gray", xlim=c(0,10), main="", xlab = "Accident
 summary(metrics.frame$Jam)
 
 
+
+
+# Same, but now splitting by preceding and following events. Slow loop right now. !!! This actually should not have any post at all, per Ryan
+mf <- vector()
+
+for(i in 1:length(list.keep.street)){
+  x = list.keep.street[[i]]
+  
+  jam.pre = length(which(x$alert_type=="JAM" & as.numeric(x$pub_millis) < as.numeric(x[x$cluster.root==1,'pub_millis'])))
+  road_closed.pre = length(which(x$alert_type=="ROAD_CLOSED" & as.numeric(x$pub_millis) < as.numeric(x[x$cluster.root==1,'pub_millis'])))
+  weatherhazard.pre = length(which(x$alert_type=="WEATHERHAZARD" & as.numeric(x$pub_millis) < as.numeric(x[x$cluster.root==1,'pub_millis'])))
+  acc.pre = length(which(x$alert_type=="ACCIDENT" & as.numeric(x$pub_millis) < as.numeric(x[x$cluster.root==1,'pub_millis'])))
+  
+  jam.post = length(which(x$alert_type=="JAM" & as.numeric(x$pub_millis) >= as.numeric(x[x$cluster.root==1,'pub_millis'])))
+  road_closed.post = length(which(x$alert_type=="ROAD_CLOSED" & as.numeric(x$pub_millis) >= as.numeric(x[x$cluster.root==1,'pub_millis'])))
+  weatherhazard.post = length(which(x$alert_type=="WEATHERHAZARD" & as.numeric(x$pub_millis) >= as.numeric(x[x$cluster.root==1,'pub_millis'])))
+  acc.post = length(which(x$alert_type=="ACCIDENT" & as.numeric(x$pub_millis) >= as.numeric(x[x$cluster.root==1,'pub_millis']))) - 1
+  
+  mf <- rbind(mf, data.frame(jam.pre, road_closed.pre, weatherhazard.pre, acc.pre, 
+             jam.post, road_closed.post, weatherhazard.post, acc.post))
+  
+  if(i %% 5000 == 0) cat(i, ". ")
+}
+
+m2 <- mf %>% 
+  gather(key = "Alert_type_prepost", value = "Count")
+
+m2$Pre = grep("pre", m2$Alert_type_prepost) == rownames(m2)
+
+m2$Alert_type = unlist(lapply(strsplit(m2$Alert_type_prepost, "\\."), function(x) x[[1]]))
+ 
+ggplot(m2, aes(x = Alert_type, y = Count, fill = Pre)) +
+  geom_boxplot()
+
+# Make another attempt, median count of events before or after
+means <- data.frame(mean = apply(mf, 2, mean))
+means$ses <- apply(mf, 2, function(x) sd(x)/sqrt(length(x)-1))
+
+means$Alert_type = unlist(lapply(strsplit(rownames(means), "\\."), function(x) x[[1]]))
+means$Alert_type <- factor(means$Alert_type, labels = c("Accident", "Jam", "Road Closed", "Weather/Hazard"))
+
+means$Pre = unlist(lapply(strsplit(rownames(means), "\\."), function(x) x[[2]]))
+means$Pre <- factor(means$Pre, labels = c("2Post", "1Pre"))
+means$Pre <- as.factor(as.character(means$Pre))
+levels(means$Pre) = c("Pre", "Post")
+
+ggplot(means %>% filter(Alert_type != "Road Closed"), aes(x = Alert_type, y = mean, fill = Pre)) +
+  geom_bar(stat='identity',
+           position=position_dodge()) +
+  ylab("Mean count of related alerts") +
+  xlab("Alert type") +
+  ggtitle("Mean count of related alerts for CT crashes") +
+  geom_text(aes(label = round(mean, 2)),
+            position = position_dodge(0.9),
+            vjust = -1) +
+  guides(fill= guide_legend(title="Pre/post crash"))
 
 ## Need comparison to total CT events
 summary(as.factor(ct.data$alert_type))/nrow(ct.data)
