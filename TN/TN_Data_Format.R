@@ -21,10 +21,10 @@ setwd("~/workingdata/TN")
 # Data explore
 
 # Crash ----
+# look at Crash/vwCollision.txt
 crash <-read.table("Crash/vwCollision.txt", sep = '|')
 
 
-# look at Crash/vwCollision.txt
 
 
 # Special Events ----
