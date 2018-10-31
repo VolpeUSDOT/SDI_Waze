@@ -21,8 +21,20 @@ setwd("~/workingdata/TN")
 # Data explore
 
 # Crash ----
-# look at Crash/vwCollision.txt
 crash <-read.table("Crash/vwCollision.txt", sep = '|')
+
+
+
+
+# look at Crash/vwCollision.txt
+# First time need to read from txt, afterwards can read from RData, ~ 2 seconds vs 5 minutes. Every column is read as character.
+if(length(grep("TN_Crash.RData", dir('Crash')))==0){
+  crash <- read.csv("Crash/vwCollision.txt", sep = '|')
+  # format(object.size(crash), 'Mb')
+  save(crash, file = "Crash/TN_Crash.RData")
+} else {
+  load('Crash/TN_Crash.RData')
+}
 
 
 
