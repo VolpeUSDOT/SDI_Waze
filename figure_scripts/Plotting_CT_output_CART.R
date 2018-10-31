@@ -2,9 +2,10 @@
 
 library(tidyverse)
 
-setwd("//vntscex.local/DFS/Projects/PROJ-OS62A1/SDI Waze Phase 2/Output/CT_MD/Random_Forest_Output")
+setwd("//vntscex.local/DFS/Projects/PROJ-OS62A1/SDI Waze Phase 2/Output/Random_Forest_Output")
 
-load("CT_Model_18_RandomForest_Output.RData")
+# load("CT_Model_18_RandomForest_Output.RData")
+load("MD_Model_30_RandomForest_Output.RData")
 
 load("Model_18_Output_to_CT.RData")
 
@@ -44,6 +45,7 @@ d <- read.csv("CT_All_Model_30.csv")
 d %>%
 #  group_by(DayOfWeek) %>%
   summarise(sum(nMatchEDT_buffer_Acc),
+            sum(nWazeAccident),
             sum(Pred),
             sum(FATALS_SUM))
 
@@ -81,13 +83,13 @@ alsoomit = c("Obs", "Pred", "Prob.Noncrash", "Prob.Crash","TN","FP","FN","TP",
 
 predvars = names(d[!names(d) %in% c(alwaysomit, alsoomit)])
 
+# Produces a large lm object, ~ 1 Gb
 summary(lm.full <- lm(as.formula(paste("Prob.Crash ~", paste(predvars, collapse = " + "))), data = d
 ))
 
-
 coef.lm <- data.frame(vars = names(coef(lm.full)), coefs = coef(lm.full))
-(coef.lm = coef.lm[order(abs(coef.lm$coef), decreasing = T),])
-
+coef.lm = coef.lm[order(abs(coef.lm$coef), decreasing = T),]
+knitr::kable(coef.lm)
 
 
 ### CART Plotting
