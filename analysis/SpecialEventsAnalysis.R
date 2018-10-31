@@ -17,7 +17,7 @@ library(ggplot2)
 require(spatialEco) # point.in.poly() function. # install.packages('spatialEco')
 
 # if fails, follow this: https://github.com/r-quantities/units
-# as ec2-user in Terminal: sudo yum install udunits2-devel
+# system level package: as ec2-user in Terminal: sudo yum install udunits2-devel
 
 library(scales)
 
