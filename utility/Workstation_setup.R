@@ -37,7 +37,7 @@ for (i in workinglevel){
 
 teambucket <- "s3://prod-sdc-sdi-911061262852-us-east-1-bucket"
 
-states = c("CT", "UT", "VA", "MD")
+states = c("CT", "UT", "VA", "MD", "TN")
 
 # census ----
 
@@ -239,8 +239,6 @@ for(i in lodes.ls){
 
 # FARS ----
 
-
-
 fars.ls = c('FARS_CT_MD_UT_VA.zip')
 
 for(i in fars.ls){
@@ -270,8 +268,36 @@ for(i in special.ls){
   }
 }
 
+# Tennessee data ----
+
+tn.ls = c('TN.zip')
+
+for(i in tn.ls){
+  if(length(grep(i, dir(file.path('~', 'workingdata', 'TN'))))==0){
+    
+    system(paste("aws s3 cp",
+                 file.path(teambucket, 'TN', i),
+                 file.path('~', 'workingdata', 'TN', i)))
+    if(length(grep('zip$', i))!=0) {
+       system(paste('unzip -o', file.path('~', 'workingdata', 'TN', i), '-d',
+                                                file.path('~', 'workingdata', 'TN/')))
+      
+      
+        
+      }
+  }
+}
+
+# Reorganize unzipped directories if necessary
+if(length(grep("TN$", dir(file.path('~', 'workingdata', 'TN'))))>0) {
+  for(i in c("Crash", "Output", "SpecialEvents", "Weather")){
+    system(paste0('mv ~/workingdata/TN/TN/', i, ' ~/workingdata/TN/', i))
+  }
+  system(paste0('rm ~/workingdata/TN/TN/ -R'))
+}
 
 # Re-organizing export of model outputs for new system ----
+#  This can serve as example code snippet to place within any analysis script, to save outputs first to the team bucket and then exportable outputs to the export_requests directory in the team bucket.
 
 EXPORTREORG = F
 
@@ -293,11 +319,6 @@ if(EXPORTREORG){
   system(paste('zip', file.path('~/workingdata', zipname),
     file.path(outputdir, 'MD_VMT_Output_to_30.RData'),
     file.path(outputdir, 'CT_VMT_Output_to_30.RData'),
-    # file.path(outputdir, 'Model_18_Output_to_CT.RData'),
-    # file.path(outputdir, 'Model_18_CT_mod_MD_data_Output.RData'),
-    # file.path(outputdir, 'Model_18_CT_mod_MD_dat_RandomForest_Output.RData'),
-    # file.path(outputdir, 'Model_18_MD_mod_CT_data_Output.RData'),
-    # file.path(outputdir, 'Model_18_MD_mod_CT_dat_RandomForest_Output.RData'),
     file.path(outputdir, 'MD_Model_63_RandomForest_Output.RData'),
     file.path(outputdir, 'MD_Model_62_RandomForest_Output.RData'),
     file.path(outputdir, 'MD_Model_61_RandomForest_Output.RData'),
@@ -306,8 +327,6 @@ if(EXPORTREORG){
     file.path(outputdir, 'CT_Model_62_RandomForest_Output.RData'),
     file.path(outputdir, 'CT_Model_61_RandomForest_Output.RData'),
     file.path(outputdir, 'CT_Model_30_RandomForest_Output.RData')
-    # file.path(outputdir, 'CT_Model_18_RandomForest_Output.RData'),
-    # file.path(outputdir, 'MD_Model_18_RandomForest_Output.RData')
   ))
 
   system(paste(
@@ -341,6 +360,11 @@ system(paste("aws s3 ls",
 MOVEFROMUPLOAD = F
 
 if(MOVEFROMUPLOAD){
+ 
+  system(paste("aws s3 mv", 
+               file.path(teambucket, system('whoami', intern = T), "uploaded_files", "TN.zip"),
+               file.path(teambucket, "TN", "TN.zip"))
+  )
   
   system(paste("aws s3 mv", 
                file.path(teambucket, system('whoami', intern = T), "uploaded_files", "AADT_CT_MD_UT_VA.zip"),

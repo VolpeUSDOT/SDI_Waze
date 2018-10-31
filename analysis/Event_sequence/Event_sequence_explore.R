@@ -323,7 +323,7 @@ ggplot(mf, aes(x = Count, group = Alert_Type)) +
 
 gp1 <- ggplot(mf %>% filter(Alert_Type != 'Road Closed'), aes(x = Alert_Type, y = Count, fill = Alert_Type)) +
   geom_boxplot(na.rm=T) +
-  ylab("Count of preceding alerts") +
+  ylab("Count of preceding alerts", size = 10) +
   xlab("Alert type") +
   ggtitle("Mean count of preceding alerts for CT crashes") 
 
@@ -331,10 +331,14 @@ mc <- mf %>% filter(Alert_Type != 'Road Closed') %>%
   group_by(Alert_Type) %>%
   summarize(mean = mean(Count))
 
-gp1 + annotate("text",
-               x = c(1,2,3), y = mc$mean, label = round(mc$mean,2))  +
+gp2 <- gp1 + annotate("text",
+               x = c(1,2,3), y = mc$mean, label = round(mc$mean,2),
+               size = 2)  
   
-
+pdf('testplot.pdf', width = 6, height = 3)
+print(gp1)
+print(gp2)
+dev.off()
 
 
 mf.no.zero=mf

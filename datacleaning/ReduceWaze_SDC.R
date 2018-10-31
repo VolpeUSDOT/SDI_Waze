@@ -14,7 +14,6 @@ source(file.path(codeloc, 'utility/Workstation_setup.R')) # Download necessary f
 VALIDATE = T # to display values from Redshift query for validataion in SQL Workbench
 
 library(tidyverse) # tidyverse install on SDC may require additional steps, see Package Installation Notes.Rmd 
-# library(aws.s3)
 library(lubridate)
 library(doParallel)
 library(foreach)
