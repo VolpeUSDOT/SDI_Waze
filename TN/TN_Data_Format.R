@@ -21,11 +21,6 @@ setwd("~/workingdata/TN")
 # Data explore
 
 # Crash ----
-crash <-read.table("Crash/vwCollision.txt", sep = '|')
-
-
-
-
 # look at Crash/vwCollision.txt
 # First time need to read from txt, afterwards can read from RData, ~ 2 seconds vs 5 minutes. Every column is read as character.
 if(length(grep("TN_Crash.RData", dir('Crash')))==0){
@@ -36,8 +31,32 @@ if(length(grep("TN_Crash.RData", dir('Crash')))==0){
   load('Crash/TN_Crash.RData')
 }
 
+# examine the crash data
+names(crash)
+dim(crash) # 829,301 rows * 80 columns
 
+# Crash ID, it is unique? Yes.
+length(unique(crash$MstrRecNbrTxt)) # 829,301, looks like this is a unique crash ID
 
+table(crash$NbrUnitsNmb) # this column could include more than the number of vehicles
+# 0      1      2      3      4      5      6      7      8      9     10     11     12     13     14     15     17     18     22     26     98 
+# 3 219063 565583  37956   5359    969    243     73     18      9      8      4      1      2      1      1      1      1      1      1      1
+
+# select the necessary columns for analysis (optional: save it as subset in the RData again?)
+var <- c("MstrRecNbrTxt" # Unique crash ID
+         , "CollisionDte" # Date of Crash
+         , "CollisionTimeTxt" # Time of Crash
+         , "NbrUnitsNmb" # Number of vehicles involved
+         , "NbrFatalitiesNmb" # Fatals
+         , "NbrInjuredNmb" # Injuries
+         , "NbrNonInjuredNmb" # Non-Inguries
+         , "NbrMotoristsNmb" # Number of drivers
+         , "AlcoholInd" # whether alchohol is involved
+         , "BlockNbrTxt" # Does not look like Census block
+         , "CityCde" # City ID
+         , "CountyStateCde" # County ID
+         , "CrashTypeCde"  # What crash type do they have?
+         ) 
 
 # Special Events ----
 
