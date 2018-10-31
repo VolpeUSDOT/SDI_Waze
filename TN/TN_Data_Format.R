@@ -16,11 +16,13 @@ teambucket <- "s3://prod-sdc-sdi-911061262852-us-east-1-bucket"
 
 user <- paste0( "/home/", system("whoami", intern = TRUE)) # The user directory
 
-
+setwd("~/workingdata/TN")
 
 # Data explore
 
 # Crash ----
+crash <-read.table("Crash/vwCollision.txt", sep = '|')
+
 
 # look at Crash/vwCollision.txt
 
