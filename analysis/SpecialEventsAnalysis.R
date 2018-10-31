@@ -27,7 +27,12 @@ localdir <- paste0(user, "/workingdata") # full path for readOGR
 teambucket <- "s3://prod-sdc-sdi-911061262852-us-east-1-bucket"
 
 source(file.path(codeloc, "utility/wazefunctions.R")) 
-source(file.path(codeloc, "utility/Workstation_setup.R")) # will set up your workstation and download necessary data files 
+# Workstation setup. Runs if missing VMT data in the AADT folder on workingdata
+if(length(dir(localdir)[grep("aadt_by_grid", dir(file.path(localdir, 'AADT')))]) == 0){
+  source(file.path(codeloc, "utility/Workstation_setup.R"))
+  # move any files which are in an unnecessary "shapefiles" folder up to the top level of the localdir
+  system("mv -v ~/workingdata/shapefiles/* ~/workingdata/")
+}
 
 # Project to Albers equal area conic 102008. Check comparision with USGS version, WKID: 102039
 proj <- showP4(showWKT("+init=epsg:102008"))
@@ -70,45 +75,28 @@ hm_to_num <- function(x){
 #### Read shapefiles and data ####
 # Read shapefiles and apply coordinate reference system of hexagons (USGS version of Albers equal area) to Urban Areas and counties using uproj.USGS
 
-# Read in US state shapefile
-ua <- readOGR(file.path(localdir,"census"), layer = "cb_2016_us_ua10_500k")
-ua <- spTransform(ua, CRS(proj.USGS))
-
-# Read in county shapefile 
-co <- readOGR(file.path(localdir,"census"), layer = "cb_2017_us_county_500k")
-co <- spTransform(co, CRS(proj.USGS))
-
-md <- readOGR(file.path(localdir,"census"), layer = "MD_buffered")
-md <- spTransform(md, CRS(proj.USGS))
-# md@data # check the data table in SpatialPolygonsDataFrame class
-
 # Read in hexagon shapefile
 grid <- readOGR(file.path(localdir,"MD_hexagons_shapefiles"), layer = "MD_hexagons_1mi_newExtent_neighbors")
 grid <- spTransform(grid, CRS(proj.USGS))
 
 # Read in model output and independent variables used in the model
-AllModel30 <- read.csv(file.path(localdir, "All_Model_30.csv")) # 2,2xx,060 x 94, was 617,338*124
+AllModel30 <- read.csv(file.path(localdir, "MD_All_Model_30.csv")) # 1,576,531 x 94, was 617,338*124
+
+# Check to make sure GRID_ID x day x hour is unique. Must be true.
+stopifnot(sum(duplicated(with(AllModel30, paste(GRID_ID, day, hour))))==0)
 
 # Convert day of year to date
 # GridCount$date <- as.Date(GridCount$day, origin = "2016-12-31")
 AllModel30$date <- as.Date(AllModel30$day, origin = "2016-12-31")
 # as.Date(91, origin = "2016-12-31") # "2017-04-01", the origin needs to be the last day of 2016.
 
-length(unique(AllModel30$GRID_ID)) # was 5880, now 7172
-# length(unique(GridCount$GRID_ID)) # 5176
+length(unique(AllModel30$GRID_ID)) # was 5880, now 6875
 
 # Verify the date range
-# max(GridCount$date) # Sept 30
-# min(GridCount$date) # April 1
 max(AllModel30$date) # Sept 30
 min(AllModel30$date) # April 1, 2017
 
-# Trim to April - September, will need to double check
-
-AllModel30 = AllModel30 %>% filter(day > 90 & day  < 274)
-
 # create weekday
-
 AllModel30$weekday = lubridate::wday(AllModel30$date)
 # subset AllModel30
 
@@ -155,11 +143,11 @@ edt_SP <- spTransform(edt_SP, CRS(proj.USGS)) # create spatial point data frame
 # match crash locations with GRID_ID
 pts.poly <- point.in.poly(edt_SP, grid)
 head(pts.poly@data)
-dim(pts.poly@data) # 88786*65
+dim(pts.poly@data) # 88777*65
 
-# Plot the points on the 
-plot(grid)
-points(edt_SP, pch=20, col = "red")
+# Plot the points 
+# plot(grid)
+# points(edt_SP, pch=20, col = "red")
 
 # Variables to consider
 table(edt$SchoolBusRelated) # binary variable - residential crash indicator, occasionally will happen on highway.
@@ -225,7 +213,7 @@ SpecialEventsExpand <- SpecialEventsExpand %>% left_join(uniquelocbuf, by = c("L
 write.csv(SpecialEventsExpand, file = file.path(localdir,"SpecialEvents", "SpecialEventsExpand_MD_AprilToSept_2017.csv"), row.names = F)
 
 # Save necessary objects as Rdata for easy access for visualization
-save(list = c("co","AllModel30_sub","SpecialEventsExpand","SpecialEvents","edt.sum","md","ua","grid"), file = file.path(localdir,"SpecialEvents", "SpecialEvents_MD_AprilToSept_2017.Rdata"))
+save(list = c("AllModel30_sub","SpecialEventsExpand","SpecialEvents","edt.sum","grid"), file = file.path(localdir,"SpecialEvents", "SpecialEvents_MD_AprilToSept_2017.Rdata"))
 
 #### Data for Time Series ####
 load(file = file.path(localdir,"SpecialEvents", "SpecialEvents_MD_AprilToSept_2017.Rdata"))
@@ -337,7 +325,7 @@ load(file = file.path(localdir,"SpecialEvents", "SpecialEvents_MD_AprilToSept_20
 x <- AllModel30_sub[AllModel30_sub$Obs != AllModel30_sub$nEDTAccident, c("GRID_ID","date","hour","Obs","nEDTAccident")]
 
 sum(x$Obs) # 11,395
-sum(x$nEDTAccident) # 333,063
+sum(x$nEDTAccident) # 44,078
 
 AllModel30_sub$Waze_avail <- ifelse(AllModel30_sub$nWazeAccident >0 | 
                                       AllModel30_sub$nWazeJam > 0 |
@@ -352,7 +340,7 @@ sum(y$nEDTAccident)
 
 
 #######################################################
-# Visualization Only
+# Visualization Only ----
 #######################################################
 #### Special Events Time Series Plots ####
 loc = "SE1"
