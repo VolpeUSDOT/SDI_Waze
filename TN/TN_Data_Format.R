@@ -11,7 +11,36 @@ source(file.path(codeloc, 'utility/Workstation_setup.R')) # Download necessary f
 library(tidyverse) # tidyverse install on SDC may require additional steps, see Package Installation Notes.Rmd 
 library(lubridate)
 # Customized Functions
-
+sumstats = function(x) { 
+  null.k <- function(x) sum(is.na(x))
+  unique.k <- function(x) {if (sum(is.na(x)) > 0) length(unique(x)) - 1
+    else length(unique(x))}
+  range.k <- function(x) max(x, na.rm=TRUE) - min(x, na.rm=TRUE)
+  mean.k=function(x) {if (is.numeric(x)) round(mean(x, na.rm=TRUE), digits=2)
+    else "N*N"} 
+  sd.k <- function(x) {if (is.numeric(x)) round(sd(x, na.rm=TRUE), digits=2)
+    else "N*N"} 
+  min.k <- function(x) {if (is.numeric(x)) round(min(x, na.rm=TRUE), digits=2)
+    else "N*N"} 
+  q05 <- function(x) quantile(x, probs=.05, na.rm=TRUE)
+  q10 <- function(x) quantile(x, probs=.1, na.rm=TRUE)
+  q25 <- function(x) quantile(x, probs=.25, na.rm=TRUE)
+  q50 <- function(x) quantile(x, probs=.5, na.rm=TRUE)
+  q75 <- function(x) quantile(x, probs=.75, na.rm=TRUE)
+  q90 <- function(x) quantile(x, probs=.9, na.rm=TRUE)
+  q95 <- function(x) quantile(x, probs=.95, na.rm=TRUE)
+  max.k <- function(x) {if (is.numeric(x)) round(max(x, na.rm=TRUE), digits=2)
+    else "N*N"} 
+  
+  sumtable <- cbind(as.matrix(colSums(!is.na(x))), sapply(x, null.k), sapply(x, unique.k), sapply(x, range.k), sapply(x, mean.k), sapply(x, sd.k),
+                    sapply(x, min.k), sapply(x, q05), sapply(x, q10), sapply(x, q25), sapply(x, q50),
+                    sapply(x, q75), sapply(x, q90), sapply(x, q95), sapply(x, max.k)) 
+  
+  sumtable <- as.data.frame(sumtable); names(sumtable) <- c('count', 'null', 'unique',
+                                                            'range', 'mean', 'std', 'min', '5%', '10%', '25%', '50%', '75%', '90%',
+                                                            '95%', 'max') 
+  return(sumtable)
+} 
 
 # Location of SDC SDI Waze team S3 bucket. Files will first be written to a temporary directory in this EC2 instance, then copied to the team bucket.
 teambucket <- "s3://prod-sdc-sdi-911061262852-us-east-1-bucket"
