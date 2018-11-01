@@ -56,7 +56,16 @@ var <- c("MstrRecNbrTxt" # Unique crash ID
          , "CityCde" # City ID
          , "CountyStateCde" # County ID
          , "CrashTypeCde"  # What crash type do they have?
+         , "IntersectionInd" # Whether it is an intersection             
+         , "IntersectLocalIDTxt" # Intersection Location ID
+         , "IntersectRoadNameTxt" # Intersection road name
+         , "IntersectRoadNameSuffixTxt" # Name suffix
+         , "IntersectRoadNbrTxt" # Intersection road/route number
+         , "LatDecimalNmb" # Lat
+         , "LongDecimalNmb" # Lon
+         , "LightConditionCde" # light condition
          ) 
+crash <- crash[,var]
 
 # Special Events ----
 
