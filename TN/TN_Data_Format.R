@@ -10,6 +10,8 @@ source(file.path(codeloc, 'utility/Workstation_setup.R')) # Download necessary f
 
 library(tidyverse) # tidyverse install on SDC may require additional steps, see Package Installation Notes.Rmd 
 library(lubridate)
+# Customized Functions
+
 
 # Location of SDC SDI Waze team S3 bucket. Files will first be written to a temporary directory in this EC2 instance, then copied to the team bucket.
 teambucket <- "s3://prod-sdc-sdi-911061262852-us-east-1-bucket"
@@ -42,6 +44,10 @@ table(crash$NbrUnitsNmb) # this column could include more than the number of veh
 # 0      1      2      3      4      5      6      7      8      9     10     11     12     13     14     15     17     18     22     26     98 
 # 3 219063 565583  37956   5359    969    243     73     18      9      8      4      1      2      1      1      1      1      1      1      1
 
+table(crash$CrashTypeCde) # need information from TN State Petrol for more information
+# 0      1      2      3      4      5      6     80     98 
+# 21   3627  21418  54944 114219 574395  60574     96      1 
+
 # select the necessary columns for analysis (optional: save it as subset in the RData again?)
 var <- c("MstrRecNbrTxt" # Unique crash ID
          , "CollisionDte" # Date of Crash
@@ -66,6 +72,21 @@ var <- c("MstrRecNbrTxt" # Unique crash ID
          , "LightConditionCde" # light condition
          ) 
 crash <- crash[,var]
+
+# Data completeness
+crash[!complete.cases(crash),] # Error: C stack usage  8200812 is too close to the limit, the data is stil too large
+
+# Further reduce the data
+var1 <- c("MstrRecNbrTxt", "CollisionDte", "LatDecimalNmb", "LongDecimalNmb") # only take ID, time, and location
+crash1 <- crash[, var1]
+crash1[!complete.cases(crash1),] # display rows with missing data, looks like most of them are just missing the geo-coordinates.
+
+colSums(is.na(crash1)) # Number of missing data.
+colSums(is.na(crash1))*100/nrow(crash1) # percent of missing data, ~29% missing Lat/Lon
+
+round(colSums(is.na(crash))*100/nrow(crash), 2) # Large amounts of data are missing for some columns, such as BlockNbrTxt, IntersectionInd, IntersectLocalIDTxt, IntersectRoadNameTxt. If we plan to use these columns, need to understand why the missing data are not captured in is.na(). This might be due to blanks. 
+
+sumstats(crash1)
 
 # Special Events ----
 
