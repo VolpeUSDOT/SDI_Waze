@@ -115,7 +115,7 @@ colSums(is.na(crash1))*100/nrow(crash1) # percent of missing data, ~29% missing 
 
 round(colSums(is.na(crash))*100/nrow(crash), 2) # Large amounts of data are missing for some columns, such as BlockNbrTxt, IntersectionInd, IntersectLocalIDTxt, IntersectRoadNameTxt. If we plan to use these columns, need to understand why the missing data are not captured in is.na(). This might be due to blanks. 
 
-sumstats(crash1)
+sumstats(crash1) # did not work as some columns are automatically read as factors, consider change data type or prevent reading them as factors.
 
 # Special Events ----
 
