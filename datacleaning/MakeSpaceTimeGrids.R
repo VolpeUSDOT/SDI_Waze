@@ -12,7 +12,7 @@ library(foreach)
 #Set parameters for data to process
 HEXSIZE = c("1", "4", "05")[1] # Change the value in the bracket to use 1, 4, or 0.5 sq mi hexagon grids
 
-codedir <- "~/SDI_Waze" 
+codeloc <- "~/SDI_Waze" 
 
 user <- paste0( "/home/", system("whoami", intern = TRUE)) #the user directory to use
 localdir <- paste0(user, "/workingdata/") # full path for readOGR
@@ -51,7 +51,7 @@ for(state in states){ # state = "CT"
                                start = 17,
                                stop = 23))
   
-  todo.months = sort(avail.months)[c(1:9)]
+  todo.months = avail.months #sort(avail.months)[c(1:9)]
 
   use.tz <- tzs$tz[tzs$states == state]
   
@@ -137,6 +137,6 @@ for(state in states){ # state = "CT"
     cat("Completed", j, "\n")
     } # End SpaceTimeGrid loop ----
   
-  stopCluster(cl)
+  stopCluster(cl); gc()
   
 } # end state loop

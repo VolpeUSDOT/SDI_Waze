@@ -81,7 +81,7 @@ for(i in edt.ls){
 
 # Rename Maryland to MD
 
-system(paste('mv ~/workingdata/EDT/Maryland_april2017_to_present.csv ~/workingdata/EDT/Maryland_april2017_to_present.csv'))
+system(paste('mv ~/workingdata/EDT/Maryland_april2017_to_present.csv ~/workingdata/EDT/MD_april2017_to_present.csv'))
 
 # Hex ----
 
@@ -343,18 +343,12 @@ if(EXPORTREORG){
 CHECKUPLOAD = F
 
 if(CHECKUPLOAD){
-system(paste(
-  'aws s3 ls',
-  file.path(teambucket, system('whoami', intern = T), 'uploaded_files/')
-))
-
-
+  system(paste(
+    'aws s3 ls',
+    file.path(teambucket, system('whoami', intern = T), 'uploaded_files/')
+  ))
+  
 }
-
-# View uploaded files
-system(paste("aws s3 ls", 
-             file.path(teambucket, system('whoami', intern = T), "uploaded_files/")))
-
 # Moving from upload ----
 
 MOVEFROMUPLOAD = F
