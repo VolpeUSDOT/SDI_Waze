@@ -21,7 +21,7 @@ library(foreach)
 # Location of SDC SDI Waze team S3 bucket. Files will first be written to a temporary directory in this EC2 instance, then copied to the team bucket.
 teambucket <- "s3://prod-sdc-sdi-911061262852-us-east-1-bucket"
  
-user <- paste0( "/home/", system("whoami", intern = TRUE)) #he user directory to use
+user <- paste0( "/home/", system("whoami", intern = TRUE)) # user directory
 output.loc <- paste0(user, "/tempout")
 
 localdir <- paste0(user, "/workingdata/") # full path for readOGR
@@ -35,14 +35,16 @@ source(file.path(codeloc, 'utility/connect_redshift_pgsql.R'))
 
 # Query parameters
 # states with available EDT data for model testing
-states = c("CT", "MD", "UT", "VA")
+states = c("CT", "MD", "TN", "UT", "VA", "WA")
 
 # Time zone picker:
 tzs <- data.frame(states, 
                   tz = c("US/Eastern",
                          "US/Eastern",
+                         "US/Eastern",
                          "US/Mountain",
-                         "US/Eastern"),
+                         "US/Eastern",
+                         "US/Pacific"),
                   stringsAsFactors = F)
 
 # <><><><><><><><><><><><><><><><><><><><><><><><>
@@ -52,7 +54,7 @@ tzs <- data.frame(states,
 # Get year/month, year/month/day, and last day of month vectors to create the SQL queries
 yearmonths = c(
   paste(2017, formatC(4:12, width = 2, flag = "0"), sep="-"),
-  paste(2018, formatC(1:8, width = 2, flag = "0"), sep="-")
+  paste(2018, formatC(1:10, width = 2, flag = "0"), sep="-")
 )
 yearmonths.1 <- paste(yearmonths, "01", sep = "-")
 lastdays <- days_in_month(as.POSIXct(yearmonths.1)) # from lubridate
@@ -112,7 +114,7 @@ for(i in states){ # i = 'UT'
 # Previously  ~ 1.6 h for MD, CT, UT, and VA. Now with new Redshift cluster (2018-08-12) only 20 minutes. 
 
 # Clip to state boundaries ----
-  # ~ 2 h runtime for these four states
+  # ~ 2 h runtime for six states
   # Depends on *_Raw_events_to_lastyearmonth.RData being in localdir,
   # and *_buffered.shp (and associated files) being in localdir/census.
   # Will save *_Buffered_Clipped_events_to_lastyearmonth.RData in localdir and to S3
@@ -152,7 +154,7 @@ for(i in states){ # i = "UT"
   d <- d[,!names(d) %in% dropvars]
 
   # Manual 'loop' for MD. Have to re-make ym and also re-load for each half. Work on this to optimize when dataframe d is some % of available RAM. Now split between 1:8 and 9:17. 5.8 Gb is too big to parallelize on 8 core 60 Gb instance.
-   d <- d[ym %in% yearmonths[9:17],];  ym <- format(d$pub_utc_timestamp, "%Y-%m"); gc()
+  d <- d[ym %in% yearmonths[9:17],];  ym <- format(d$pub_utc_timestamp, "%Y-%m"); gc()
   
   # Set up cluster. 
   avail.cores <- parallel::detectCores()
@@ -166,6 +168,8 @@ foreach(mo = unique(ym), .packages = c("dplyr", "tidyr")) %dopar% {
     dx <- d[ym == mo,]
     
     # dx = dx[1:5000,]
+    
+    
     
     ll <- dx %>%
       group_by(alert_uuid) %>%

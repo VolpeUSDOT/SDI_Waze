@@ -51,7 +51,12 @@ for(state in states){ # state = "CT"
                                start = 17,
                                stop = 23))
   
-  todo.months = avail.months #sort(avail.months)[c(1:9)]
+  # Look for already completed months and skip those
+  tlfiles <- dir(temp.outputdir)[grep("WazeHexTimeList_", dir(temp.outputdir))]
+  state.tlfiles <- tlfiles[grep(state, tlfiles)]
+  done.months <- unlist(lapply(strsplit(state.tlfiles, "_"), function(x) x[[2]])) 
+
+  todo.months = avail.months[!avail.months %in% done.months] #sort(avail.months)[c(1:9)]
 
   use.tz <- tzs$tz[tzs$states == state]
   

@@ -26,14 +26,14 @@ teambucket <- "s3://prod-sdc-sdi-911061262852-us-east-1-bucket"
 
 source(file.path(codeloc, "utility/wazefunctions.R")) 
 
-states = c("CT", "UT")#, "VA", "MD")
+states = c("CT", "UT", "VA", "MD")
 
 # Time zone picker:
 tzs <- data.frame(states, 
                   tz = c("US/Eastern",
-                         "US/Mountain"#,
-         #                "US/Eastern",
-          #               "US/Eastern"
+                         "US/Mountain",
+                         "US/Eastern",
+                         "US/Eastern"
          ),
                   stringsAsFactors = F)
 
@@ -66,7 +66,7 @@ for(state in states){ # state = "CT"
   cl <- makeCluster(parallel::detectCores()) # make a cluster of all available cores
   registerDoParallel(cl)
   
-  writeLines(c(""), paste0(HEXSIZE, "_log.txt"))    
+  writeLines(c(""), paste0(state, "_log.txt"))    
   
   foreach(j = todo.months, .packages = c("dplyr", "lubridate", "utils")) %dopar% {
     

@@ -16,6 +16,8 @@
 
 # More flexible: create copy commands by pasting together the team bucket name, directory, and file name as the source, and ~/workingdata, sub-directory, and file name as destination.
 
+GETOUTPUT = F # Set to T to get Random Forest Output, leave as F to save space
+
 # Create directory structure ----
 
 toplevel = c('workingdata', 'agg_out', 'tempout')
@@ -37,7 +39,7 @@ for (i in workinglevel){
 
 teambucket <- "s3://prod-sdc-sdi-911061262852-us-east-1-bucket"
 
-states = c("CT", "UT", "VA", "MD", "TN")
+states = c("CT", "MD", "TN", "UT", "VA", "WA")
 
 # census ----
 
@@ -91,9 +93,11 @@ hex.ls <- system(paste("aws s3 ls",
 intern = T)
 
 # parse to file names
-hex.ls <- unlist(lapply(strsplit(hex.ls, " "), function(x) x[[length(x)]]))
+# hex.ls <- unlist(lapply(strsplit(hex.ls, " "), function(x) x[[length(x)]]))
+# 
+# hex.ls <- hex.ls[!1:length(hex.ls) %in% grep("/", hex.ls)] # Omit directories
 
-hex.ls <- hex.ls[!1:length(hex.ls) %in% grep("/", hex.ls)] # Omit directories
+hex.ls <- c("ct_md_ut_va_hexagons_1mi.zip")
 
 for(i in hex.ls){
   if(length(grep(i, dir(file.path('~', 'workingdata', 'Hex'))))==0){
@@ -107,27 +111,27 @@ for(i in hex.ls){
 
 
 # And again, just for MD (with multiple grid sizes)
-
-hex.ls <- system(paste("aws s3 ls", 
-                       file.path(teambucket, "Hex/MD_hexagons_shapefiles/")
-),
-intern = T)
-
-# parse to file names
-hex.ls <- unlist(lapply(strsplit(hex.ls, " "), function(x) x[[length(x)]]))
-
-hex.ls <- hex.ls[!1:length(hex.ls) %in% grep("/", hex.ls)] # Omit directories
-
-for(i in hex.ls){
-  if(length(grep(i, dir(file.path('~', 'workingdata', 'Hex', 'MD_hexagons_shapefiles'))))==0){
-    
-  system(paste("aws s3 cp",
-               file.path(teambucket, 'Hex', 'MD_hexagons_shapefiles', i),
-               file.path('~', 'workingdata', 'Hex', 'MD_hexagons_shapefiles', i)))
-  if(length(grep('zip$', i))!=0) system(paste('unzip -o', file.path('~', 'workingdata', 'Hex', 'MD_hexagons_shapefiles', i),
-                                              '-d', file.path('~', 'workingdata', 'Hex/')))
-  }
-}
+# 
+# hex.ls <- system(paste("aws s3 ls", 
+#                        file.path(teambucket, "Hex/MD_hexagons_shapefiles/")
+# ),
+# intern = T)
+# 
+# # parse to file names
+# hex.ls <- unlist(lapply(strsplit(hex.ls, " "), function(x) x[[length(x)]]))
+# 
+# hex.ls <- hex.ls[!1:length(hex.ls) %in% grep("/", hex.ls)] # Omit directories
+# 
+# for(i in hex.ls){
+#   if(length(grep(i, dir(file.path('~', 'workingdata', 'Hex', 'MD_hexagons_shapefiles'))))==0){
+#     
+#   system(paste("aws s3 cp",
+#                file.path(teambucket, 'Hex', 'MD_hexagons_shapefiles', i),
+#                file.path('~', 'workingdata', 'Hex', 'MD_hexagons_shapefiles', i)))
+#   if(length(grep('zip$', i))!=0) system(paste('unzip -o', file.path('~', 'workingdata', 'Hex', 'MD_hexagons_shapefiles', i),
+#                                               '-d', file.path('~', 'workingdata', 'Hex/')))
+#   }
+# }
 
 # Link ----
 
@@ -182,6 +186,8 @@ for(state in states){
 
 # Random_Forest_Output --- 
 
+if(GETOUPUT){
+
 for(state in states){
   Random_Forest_Output.ls <- system(paste("aws s3 ls", 
                              file.path(teambucket, paste0(state, "/"))
@@ -204,6 +210,7 @@ for(state in states){
   }
 }
 
+}
 # AADT ----
 
 
