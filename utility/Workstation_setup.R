@@ -23,7 +23,7 @@ GETOUTPUT = F # Set to T to get Random Forest Output, leave as F to save space
 toplevel = c('workingdata', 'agg_out', 'tempout')
 
 for (i in toplevel){
-  if(length(dir(file.path("~", i)))==0) system(paste('mkdir', file.path("~", i)))
+  if(length(dir(file.path("~", i)))==0) system(paste('mkdir -p', file.path("~", i)))
 }
 
 # Create directories within 'workingdata' 
@@ -40,6 +40,11 @@ for (i in workinglevel){
 teambucket <- "s3://prod-sdc-sdi-911061262852-us-east-1-bucket"
 
 states = c("CT", "MD", "TN", "UT", "VA", "WA")
+
+
+for (i in states){
+  system(paste('mkdir -p', file.path("~", "workingdata", i)))
+}
 
 # census ----
 
@@ -128,7 +133,7 @@ for(i in hex.ls){
 #   system(paste("aws s3 cp",
 #                file.path(teambucket, 'Hex', 'MD_hexagons_shapefiles', i),
 #                file.path('~', 'workingdata', 'Hex', 'MD_hexagons_shapefiles', i)))
-#   if(length(grep('zip$', i))!=0) system(paste('unzip -o', file.path('~', 'workingdata', 'Hex', 'MD_hexagons_shapefiles', i),
+#   if(length(grep('zip$', i))!=0) system(paste('unzip -o', file.path('~', 'workittngdata', 'Hex', 'MD_hexagons_shapefiles', i),
 #                                               '-d', file.path('~', 'workingdata', 'Hex/')))
 #   }
 # }
@@ -185,8 +190,9 @@ for(state in states){
 }
 
 # Random_Forest_Output --- 
+GETOUTPUT = F 
 
-if(GETOUPUT){
+if(GETOUTPUT){
 
 for(state in states){
   Random_Forest_Output.ls <- system(paste("aws s3 ls", 
@@ -411,6 +417,7 @@ system(paste("aws s3 ls", teambucket))
 # Examples of how to remove individual files or folders
 system(paste("aws s3 rm", 
              file.path(teambucket, 'FARS_CT_2015_2016_sum_fclass.shp')))
+
 system(paste("aws s3 rm", file.path( teambucket, 'HomeFolderData/'), '--recursive'))
 
 # Move multiple files

@@ -103,7 +103,8 @@ var <- c("MstrRecNbrTxt" # Unique crash ID
 crash <- crash[,var]
 
 # Data completeness
-crash[!complete.cases(crash),] # Error: C stack usage  8200812 is too close to the limit, the data is stil too large
+# crash[!complete.cases(crash),] # Error: C stack usage  8200812 is too close to the limit, the data is stil too large
+# format(object.size(crash), "Mb") = 425 Mb
 
 # Further reduce the data
 var1 <- c("MstrRecNbrTxt", "CollisionDte", "LatDecimalNmb", "LongDecimalNmb") # only take ID, time, and location
@@ -115,7 +116,40 @@ colSums(is.na(crash1))*100/nrow(crash1) # percent of missing data, ~29% missing 
 
 round(colSums(is.na(crash))*100/nrow(crash), 2) # Large amounts of data are missing for some columns, such as BlockNbrTxt, IntersectionInd, IntersectLocalIDTxt, IntersectRoadNameTxt. If we plan to use these columns, need to understand why the missing data are not captured in is.na(). This might be due to blanks. 
 
-sumstats(crash1) # did not work as some columns are automatically read as factors, consider change data type or prevent reading them as factors.
+
+# Looking at missing location info by year
+crash$date = as.POSIXct(strptime(crash$CollisionDte, "%Y-%m-%d %H:%M:%S", tz = "US/Central"))
+crash$year = as.numeric(format(crash$date, "%Y"))
+# Fix data types
+crash$MstrRecNbrTxt <- as.character(crash$MstrRecNbrTxt)
+
+na.lat <- crash %>%
+  filter(!is.na(year)) %>%
+  group_by(fatal = NbrFatalitiesNmb > 0 , year) %>%
+  summarize(naLat = sum(is.na(LatDecimalNmb) | LatDecimalNmb <= -99),
+            N = n(),
+            pct.na = 100*naLat/N)
+
+ggplot(na.lat) +
+  geom_point(aes(x = as.factor(year), y = pct.na, color = fatal)) +
+  ylab("Percent missing Lat/Long") + xlab("Year") + 
+  ggtitle("Summary of missing location by year and crash fatality for Tennessee")
+ggsave("Output/Missing_lat_TN.jpeg")
+
+
+var1 <- c("MstrRecNbrTxt", "date", "year", "LatDecimalNmb", "LongDecimalNmb") # only take ID, time, and location
+crash1 <- crash[, var1]
+
+sumstats(crash1[2:ncol(crash1)])
+
+
+tn_crash <- crash1 %>% filter(LatDecimalNmb > 25 & LatDecimalNmb < 45 &
+         LongDecimalNmb < -75 & LongDecimalNmb > -99)
+
+sumstats(tn_crash[2:ncol(tn_crash)])
+
+
+save("tn_crash", file = "Crash/TN_Crash_Simple_2008-2018.RData")
 
 # Special Events ----
 
