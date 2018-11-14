@@ -22,7 +22,8 @@ state = 'MD' #'CT'  #'UT' # Sets the state. UT, VA, MD will all be options.
 # <><><><><>
 
 # Manually setting months to run here; could also scan S3 for months available for this state
-do.months = paste("2017", c("04","05","06","07","08","09"), sep="-")
+do.months = c(paste("2017", c("04","05","06","07","08","09", "10", "11", "12"), sep="-"),
+              paste("2018", c("01","02","03","04"), sep="-"))
 
 REASSESS = F # re-assess model fit and diagnostics using reassess.rf instead of do.rf
 

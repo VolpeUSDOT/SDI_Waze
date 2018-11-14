@@ -71,7 +71,7 @@ for(state in states){ # state = "CT"
 
     sink("log.txt", append=TRUE)
     
-    cat(paste(Sys.time()), j, "\n")                                                           
+    cat(paste(Sys.time()), state, j, "\n")                                                           
                                                              
     
     load(file.path(wazemonthdir, paste0("merged.waze.edt.", j,"_", state, ".RData"))) # includes both waze (link.waze.edt) and edt (edt.df) data, with grid for central and neighboring cells

@@ -103,9 +103,10 @@ for(j in months_shared){ # j = "2018-03"
   tn_crash@data$ym = format(tn_crash$date, '%Y-%m')
   tn_j <- tn_crash[tn_crash@data$ym == j,]
     
-  plot(tn_j, main = paste("TN Waze overlay \n", state, j), col = alpha("black", 0.5),
+  plot(tn_j, main = paste("TN Waze overlay \n", state, j), col = alpha("black", 0.25),
        cex = 0.8)
-  plot(d, add = T, col = alpha("firebrick", 0.1), cex = 0.5)
+  d_crash = d[d$alert_type == "ACCIDENT",]
+  plot(d_crash, add = T, col = alpha("firebrick", 0.2), cex = 0.8)
   dev.print(jpeg, file = paste0("Figures/Link_plot_", state, "_" , j, ".jpeg"), width= 500, height = 500)
   
   # <><><><><><><><><><><><><><><><><><><><><><><><>
