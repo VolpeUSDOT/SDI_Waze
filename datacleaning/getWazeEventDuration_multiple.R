@@ -67,6 +67,8 @@ starttime <- Sys.time()
 
 # For each state, grab already processed months of data with duration in there
 
+all.state.acc = vector()
+
 for(state in states){ # state = 'UT'
   
   # Check S3 contents for this state
@@ -89,8 +91,6 @@ for(state in states){ # state = 'UT'
     
   }
   
-
-
   # calculate estimated duration of the event in minutes 
   # take difference of time and last.pull.time; correct pull durations for 2017 and 2018 have already been done
 
@@ -103,7 +103,7 @@ for(state in states){ # state = 'UT'
   cols = c("lon", "lat", "city", "alert_type", "sub_type", "street", "road_type", "time", "last.pull.time", "event_duration_minutes")
   
   alert_results = alert_results %>% 
-    filter(alert_type != "ROAD_CLOSED" & sub_type != "HAZARD_ON_ROAD_CONSTRUCTION") %>%
+    filter(alert_type != "ROAD_CLOSED") %>%
     select(cols)
   
   # Looking at historgrams, limit to events lasting less than 3 hrs
@@ -113,10 +113,21 @@ for(state in states){ # state = 'UT'
   ggsave(filename = paste0(file.path("~", "workingdata", "Figures/"), state, "_Event_Duration_Hist.jpg"))
   
   # Save to local, will zip and put in export after
-  write.csv(alert_results, file = paste0(file.path(localdir, state, "/"), state, "_Event_Duration_to_", yearmonths[length(yearmonths)], ".csv"))
+  write.csv(alert_results, file = paste0(file.path(localdir, state, "/"), state, "_Event_Duration_to_", yearmonths[length(yearmonths)], ".csv", row.names = F))
+  
+  acc_res = alert_results %>%
+    filter(alert_type == "ACCIDENT") %>%
+    select(-alert_type) %>%
+    mutate(state = state)
+  
+  all.state.acc = rbind(all.state.acc, acc_res)
+  
 }
 
+# add day of week
+all.state.acc$DayOfWeek = format(all.state.acc$time, "%A")
 
+write.csv(all.state.acc, paste0(localdir, "/", "Accident_Duration_to_", yearmonths[length(yearmonths)], ".csv"))
 
 # Zip and export
 
@@ -125,10 +136,12 @@ for(state in states){
   zipfiles = c(zipfiles, paste0(file.path(localdir, state, "/"), state, "_Event_Duration_to_", yearmonths[length(yearmonths)], ".csv"))
 }
 
-zipname = paste0("Event_Durations_CT_MD_VA_UT_", Sys.Date(), ".zip")
+zipfiles = c(zipfiles, paste0(localdir, "/", "Accident_Duration_to_", yearmonths[length(yearmonths)], ".csv"))
+
+zipname = paste0("Event_Accident_Durations_CT_MD_VA_UT_", Sys.Date(), ".zip")
 
 for(z in zipfiles){
-  system(paste('zip', file.path('~/workingdata', zipname), z))
+  system(paste('zip -j', file.path('~/workingdata', zipname), z))
 }
   
 system(paste(
