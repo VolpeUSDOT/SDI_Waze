@@ -12,6 +12,7 @@ library(sp)
 library(rgdal)
 library(rgeos)
 library(ggmap)
+library(spatstat) # for ppp density estimation. devtools::install_github('spatstat/spatstat')
 library(tidyverse)
 
 
@@ -76,7 +77,7 @@ e_i$CrashDate_Local <- with(e_i,
 
 # After compiling data frames, then carry out plotting.
 
-specialeventloc = "SE1" # see levels(SpecialEvents$Location.ID)
+specialeventloc = "SE2" # see levels(SpecialEvents$Location.ID). SE2 = Camden Yards
 
 se.use = SpecialEvents %>% 
   filter(Location.ID == specialeventloc & EventType != "NoEvent") 
@@ -212,8 +213,8 @@ for(i in 1:nrow(se.use)){ # Start event day loop; i = 1
 # *.ll versions indicate represented as lat long instead of projected in Albers Equal Area; this makes mapping with ggmap more convenient for now. *.proj is projected versions
 
 fn = paste0(state, "_", 
-            paste0(min(se.use$Date), "_to_", max(se.use$Date)),
-            "_SpecialEvents.RData")
+            paste(min(se.use$Date), "to", max(se.use$Date)),
+            specialeventloc, "SpecialEvents.RData", sep="_")
 
 save(list = c("w", "e", "ws", "es", "zoom_box", "zoomll",
               "ws.ll", "es.ll",
@@ -252,13 +253,13 @@ system(paste(
 
 # Get a map for plotting.
 
-if(length(grep(paste0(state, "_Basemaps"), dir(file.path(localdir, "SpecialEvents")))) == 0){
+if(length(grep(paste0(state, "_", specialeventloc, "_Basemaps"), dir(file.path(localdir, "SpecialEvents")))) == 0){
   map_terrain_14 <- get_stamenmap(bbox = as.vector(bbox(zoom_box.ll)), maptype = 'terrain', zoom = 14)
   map_toner_hybrid_14 <- get_stamenmap(bbox = as.vector(bbox(zoom_box.ll)), maptype = 'toner-hybrid', zoom = 14)
   map_toner_14 <- get_stamenmap(bbox = as.vector(bbox(zoom_box.ll)), maptype = 'toner', zoom = 14)
   save(list = c("map_terrain_14", "map_toner_hybrid_14", "map_toner_14"),
-       file = file.path(localdir, "SpecialEvents", paste0(state, "_Basemaps.RData")))
-} else { load(file.path(localdir, "SpecialEvents", paste0(state, "_Basemaps.RData"))) }
+       file = file.path(localdir, "SpecialEvents", paste0(state, "_", specialeventloc, "_Basemaps.RData")))
+} else { load(file.path(localdir, "SpecialEvents", paste0(state, "_", specialeventloc, "_Basemaps.RData"))) }
 
 
 # ggmap(map_terrain_14)
@@ -280,7 +281,7 @@ edt.ll$Date = format(edt.ll$CrashDate_Local, "%Y-%m-%d")
 
 for(specialeventtype in levels(se.use$EventType)) { # specialeventtype = 'NonEvent'
   
-  figname = file.path(localdir, 'Figures', paste(state, specialeventtype, "Combined_Special_Event_Hot_Spot.pdf", sep="_"))
+  figname = file.path(localdir, 'Figures', paste(state, specialeventloc, specialeventtype, "Combined_Special_Event_Hot_Spot.pdf", sep="_"))
   
   pdf(file = figname, width = 10, height = 10)
   # Get the days for this event type
@@ -378,7 +379,31 @@ for(specialeventtype in levels(se.use$EventType)) { # specialeventtype = 'NonEve
           guides(color = guide_legend(order = 2, title = "Waze alert type")))
   
   
+  # 4. Difference between EDT and Waze accident density
+  # Set observation window
+  pwin = owin(xrange = zoom_box.ll@bbox['x',],
+              yrange = zoom_box.ll@bbox['y',])
+  lx.acc = lx %>% filter(alert_type == "ACCIDENT")
+  dp <- ppp(lx.acc$lon, lx.acc$lat, window = pwin)
+  dd.w <- density(dp, edge = T)
   
+  dp <- ppp(lx.e$lon, lx.e$lat, window = pwin)
+  dd.e <- density(dp, edge = T)
+  
+  par(mfrow=c(2, 2), mar=rep(2,4))
+  plot(dd.e, main="EDT Density"); plot(dd.w, main="Waze Density"); plot(dd.w-dd.e, main="Difference Waze-EDT"); plot(dd.e-dd.w, main="Difference EDT-Waze")
+  
+  # Problem: spatstat images don't easily interact with ggmaps. And the RGoogleMap package no longer works (API rules changed). So need a workaround for plotting class `im` images from spatstat on ggmaps, or otherwise find a new mapping package
+  
+    # map5 <- ggmap(map_toner_hybrid_14, extent = 'device') + 
+  #   geom_raster()
+  #   
+  # print(map5 + ggtitle(paste0("Waze + EDT crash density ", specialeventtype))  +
+  #         scale_fill_gradient(low = "blue", high = "red", 
+  #                             guide_legend(title = "Crash density")) +
+  #         scale_alpha(range = c(0.1, 0.8), guide = FALSE) )
+  # 
+  # 
   dev.off()
   
   
