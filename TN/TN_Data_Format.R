@@ -49,6 +49,25 @@ user <- paste0( "/home/", system("whoami", intern = TRUE)) # The user directory
 
 setwd("~/workingdata/TN")
 
+# Get Waze data ----
+
+yearmonths = c(
+  paste(2017, formatC(4:12, width = 2, flag = "0"), sep="-"),
+  paste(2018, formatC(1:8, width = 2, flag = "0"), sep="-"))
+
+tn.ls = paste0("TN_", yearmonths, ".RData")
+
+for(i in tn.ls){
+  if(length(grep(i, dir(file.path('~', 'workingdata', 'TN'))))==0){
+    
+    system(paste("aws s3 cp",
+                 file.path(teambucket, 'TN', i),
+                 file.path('~', 'workingdata', 'TN', i)))
+    
+  }
+}
+
+
 # Data explore
 
 # Crash ----
@@ -154,6 +173,8 @@ save("tn_crash", file = "Crash/TN_Crash_Simple_2008-2018.RData")
 # Special Events ----
 
 # look at 'SpecialEvents/2018 Special Events.xlsx'; can use read_excel function in readxl package
+
+
 
 # Weather ----
 
