@@ -173,7 +173,8 @@ save("tn_crash", file = "Crash/TN_Crash_Simple_2008-2018.RData")
 # Special Events ----
 
 # look at 'SpecialEvents/2018 Special Events.xlsx'; can use read_excel function in readxl package
-
+# Waze data
+load("TN_2017-04.RData")
 
 
 # Weather ----
