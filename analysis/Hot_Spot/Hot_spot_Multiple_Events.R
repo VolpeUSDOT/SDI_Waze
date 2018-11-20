@@ -14,7 +14,7 @@ library(rgeos)
 library(ggmap)
 library(spatstat) # for ppp density estimation. devtools::install_github('spatstat/spatstat')
 library(tidyverse)
-
+library(raster) # to work with density difference raster
 
 codeloc <- "~/SDI_Waze"
 source(file.path(codeloc, 'utility/get_packages.R'))
@@ -136,7 +136,7 @@ for(i in 1:nrow(se.use)){ # Start event day loop; i = 1
   
   w <- spTransform(w, CRS(proj))
   # Subset to area of interest only ---- 
-  zoomll = se.use %>% select(Lon, Lat)
+  zoomll = se.use %>% dplyr::select(Lon, Lat)
   zoomll = zoomll[!duplicated(zoomll),]
   
   zoomll = SpatialPointsDataFrame(zoomll[c("Lon", "Lat")], zoomll, 
@@ -278,7 +278,11 @@ waze.ll$Date = format(waze.ll$time, "%Y-%m-%d")
 edt.ll$Date = format(edt.ll$CrashDate_Local, "%Y-%m-%d")
 
 
+se.use$EventType = as.factor(sub(" ", "_", as.character(se.use$EventType)))
+
 for(specialeventtype in levels(se.use$EventType)) { # specialeventtype = 'NonEvent'
+  
+  cat(specialeventtype, "\n\n")
   
   figname = file.path(localdir, 'Figures', paste(state, specialeventloc, specialeventtype, "Combined_Special_Event_Hot_Spot.pdf", sep="_"))
   
@@ -286,7 +290,7 @@ for(specialeventtype in levels(se.use$EventType)) { # specialeventtype = 'NonEve
   # Get the days for this event type
   use.dates = se.use %>% 
     filter(EventType == specialeventtype) %>%
-    select(Date)
+    dplyr::select(Date)
   
 
   lx = waze.ll %>%
@@ -315,7 +319,7 @@ for(specialeventtype in levels(se.use$EventType)) { # specialeventtype = 'NonEve
   # 2. Waze with points 
   map2 = map1 + 
     geom_point(data = lx, 
-               aes(x = lon, y = lat, color = alert_type), 
+               aes(x = lon, y = lat, color = alert_type, alpha = 0.5), 
                pch = "+", cex = 3, stroke = 2) 
   
   print(map2 + ggtitle(paste0("Waze event density ", specialeventtype))  +
@@ -329,7 +333,7 @@ for(specialeventtype in levels(se.use$EventType)) { # specialeventtype = 'NonEve
   map3 = map2 + 
     geom_point(data = lx.e, 
                aes(x = lon, y = lat), 
-               pch = 16, cex = 3, stroke = 2, color = scales::alpha("midnightblue", 0.5)) 
+               pch = 16, cex = 3, stroke = 1, color = scales::alpha("midnightblue", 0.1)) 
   
   print(map3 + ggtitle(paste0("Waze event density ", specialeventtype))  +
           scale_fill_gradient(low = "blue", high = "red", 
@@ -355,7 +359,7 @@ for(specialeventtype in levels(se.use$EventType)) { # specialeventtype = 'NonEve
   # 2. Waze with points 
   map2 = map1 + 
     geom_point(data = lx %>% filter(alert_type == "ACCIDENT"), 
-               aes(x = lon, y = lat, color = alert_type), 
+               aes(x = lon, y = lat, color = alert_type, alpha = 0.5), 
                pch = "+", cex = 3, stroke = 2) 
   
   print(map2 + ggtitle(paste0("Waze crash density ", specialeventtype))  +
@@ -369,7 +373,7 @@ for(specialeventtype in levels(se.use$EventType)) { # specialeventtype = 'NonEve
   map3 = map2 + 
     geom_point(data = lx.e, 
                aes(x = lon, y = lat), 
-               pch = 16, cex = 3, stroke = 2, color = scales::alpha("midnightblue", 0.5)) 
+               pch = 16, cex = 3, stroke = 2, color = scales::alpha("midnightblue", 0.1)) 
   
   print(map3 + ggtitle(paste0("Waze crash density ", specialeventtype))  +
           scale_fill_gradient(low = "blue", high = "red", 
@@ -390,11 +394,11 @@ for(specialeventtype in levels(se.use$EventType)) { # specialeventtype = 'NonEve
   dd.e <- density(dp, edge = T)
   
   par(mfrow=c(2, 2), mar=rep(2,4))
-  plot(dd.e, main="EDT Density"); plot(dd.w, main="Waze Density"); plot(dd.w-dd.e, main="Difference Waze-EDT"); plot(dd.e-dd.w, main="Difference EDT-Waze")
+  plot(dd.e, main="EDT Density"); plot(dd.w, main="Waze Density"); plot(dd.w-dd.e, main="Difference Waze-EDT")
   
   # Problem: spatstat images don't easily interact with ggmaps. And the RGoogleMap package no longer works (API rules changed). So need a workaround for plotting class `im` images from spatstat on ggmaps, or otherwise find a new mapping package
   
-    # map5 <- ggmap(map_toner_hybrid_14, extent = 'device') + 
+  # map5 <- ggmap(map_toner_hybrid_14, extent = 'device') + 
   #   geom_raster()
   #   
   # print(map5 + ggtitle(paste0("Waze + EDT crash density ", specialeventtype))  +
@@ -403,8 +407,29 @@ for(specialeventtype in levels(se.use$EventType)) { # specialeventtype = 'NonEve
   #         scale_alpha(range = c(0.1, 0.8), guide = FALSE) )
   # 
   # 
-  dev.off()
+  #im.map1 <- ggmap(map_toner_hybrid_14, extent = 'device')
+  #im.map2 <- im.map1 + ggimage(dd.e)
   
+  # Try to conver tto SpatialPixelsDataFrame
+  # OR just export as geoTIFF
+  
+  dd.diff = dd.w-dd.e
+  
+  dr <- raster(dd.diff$v)
+  crs(dr) <- '+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0'
+  extent(dr) = c(dd.diff$xrange, dd.diff$yrange)
+  
+  dwr <- raster(dd.w$v)
+  crs(dwr) <- '+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0'
+  extent(dwr) = c(dd.w$xrange, dd.w$yrange)
+  
+  writeRaster(dr, filename = file.path(localdir, "SpecialEvents", paste("Diff", state, specialeventloc, specialeventtype, sep="_")),
+              options = 'TFW=YES', overwrite=T)
+
+  writeRaster(dwr, filename = file.path(localdir, "SpecialEvents", paste("Waze", state, specialeventloc, specialeventtype, sep="_")),
+              options = 'TFW=YES', overwrite=T)
+  
+  dev.off()
   
   # Save output
   
@@ -416,10 +441,14 @@ for(specialeventtype in levels(se.use$EventType)) { # specialeventtype = 'NonEve
 
 # Save to export
 
-zipname = paste0('Hot_Spot_Mapping_Multiple_Figures_', Sys.Date(), '.zip')
+zipname = paste0('Hot_Spot_Mapping_Multiple_Figures_RasterLayers_', Sys.Date(), '.zip')
+
+# Get raster layer names
+rasters = dir(file.path(localdir, "SpecialEvents"))[grep(".gr", dir(file.path(localdir, "SpecialEvents")))]
 
 system(paste('zip -j', file.path('~/workingdata', zipname),
-             fignames)
+             fignames,
+             paste(file.path(localdir, "SpecialEvents", rasters)))
 )
 
 system(paste(

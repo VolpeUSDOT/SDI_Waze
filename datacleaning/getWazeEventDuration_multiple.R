@@ -127,7 +127,8 @@ for(state in states){ # state = 'UT'
 # add day of week
 all.state.acc$DayOfWeek = format(all.state.acc$time, "%A")
 
-write.csv(all.state.acc, paste0(localdir, "/", "Accident_Duration_to_", yearmonths[length(yearmonths)], ".csv"))
+write.csv(all.state.acc, paste0(localdir, "/", "Accident_Duration_to_", yearmonths[length(yearmonths)], ".csv"),
+          row.names=F)
 
 # Zip and export
 
@@ -150,4 +151,10 @@ system(paste(
   file.path(teambucket, 'export_requests', zipname)
 ))
 
+# Summarize for documentation
+# all.state.acc <- read.csv("Accident_Duration_to_2018-08.csv", stringsAsFactors = F)
 
+all.state.acc %>%
+  group_by(state) %>%
+#  count() %>%
+  summarize(meanDur = mean(event_duration_minutes))
