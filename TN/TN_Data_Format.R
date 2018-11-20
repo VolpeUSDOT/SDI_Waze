@@ -171,8 +171,26 @@ sumstats(tn_crash[2:ncol(tn_crash)])
 save("tn_crash", file = "Crash/TN_Crash_Simple_2008-2018.RData")
 
 # Special Events ----
+library(readxl)
+spev <- read_excel("SpecialEvents/2018 Special Events.xlsx")
+
+names(spev)
+dim(spev) #813*12
+
+# How many Event_Type
+# 12 types:  [1] "Car Show"         "Fair"             "Fair/Festival"    "Festival"         "Motorcycle Rally" 
+# "Parade"           "Race/Car Show"   "Rodeo"            "Run/Rally"        "Special"          "Special Event"    "Sporting"
+
+table(spev$Event_Type)
+
+# what are the x__1 to x__4?
+sum(is.na(spev$X__1)) # 811 missing, only two rows have data.
+sum(is.na(spev$X__4)) # 812 missing
+
 
 # look at 'SpecialEvents/2018 Special Events.xlsx'; can use read_excel function in readxl package
+# Waze data
+load("TN_2017-04.RData") # load an example Waze data to look at columns
 
 
 
