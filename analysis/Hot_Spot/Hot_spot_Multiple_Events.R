@@ -217,6 +217,7 @@ fn = paste(state, min(se.use$Date), "to", max(se.use$Date),
 
 save(list = c("w", "e", "ws", "es", "zoom_box", "zoomll",
               "ws.ll", "es.ll",
+              "waze.ll", "waze.ll.proj", "edt.ll", 
               "ll.proj", "edt.ll.proj", "zoom_box.ll"),
      file = file.path(localdir, "SpecialEvents", 
                       fn))
@@ -250,6 +251,9 @@ system(paste(
 
 # Plotting ----
 
+# Start from previous:
+# load('/home/daniel/workingdata/SpecialEvents/MD_2017-02-26_to_2018-11-10_SE2_SpecialEvents.RData')
+# load('/home/daniel/workingdata/SpecialEvents/MD_2017-02-26_to_2018-11-10_SE2_SpecialEvent_Export.RData')
 # Get a map for plotting.
 
 if(length(grep(paste0(state, "_", specialeventloc, "_Basemaps"), dir(file.path(localdir, "SpecialEvents")))) == 0){
@@ -280,7 +284,7 @@ edt.ll$Date = format(edt.ll$CrashDate_Local, "%Y-%m-%d")
 
 se.use$EventType = as.factor(sub(" ", "_", as.character(se.use$EventType)))
 
-for(specialeventtype in levels(se.use$EventType)) { # specialeventtype = 'NonEvent'
+for(specialeventtype in levels(se.use$EventType)) { # specialeventtype = 'Baseball'
   
   cat(specialeventtype, "\n\n")
   
@@ -413,7 +417,7 @@ for(specialeventtype in levels(se.use$EventType)) { # specialeventtype = 'NonEve
   # Try to conver tto SpatialPixelsDataFrame
   # OR just export as geoTIFF
   
-  dd.diff = dd.w-dd.e
+  dd.diff = dd.e-dd.w
   
   dr <- raster(dd.diff$v)
   crs(dr) <- '+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0'
@@ -422,6 +426,13 @@ for(specialeventtype in levels(se.use$EventType)) { # specialeventtype = 'NonEve
   dwr <- raster(dd.w$v)
   crs(dwr) <- '+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0'
   extent(dwr) = c(dd.w$xrange, dd.w$yrange)
+  
+  plot(dr, col = bpy.colors(255))
+  plot(dwr, col = bpy.colors(255))
+  
+  plot(der, col = bpy.colors(255))
+  
+  plot(map_toner_hybrid_14)
   
   writeRaster(dr, filename = file.path(localdir, "SpecialEvents", paste("Diff", state, specialeventloc, specialeventtype, sep="_")),
               options = 'TFW=YES', overwrite=T)
