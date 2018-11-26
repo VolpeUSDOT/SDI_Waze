@@ -63,8 +63,9 @@ alert_query <- paste0(
         WHERE state = 'MD'
         AND start_pub_utc_timestamp BETWEEN 
         --'2017-09-10 04:00:00' and '2017-09-11 04:00:00'  --NOTE-UTC is 4 hours ahead of EDT, this gives us 12AM - 12AM 
-        '2017-09-17 04:00:00' and '2017-09-18 04:00:00'  --NOTE-UTC is 4 hours ahead of EDT, this gives us 12AM - 12AM 
-        AND alert_type IN ('JAM', 'ACCIDENT')
+        --'2017-09-17 04:00:00' and '2017-09-18 04:00:00'  --NOTE-UTC is 4 hours ahead of EDT, this gives us 12AM - 12AM 
+        '2017-04-01 04:00:00' and '2018-07-31 04:00:00'  --NOTE-UTC is 4 hours ahead of EDT, this gives us 12AM - 12AM 
+        AND alert_type IN ('ACCIDENT')
         GROUP BY alert_uuid 
       ) b 
       ON a.alert_uuid = b.alert_uuid
@@ -257,19 +258,45 @@ names(output_df_0917) <- c("GRID_ID", "alert_type",
                       "hr_18", "hr_19", "hr_20", "hr_21", "hr_22", "hr_23")
 
 
+## melt the data into long format - better for tableau 
+output_df_0910_long <- melt(output_df_0910, id.vars = c("GRID_ID", "alert_type"))
+output_df_0917_long <- melt(output_df_0917, id.vars = c("GRID_ID", "alert_type"))
+
+
+## Merge data into one data table -- helpful for tableau filtering 
+
+output_df_0910_long$Day <- "EventDay"
+output_df_0917_long$Day <- "NoEventDay"
+
+output_df_combind <- rbind(output_df_0910_long, output_df_0917_long)
+
+
+
 ### export data
 
-fn = "Duration_EventDay_0910_12to12" # file name for day of event - September 10, 2017
-write.csv(output_df_0910, file = file.path(localdir, paste0(fn, ".csv")), row.names = F) 
+fn = "Duration_EventDay_0910_12to12_long" # file name for day of event - September 10, 2017
+write.csv(output_df_0910_long, file = file.path(localdir, paste0(fn, ".csv")), row.names = F) 
 
-fn = "Duration_NoEventDay_0917_12to12" # file name for day with no event - September 17, 2017
-write.csv(output_df_0917, file = file.path(localdir, paste0(fn, ".csv")), row.names = F)
+fn = "Duration_NoEventDay_0917_12to12_long" # file name for day with no event - September 17, 2017
+write.csv(output_df_0917_long, file = file.path(localdir, paste0(fn, ".csv")), row.names = F)
+
+fn = "Duration_Combined_0910_0917" # file name for day with no event - September 17, 2017
+write.csv(output_df_combind, file = file.path(localdir, paste0(fn, ".csv")), row.names = F)
 
 
-# copy from instance to se3 bucket 
-system(paste("aws s3 cp", 
-             file.path(localdir, paste0(fn, ".csv")),
-             file.path(teambucket, 'export_requests', paste0(fn, ".csv")))) 
+system(paste(
+  'zip ~/workingdata/SpecialEventsDuration_0910_0917.zip',
+  '~/workingdata/Duration_EventDay_0910_12to12_long.csv', 
+  '~/workingdata/Duration_NoEventDay_0917_12to12_long.csv', 
+  '~/workingdata/Duration_Combined_0910_0917.csv'))
+
+
+system(paste(
+  'aws s3 cp',
+  '~/workingdata/SpecialEventsDuration_0910_0917.zip',
+  file.path(teambucket, 'export_requests', 'SpecialEventsDuration_0910_0917.zip')
+))
+
 
 
 
