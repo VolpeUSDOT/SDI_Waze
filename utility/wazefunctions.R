@@ -43,8 +43,8 @@ makelink <- function(accfile = edt.april, incfile = waze.april,
     # d.sp: Waze events. inctimevar2 is the *end* of the event and inctimevar1 is the *start* of the event. We look to see if the end of the event is greater than EDT event -60 minutes and see if the start of the Waze event is less than the EDT event +60 minutes.
     d.t <- d.sp[d.sp[,inctimevar2] >= ei[,acctimevar]-60*60 & d.sp[,inctimevar1] <= ei[,acctimevar]+60*60,] 
     
-    id.accident <- rep(as.character(ei[,accidvar]), nrow(d.t))
-    id.incidents <- as.character(d.t[,incidvar])
+    id.accident <- rep(as.character(ei[,accidvar]), nrow(d.t)) # Waze
+    id.incidents <- as.character(d.t[,incidvar]) # EDT
     
     if(i %% 50000 == 0) {
       timediff <- round(Sys.time()-starttime, 2)
@@ -58,10 +58,10 @@ makelink <- function(accfile = edt.april, incfile = waze.april,
   
   stopCluster(cl) # stop the cluster.
   
-  linktable
+  linktable # Give all Waze accident IDs with EDT incident IDs
   }
   
-
+# Non-parallel
 makelink.nonpar <- function(accfile = edt.april, incfile = waze.april,
                        acctimevar = "CrashDate_Local",
                        inctimevar1 = "time",
@@ -241,6 +241,14 @@ prep.hex <- function(hexname, state, month, s3 = T, bucket = teambucket){
   wte$MatchEDT_buffer_Acc[wte$MatchEDT_buffer_Acc > 0] = 1 
   wte$MatchEDT_buffer_Acc <- as.factor(wte$MatchEDT_buffer_Acc)
   
+  
+  # Omit grid cell x day combinations which are outside of this particular month (Waze road closures)
+  yr = substr(mo, 1, 4)
+  month.2 = substr(mo, 6, 7)
+  yrday = strptime(paste(yr, formatC(wte$day, width =3, flag = 0), sep="-"), "%Y-%j")
+  month.1 = format(yrday, "%m")
+  wte = wte[month.1 %in% month.2,]
+  
   mo <- sub("-", "_", mo) # change e.g. from 2017-04 to 2017_04 for R object naming
   
   assign(paste("w", mo, sep="."), wte, envir = globalenv()) 
@@ -362,6 +370,11 @@ append.hex2 <- function(hexname, data.to.add, state, na.action = c("omit", "keep
       
       } 
     
+    if(length(grep("bg_wac", data.to.add)) > 0 | length(grep("bg_rac", data.to.add)) > 0 ){
+      assign(data.to.add, foreign::read.dbf(file = file.path(localdir, "LODES_LEHD", state, paste0(data.to.add, ".dbf"))),
+             envir = globalenv())
+      
+    } 
     # { # Build this out lodes, aadt
     #   assign(data.to.add, rgdal::readOGR(localdir, layer = data.to.add), envir = globalenv())
     # }
@@ -391,9 +404,10 @@ append.hex2 <- function(hexname, data.to.add, state, na.action = c("omit", "keep
     #   group_by(GRID_ID, month, dayofweek, hour) %>%
     #   tidyr::spread(key = F_SYSTEM_VN, value = volume, fill = 0, sep = "_")
     
-    # Rows are uniquely described by grid id, month, dayofweek, hour, and road class
+    # Rows ahave to be uniquely described by grid id, month, dayofweek, hour, and road class
     # summary(duplicated(with(dd, paste(GRID_ID, month, dayofweek, hour, F_SYSTEM_VN))))
-    
+    dd <- dd[!duplicated(with(dd, paste(GRID_ID, month, dayofweek, hour, F_SYSTEM_VN))),]
+      
     dd.summax <- dd %>%
       group_by(GRID_ID, month, dayofweek, hour) %>%
       select(GRID_ID, month, dayofweek, hour, F_SYSTEM_VN, SUM_MAX_AADT_VN) %>%
@@ -457,7 +471,7 @@ append.hex2 <- function(hexname, data.to.add, state, na.action = c("omit", "keep
 
   if(length(grep("bg_rac_", data.to.add)) > 0){
     
-    dd <- dd@data 
+    #dd <- dd@data 
     dd <- dd[c("GRID_ID", 
                "SUM_C000",                                                            # Total jobs
                #               "SUM_CA01", "SUM_CA02", "SUM_CA03",                                    # By age category
@@ -469,9 +483,9 @@ append.hex2 <- function(hexname, data.to.add, state, na.action = c("omit", "keep
     
   }
   
-  if(length(grep("bg_lodes_", data.to.add)) > 0){
+  if(length(grep("bg_wac_", data.to.add)) > 0){
     
-    dd <- dd@data 
+    #dd <- dd 
     dd <- dd[c("GRID_ID", 
                "SUM_C000",                                                            # Total jobs
                #               "SUM_CA01", "SUM_CA02", "SUM_CA03",                                    # By age category

@@ -26,14 +26,14 @@ teambucket <- "s3://prod-sdc-sdi-911061262852-us-east-1-bucket"
 
 source(file.path(codeloc, "utility/wazefunctions.R")) 
 
-states = c("CT", "UT")#, "VA", "MD")
+states = c("CT", "UT", "VA", "MD")
 
 # Time zone picker:
 tzs <- data.frame(states, 
                   tz = c("US/Eastern",
-                         "US/Mountain"#,
-         #                "US/Eastern",
-          #               "US/Eastern"
+                         "US/Mountain",
+                         "US/Eastern",
+                         "US/Eastern"
          ),
                   stringsAsFactors = F)
 
@@ -58,7 +58,12 @@ for(state in states){ # state = "CT"
                                start = 17,
                                stop = 23))
   
-  todo.months = sort(avail.months)#[c(1:9)]
+  # Look for already completed months and skip those
+  tlfiles <- dir(temp.outputdir)[grep("WazeTimeEdtHexAll_", dir(temp.outputdir))]
+  state.tlfiles <- tlfiles[grep(state, tlfiles)]
+  done.months <- unlist(lapply(strsplit(state.tlfiles, "_"), function(x) x[[2]])) 
+  
+  todo.months = sort(avail.months[!avail.months %in% done.months])
   
   use.tz <- tzs$tz[tzs$states == state]
   
@@ -66,11 +71,11 @@ for(state in states){ # state = "CT"
   cl <- makeCluster(parallel::detectCores()) # make a cluster of all available cores
   registerDoParallel(cl)
   
-  writeLines(c(""), paste0(HEXSIZE, "_log.txt"))    
+  writeLines(c(""), paste0(state, "_log.txt"))    
   
   foreach(j = todo.months, .packages = c("dplyr", "lubridate", "utils")) %dopar% {
     
-    sink(paste0(HEXSIZE, "_log.txt"), append=TRUE)
+    sink(paste0(state, "_log.txt"), append=TRUE)
     
     cat(paste(Sys.time()), j, "\n")                                                           
     
@@ -283,6 +288,8 @@ for(state in states){ # state = "CT"
 
 # move any old files to S3 (should not be needed any more, S3 copy command is part of loop now.)
 
+SCRATCH = F
+if(SCRATCH){
 aggfiles <- dir(temp.outputdir) # consists of both the TimeList and HexAll files for each state
 for(state in states){
   state.aggfiles <- aggfiles[grep(state, aggfiles)]
@@ -292,7 +299,7 @@ for(state in states){
                  file.path(teambucket, state, i)))
   }
 }
-
+} # end scratch
 
 # Check with plots -- written for ATA, needs update for SDC 2018-08-15
 

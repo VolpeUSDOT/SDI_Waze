@@ -22,6 +22,8 @@ library(rgdal) # for readOGR(), needed for reading in ArcM shapefiles
 library(rgeos) # for gIntersection, to clip two shapefiles
 library(raster)
 
+user <- paste0( "/home/", system("whoami", intern = TRUE)) 
+localdir <- paste0(user, "/workingdata/") # full path for readOGR
 setwd(localdir)
 
 # Spatial setup ----
@@ -31,9 +33,12 @@ BUFFER = TRUE # Set to false to use original counties shapefile, true for 0.5 mi
 # Project to Albers equal area, ESRI 102008
 proj <- showP4(showWKT("+init=epsg:102008"))
 
-FIPS = data.frame(state = c("CT", "MD", "UT", "VA"),
-                  FIPS =  c("09", "24", "49", "51"),
-                  stringsAsFactors = F)
+# inherits states from ReduceWaze_SDC.R
+
+FIPS = maps::state.fips %>% filter(abb %in% states)
+FIPS = FIPS[!duplicated(FIPS$fips),c("abb", "fips")]
+names(FIPS) = c("state", "FIPS")
+FIPS$FIPS <- formatC(FIPS$FIPS, width = 2, flag = "0")
 
 # Start loop over states ----
 
@@ -43,8 +48,9 @@ starttime <- Sys.time()
 
 for(i in states){ # i = "CT"
   
-  # Read in county data from Census
+  # Read in county data from Census. Check to see if a buffered version for this state exists, create if not.
   if(BUFFER){
+    if(length(grep(paste0(i, "_buffered"), dir("census")))==0) { source(codeloc, "datacleaning/Buffer_state.R") }  
     i_counties <- readOGR("census", layer = paste0(i, "_buffered"))  
   } else {
     counties <- readOGR("census", layer = "cb_2017_us_county_500k")
@@ -53,12 +59,14 @@ for(i in states){ # i = "CT"
   }
   
   # ~ 1 min to read 3.4 Gb CT file
-  load(file.path(output.loc, statefiles[grep(paste0(i, "_Raw_"), statefiles)]))
+  # Sort for latest version
+  statefile = sort(statefiles[grep(paste0(i, "_Raw_"), statefiles)], decreasing = T)[1]
+  load(file.path(output.loc, statefile))
   
   cat(i, "loaded \n")
   
   # original file size in MB
-  orig.file.size <- round(file.info(file.path(output.loc, statefiles[grep(paste0(i, "_Raw_"), statefiles)]))$size/1000000, 2)
+  orig.file.size <- round(file.info(file.path(output.loc, statefile))$size/1000000, 2)
   orig.nrow <- nrow(results)
   
   # <><><><><><><><><><><><><><><><><><><><>
@@ -130,6 +138,8 @@ for(i in states){ # i = "CT"
                file.path(localdir, paste0(fn, ".RData")),
                file.path(teambucket, i, paste0(fn, ".RData"))))
   
-  rm(d)
+  rm(d); gc()
   
 } # end state loop
+
+rm(counties, i.u, xx)

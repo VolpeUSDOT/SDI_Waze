@@ -12,7 +12,7 @@ library(foreach)
 #Set parameters for data to process
 HEXSIZE = c("1", "4", "05")[1] # Change the value in the bracket to use 1, 4, or 0.5 sq mi hexagon grids
 
-codedir <- "~/SDI_Waze" 
+codeloc <- "~/SDI_Waze" 
 
 user <- paste0( "/home/", system("whoami", intern = TRUE)) #the user directory to use
 localdir <- paste0(user, "/workingdata/") # full path for readOGR
@@ -51,7 +51,12 @@ for(state in states){ # state = "CT"
                                start = 17,
                                stop = 23))
   
-  todo.months = sort(avail.months)[c(1:9)]
+  # Look for already completed months and skip those
+  tlfiles <- dir(temp.outputdir)[grep("WazeHexTimeList_", dir(temp.outputdir))]
+  state.tlfiles <- tlfiles[grep(state, tlfiles)]
+  done.months <- unlist(lapply(strsplit(state.tlfiles, "_"), function(x) x[[2]])) 
+
+  todo.months = avail.months[!avail.months %in% done.months] #sort(avail.months)[c(1:9)]
 
   use.tz <- tzs$tz[tzs$states == state]
   
@@ -66,7 +71,7 @@ for(state in states){ # state = "CT"
 
     sink("log.txt", append=TRUE)
     
-    cat(paste(Sys.time()), j, "\n")                                                           
+    cat(paste(Sys.time()), state, j, "\n")                                                           
                                                              
     
     load(file.path(wazemonthdir, paste0("merged.waze.edt.", j,"_", state, ".RData"))) # includes both waze (link.waze.edt) and edt (edt.df) data, with grid for central and neighboring cells
@@ -137,6 +142,6 @@ for(state in states){ # state = "CT"
     cat("Completed", j, "\n")
     } # End SpaceTimeGrid loop ----
   
-  stopCluster(cl)
+  stopCluster(cl); gc()
   
 } # end state loop

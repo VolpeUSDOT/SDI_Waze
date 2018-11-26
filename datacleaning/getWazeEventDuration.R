@@ -27,11 +27,6 @@ source(file.path(codeloc, 'utility/wazefunctions.R'))
 source(file.path(codeloc, 'utility/connect_redshift_pgsql.R'))
 
 
-# uncomment these lines and run with user redshift credentials filled in to resolve error if above line throws one.
-#Sys.setenv('sdc_waze_username' = 'mgilmore') 
-#Sys.setenv('sdc_waze_password' = 'r7ZcGYzjgmu4zxKR')
-
-
 # Set up workstation to get hexagon shapefiles 
 source(file.path(codeloc, 'utility/Workstation_setup.R'))
 

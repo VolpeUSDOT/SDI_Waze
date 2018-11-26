@@ -26,13 +26,13 @@ teambucket <- "s3://prod-sdc-sdi-911061262852-us-east-1-bucket"
 
 source(file.path(codeloc, "utility/wazefunctions.R")) 
 
-states = c(#"CT", "UT", 
+states = c("CT", "UT", 
   "VA", "MD")
 
 # Time zone picker:
 tzs <- data.frame(states, 
-                  tz = c(#"US/Eastern",
-                         #"US/Mountain"#,
+                  tz = c("US/Eastern",
+                         "US/Mountain",
                          "US/Eastern",
                          "US/Eastern"
                          ),
@@ -68,16 +68,13 @@ co <- spTransform(co, CRS(proj.USGS))
 # load("~/workingdata/Hex/hexagons_1mi_lower48_neighbors.RData")
 # hex <- readOGR(file.path(localdir, "Hex"), layer = "hexagons_1mi_lower48_neighbors")
 # In terminal, ulimit -s 16384, then R readOGR, save as .RData. Produces 4.5 Gb .Rdata file.
-# !!! Now doing just for these four states with separate files !!!
+# !!! Now doing just for these four states with separate state shapefiles !!!
 
 # start state loop ----
 for(i in states){ # i = "UT"
   
-  if(i == "MD"){
-    hex = readOGR(file.path(localdir, "Hex", "MD_hexagons_shapefiles"), layer = "MD_hexagons_1mi_newExtent_neighbors")
-  } else {
-    hex = readOGR(file.path(localdir, "Hex"), layer = paste0(i, "_hexagons_1mi_neighbors"))
-  }
+  hex = readOGR(file.path(localdir, "Hex", i), layer = paste0(i, "_hexagons_1mi_neighbors"))
+ 
   
   # grid column names
   gridcols <- names(hex)[grep("^GRID", names(hex))]
@@ -85,8 +82,8 @@ for(i in states){ # i = "UT"
   FIPS_i = formatC(state.fips[state.fips$abb == i, "fips"][1], width = 2, flag = "0")
   co_i <- co[co$STATEFP == FIPS_i,]
   
-  # Files -- need to add step to grab from S3 if not in these locations. Also change from tempout to a subdirectory in workingdata
-  e_i <- read.csv(file.path(edtdir, dir(edtdir)[grep(i, dir(edtdir))]),
+  # Files -- 
+  e_i <- read.csv(file.path(edtdir, dir(edtdir)[grep(paste0("^", i, "_"), dir(edtdir))]),
                     na.strings = c("NA", "NULL"))
   
   # Prep EDT data for this state
@@ -246,7 +243,8 @@ for(i in states){ # i = "UT"
   
   timediff <- Sys.time() - starttime_state
   cat(round(timediff, 2), attr(timediff, "units"), "elapsed to overlay", i, "\n\n")
+
+  stopCluster(cl); gc()
   
 } #End state loop
 
-stopCluster(cl)

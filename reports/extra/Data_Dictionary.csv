@@ -1,0 +1,95 @@
+Variable,Notes,Select
+GRID_ID,,
+day,,
+hour,,
+Obs,,
+Pred,,
+Prob.Noncrash,,
+Prob.Crash,,
+TN,,
+FP,,
+FN,,
+TP,,
+Pred.grp,,
+nMatchEDT_buffer_Acc,,
+hour.1,,
+nWazeAccident,Count of Waze crash reports,x
+nWazeJam,Count of Waze jam reports,x
+nWazeRoadClosed,Count of Waze road closure reports,x
+nWazeWeatherOrHazard,Count of Waze Weather or Hazard reports,x
+nWazeRT3,Count of Waze reports on freeways,x
+nWazeRT4,,
+nWazeRT6,Count of Waze reports on primary roads,x
+nWazeRT7,Count of Waze reports on secondary roads,x
+nWazeRT2,,
+nWazeRT0,,
+nWazeRT1,,
+nWazeRT20,,
+nWazeRT17,,
+medLastRepRate,Median value of Waze report ratings,x
+medLastConf,Median value of Waze confidence ratings,x
+medLastReliab,Median value of Waze reliability ratings,x
+medMagVar,Median value of direction of travel,x
+nMagVar330to30,,
+nMagVar30to60,,
+nMagVar90to180,,
+nMagVar180to240,,
+nMagVar240to360,Count of Waze report traveling at heading of 240-360 degrees,x
+nWazeAcc_NW,,
+nWazeAcc_N,,
+nWazeAcc_NE,,
+nWazeAcc_SW,,
+nWazeAcc_S,,
+nWazeAcc_SE,,
+nWazeJam_NW,,
+nWazeJam_N,,
+nWazeJam_NE,,
+nWazeJam_SW,,
+nWazeJam_S,,
+nWazeJam_SE,,
+DayOfWeek,Day of Week,x
+CRASH_SUM,,
+FATALS_SUM,,
+vmt_time,,
+SUM_MAX_AADT_1,,
+SUM_MAX_AADT_2,,
+SUM_MAX_AADT_3,,
+SUM_MAX_AADT_4,,
+SUM_MAX_AADT_5,,
+HOURLY_MAX_AADT_1,Maximum hourly AADT share on interstates (F_1),x
+HOURLY_MAX_AADT_2,Maximum hourly AADT share on principal arterials - other freeways and expressways (F_2),x
+HOURLY_MAX_AADT_3,Maximum hourly AADT share on principal arterials - others (F_3),x
+HOURLY_MAX_AADT_4,Maximum hourly AADT share on minor arterials (F_4),x
+HOURLY_MAX_AADT_5,Maximum hourly AADT share on major collectors (F_5),x
+WAC_SUM_C000,,
+WAC_SUM_CE01,Sum of Workplace Area Characteristics from LEHD: number of jobs earning $1250/month or less,x
+WAC_SUM_CE02,Sum of Workplace Area Characteristics from LEHD: number of jobs earning $1251 to $3333/month,x
+WAC_SUM_CE03,,
+WAC_SUM_CS01,Sum of Workplace Area Characteristics from LEHD: number of jobs for workers with Sex: Male,x
+WAC_SUM_CS02,,
+WAC_SUM_CFS01,,
+WAC_SUM_CFS02,,
+WAC_SUM_CFS03,,
+WAC_SUM_CFS04,,
+WAC_SUM_CFS05,,
+RAC_SUM_C000,,
+RAC_SUM_CE01,,
+RAC_SUM_CE02,Sum of Residence Area Characteristics from LEHD: number of jobs earning $1251 to $3333/month,x
+RAC_SUM_CE03,,
+nHazardOnRoad,,
+nHazardOnShoulder,,
+nHazardWeather,"Count of Waze hazard reports, sub-type weather",x
+nWazeAccidentMajor,"Count of Waze crash reports, sub-type major",x
+nWazeAccidentMinor,"Count of Waze crash reports, sub-type minor",x
+nWazeHazardCarStoppedRoad,"Count of Waze hazard reports, sub-type car stopped on road",x
+nWazeHazardCarStoppedShoulder,"Count of Waze hazard reports, sub-type car stopped on shoulder",x
+nWazeHazardConstruction,,
+nWazeHazardObjectOnRoad,,
+nWazeHazardPotholeOnRoad,,
+nWazeHazardRoadKillOnRoad,,
+nWazeJamModerate,,
+nWazeJamHeavy,"Count of Waze jam reports, sub-type heavy",x
+nWazeJamStandStill,"Count of Waze jam reports, sub-type standstill",x
+nWazeWeatherFlood,"Count of Waze hazard reports, sub-type weather/flood",x
+nWazeWeatherFog,,
+nWazeHazardIceRoad,,

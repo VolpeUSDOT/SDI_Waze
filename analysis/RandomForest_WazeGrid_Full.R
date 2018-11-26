@@ -18,11 +18,12 @@ source(file.path(codeloc, 'utility/get_packages.R')) # installs necessary packag
 HEXSIZE = 1 #c("1", "4", "05")[1] # Change the value in the bracket to use 1, 4, or 0.5 sq mi hexagon grids
 
 # <><><><><>
-state = 'CT'  #'UT' # Sets the state. UT, VA, MD will all be options.
+state = 'UT' #'CT'  #'UT' # Sets the state. UT, VA, MD will all be options.
 # <><><><><>
 
 # Manually setting months to run here; could also scan S3 for months available for this state
-do.months = paste("2017", c("04","05","06","07","08","09"), sep="-")
+do.months = c(paste("2017", c("04","05","06","07","08","09", "10", "11", "12"), sep="-"),
+              paste("2018", c("01","02","03","04"), sep="-"))
 
 REASSESS = F # re-assess model fit and diagnostics using reassess.rf instead of do.rf
 
@@ -62,7 +63,7 @@ for(mo in do.months){
 # This was useful when testing different grid sizes, to make sure everything was matching correctly.
 CHECKPLOT = F
 if(CHECKPLOT){
-  grid_shp <- rgdal::readOGR(file.path(localdir, "Hex"), paste0(state, "_hexagons_1mi_neighbors"))
+  grid_shp <- rgdal::readOGR(file.path(localdir, "Hex", state), paste0(state, "_hexagons_1mi_neighbors"))
   
   w.g <- match(w.2017_04$GRID_ID, grid_shp$GRID_ID)
   w.g <- w.g[!is.na(w.g)]
@@ -72,23 +73,27 @@ if(CHECKPLOT){
   rm(w.g, gs, grid_shp)
 }
 
-# Update this later after getting supplemental data ready
 # Add FARS, AADT, HPMS, jobs
  na.action = "fill0"
-# for(w in c("w.04", "w.05", "w.06", "w.07","w.08", "w.09")){
-#   append.hex(hexname = w, data.to.add = "FARS_MD_2012_2016_sum_annual", na.action = na.action)
-    append.hex(hexname = w, data.to.add = paste0("FARS_", state, "_2012_2016_sum_annual"), na.action = na.action)
  
- #   append.hex(hexname = w, data.to.add = "hexagons_1mi_routes_AADT_total_sum", na.action = na.action)
-
- #   append.hex(hexname = w, data.to.add = "hexagons_1mi_routes_sum", na.action = na.action)
-#   append.hex(hexname = w, data.to.add = "hexagons_1mi_bg_lodes_sum", na.action = na.action)
-#   append.hex(hexname = w, data.to.add = "hexagons_1mi_bg_rac_sum", na.action = na.action)
-#   }
+ monthfiles = paste("w", do.months, sep=".")
+ monthfiles = sub("-", "_", monthfiles)
+ 
+ # Append supplmental data. This is now a time-intensive step, with hourly VMT; consider making this parallel
+ 
+for(w in monthfiles){ # w = "w.2017_04"
+   append.hex2(hexname = w, data.to.add = paste0("FARS_", state, "_2012_2016_sum_annual"), state = state, na.action = na.action)
+   
+   # VMT   
+   append.hex2(hexname = w, data.to.add = paste0(state, "_total_aadt_by_grid_fc_urban_VMTfactored"), state = state, na.action = na.action)
+ 
+   append.hex2(hexname = w, data.to.add = paste0(state, "_hexagons_1mi_bg_wac_sum"), state = state, na.action = na.action)
+   append.hex2(hexname = w, data.to.add = paste0(state, "_hexagons_1mi_bg_rac_sum"), state=state, na.action = na.action)
+ }
 
 
 # Bind all months together
-w.allmonths.named <- ls()[grep("^w.", ls())]
+w.allmonths.named <- monthfiles
 
 w.allmonths <- vector()
 for(i in w.allmonths.named){

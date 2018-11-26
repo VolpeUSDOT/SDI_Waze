@@ -1,0 +1,283 @@
+---
+title: ''
+output:
+  html_document:
+    df_print: paged
+    toc: yes
+    toc_depth: 3
+    toc_float:
+      collapsed: yes
+      smooth_scroll: yes
+---
+
+```{r setup, include=FALSE, echo = FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+
+codeloc <- "~/SDI_Waze" 
+teambucket <- "s3://prod-sdc-sdi-911061262852-us-east-1-bucket"
+user <- paste0( "/home/", system("whoami", intern = TRUE)) # the user directory to use
+localdir <- paste0(user, "/workingdata") # full path for readOGR
+outputdir <- file.path(localdir, 'Random_Forest_Output')
+
+library(tidyverse)
+library(knitr)
+library(kableExtra)
+library(randomForest)
+library(pander)
+library(DT)
+# Run this if you don't have these packages:
+# source(file.path(codeloc, 'utility/get_packages.R'))
+
+knitr::opts_knit$set(root.dir = localdir)
+
+# read utility functions
+source(file.path(codeloc, 'utility/wazefunctions.R'))
+
+# read random forest functions
+source(file.path(codeloc, "analysis/RandomForest_WazeGrid_Fx.R"))
+```
+
+```{r getfiles, message=FALSE, warning=FALSE}
+
+# Pull down model outputs from S3 if necessary
+md.files <-  c(
+  'MD_VMT_Output_to_30.RData',
+  'MD_Model_30_RandomForest_Output.RData',
+  'MD_Model_63_RandomForest_Output.RData',
+  'MD_Model_62_RandomForest_Output.RData',
+  'MD_Model_61_RandomForest_Output.RData')
+
+# MD files
+#  system(paste("aws s3 ls", file.path(teambucket, 'MD/')))
+
+for(i in md.files){
+  if(length(grep(i, dir(outputdir))) == 0){
+    system(paste("aws s3 cp",
+                 file.path(teambucket, "MD", i),
+                 file.path(outputdir, i)))
+  }
+}
+
+ct.files <-  c(
+  'CT_VMT_Output_to_30.RData',
+  'CT_Model_30_RandomForest_Output.RData',
+  'CT_Model_63_RandomForest_Output.RData',
+  'CT_Model_62_RandomForest_Output.RData',
+  'CT_Model_61_RandomForest_Output.RData')
+
+# CT files
+#  system(paste("aws s3 ls", file.path(teambucket, 'CT/')))
+
+for(i in ct.files){
+  if(length(grep(i, dir(outputdir))) == 0){
+    system(paste("aws s3 cp",
+                 file.path(teambucket, "CT", i),
+                 file.path(outputdir, i)))
+  }
+}
+
+```
+
+# Traffic volume measures
+
+The Safety Data Initiative Waze pilot project has focused on how crowdsourced roadway inicident reports from Waze can be used to estimate police-reportable crashes. A number of supplmental data sources were found to add value to the machine learning models of crashes, including average annual daily traffic (AADT). AADT values were extracted for all roads in the Highway Performance Monitoring System (HPMS) of FHWA, applied to the 1 sq mile grid cells used in the modeling approach. This variable substantially improved model performance, principally by better reducing the number of false negatives: grid cells and hours where crashes were reported in the EDT data, but the model did not identify that grid cell and hour as a crash. 
+
+While AADT is a useful variable, it is a single static for each road segment. As an alternative, we worked with researchers at Volpe and FHWA who have developed a method to apportion AADT values over the course of a year, applying adjustments to account for hour of day, day of week, and month of year. We refer to those values here as "hourly AADT shares". *Jonathan: is there a citation?*
+
+Using Maryland as the basis for testing the hourly AADT shares, two 
+
+by sum of the AADT in the roads in a grid cell, from HPMS.
+
+- VMT: Volume of traffic distributed by hour of day, day of week, and month of year from ATR data. Approximately 5,000 stations on the National Highway System (NHS). Hour of year VMT is the product of hour of year volume and HPMS segment length.
+
+#### Maryland hourly AADT shares model comparisons
+
+```{r MD_VMT_metrics, echo = F}
+# Get outputs
+load(file.path(outputdir, "MD_VMT_Output_to_30.RData"))
+
+tabl <- vector()
+for(i in c("18", "61", "62", "30")){ tabl <- rbind(tabl, c(100*keyoutputs[[i]]$diag, round(keyoutputs[[i]]$auc, 4)))}
+
+colnames(tabl)[1:5] = c("Accuracy", "Precision", "Recall", "False Positive Rate", "AUC")
+rownames(tabl) =  c("Simple model", "AADT", "Hourly AADT", "Full model")
+datatable(tabl, 
+          caption = "Maryland Hourly AADT model comparisons",
+          rownames = T,
+          options = list(dom = "t",
+                         order = list(list(5, 'desc')),
+                         pageLength = 5)
+          ) %>% formatCurrency(1:4, currency = "", digits = 2) %>% formatCurrency(5, currency = "", digits = 3) %>%
+          formatStyle(1, background = styleEqual(max(tabl[,1]), 'lightgreen'))%>%
+          formatStyle(2, background = styleEqual(max(tabl[,2]), 'lightgreen'))%>%
+          formatStyle(3, background = styleEqual(max(tabl[,3]), 'lightgreen'))%>%
+          formatStyle(4, background = styleEqual(min(tabl[,4]), 'lightgreen'))%>%
+          formatStyle(5, background = styleEqual(max(tabl[,5]), 'lightgreen'))
+```   
+
+#### Connecticut Hourly AADT model comparisons
+
+
+```{r CT_VMT_metrics, echo = F}
+# Get outputs
+
+load(file.path(localdir, "CT_VMT_Output_to_18"))
+k_18 = keyoutputs
+load(file.path(outputdir, "CT_VMT_Output_to_30.RData"))
+keyoutputs[['18']] = k_18[['18']]
+
+tabl <- vector()
+for(i in c("18","61", "62",  "30")){ tabl <- rbind(tabl, c(100*keyoutputs[[i]]$diag, round(keyoutputs[[i]]$auc, 4)))}
+
+colnames(tabl)[1:5] = c("Accuracy", "Precision", "Recall", "False Positive Rate", "AUC")
+rownames(tabl) =  c("Simple model", "AADT", "Hourly AADT", "Full model")
+datatable(tabl, 
+          caption = "Connecticut Hourly AADT model comparisons",
+          rownames = T,
+          options = list(dom = "t",
+                         order = list(list(5, 'desc')),
+                         pageLength = 5)
+          ) %>% formatCurrency(1:4, currency = "", digits = 2) %>% 
+                formatCurrency(5, currency = "", digits = 3) %>%
+          formatStyle(1, background = styleEqual(max(tabl[,1]), 'lightgreen'))%>%
+          formatStyle(2, background = styleEqual(max(tabl[,2]), 'lightgreen'))%>%
+          formatStyle(3, background = styleEqual(max(tabl[,3]), 'lightgreen'))%>%
+          formatStyle(4, background = styleEqual(min(tabl[,4]), 'lightgreen'))%>%
+          formatStyle(5, background = styleEqual(max(tabl[,5]), 'lightgreen'))
+```   
+
+
+#### Utah Hourly AADT model comparisons
+
+```{r UT_VMT_metrics, echo = F}
+# Get outputs
+load(file.path(localdir, "UT_VMT_Output_to_30.RData"))
+
+tabl <- vector()
+for(i in c("18","61", "62", "30")){ tabl <- rbind(tabl, c(100*keyoutputs[[i]]$diag, round(keyoutputs[[i]]$auc, 4)))}
+
+colnames(tabl)[1:5] = c("Accuracy", "Precision", "Recall", "False Positive Rate", "AUC")
+rownames(tabl) =  c("Simple model", "AADT", "Hourly AADT", "Full model")
+datatable(tabl, 
+          caption = "Utah Hourly AADT model comparisons",
+          rownames = T,
+          options = list(dom = "t",
+                         order = list(list(5, 'desc')),
+                         pageLength = 5)
+          ) %>% formatCurrency(1:4, currency = "", digits = 2) %>% 
+                formatCurrency(5, currency = "", digits = 3) %>%
+          formatStyle(1, background = styleEqual(max(tabl[,1]), 'lightgreen'))%>%
+          formatStyle(2, background = styleEqual(max(tabl[,2]), 'lightgreen'))%>%
+          formatStyle(3, background = styleEqual(max(tabl[,3]), 'lightgreen'))%>%
+          formatStyle(4, background = styleEqual(min(tabl[,4]), 'lightgreen'))%>%
+          formatStyle(5, background = styleEqual(max(tabl[,5]), 'lightgreen'))
+```   
+
+
+#### Virginia Hourly AADT model comparisons
+
+```{r VA_VMT_metrics, echo = F}
+# Get outputs
+load(file.path(localdir, "VA_VMT_Output_to_30.RData"))
+
+tabl <- vector()
+for(i in c("18","61", "62", "30")){ tabl <- rbind(tabl, c(100*keyoutputs[[i]]$diag, round(keyoutputs[[i]]$auc, 4)))}
+
+colnames(tabl)[1:5] = c("Accuracy", "Precision", "Recall", "False Positive Rate", "AUC")
+rownames(tabl) =  c("Simple model", "AADT", "Hourly AADT", "Full model")
+datatable(tabl, 
+          caption = "Virginia Hourly AADT model comparisons",
+          rownames = T,
+          options = list(dom = "t",
+                         order = list(list(5, 'desc')),
+                         pageLength = 5)
+          ) %>% formatCurrency(1:4, currency = "", digits = 2) %>% 
+                formatCurrency(5, currency = "", digits = 3) %>%
+          formatStyle(1, background = styleEqual(max(tabl[,1]), 'lightgreen'))%>%
+          formatStyle(2, background = styleEqual(max(tabl[,2]), 'lightgreen'))%>%
+          formatStyle(3, background = styleEqual(max(tabl[,3]), 'lightgreen'))%>%
+          formatStyle(4, background = styleEqual(min(tabl[,4]), 'lightgreen'))%>%
+          formatStyle(5, background = styleEqual(max(tabl[,5]), 'lightgreen'))
+```   
+
+
+
+## Importance of Hourly AADT variables
+
+
+
+```{r CT_MD_varimp_table, eval=T}
+load(file.path(outputdir, "CT_Model_30_RandomForest_Output.RData"))
+CT_rf.out = rf.out
+
+load(file.path(outputdir, "MD_Model_30_RandomForest_Output.RData"))
+MD_rf.out = rf.out
+
+load(file.path(outputdir, "UT_Model_30_RandomForest_Output.RData"))
+UT_rf.out = rf.out
+
+load(file.path(outputdir, "VA_Model_30_RandomForest_Output.RData"))
+VA_rf.out = rf.out
+
+nimp = 100
+
+CT_rf.out$importance = 100*CT_rf.out$importance / sum(CT_rf.out$importance)
+MD_rf.out$importance = 100*MD_rf.out$importance / sum(MD_rf.out$importance)
+UT_rf.out$importance = 100*UT_rf.out$importance / sum(UT_rf.out$importance)
+VA_rf.out$importance = 100*VA_rf.out$importance / sum(VA_rf.out$importance)
+
+CT_imp = CT_rf.out$importance[order(CT_rf.out$importance, decreasing = T)[1:nimp],]
+MD_imp = MD_rf.out$importance[order(MD_rf.out$importance, decreasing = T)[1:nimp],]
+UT_imp = UT_rf.out$importance[order(UT_rf.out$importance, decreasing = T)[1:nimp],]
+VA_imp = VA_rf.out$importance[order(VA_rf.out$importance, decreasing = T)[1:nimp],]
+
+CT_imp = data.frame(var = names(CT_imp),
+                    CT_rank = 1:nimp,
+                    CT_Importance = CT_imp)
+
+MD_imp = data.frame(var = names(MD_imp),
+                    MD_rank = 1:nimp,
+                    MD_Importance = MD_imp)
+
+UT_imp = data.frame(var = names(UT_imp),
+                    UT_rank = 1:nimp,
+                    UT_Importance = UT_imp)
+VA_imp = data.frame(var = names(VA_imp),
+                    VA_rank = 1:nimp,
+                    VA_Importance = VA_imp)
+
+
+CT_MD_imp = full_join(CT_imp, MD_imp, by = "var")
+All_imp = full_join(CT_MD_imp, UT_imp, by = "var")
+All_imp = full_join(All_imp, VA_imp, by = "var")
+
+# Get rank of Hourly AADT variables
+VMT_table = All_imp[grep("HOURLY", All_imp$var),]
+
+VMT_table = VMT_table[order(VMT_table$var),]
+VMT_table$var = c("Hourly Hourly AADT - 1 Interstate",
+                  "Hourly Hourly AADT - 2 Principal Arterial - Freeway and Expressway",
+                  "Hourly Hourly AADT - 3 Principal Arterial",
+                  "Hourly Hourly AADT - 4 Minor Arterial",
+                  "Hourly Hourly AADT - 5 Major Collector"
+                  )
+
+datatable(VMT_table,
+          rownames = FALSE,
+          colnames = c("VMT Variable", "CT Rank", "CT Importance",
+                       "MD Rank", "MD Importance",
+                       "UT Rank", "UT Importance",
+                       "VA Rank", "VA Importance"),
+          caption = "Importance of Hourly AADT variables for the four focal states.",
+           options = list(dom = "t",
+                          order = list(0, 'asc'),
+                          autoWidth = T)
+          ) %>% formatCurrency(c(3, 5, 7, 9), currency = "", digits = 2)
+
+```
+
+
+### Estimated crashes with and without Hourly AADT variables
+
+
+

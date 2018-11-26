@@ -1,3 +1,4 @@
+# Step 2 of the data cleaning pipeline, follows ReduceWaze_SDC.R
 # Time-space match points
 # Matching EDT and Waze events.
 
@@ -38,7 +39,7 @@ states = c("CT", "UT", "VA", "MD")
 
 yearmonths = c(
   paste(2017, formatC(4:12, width = 2, flag = "0"), sep="-"),
-  paste(2018, formatC(1:4, width = 2, flag = "0"), sep="-")
+  paste(2018, formatC(1:8, width = 2, flag = "0"), sep="-")
 )
 
 # Time zone picker:
@@ -66,7 +67,8 @@ for(i in states) {  #i= "MD"
   wazemonthfiles = wazemonthfiles[-omit]
   
   # get EDT data for this state
-  e_i <- read.csv(file.path(edtdir, dir(edtdir)[grep(i, dir(edtdir))]),
+  e_i <- read.csv(file.path(edtdir, "CTMDUTVA_20170401_20180731.txt"),
+                  sep = "\t",
                   na.strings = c("NA", "NULL")) 
   
   # find rows with missing lat/long
