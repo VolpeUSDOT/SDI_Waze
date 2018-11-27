@@ -46,6 +46,35 @@ for (i in states){
   system(paste('mkdir -p', file.path("~", "workingdata", i)))
 }
 
+# Waze data ----
+# Grab any <state>_<yyyy-mm>.RData files from S3 and place in appropriate state directory on local
+
+
+for(state in states){
+  Waze.ls <- system(paste("aws s3 ls", 
+                             file.path(teambucket, paste0(state, "/"))
+  ),
+  intern = T)
+  
+  # parse to file names
+  Waze.ls <- unlist(lapply(strsplit(Waze.ls, " "), function(x) x[[length(x)]]))
+  
+  Waze.ls <- Waze.ls[grep(paste0("^", state, "_"), Waze.ls)] # get just Waze files: starts with <state>_
+  Waze.ls <- Waze.ls[grep("RData$", Waze.ls)] # ends with RData
+  Waze.ls <- Waze.ls[nchar(Waze.ls)==16] # is 16 characters long 
+  
+  for(i in Waze.ls){
+    if(length(grep(i, dir(file.path('~', 'workingdata', state, 'Waze'))))==0){
+      
+      system(paste("aws s3 cp",
+                   file.path(teambucket, state, i),
+                   file.path('~', 'workingdata', state, 'Waze', i)))
+    }
+  }
+}
+
+
+
 # census ----
 
 # cb_2016_us_ua10_500k
@@ -88,7 +117,7 @@ for(i in edt.ls){
 
 # Rename Maryland to MD
 
-system(paste('mv ~/workingdata/EDT/Maryland_april2017_to_present.csv ~/workingdata/EDT/MD_april2017_to_present.csv'))
+# system(paste('mv ~/workingdata/EDT/Maryland_april2017_to_present.csv ~/workingdata/EDT/MD_april2017_to_present.csv'))
 
 # Hex ----
 
@@ -296,7 +325,7 @@ for(i in tn.ls){
                                                 file.path('~', 'workingdata', 'TN/')))
       
       
-        
+      
       }
   }
 }
