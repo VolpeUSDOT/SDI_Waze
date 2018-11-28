@@ -23,7 +23,8 @@ loadpacks <- c(
             "rgeos",  # for gIntersection, to clip two shapefiles
             "sp",
             "tidyverse",
-            "utils")
+            "utils",
+			"dplyr")
 
 
 for(i in loadpacks){if(length(grep(i, (.packages(all.available=T))))==0) install.packages(i, dependencies =TRUE)}
