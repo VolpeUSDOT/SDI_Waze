@@ -23,11 +23,11 @@ startday = '2018-01-01'
 endday   = '2018-11-30'
 
 # Bounding box which roughly encompasses all of Bellevue
-latrange = c(47.4,  47.7) 
-lonrange = c(-122.0, -122.4)
+latrange = c(47.0,  48.0) 
+lonrange = c(-122.0, -123)
 
 alert_query <- paste0("SELECT DISTINCT alert_uuid, alert_type, sub_type, street, city, state, magvar, report_description, location_lat, location_lon, jam_uuid, start_pub_utc_timestamp, pub_utc_timestamp, road_type from dw_waze.alert
-WHERE state='MA'
+WHERE state='WA'
   AND pub_utc_timestamp BETWEEN to_timestamp('",startday, " 00:00:00','YYYY-MM-DD HH24:MI:SS') 
   AND     to_timestamp('", endday," 23:59:59','YYYY-MM-DD HH24:MI:SS')
   AND location_lat BETWEEN ", latrange[1], " AND ", latrange[2], " AND location_lon BETWEEN ", lonrange[1], " AND ", lonrange[2],";")
@@ -38,18 +38,17 @@ cat(format(nrow(results), big.mark = ","), "observations \n")
 
 fn = paste0("Bellevue_Raw_events_", startday, "_to_", endday,".csv")
 
-write.csv(results, file = file.path(working.loc, "WA", fn))
+write.csv(results, file = file.path(localdir, "WA", fn))
 
 # Copy to S3
 system(paste("aws s3 cp",
-             file.path(working.loc, "WA", fn),
+             file.path(localdir, "WA", fn),
              file.path(teambucket, "WA", fn)))
 
-
-
-# rows
+# 3.125 M rows
 
 # 2. Query jams ----
+
 # MA notes
 # Looping over one month at time, 1 - 1.6 GB each as .csv. Also saving as .RData for easier further processings.
 # Each month 5-7 million rows, takes ~ 7 min to query three months and upload.
@@ -79,15 +78,15 @@ for(mo in 1:length(months)){ # mo = 1
   
   fn = paste0("WA_jams_", yearmonths.1[mo], "_to_", yearmonths.end[mo],".csv")
   
-  write.csv(results, file = file.path(working.loc, "WA", fn), row.names=F)
+  write.csv(results, file = file.path(localdir, "WA", fn), row.names=F)
 
-  fn.R = paste0("MA_jams_", yearmonths.1[mo], "_to_", yearmonths.end[mo],".RData")
+  fn.R = paste0("WA_jams_", yearmonths.1[mo], "_to_", yearmonths.end[mo],".RData")
   
-  save("results", file = file.path(working.loc, "WA", fn.R))
+  save("results", file = file.path(localdir, "WA", fn.R))
   
   # Copy to S3
   system(paste("aws s3 cp",
-               file.path(working.loc, "WA", fn),
+               file.path(localdir, "WA", fn),
                file.path(teambucket, "WA", fn)))
   
   # Save jam ids
@@ -96,12 +95,16 @@ for(mo in 1:length(months)){ # mo = 1
 
 jam_ids <- unique(jam_ids)
 
-save('jam_ids', file = file.path(working.loc, "WA", "Jam_ID.RData"))
+save('jam_ids', file = file.path(localdir, "WA", "Jam_ID.RData"))
+
+system(paste("aws s3 cp",
+             file.path(localdir, "WA", "Jam_ID.RData"),
+             file.path(teambucket, "WA", "Jam_ID.RData")))
 
 # 3. Query jam_point_sequence ----
 # Only have jam uuid and lat long. So can match to jam_ids from jam table, and also restrict by lat long.
 
-load(file.path(working.loc, 'WA', 'Jam_ID.RData'))
+load(file.path(localdir, 'WA', 'Jam_ID.RData'))
 
 # jam_id	        varchar(50)	
 # location_x    	varchar(50)
@@ -149,14 +152,14 @@ cat(round(timediff, 2), attr(timediff, "units"), "elapsed to query all jams\n\n"
 # Save to S3
 fn = paste0("WA_jam_point_sequence.csv")
 
-write.csv(results_all, file = file.path(working.loc, "WA", fn), row.names=F)
+write.csv(results_all, file = file.path(localdir, "WA", fn), row.names=F)
 
 fn.R = paste0("WA_jam_point_sequence.RData")
 
-save("results_all", file = file.path(working.loc, "WA", fn.R))
+save("results_all", file = file.path(localdir, "WA", fn.R))
 
 system(paste("aws s3 cp",
-             file.path(working.loc, "WA", fn),
+             file.path(localdir, "WA", fn),
              file.path(teambucket, "WA", fn)))
 
 
@@ -164,23 +167,23 @@ system(paste("aws s3 cp",
 
 #  Given that now we have jams located in time (from jam table, step 2) and located in both space and time (from jam_point_sequence, queried with step 2. jam IDs), we can go back to the jam table and limit by space.
 
-load(file.path(working.loc, "WA", "WA_jam_point_sequence.RData")) # called results_all. Remove after grabbing IDs to save RAM
+load(file.path(localdir, "WA", "WA_jam_point_sequence.RData")) # called results_all. Remove after grabbing IDs to save RAM
 
 jam_id_space_time <- unique(results_all$jam_id); rm(results_all)
 
 cat(format(length(jam_id_space_time), big.mark=","), "unique jam IDs by the space and time filters")
 
-# xxxx M unique jam IDs now
+# 5,187,471 M unique jam IDs now
 
 # load the jam data, in month chunks
 
-jam_data_files <- dir(working.loc)[grep("WA_jams_2018", dir(working.loc))]
+jam_data_files <- dir(file.path(localdir, "WA"))[grep("WA_jams_2018", dir(file.path(localdir, "WA")))]
 jam_data_files <- jam_data_files[grep("rdata$", tolower(jam_data_files))]
 
 all_jams <- vector()
 
 for(i in jam_data_files){
-  load(file.path(working.loc, i)) # called results, each about 1 Gb
+  load(file.path(localdir, "WA", i)) # called results, each about 1 Gb
   
   # filter by jam_id_space_time here
   r2 <- results %>% 
@@ -204,12 +207,12 @@ length(unique(all_jams$id)) == length(jam_id_space_time) # TRUE
 # Save to S3
 fn = paste0("WA_jams_2018-01-01_to_2018-11-30.csv")
 
-write.csv(all_jams, file = file.path(working.loc, "WA", fn), row.names=F)
+write.csv(all_jams, file = file.path(localdir, "WA", fn), row.names=F)
 
 fn.R = paste0("WA_jams_2018-01-01_to_2018-11-30.RData")
 
-save("all_jams", file = file.path(working.loc, "WA", fn.R))
+save("all_jams", file = file.path(localdir, "WA", fn.R))
 
 system(paste("aws s3 cp",
-             file.path(working.loc, "WA", fn),
+             file.path(localdir, "WA", fn),
              file.path(teambucket, "WA", fn)))
