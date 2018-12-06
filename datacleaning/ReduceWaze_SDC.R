@@ -34,19 +34,19 @@ source(file.path(codeloc, 'utility/wazefunctions.R'))
 source(file.path(codeloc, 'utility/connect_redshift_pgsql.R'))
 
 # Query parameters
-# states with available EDT data for model testing
-states = c("CT", "MD", "TN", "UT", "VA", "WA")
+# states with available EDT data for model testing. Adding NC for disaster test
+states = c("CT", "MD", "NC", "TN", "UT", "VA", "WA")
 
 # Time zone picker:
 tzs <- data.frame(states, 
                   tz = c("US/Eastern",
                          "US/Eastern",
                          "US/Eastern",
+                         "US/Eastern",
                          "US/Mountain",
                          "US/Eastern",
                          "US/Pacific"),
                   stringsAsFactors = F)
-
 # <><><><><><><><><><><><><><><><><><><><><><><><>
 # Compiling by State ----
 # <><><><><><><><><><><><><><><><><><><><><><><><>
@@ -54,7 +54,7 @@ tzs <- data.frame(states,
 # Get year/month, year/month/day, and last day of month vectors to create the SQL queries
 yearmonths = c(
   paste(2017, formatC(4:12, width = 2, flag = "0"), sep="-"),
-  paste(2018, formatC(1:10, width = 2, flag = "0"), sep="-")
+  paste(2018, formatC(1:11, width = 2, flag = "0"), sep="-")
 )
 yearmonths.1 <- paste(yearmonths, "01", sep = "-")
 lastdays <- days_in_month(as.POSIXct(yearmonths.1)) # from lubridate
@@ -273,3 +273,12 @@ for(i in states){ # i = "UT"
 } # end state loop
 
 
+# re-organized from tempout to state folders in workingdir
+for(state in states){
+  state.files <- dir(output.loc)
+  state.files <- state.files[grep(paste0("^", state, "_"), state.files)]
+  for(sf in state.files){
+    system(paste("mv", file.path(output.loc, sf),
+                 file.path(localdir, state, sf)))
+  }
+}

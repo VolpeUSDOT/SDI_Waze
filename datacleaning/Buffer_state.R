@@ -16,13 +16,13 @@ library(maptools) # for unionSpatialPolygons
 library(rgdal) # for readOGR(), needed for reading in ArcM shapefiles
 library(rgeos) # for gIntersection, to clip two shapefiles
 library(tidyverse)
-localdir <- paste0(user, "/workingdata/census") # full path for readOGR
+censusdir <- paste0(user, "/workingdata/census") # full path for readOGR
 localdir.hex <- paste0(user, "/workingdata/Hex")
 
-setwd(localdir)
+setwd(censusdir)
 
 # Read in county data from Census. In EPSG:4269.
-counties <- rgdal::readOGR(localdir, layer = "cb_2017_us_county_500k")
+counties <- rgdal::readOGR(censusdir, layer = "cb_2017_us_county_500k")
 
 # Read in hexagon shapefile, as .RData. This is a rectangular surface of 1 sq mi area hexagons, national for lower 48 states. For now, just use hex files created outside of SDC (hex files created as subsets of national in ArcGIS Pro)
 # load("~/workingdata/Hex/hexagons_1mi_lower48_neighbors.RData")
