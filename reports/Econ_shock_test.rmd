@@ -1,14 +1,13 @@
 ---
+html_document:
+  df_print: paged
+  toc: yes
+  toc_depth: 4
+  toc_float:
+    collapsed: yes
+    smooth_scroll: yes
+author: "Dan Flynn | Volpe"
 title: "Waze / Economic Shock Test"
-author: "Dan Flynn"
-date: "12/3/2018"
-  html_document:
-    df_print: paged
-    toc: yes
-    toc_depth: 3
-    toc_float:
-      collapsed: yes
-      smooth_scroll: yes
 ---
 
 
@@ -17,7 +16,7 @@ date: "12/3/2018"
 
 
 ```{r setup, echo = F, message = F, warning=F}
-knitr::opts_chunk$set(warning = FALSE, message = FALSE)
+knitr::opts_chunk$set(warning = FALSE, message = FALSE, echo = F)
 library(tidyverse)
 library(DT)
 library(lubridate)
@@ -25,58 +24,275 @@ library(sp)
 library(maps) # for mapping base layers
 library(rgdal) # for readOGR(), needed for reading in ArcM shapefiles
 library(rgeos) # for gIntersection, to clip two shapefiles
+library(kableExtra)
 
 user <- paste0( "/home/", system("whoami", intern = TRUE))
-localdir <- paste0(user, "/workingdata/census") # full path for readOGR
+localdir <- paste0(user, "/workingdata/") # full path for readOGR
 teambucket <- "prod-sdc-sdi-911061262852-us-east-1-bucket"
 output.loc <- "~/tempout"
 codeloc <- "~/SDI_Waze"
 
 ```
 
-## Overview
+### Overview
 
 - Test data for economic recovery from natural disasters example
 - Find counties impacted by Hurricane Florence, do county level total reports of different types by day,
 - Compare to previous year
 
+Queried Waze data for North Carolina, and prepared data as counts of Waze report types by day. Overlayed with county FIPS, and filtered to manually selected counties with varying levels of impact, using [FEMA disaster declaration](https://www.census.gov/topics/preparedness/events/hurricanes/florence.html). Disaster was declared on September 14, 2018, and the official incident period was September 7 to 29, 2018. No disasters were declared in North Carolina in 2017.
 
-```{r county_overlay}
+```{r prep_data}
 state = "NC"
 
-# Done in ReduceWaze_SDC.R
-# in two parts: 2018-06  to 2018-10, then 2017-06 to 2017-10
-load(file.path(output.loc, "NC_Raw_events_to_2018-10.RData"))
-r2018 <- results
+# Using output from in ReduceWaze_SDC.R
+months_2017 = 5:11
 
-load(file.path(output.loc, "NC_Raw_events_to_2017-10.RData"))
-r2017 <- results; rm(results)
+if(length(grep("NC_Econ_Shock.RData", dir(file.path(localdir, state))))==0){
+  r2017 = vector()
+  for(i in months_2017){
+    load(file.path(localdir, state, paste0("NC_2017-", formatC(i, width = 2, flag = 0),".RData")))
+    r2017 = rbind(r2017, mb)
+    }
+  
+  months_2018 = 5:11
+  
+  r2018 = vector()
+  for(i in months_2018){
+    load(file.path(localdir, state, paste0("NC_2018-", formatC(i, width = 2, flag = 0),".RData")))
+    r2018 = rbind(r2018, mb)
+    }
+    
+  # Select columns to keep
+  keep = c("alert_uuid", "alert_type", "sub_type", "lon", "lat",
+           "nrecord",
+           "city", "time","last.pull.time", "road_type")
+  
+  d = rbind(r2017[keep],
+            r2018[keep])
+  
+  rm(mb, r2017, r2018)
+  
+  # Get spatial data
+  counties <- rgdal::readOGR(file.path(localdir, "census"), layer = "cb_2017_us_county_500k")
+  
+  
+  # Project to Albers equal area, ESRI 102008
+  proj <- showP4(showWKT("+init=epsg:102008"))
+  # USGS version of AEA. Use this for all projections for consistency; this is what the hexagon layer is in 
+  proj.USGS <- "+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs +ellps=GRS80 +towgs84=0,0,0"
+  
+  counties <- spTransform(counties, CRS(proj.USGS))
+  
+  FIPS = maps::state.fips %>% filter(abb %in% state)
+  FIPS = FIPS[!duplicated(FIPS$fips),c("abb", "fips")]
+  names(FIPS) = c("state", "FIPS")
+  FIPS$FIPS <- formatC(FIPS$FIPS, width = 2, flag = "0")
+  
+  
+  # County overlay ----
+  # d now has all NC events for selected months. 6 M rows, 10 columns 
+  # want to get the county for each event
+  d_s <- SpatialPointsDataFrame(coords = cbind(d["lon"], d["lat"]),
+                                data = d,
+                                proj4string = CRS("+proj=longlat +datum=WGS84"))
+  
+  d_s <- spTransform(d_s, CRS(proj.USGS))
+  
+  co_intersect <- gIntersects(d_s, counties, byid = T, returnDense = F)
+  
+  cv <- unlist(co_intersect)
+  
+  cf <- as.character(counties@data$GEOID[cv])
+  names(cf) = names(cv)
+  
+  d_s$county_FIPS <- cf[match(rownames(d_s@data), names(cf))]
+  
+  d_s <- d_s[!is.na(d_s$county_FIPS),]
+  
+  save(d_s, file = file.path(localdir, state, "NC_Econ_Shock.RData"))
+  } else {
+  load(file.path(localdir, state, "NC_Econ_Shock.RData"))
+}
 
-# Select columns to keep
-keep = c("alert_uuid", "uuid_version", "total_occurrences", "alert_type", "sub_type",
-         "city", "state", "pub_utc_timestamp","road_type")
+```
+
+Selected counties:
+
+```{r select_counties}
+# Which counties do we want to focus on?
+
+co_name = c("Brunswick",
+            "Carteret",
+            "Hyde",
+            "Moore",
+            "Johnston",
+            "Robeson",
+            "Buncombe",
+            "Rockingham",
+            "Haywood")
+
+co_type = c(rep("Outer banks", 3),
+            rep("Inland", 3),
+            rep("Less affected", 3))
+
+co_fips = c(37019,
+            37031,
+            37095,
+            37125,
+            37101,
+            37155,
+            37021,
+            37157,
+            37087)
+
+co <- data.frame(co_name, co_type, co_fips)
+
+
+ds <- d_s@data[d_s@data$county_FIPS %in% co$co_fips,]
+ds$Day <- format(ds$time, "%Y-%m-%d")
+ds$Year <- format(ds$time, "%Y")
+ds$JDay <- format(ds$time, "%j")
+
+# Summarize to counts of alert_types by day
+dz <- ds %>%
+  group_by(county_FIPS, Year, Day, JDay, alert_type) %>%
+  summarize(count = n())
+
+co$co_fips = as.character(co$co_fips)
+
+dz2 <- left_join(dz, co, by = c("county_FIPS" = "co_fips"))
+
+dz3 <- dz2 %>%
+  group_by(co_name, co_type, county_FIPS) %>%
+  summarize(count = sum(count))
+datatable(dz3, caption = "Selected counties in North Carolina, with total counts of Waze incident reports in May-November of 2017 and 2018",
+          rownames = F,
+          options = list(dom = "t",
+                         order = list(list(1, 'desc')))) %>%
+          formatCurrency(4, currency="", digits = 0)  
+          
+```
+
+Using data from May to November of each 2017 and 2018, in total there were `r format(nrow(d_s), big.mark = ",")` Waze reports in NC. 
+
+The vertical line in the plots below mark the disaster declaration on September 14, 2018.
+
+### Outer Banks
+
+```{r plot1}
+
+# ggplot(dz %>% filter(Year == "2017")) +
+#   geom_point(aes(x = JDay, y = count, group = alert_type, color = alert_type)) +
+#   facet_wrap(~county_FIPS)
+# 
+# ggplot(dz %>% filter(Year == "2018")) +
+#   geom_point(aes(x = JDay, y = count, group = alert_type, color = alert_type)) +
+#   facet_wrap(~county_FIPS)
+
+class(dz$JDay) = "numeric"
+vline.dat <- data.frame(Year = unique(dz$Year), vl = c(NA, 257))
+
+# Brunswick 
+ggplot(dz %>% filter(county_FIPS == "37019"),
+       aes(x = JDay, y = count, group = alert_type, color = alert_type)) +
+  geom_point(alpha = 0.2) + geom_smooth() +
+  #ylim(c(0, 250))+
+  facet_wrap(~Year) +
+  ggtitle("Brunswick County - Outer Banks, Disaster declared") + 
+  xlab("Day of year") +
+  geom_vline(aes(xintercept = vl), data = vline.dat)
+
+# Carteret
+ggplot(dz %>% filter(county_FIPS == "37031"),
+       aes(x = JDay, y = count, group = alert_type, color = alert_type)) +
+  geom_point(alpha = 0.2) + geom_smooth() +
+  facet_wrap(~Year) +
+  ggtitle("Carteret County - Outer Banks, Disaster declared") + 
+  xlab("Day of year") +
+  geom_vline(aes(xintercept = vl), data = vline.dat)
+
+# Hyde
+ggplot(dz %>% filter(county_FIPS == "37095"),
+       aes(x = JDay, y = count, group = alert_type, color = alert_type)) +
+  geom_point(alpha = 0.2) + geom_smooth() +
+  ylim(c(0, 50))+
+  facet_wrap(~Year) +
+  ggtitle("Hyde County - Outer Banks, Disaster declared")  +
+  xlab("Day of year") +
+  geom_vline(aes(xintercept = vl), data = vline.dat)
+```
+
+### Inland, Disaster declared
+
+```{r plot2}
+ggplot(dz %>% filter(county_FIPS == "37101"),
+       aes(x = JDay, y = count, group = alert_type, color = alert_type)) +
+  geom_point(alpha = 0.2) + geom_smooth() +
+#  ylim(c(0, 150))+
+  facet_wrap(~Year) +
+  ggtitle("Johnston County - Inland, Disaster declared") + 
+  xlab("Day of year") +
+  geom_vline(aes(xintercept = vl), data = vline.dat)
+
+ggplot(dz %>% filter(county_FIPS == "37125"),
+       aes(x = JDay, y = count, group = alert_type, color = alert_type)) +
+  geom_point(alpha = 0.2) + geom_smooth() +
+  ylim(c(0, 150))+
+  facet_wrap(~Year) +
+  ggtitle("Moore County - Inland, Disaster declared") + 
+  xlab("Day of year") +
+  geom_vline(aes(xintercept = vl), data = vline.dat)
+
+ggplot(dz %>% filter(county_FIPS == "37155"),
+       aes(x = JDay, y = count, group = alert_type, color = alert_type)) +
+  geom_point(alpha = 0.2) + geom_smooth() +
+#  ylim(c(0, 150))+
+  facet_wrap(~Year) +
+  ggtitle("Robeson County - Inland, Disaster declared") + 
+  xlab("Day of year") +
+  geom_vline(aes(xintercept = vl), data = vline.dat)
 
 
 
-# Get spatial data
-counties <- rgdal::readOGR(localdir, layer = "cb_2017_us_county_500k")
+```
 
 
-# Project to Albers equal area, ESRI 102008
-proj <- showP4(showWKT("+init=epsg:102008"))
-# USGS version of AEA. Use this for all projections for consistency; this is what the hexagon layer is in 
-proj.USGS <- "+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs +ellps=GRS80 +towgs84=0,0,0"
 
-counties <- spTransform(counties, CRS(proj.USGS))
+### Inland, No disaster declared
 
-FIPS = maps::state.fips %>% filter(abb %in% states)
-FIPS = FIPS[!duplicated(FIPS$fips),c("abb", "fips")]
-names(FIPS) = c("state", "FIPS")
-FIPS$FIPS <- formatC(FIPS$FIPS, width = 2, flag = "0")
+```{r plot3}
+# Buncombe (Asheville)
+ggplot(dz %>% filter(county_FIPS == "37021"),
+       aes(x = JDay, y = count, group = alert_type, color = alert_type)) +
+  geom_point(alpha = 0.2) + geom_smooth() +
+  #ylim(c(0, 250))+
+  facet_wrap(~Year) + 
+  ggtitle("Buncombe County (Asheville) - Less Affected") + 
+  xlab("Day of year") +
+  geom_vline(aes(xintercept = vl), data = vline.dat)
 
-  # hex_i_intersect <- gIntersects(xx, hex, byid = T)
-  # hex_i <- hex[hex_i_intersect[,1],]
-  # #plot(hex_i)
+
+# Haywood
+ggplot(dz %>% filter(county_FIPS == "37087"),
+       aes(x = JDay, y = count, group = alert_type, color = alert_type)) +
+  geom_point(alpha = 0.2) + geom_smooth() +
+  #ylim(c(0, 250))+
+  facet_wrap(~Year) + 
+  ggtitle("Haywood County - Less Affected") + 
+  xlab("Day of year") +
+  geom_vline(aes(xintercept = vl), data = vline.dat)
+
+# Rockingham
+ggplot(dz %>% filter(county_FIPS == "37157"),
+       aes(x = JDay, y = count, group = alert_type, color = alert_type)) +
+  geom_point(alpha = 0.2) + geom_smooth() +
+  #ylim(c(0, 250))+
+  facet_wrap(~Year) + 
+  ggtitle("Rockingham County - Less Affected") + 
+  xlab("Day of year") +
+  geom_vline(aes(xintercept = vl), data = vline.dat)
+
 
 ```
 

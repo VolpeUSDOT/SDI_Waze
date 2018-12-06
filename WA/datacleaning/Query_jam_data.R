@@ -197,9 +197,9 @@ for(i in jam_data_files){
   rm(results, r2)
   }
 
-format(object.size(all_jams), "Gb") # all jams now 1.7 Gb 
-format(nrow(all_jams), big.mark = ",") # 14,119,493 total observations
-format(length(unique(all_jams$id)), big.mark = ",") # 2,868,311 unique jams
+format(object.size(all_jams), "Gb") # all jams now 2.8 Gb 
+format(nrow(all_jams), big.mark = ",") # 23,777,516 total observations
+format(length(unique(all_jams$id)), big.mark = ",") # 5,187,471 unique jams
 
 
 length(unique(all_jams$id)) == length(jam_id_space_time) # TRUE
@@ -216,3 +216,8 @@ save("all_jams", file = file.path(localdir, "WA", fn.R))
 system(paste("aws s3 cp",
              file.path(localdir, "WA", fn),
              file.path(teambucket, "WA", fn)))
+
+
+system(paste("aws s3 cp",
+             file.path(localdir, "WA", fn.R),
+             file.path(teambucket, "WA", fn.R)))
