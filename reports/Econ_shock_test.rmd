@@ -1,11 +1,12 @@
 ---
-html_document:
-  df_print: paged
-  toc: yes
-  toc_depth: 4
-  toc_float:
-    collapsed: yes
-    smooth_scroll: yes
+output:
+  html_document:
+    df_print: paged
+    toc: yes
+    toc_depth: 4
+    toc_float:
+      collapsed: yes
+      smooth_scroll: yes
 author: "Dan Flynn | Volpe"
 title: "Waze / Economic Shock Test"
 ---
@@ -36,11 +37,14 @@ codeloc <- "~/SDI_Waze"
 
 ### Overview
 
-- Test data for economic recovery from natural disasters example
-- Find counties impacted by Hurricane Florence, do county level total reports of different types by day,
-- Compare to previous year
+The goal of this quick analysis is the following:
 
-Queried Waze data for North Carolina, and prepared data as counts of Waze report types by day. Overlayed with county FIPS, and filtered to manually selected counties with varying levels of impact, using [FEMA disaster declaration](https://www.census.gov/topics/preparedness/events/hurricanes/florence.html). Disaster was declared on September 14, 2018, and the official incident period was September 7 to 29, 2018. No disasters were declared in North Carolina in 2017.
+- Visualize Waze report data for example counties impacted by one natural disaster, in this case Hurricane Florence
+- Compare counts of total Waze incident reports for different alert types by day, by county, for 2018 and 2017
+
+These visuals will help assess what could be drawn from the Waze alert table for to support economic activity models for the Board of Governors of the Federal Reserve System. Note: in addition to the alert table, additional system-generated data on jams, including spatial extent of jam and speed, are also available. These visuals only focus on the alert table, which includes user reports of crashes, weather hazards, hazards on the road, road closures, and user-reported jams.
+
+In brief, this involved querying the Waze alert data for North Carolina, and they using GIS to assign with county FIPS codes to each alert. The data were then summarized as counts of Waze reports, by alert types, day, and county. The data were then further filtered to selected counties with varying levels of impact to Hurricane Florence, using [FEMA disaster declaration](https://www.census.gov/topics/preparedness/events/hurricanes/florence.html). Twenty-nine counties in North Carolina were included in the disaster declaration out of the 100 counties in the state. Six states and the District of Columbia were potentially affected. Disaster was declared on September 14, 2018, and the official incident period was September 7 to 29, 2018. No disasters were declared in North Carolina in 2017.
 
 ```{r prep_data}
 state = "NC"
@@ -132,9 +136,9 @@ co_name = c("Brunswick",
             "Rockingham",
             "Haywood")
 
-co_type = c(rep("Outer banks", 3),
-            rep("Inland", 3),
-            rep("Less affected", 3))
+co_type = c(rep("Outer Banks - Disaster", 3),
+            rep("Inland - Disaster", 3),
+            rep("Inland - No Disaster", 3))
 
 co_fips = c(37019,
             37031,
@@ -176,9 +180,9 @@ datatable(dz3, caption = "Selected counties in North Carolina, with total counts
 
 Using data from May to November of each 2017 and 2018, in total there were `r format(nrow(d_s), big.mark = ",")` Waze reports in NC. 
 
-The vertical line in the plots below mark the disaster declaration on September 14, 2018.
+The vertical line in the plots below mark the disaster declaration on September 14, 2018. Smoothed lines are splines.
 
-### Outer Banks
+### Outer Banks, Disaster declared
 
 ```{r plot1}
 
@@ -192,30 +196,49 @@ The vertical line in the plots below mark the disaster declaration on September 
 
 class(dz$JDay) = "numeric"
 vline.dat <- data.frame(Year = unique(dz$Year), vl = c(NA, 257))
+spanit = 0.5 # default = 1, smaller values = wigglier
 
 # Brunswick 
 ggplot(dz %>% filter(county_FIPS == "37019"),
        aes(x = JDay, y = count, group = alert_type, color = alert_type)) +
-  geom_point(alpha = 0.2) + geom_smooth() +
+  geom_point(alpha = 0.2) + geom_smooth(span=spanit) +
   #ylim(c(0, 250))+
   facet_wrap(~Year) +
   ggtitle("Brunswick County - Outer Banks, Disaster declared") + 
   xlab("Day of year") +
   geom_vline(aes(xintercept = vl), data = vline.dat)
 
+# ggplot(dz %>% filter(county_FIPS == "37019" & alert_type == "ACCIDENT"),
+#        aes(x = JDay, y = count, group = alert_type, color = alert_type)) +
+#   geom_point(alpha = 0.2) + geom_smooth(span = spanit) +
+#   #ylim(c(0, 250))+
+#   facet_wrap(~Year) +
+#   ggtitle("Brunswick County - Outer Banks, Disaster declared") + 
+#   xlab("Day of year") +
+#   geom_vline(aes(xintercept = vl), data = vline.dat)
+
 # Carteret
 ggplot(dz %>% filter(county_FIPS == "37031"),
        aes(x = JDay, y = count, group = alert_type, color = alert_type)) +
-  geom_point(alpha = 0.2) + geom_smooth() +
+  geom_point(alpha = 0.2) + geom_smooth(span=spanit) +
   facet_wrap(~Year) +
   ggtitle("Carteret County - Outer Banks, Disaster declared") + 
   xlab("Day of year") +
   geom_vline(aes(xintercept = vl), data = vline.dat)
 
+# 
+# ggplot(dz %>% filter(county_FIPS == "37031" & alert_type == "ACCIDENT"),
+#        aes(x = JDay, y = count, group = alert_type, color = alert_type)) +
+#   geom_point(alpha = 0.2) + geom_smooth(span=spanit) +
+#   facet_wrap(~Year) +
+#   ggtitle("Carteret County - Outer Banks, Disaster declared") + 
+#   xlab("Day of year") +
+#   geom_vline(aes(xintercept = vl), data = vline.dat)
+
 # Hyde
 ggplot(dz %>% filter(county_FIPS == "37095"),
        aes(x = JDay, y = count, group = alert_type, color = alert_type)) +
-  geom_point(alpha = 0.2) + geom_smooth() +
+  geom_point(alpha = 0.2) + geom_smooth(span=0.5) +
   ylim(c(0, 50))+
   facet_wrap(~Year) +
   ggtitle("Hyde County - Outer Banks, Disaster declared")  +
@@ -228,7 +251,7 @@ ggplot(dz %>% filter(county_FIPS == "37095"),
 ```{r plot2}
 ggplot(dz %>% filter(county_FIPS == "37101"),
        aes(x = JDay, y = count, group = alert_type, color = alert_type)) +
-  geom_point(alpha = 0.2) + geom_smooth() +
+  geom_point(alpha = 0.2) + geom_smooth(span=spanit) +
 #  ylim(c(0, 150))+
   facet_wrap(~Year) +
   ggtitle("Johnston County - Inland, Disaster declared") + 
@@ -237,7 +260,7 @@ ggplot(dz %>% filter(county_FIPS == "37101"),
 
 ggplot(dz %>% filter(county_FIPS == "37125"),
        aes(x = JDay, y = count, group = alert_type, color = alert_type)) +
-  geom_point(alpha = 0.2) + geom_smooth() +
+  geom_point(alpha = 0.2) + geom_smooth(span=spanit) +
   ylim(c(0, 150))+
   facet_wrap(~Year) +
   ggtitle("Moore County - Inland, Disaster declared") + 
@@ -246,7 +269,7 @@ ggplot(dz %>% filter(county_FIPS == "37125"),
 
 ggplot(dz %>% filter(county_FIPS == "37155"),
        aes(x = JDay, y = count, group = alert_type, color = alert_type)) +
-  geom_point(alpha = 0.2) + geom_smooth() +
+  geom_point(alpha = 0.2) + geom_smooth(span=spanit) +
 #  ylim(c(0, 150))+
   facet_wrap(~Year) +
   ggtitle("Robeson County - Inland, Disaster declared") + 
@@ -265,7 +288,7 @@ ggplot(dz %>% filter(county_FIPS == "37155"),
 # Buncombe (Asheville)
 ggplot(dz %>% filter(county_FIPS == "37021"),
        aes(x = JDay, y = count, group = alert_type, color = alert_type)) +
-  geom_point(alpha = 0.2) + geom_smooth() +
+  geom_point(alpha = 0.2) + geom_smooth(span=spanit) +
   #ylim(c(0, 250))+
   facet_wrap(~Year) + 
   ggtitle("Buncombe County (Asheville) - Less Affected") + 
@@ -276,7 +299,7 @@ ggplot(dz %>% filter(county_FIPS == "37021"),
 # Haywood
 ggplot(dz %>% filter(county_FIPS == "37087"),
        aes(x = JDay, y = count, group = alert_type, color = alert_type)) +
-  geom_point(alpha = 0.2) + geom_smooth() +
+  geom_point(alpha = 0.2) + geom_smooth(span=spanit) +
   #ylim(c(0, 250))+
   facet_wrap(~Year) + 
   ggtitle("Haywood County - Less Affected") + 
@@ -286,7 +309,7 @@ ggplot(dz %>% filter(county_FIPS == "37087"),
 # Rockingham
 ggplot(dz %>% filter(county_FIPS == "37157"),
        aes(x = JDay, y = count, group = alert_type, color = alert_type)) +
-  geom_point(alpha = 0.2) + geom_smooth() +
+  geom_point(alpha = 0.2) + geom_smooth(span=spanit) +
   #ylim(c(0, 250))+
   facet_wrap(~Year) + 
   ggtitle("Rockingham County - Less Affected") + 
