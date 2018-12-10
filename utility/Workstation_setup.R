@@ -312,7 +312,7 @@ for(i in special.ls){
 
 # Tennessee data ----
 
-tn.ls = c('TN.zip')
+tn.ls = c('TN.zip', 'Weather/TN_Weather_GHCN.zip')
 
 for(i in tn.ls){
   if(length(grep(i, dir(file.path('~', 'workingdata', 'TN'))))==0){
@@ -405,6 +405,15 @@ MOVEFROMUPLOAD = F
 
 if(MOVEFROMUPLOAD){
  
+  system(paste("aws s3 ls", 
+               file.path(teambucket, system('whoami', intern = T), "uploaded_files/")
+  ))
+  
+  system(paste("aws s3 mv", 
+               file.path(teambucket, system('whoami', intern = T), "uploaded_files", "TN_Weather_GHCN.zip"),
+               file.path(teambucket, "TN", "Weather", "TN_Weather_GHCN.zip"))
+  )
+  
   system(paste("aws s3 mv", 
                file.path(teambucket, system('whoami', intern = T), "uploaded_files", "TN.zip"),
                file.path(teambucket, "TN", "TN.zip"))

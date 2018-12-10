@@ -10,6 +10,7 @@ library(ggmap)
 library(httr) # for GET
 library(tidyverse)
 library(xml2) # for xml parsing in tidy way
+library(XML) # for xmlToList
 
 user <- file.path( "/home", system("whoami", intern = TRUE)) # the user directory 
 localdir <- file.path(user, "workingdata", "TN") # full path for readOGR
@@ -57,7 +58,6 @@ system(paste("aws s3 cp",
 
 # Parse to data frame, apply to spatial grid, overlay on crash data for use in models
 # Useful to look at elements of the XML file
-# library(XML)
 # dat <- xmlParse(get(xmls[1]))
 # dat
 # xmlToList(dat) 
@@ -102,4 +102,8 @@ for(i in 1:length(xmls)){
       dat <- rbind(dat, data.frame(lat, lon, yr, ydays, th, tl, cond, qpf, snow, maxwind, avewind))
     }
 }
+
+# Next steps: interpolate to state level using kriging or other methods, see 
+# http://rspatial.org/analsis/rst/4-interpolation.html
+
 
