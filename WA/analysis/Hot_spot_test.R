@@ -22,7 +22,7 @@ source(file.path(codeloc, 'utility/get_packages.R'))
 user <- paste0( "/home/", system("whoami", intern = TRUE)) #the user directory to use
 localdir <- paste0(user, "/workingdata") # full path for readOGR
 
-wazedir <- "~/tempout" # has State_Year-mo.RData files. Grab from S3 if necessary
+wazedir <- file.path(localdir, "WA") # has State_Year-mo.RData files. Grab from S3 if necessary
 
 setwd(localdir) 
 
@@ -41,19 +41,21 @@ wazemonthfiles <- wazemonthfiles[grep("RData$", wazemonthfiles)]
 # omit _Raw_
 omit <- grep('_Raw_', wazemonthfiles)
 wazemonthfiles = wazemonthfiles[-omit]
+wazemonthfiles = wazemonthfiles[nchar(wazemonthfiles)==16]
 
 use.tz <- "US/Pacific"
 
 
 # Compile events ----
 
-loc = c(-122.156285, 47.592306) # Bellevue, WA
+loc = c(-122.155, 47.59) # Bellevue, WA
 
 
 # Empty objects to store output, will rbind at the end of loop
-waze.ll = waze.ll.proj = res.tab = vector()
+waze.ll = waze.ll.proj = w.all = w.all.proj = vector()
   
 for(i in 1:length(wazemonthfiles)){ # Start loop; i = 1
+    cat(wazemonthfiles[i], "\n")
   
     load(file.path(wazedir, wazemonthfiles[i])) # load dataframe mb
   
@@ -70,7 +72,7 @@ for(i in 1:length(wazemonthfiles)){ # Start loop; i = 1
   
   zoomll <- spTransform(zoomll, CRS(proj))
   
-  zoom_box = gBuffer(zoomll, width = 9654) # 6 mile circle Bellevue
+  zoom_box = gBuffer(zoomll, width = 9654) # 6 mile circle around Bellevue
   
   zoom_box.ll = spTransform(zoom_box, CRS("+proj=longlat +datum=WGS84")) # Back to lat long for mapping
   
@@ -87,18 +89,18 @@ for(i in 1:length(wazemonthfiles)){ # Start loop; i = 1
   ll.proj <- data.frame(lat = coordinates(ws)[,2], lon = coordinates(ws)[,1], alert_type = ws$alert_type, time = ws$time, roadclass = ws$road_type)
   
   # Compile
+  w.all <- rbind(w.all, data.frame(ws.ll@coords, ws.ll@data))
+  w.all.proj <- rbind(w.all.proj, data.frame(ws@coords, ws@data))
+  
   waze.ll = rbind(waze.ll, ll)
   waze.ll.proj = rbind(waze.ll.proj, ll.proj)
  
-} # End special events day loop
-
+} # End compile Waze event loop
 
 
 # Save for plotting (will need to expand filename if doing multiple special events in a month) 
-# w   Waze events for selected month and state, as spatial points data frame
-# e   EDT crashes for selected month and state, SPDF
-# ws  Geographic zoom of Waze events 
-# es  Geographic zoom of EDT crahes
+# w.all     Waze events for selected area, as spatial points data frame, with all variables
+# waze.ll   Waze events for selected area, as spatial points data frame, with only alert type, road class, and lat long
 # zoom_box  Bounding area for the geographic zoom
 # zoomll    Lat/long of special event location at center of bounding area
 
@@ -106,8 +108,10 @@ for(i in 1:length(wazemonthfiles)){ # Start loop; i = 1
 
 fn = paste(state, "Bellevue_prep.RData", sep="_")
 
-save(list = c("w", "ws", "zoom_box", "zoomll",
-              "ws.ll", "ll.proj", "zoom_box.ll"),
+save(list = c("zoom_box", "zoomll",
+              "w.all", "w.all.proj",
+              "waze.ll", "waze.ll.proj",
+              "zoom_box.ll"),
      file = file.path(localdir, "WA", 
                       fn))
 
@@ -167,20 +171,43 @@ waze.ll$Date = format(waze.ll$time, "%Y-%m-%d")
 waze.ll$YM = format(waze.ll$time, "%Y-%m")
 
 
-table(waze.ll %>% filter(alert_type =="ACCIDENT") %>% select(YM))
+table(waze.ll %>% filter(alert_type =="ACCIDENT" & roadclass != 1) %>% select(YM))
 
-ggplot(waze.ll %>% filter(alert_type == "ACCIDENT" & YM != "2017-03" & YM != "2018-09")) +
+ggplot(waze.ll %>% filter(alert_type == "ACCIDENT" & YM != "2017-03")) +
   geom_histogram(aes(x = YM), stat="count") +
   ylab("Count of Waze accident reports") + xlab("Year-month") +
   ggtitle("Count of Waze accident reports by month within 6-mile buffer \n
           of Bellevue, WA city center")
 
+# Omitting Highway 
+nametable <- sort(table(as.factor(w.all$street)), decreasing = T)
+nametable[1:25]
 
-  figname = file.path(localdir, 'Figures', paste(state, "Bellevue_Hot_Spot.pdf", sep="_"))
+to_omit = c("I-405", "I-90", "SR-520", "I-5")
+
+omits = vector()
+for(i in to_omit){
+  omits = c(omits, grep(paste0("^", i), w.all$street))
+}
+w.nohwy = w.all[is.na(match(1:nrow(w.all), omits)),]
+
+# also omit by road_type = 3
+table(w.nohwy$road_type)
+table(w.all$road_type)
+
+nametable <- sort(table(as.factor(w.nohwy$street)), decreasing = T)
+nametable[1:25]
+
+nametable.rt3 <- sort(table(as.factor(w.nohwy[w.nohwy$road_type == 3, "street"])), decreasing = T)
+nametable.rt3
+
+figname = file.path(localdir, 'Figures', paste(state, "Bellevue_Hot_Spot.pdf", sep="_"))
   
-  pdf(file = figname, width = 10, height = 10)
-  
-  lx = waze.ll
+pdf(file = figname, width = 10, height = 10)
+
+  lx = w.all %>% select(lon, lat, alert_type, sub_type, road_type, time) 
+
+  lx.nohwy = w.nohwy %>% select(lon, lat, alert_type, sub_type, road_type, time) 
 
   # 1. 
   # Waze mapped. 
@@ -193,23 +220,22 @@ ggplot(waze.ll %>% filter(alert_type == "ACCIDENT" & YM != "2017-03" & YM != "20
                                   fill = ..level.., alpha = ..level..),
                    size = 0.01, bins = 8, geom = 'polygon')
   
-  print(map1 + ggtitle(paste0("Waze event density ", specialeventtype))  +
+  print(map1 + ggtitle(paste0("Waze event density"))  +
           scale_fill_gradient(low = "blue", high = "red", 
                               guide_legend(title = "Event density")) +
           scale_alpha(range = c(0.1, 0.8), guide = FALSE) )
   
-  # 2. Waze with points 
-  map2 = map1 + 
-    geom_point(data = lx, 
-               aes(x = lon, y = lat, color = alert_type), 
-               pch = "+", cex = 3, stroke = 2) 
+  # 2. Omitting highway
+
+  map.nohwy <- ggmap(map_toner_hybrid_14, extent = 'device') + 
+    stat_density2d(data = lx.nohwy, aes(x = lon, y = lat,
+                                  fill = ..level.., alpha = ..level..),
+                   size = 0.01, bins = 8, geom = 'polygon')
   
-  print(map2 + ggtitle(paste0("Waze event density ", specialeventtype))  +
+  print(map.no1 + ggtitle(paste0("Waze event density (omitting highways)"))  +
           scale_fill_gradient(low = "blue", high = "red", 
                               guide_legend(title = "Event density")) +
-          scale_alpha(range = c(0.1, 0.8), guide = FALSE)  + guides(color = 
-                                                                      guide_legend(order = 2, title = "Waze alert type")))
-  
+          scale_alpha(range = c(0.1, 0.8), guide = FALSE) )
   
   # Waze Accident only versions
   # 1. 
@@ -220,7 +246,7 @@ ggplot(waze.ll %>% filter(alert_type == "ACCIDENT" & YM != "2017-03" & YM != "20
                                   fill = ..level.., alpha = ..level..),
                    size = 0.01, bins = 8, geom = 'polygon')
   
-  print(map1 + ggtitle(paste0("Waze crash density ", specialeventtype))  +
+  print(map1 + ggtitle(paste0("Waze crash density"))  +
           scale_fill_gradient(low = "blue", high = "red", 
                               guide_legend(title = "Crash density")) +
           scale_alpha(range = c(0.1, 0.8), guide = FALSE) )
@@ -231,7 +257,35 @@ ggplot(waze.ll %>% filter(alert_type == "ACCIDENT" & YM != "2017-03" & YM != "20
                aes(x = lon, y = lat, color = alert_type), 
                pch = "+", cex = 3, stroke = 2) 
   
-  print(map2 + ggtitle(paste0("Waze crash density ", specialeventtype))  +
+  print(map2 + ggtitle(paste0("Waze crash density"))  +
+          scale_fill_gradient(low = "blue", high = "red", 
+                              guide_legend(title = "Event density")) +
+          scale_alpha(range = c(0.1, 0.8), guide = FALSE)  + guides(color = 
+                                                                      guide_legend(order = 2, title = "Waze alert type")))
+  
+  
+  # Accident only, no highway
+  
+  # 3.
+  # Waze mapped. 
+  
+  map3 <- ggmap(map_toner_hybrid_14, extent = 'device') + 
+    stat_density2d(data = lx.nohwy %>% filter(alert_type == "ACCIDENT"), aes(x = lon, y = lat,
+                                                                       fill = ..level.., alpha = ..level..),
+                   size = 0.01, bins = 8, geom = 'polygon')
+  
+  print(map3 + ggtitle(paste0("Waze crash density (omitting highways)"))  +
+          scale_fill_gradient(low = "blue", high = "red", 
+                              guide_legend(title = "Crash density")) +
+          scale_alpha(range = c(0.1, 0.8), guide = FALSE) )
+  
+  # 4. Waze with points 
+  map4 = map3 + 
+    geom_point(data = lx.nohwy %>% filter(alert_type == "ACCIDENT"), 
+               aes(x = lon, y = lat, color = scales::alpha("midnightblue", 0.5)),#alert_type), 
+               pch = "+", cex = 3, stroke = 2) 
+  
+  print(map4 + ggtitle(paste0("Waze crash density (omitting highways)"))  +
           scale_fill_gradient(low = "blue", high = "red", 
                               guide_legend(title = "Event density")) +
           scale_alpha(range = c(0.1, 0.8), guide = FALSE)  + guides(color = 
@@ -241,17 +295,12 @@ ggplot(waze.ll %>% filter(alert_type == "ACCIDENT" & YM != "2017-03" & YM != "20
   dev.off()
   
   
-  # Save output
-  
-  # save(list = c('dd','dd.e'), file = file.path(localdir, 'SpecialEvents', paste0("Special_Event_Hot_Spot_", specialeventtype, ".RData")))
-  
-  
 # Save to export
 
 zipname = paste0('Hot_Spot_Mapping_Bellevue_', Sys.Date(), '.zip')
 
 system(paste('zip -j', file.path('~/workingdata', zipname),
-             fignames)
+             figname)
 )
 
 system(paste(
@@ -259,91 +308,4 @@ system(paste(
   file.path('~/workingdata', zipname),
   file.path(teambucket, 'export_requests', zipname)
 ))
-
-
-
-
-
-# Second, plot individual event / nonevent day pairs.
-
-
-figname = file.path(localdir, 'Figures', paste0("Special_Event_Hot_Spot_", specialeventday,".pdf"))
-pdf(figname, height = 10, width = 10)
-
-for(specialeventday in se.use$Date) { # specialeventday = se.use$Date[1]
-  
-  # 1. 
-  # Waze mapped. 
-  # Relies on kernel density estimation with MASS::kde2d
-  # dd <- MASS::kde2d(x = ll$lon, y = ll$lat) # values are density per degree; would like convert this to 
-  # dd.proj <- MASS::kde2d(x = ll.proj$lon, y = ll.proj$lat); contour(dd.proj)
-  
-  map1 <- ggmap(map_toner_hybrid_14, extent = 'device') + 
-   # geom_density2d(data = ll, aes(x = lon, y = lat)) +
-    stat_density2d(data = ll, aes(x = lon, y = lat,
-                                  fill = ..level.., alpha = ..level..),
-                   size = 0.01, bins = 8, geom = 'polygon')
-  
-  print(map1 + ggtitle(paste0("Waze event density ", specialeventday))  +
-    scale_fill_gradient(low = "blue", high = "red", 
-                        guide_legend(title = "Event density")) +
-    scale_alpha(range = c(0.1, 0.8), guide = FALSE) )
-  
-  # 2. Waze with points 
-  map2 = map1 + 
-              geom_point(data = ll, 
-                         aes(x = lon, y = lat, color = alert_type), 
-                         pch = "+", cex = 3, stroke = 2) 
-    
-  print(map2 + ggtitle(paste0("Waze event density ", specialeventday))  +
-    scale_fill_gradient(low = "blue", high = "red", 
-                        guide_legend(title = "Event density")) +
-    scale_alpha(range = c(0.1, 0.8), guide = FALSE)  + guides(color = 
-                                                                guide_legend(order = 2, title = "Waze alert type")))
-  
-  
-  # 3. Same, with EDT points
-  map3 = map2 + 
-    geom_point(data = ll.e, 
-               aes(x = lon, y = lat), 
-               pch = "+", cex = 6, stroke = 2, color = "midnightblue") 
-  
-  print(map3 + ggtitle(paste0("Waze event density ", specialeventday))  +
-    scale_fill_gradient(low = "blue", high = "red", 
-                        guide_legend(title = "Event density")) +
-    scale_alpha(range = c(0.1, 0.8), guide = FALSE)  + 
-    guides(color = guide_legend(order = 2, title = "Waze alert type")))
-  
-  
-   dev.off()
-  
-  
-  # Save output
-  
-  save(list = c('dd','dd.e'), file = file.path(localdir, 'SpecialEvents', paste0("Special_Event_Hot_Spot_", specialeventday, ".RData")))
-  
-  fignames = c(fignames, figname)
-
-} # end day loop 
-
-
-# Save to S3
-teambucket <- "s3://prod-sdc-sdi-911061262852-us-east-1-bucket"
-
-# Get figs and files to export
-
-
-zipname = paste0('Hot_Spot_Mapping_Multiple_', paste(range(eventdays), collapse="_to_"), "__", Sys.Date(), '.zip')
-
-system(paste('zip -j', file.path('~/workingdata', zipname),
-             fignames)
-       )
-
-system(paste(
-  'aws s3 cp',
-  file.path('~/workingdata', zipname),
-  file.path(teambucket, 'export_requests', zipname)
-))
-
-
 

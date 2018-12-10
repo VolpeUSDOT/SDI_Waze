@@ -7,7 +7,9 @@ source(file.path(codeloc, 'utility/get_packages.R'))
 teambucket <- "s3://prod-sdc-sdi-911061262852-us-east-1-bucket"
 
 library(ggmap)
+library(sp)
 library(tidyverse)
+
 
 user <- file.path( "/home", system("whoami", intern = TRUE)) # the user directory 
 localdir <- file.path(user, "workingdata", "TN") # full path for readOGR
@@ -51,9 +53,21 @@ dat <- dat[order(dat$DATE, dat$STATION),]
 # avewind: mph
 
 
+# Match to station lat long
+station_file = file.path(localdir, "Weather", "GHCN", "ghcnd-stations.txt")
+stations <- read_fwf(station_file,
+                     col_positions = fwf_empty(station_file))
+names(stations) = c("STATION", "lat", "lon", "masl", "NAME", "x1", "x2", "x3")
+
+dat1 <- left_join(dat, stations[1:5], by = "STATION")
+
+
 # Next steps: 
-# Match to station lat longs, then 
 # interpolate to state level using kriging or other methods, see 
 # http://rspatial.org/analsis/rst/4-interpolation.html
+# then apply to grid cells in year-day / 4hr blocks
 
+d1 <- SpatialPointsDataFrame(coords = dat1[c("lon", "lat")],
+                             data = dat1)
 
+plot(d1)
