@@ -192,7 +192,9 @@ kable(nametable[1:10,],
   kable_styling(bootstrap_options = c('striped','hover'))
 ```
 
-In the Waze data, th
+In the Waze data, there are two ways to make an initial filter to omit roads which are not in the jurisdiction of Bellevue: to filter by street names, and also to filter by road class. Waze uses their own road classification system; interstates are all class '3' in the Waze system.
+
+Here we filter the Waze data by excluding I-405, I-90, as well as SR-520 (assuming this is not in Bellevue jurisdiction), and by omitting any additional events on class 3 roads. Filtering by name effectively removes nearly all class 3 roads. Some Waze events missing a street name and with an incorrect road class may still appear on the interstates after this filtering process; a GIS approach to snap Waze events to road segments will also be necessary.
 
 ```{r street_table_nohwy}
 to_omit = c("I-405", "I-90", "SR-520", "I-5")
@@ -204,15 +206,17 @@ for(i in to_omit){
 w.nohwy = w.all[is.na(match(1:nrow(w.all), omits)),]
 
 # also omit by road_type = 3
-table(w.nohwy$road_type)
-table(w.all$road_type)
+w.nohwy = w.nohwy %>% filter(road_type != "3")
 
-nametable <- sort(table(as.factor(w.nohwy$street)), decreasing = T)
-nametable[1:25]
-
-nametable.rt3 <- sort(table(as.factor(w.nohwy[w.nohwy$road_type == 3, "street"])), decreasing = T)
-nametable.rt3
+nametable <- as.data.frame(sort(table(as.factor(w.nohwy$street)), decreasing = T))
+colnames(nametable) = c("Street", "Frequency")
+kable(nametable[1:10,], 
+      caption = "Ten most frequent street names for all Waze incident reports, omitting highways, in study period",
+      format.args = list(big.mark = ",")) %>% 
+  kable_styling(bootstrap_options = c('striped','hover'))
 ```
+
+
 
 ```{r Plotting_1, fig.width = 8}
   lx = w.all %>% select(lon, lat, alert_type, sub_type, road_type, time) 
