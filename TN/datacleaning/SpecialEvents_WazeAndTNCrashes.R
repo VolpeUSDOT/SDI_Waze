@@ -39,19 +39,11 @@ source(file.path(codeloc, 'utility/wazefunctions.R'))
 # Make connection to Redshift. Requires packages DBI and RPostgres entering username and password if prompted:
 source(file.path(codeloc, 'utility/connect_redshift_pgsql.R'))
 
-
-# uncomment these lines and run with user redshift credentials filled in to resolve error if above line throws one.
-#Sys.setenv('sdc_waze_username' = 'mgilmore') 
-#Sys.setenv('sdc_waze_password' = 'r7ZcGYzjgmu4zxKR')
-
-
 # Set up workstation to get hexagon shapefiles 
 source(file.path(codeloc, 'utility/Workstation_setup.R'))
 
-
 # Read special event data and convert it to spatial data format
 SpecialEvents <- read_excel(file.path(localdir, "TN", "SpecialEvents", "EVENTS Updated 03_21_2017.xls"))
-
 
 #### Get Waze data 
 

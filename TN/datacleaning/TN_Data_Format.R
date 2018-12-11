@@ -53,16 +53,16 @@ setwd("~/workingdata/TN")
 
 yearmonths = c(
   paste(2017, formatC(4:12, width = 2, flag = "0"), sep="-"),
-  paste(2018, formatC(1:8, width = 2, flag = "0"), sep="-"))
+  paste(2018, formatC(1:11, width = 2, flag = "0"), sep="-"))
 
 tn.ls = paste0("TN_", yearmonths, ".RData")
 
 for(i in tn.ls){
-  if(length(grep(i, dir(file.path('~', 'workingdata', 'TN'))))==0){
+  if(length(grep(i, dir(file.path('~', 'workingdata', 'TN', 'Waze'))))==0){
     
     system(paste("aws s3 cp",
                  file.path(teambucket, 'TN', i),
-                 file.path('~', 'workingdata', 'TN', i)))
+                 file.path('~', 'workingdata', 'TN', 'Waze', i)))
     
   }
 }
@@ -162,7 +162,7 @@ crash1 <- crash[, var1]
 sumstats(crash1[2:ncol(crash1)])
 
 
-tn_crash <- crash1 %>% filter(LatDecimalNmb > 25 & LatDecimalNmb < 45 &
+tn_crash <- crash %>% filter(LatDecimalNmb > 25 & LatDecimalNmb < 45 &
          LongDecimalNmb < -75 & LongDecimalNmb > -99)
 
 sumstats(tn_crash[2:ncol(tn_crash)])
@@ -197,3 +197,4 @@ load("TN_2017-04.RData") # load an example Waze data to look at columns
 # Weather ----
 
 # script written to access forecasts in xml format. Consider what variables to use, and how to get historical weather.
+# See Get_weather_forecasts.R and Prep_historical_weather.R
