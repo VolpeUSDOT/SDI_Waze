@@ -330,6 +330,26 @@ for(i in tn.ls){
   }
 }
 
+# Bellevue data ----
+
+wa.ls = c('Shapefiles/Bellevue_Roadway.zip', 'Crashes/Bellevue_Crash.zip')
+
+for(i in wa.ls){
+  if(length(grep(i, dir(file.path('~', 'workingdata', 'WA'))))==0){
+    
+    system(paste("aws s3 cp",
+                 file.path(teambucket, 'WA', i),
+                 file.path('~', 'workingdata', 'WA', i)))
+    if(length(grep('zip$', i))!=0) {
+      system(paste('unzip -o', file.path('~', 'workingdata', 'WA', i), '-d',
+                   file.path('~', 'workingdata', 'WA/')))
+      
+      
+      
+    }
+  }
+}
+
 # Reorganize unzipped directories if necessary
 if(length(grep("TN$", dir(file.path('~', 'workingdata', 'TN'))))>0) {
   for(i in c("Crash", "Output", "SpecialEvents", "Weather")){
@@ -408,6 +428,16 @@ if(MOVEFROMUPLOAD){
   system(paste("aws s3 ls", 
                file.path(teambucket, system('whoami', intern = T), "uploaded_files/")
   ))
+
+  system(paste("aws s3 mv", 
+               file.path(teambucket, system('whoami', intern = T), "uploaded_files", "Bellevue_Roadway.zip"),
+               file.path(teambucket, "WA", "Shapefiles", "Bellevue_Roadway.zip"))
+  )
+  
+  system(paste("aws s3 mv", 
+               file.path(teambucket, system('whoami', intern = T), "uploaded_files", "Bellevue_Crash.zip"),
+               file.path(teambucket, "WA", "Crashes", "Bellevue_Crash.zip"))
+  )
 
   system(paste("aws s3 mv", 
                file.path(teambucket, system('whoami', intern = T), "uploaded_files", "TN_Roadway_Shapefiles.zip"),

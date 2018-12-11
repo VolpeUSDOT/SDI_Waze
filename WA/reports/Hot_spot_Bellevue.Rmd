@@ -27,6 +27,7 @@ library(ggmap)
 # library(spatstat) # for ppp density estimation. devtools::install_github('spatstat/spatstat')
 library(tidyverse)
 library(kableExtra)
+library(DT)
 
 
 codeloc <- "~/SDI_Waze"
@@ -49,14 +50,14 @@ proj <- showP4(showWKT("+init=epsg:102008"))
 ## Overview
 
 Mapping of compiled Waze events from April 2017 to November 2018 in Bellevue, WA.
-Events within 6 miles of the center of Bellevue were included in this initial work; one of the next steps will be to clip to the city boundary shapefile. In addition, the Bellevue road network has not yet been incorporated in these maps. A base layer derived from Open Street Maps is used for these maps.
+Events within 6 miles of the center of Bellevue were included in this initial work, and the 'city' field in the Waze data was used to remove events where were labeled as being outside of Bellevue. One of the next steps will be to clip to the city boundary shapefile. In addition, the Bellevue road network has not yet been incorporated in these maps. A base layer derived from Open Street Maps is used for these maps.
 
 ```{r load_data}
 # load data ----
 
 use.tz <- "US/Pacific"
 
-if(length(grep("^WA_Bellevue_Prep.RData$", dir(file.path(localdir, "WA"))))==0){ # do prep loop if needed
+if(length(grep("^WA_Bellevue_Prep.RData$", dir(file.path(localdir, "WA", "Waze"))))==0){ # do prep loop if needed
 
 # Compile events ----
 
@@ -130,7 +131,7 @@ save(list = c("zoom_box", "zoomll",
               "w.all", "w.all.proj",
               "waze.ll", "waze.ll.proj",
               "zoom_box.ll"),
-     file = file.path(localdir, "WA", 
+     file = file.path(localdir, "WA", "Waze",
                       fn))
 
 fn.export = paste(state, 
@@ -139,7 +140,7 @@ fn.export = paste(state,
 save(list = c("zoom_box", "zoomll",
               "waze.ll", "waze.ll.proj",
               "zoom_box.ll"),
-     file = file.path(localdir, "WA", 
+     file = file.path(localdir, "WA", "Waze",
                       fn.export))
 
 
@@ -156,8 +157,11 @@ system(paste(
   file.path(teambucket, 'export_requests', zipname)
 ))
 } else { # read already prepped data
-  load(file.path(localdir, "WA", "WA_Bellevue_Prep.RData"))
+  load(file.path(localdir, "WA", "Waze", "WA_Bellevue_Prep.RData"))
 }
+
+w.all <- w.all %>% filter(city == "Bellevue" | city == "Bellevue, WA" | is.na(city))
+
 ```
 
 ```{r plot_prep}
@@ -174,8 +178,7 @@ if(length(grep("WA_Bellevue_Basemaps.RData", dir(file.path(localdir, "WA")))) ==
 
 ```
 
-
-First, looking at frequency of all Waze incident reports by street name. Of all `r format(nrow(w.all), big.mark = ",")` Waze incident reports, `r format(nrow(w.all %>% filter(is.na(street))), big.mark = ",")` (`r round(100*nrow(w.all %>% filter(is.na(street)))/nrow(w.all), 2)`%) had no value provided for 'street' in the data. Of the `r format(nrow(w.all %>% filter(alert_type == "ACCIDENT")), big.mark = ",")` crashes reports,  `r format(nrow(w.all %>% filter(is.na(street) & alert_type == "ACCIDENT")), big.mark = ",")` (`r round(100*nrow(w.all %>% filter(is.na(street) & alert_type == "ACCIDENT"))/nrow(w.all),2)`%) had no value provided for 'street'.
+First, looking at frequency of all Waze incident reports by street name. Of all `r format(nrow(w.all), big.mark = ",")` Waze incident reports, `r format(nrow(w.all %>% filter(is.na(street))), big.mark = ",")` (`r round(100*nrow(w.all %>% filter(is.na(street)))/nrow(w.all), 2)`%) had no value provided for 'street' in the data. Of the `r format(nrow(w.all %>% filter(alert_type == "ACCIDENT")), big.mark = ",")` crash reports,  `r format(nrow(w.all %>% filter(is.na(street) & alert_type == "ACCIDENT")), big.mark = ",")` (`r round(100*nrow(w.all %>% filter(is.na(street) & alert_type == "ACCIDENT"))/nrow(w.all),2)`%) had no value provided for 'street'.
 
 
 ```{r street_table_hwy}
@@ -220,6 +223,22 @@ kable(nametable[1:10,],
       format.args = list(big.mark = ",")) %>% 
   kable_styling(bootstrap_options = c('striped','hover'))
 ```
+
+The Waze incidents remaining after filtering out highway events are summarized in the table below by alert type and subtype. Not all alerts have a subtype provided.
+
+```{r summary_table_nohwy}
+sum_count = w.nohwy %>%
+  group_by(alert_type, sub_type) %>%
+  summarize(count = n(),
+            pct = round(100*count / nrow(w.nohwy), 2))
+
+colnames(sum_count) = c("Alert type", "Subtype", "Count", "Percent of all alerts")
+datatable(sum_count, caption = "Count of Waze incident repots by type and subtype, April 2017 to November 2018",
+          rownames = F) %>% 
+  formatCurrency(3, currency = "", digits = 0)
+  
+```
+
 
 ## Heat maps {.tabset .tabset-pills}
 
