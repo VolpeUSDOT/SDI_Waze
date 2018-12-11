@@ -3,7 +3,7 @@ output:
   html_document:
     df_print: paged
     toc: yes
-    toc_depth: 4
+    toc_depth: 3
     toc_float:
       collapsed: yes
       smooth_scroll: yes
@@ -46,8 +46,10 @@ source(file.path(codeloc, 'utility/wazefunctions.R'))
 proj <- showP4(showWKT("+init=epsg:102008"))
 ```
 
-Hot spot of compiled Waze events from April 2017 to November 2018 in Bellevue, WA.
-Events within 6 miles of the center of Bellevue were included in this initial work; one of the next steps will be to clip to the city boundary shapfile. In addition, the Bellevue road network has not yet been incorporated in these maps. A base layer derived from Open Street Maps is used for these maps.
+## Overview
+
+Mapping of compiled Waze events from April 2017 to November 2018 in Bellevue, WA.
+Events within 6 miles of the center of Bellevue were included in this initial work; one of the next steps will be to clip to the city boundary shapefile. In addition, the Bellevue road network has not yet been incorporated in these maps. A base layer derived from Open Street Maps is used for these maps.
 
 ```{r load_data}
 # load data ----
@@ -160,13 +162,16 @@ system(paste(
 
 ```{r plot_prep}
 # Get a map for plotting.
-if(length(grep(paste0(state, "_Bellevue_Basemaps"), dir(file.path(localdir, "WA")))) == 0){
+if(length(grep("WA_Bellevue_Basemaps.RData", dir(file.path(localdir, "WA")))) == 0){
   map_terrain_14 <- get_stamenmap(bbox = as.vector(bbox(zoom_box.ll)), maptype = 'terrain', zoom = 14)
   map_toner_hybrid_14 <- get_stamenmap(bbox = as.vector(bbox(zoom_box.ll)), maptype = 'toner-hybrid', zoom = 14)
   map_toner_14 <- get_stamenmap(bbox = as.vector(bbox(zoom_box.ll)), maptype = 'toner', zoom = 14)
   save(list = c("map_terrain_14", "map_toner_hybrid_14", "map_toner_14"),
-       file = file.path(localdir, "WA", paste0(state, "_Bellevue_Basemaps.RData")))
-} else { load(file.path(localdir, "WA", paste0(state, "_Bellevue_Basemaps.RData"))) }
+       file = file.path(localdir, "WA", "WA_Bellevue_Basemaps.RData"))
+  } else { 
+  load(file.path(localdir, "WA", "WA_Bellevue_Basemaps.RData"))
+}
+
 ```
 
 
@@ -216,94 +221,70 @@ kable(nametable[1:10,],
   kable_styling(bootstrap_options = c('striped','hover'))
 ```
 
+## Heat maps {.tabset .tabset-pills}
 
+The following heat maps show 2-D kernel density estimates of incident frequency. Warm colors indicate high frequency, cool colors show lower frequency. Maps are shown with and without individual incidents plotted for clarity. 
+
+### All Waze crash reports
+
+`r format(nrow(w.all %>% filter(alert_type=="ACCIDENT")), big.mark=",")` Waze crash reports.
 
 ```{r Plotting_1, fig.width = 8}
-  lx = w.all %>% select(lon, lat, alert_type, sub_type, road_type, time) 
+  lx = w.all %>% select(lon, lat, alert_type, sub_type, road_type, time) %>% filter(alert_type == "ACCIDENT")
 
-  lx.nohwy = w.nohwy %>% select(lon, lat, alert_type, sub_type, road_type, time) 
+  lx.nohwy = w.nohwy %>% select(lon, lat, alert_type, sub_type, road_type, time) %>% filter(alert_type == "ACCIDENT")
 
-  # 1. 
-  # Waze mapped. 
-  # Relies on kernel density estimation with MASS::kde2d
-  # dd <- MASS::kde2d(x = ll$lon, y = ll$lat) # values are density per degree; would like convert this to 
-  # dd.proj <- MASS::kde2d(x = ll.proj$lon, y = ll.proj$lat); contour(dd.proj)
-  
   map1 <- ggmap(map_toner_hybrid_14, extent = 'device') + 
     stat_density2d(data = lx, aes(x = lon, y = lat,
                                   fill = ..level.., alpha = ..level..),
-                   size = 0.01, bins = 8, geom = 'polygon')
+                   size = 0.01, bins = 8, geom = 'polygon',
+                   h = 0.01) # manually set bandwith with h
   
-  print(map1 + ggtitle(paste0("Waze event density"))  +
+  map1 + ggtitle(paste0(" Waze event density"))  +
           scale_fill_gradient(low = "blue", high = "red", 
                               guide_legend(title = "Event density")) +
-          scale_alpha(range = c(0.1, 0.8), guide = FALSE) )
+          scale_alpha(range = c(0.1, 0.8), guide = FALSE) 
   
-  # 2. Omitting highway
+  # 2. With points
+  map2 = map1 + 
+    geom_point(data = lx, 
+               aes(x = lon, y = lat), color = scales::alpha("midnightblue", 0.2), 
+               pch = "+", cex = 3, stroke = 2) 
+  
+  map2 + ggtitle(paste0(" Waze crash report density"))  +
+          scale_fill_gradient(low = "blue", high = "red", 
+                              guide_legend(title = "Event density")) +
+          scale_alpha(range = c(0.1, 0.8), guide = FALSE) 
+
+```
+
+### Waze crash reports, omitting highways
+
+`r format(nrow(w.nohwy %>% filter(alert_type=="ACCIDENT")), big.mark=",")` Waze crash reports, after filtering out highways.
+
+```{r Plotting_2, fig.width=8}
 
   map.nohwy <- ggmap(map_toner_hybrid_14, extent = 'device') + 
     stat_density2d(data = lx.nohwy, aes(x = lon, y = lat,
                                   fill = ..level.., alpha = ..level..),
-                   size = 0.01, bins = 8, geom = 'polygon')
+                   size = 0.01, bins = 8, geom = 'polygon',
+                   h = 0.01)
   
-  print(map.no1 + ggtitle(paste0("Waze event density (omitting highways)"))  +
+  map.nohwy + ggtitle(" Waze crash report density (omitting highways)")  +
           scale_fill_gradient(low = "blue", high = "red", 
-                              guide_legend(title = "Event density")) +
-          scale_alpha(range = c(0.1, 0.8), guide = FALSE) )
+                              guide_legend(title = "Crash density")) +
+          scale_alpha(range = c(0.1, 0.8), guide = FALSE)
   
-  # Waze Accident only versions
-  # 1. 
-  # Waze mapped. 
 
-  map1 <- ggmap(map_toner_hybrid_14, extent = 'device') + 
-    stat_density2d(data = lx %>% filter(alert_type == "ACCIDENT"), aes(x = lon, y = lat,
-                                  fill = ..level.., alpha = ..level..),
-                   size = 0.01, bins = 8, geom = 'polygon')
-  
-  print(map1 + ggtitle(paste0("Waze crash density"))  +
-          scale_fill_gradient(low = "blue", high = "red", 
-                              guide_legend(title = "Crash density")) +
-          scale_alpha(range = c(0.1, 0.8), guide = FALSE) )
-  
-  # 2. Waze with points 
-  map2 = map1 + 
-    geom_point(data = lx %>% filter(alert_type == "ACCIDENT"), 
-               aes(x = lon, y = lat, color = alert_type), 
+  # 2. With points
+  map.nohwy.points = map.nohwy + 
+    geom_point(data = lx.nohwy, 
+               aes(x = lon, y = lat), color = scales::alpha("midnightblue", 0.2), 
                pch = "+", cex = 3, stroke = 2) 
   
-  print(map2 + ggtitle(paste0("Waze crash density"))  +
+  map.nohwy.points + ggtitle(paste0(" Waze crash report density (omitting highways)"))  +
           scale_fill_gradient(low = "blue", high = "red", 
                               guide_legend(title = "Event density")) +
-          scale_alpha(range = c(0.1, 0.8), guide = FALSE)  + guides(color = 
-                                                                      guide_legend(order = 2, title = "Waze alert type")))
-  
-  
-  # Accident only, no highway
-  
-  # 3.
-  # Waze mapped. 
-  
-  map3 <- ggmap(map_toner_hybrid_14, extent = 'device') + 
-    stat_density2d(data = lx.nohwy %>% filter(alert_type == "ACCIDENT"), aes(x = lon, y = lat,
-                                                                       fill = ..level.., alpha = ..level..),
-                   size = 0.01, bins = 8, geom = 'polygon')
-  
-  print(map3 + ggtitle(paste0("Waze crash density (omitting highways)"))  +
-          scale_fill_gradient(low = "blue", high = "red", 
-                              guide_legend(title = "Crash density")) +
-          scale_alpha(range = c(0.1, 0.8), guide = FALSE) )
-  
-  # 4. Waze with points 
-  map4 = map3 + 
-    geom_point(data = lx.nohwy %>% filter(alert_type == "ACCIDENT"), 
-               aes(x = lon, y = lat, color = scales::alpha("midnightblue", 0.5)),#alert_type), 
-               pch = "+", cex = 3, stroke = 2) 
-  
-  print(map4 + ggtitle(paste0("Waze crash density (omitting highways)"))  +
-          scale_fill_gradient(low = "blue", high = "red", 
-                              guide_legend(title = "Event density")) +
-          scale_alpha(range = c(0.1, 0.8), guide = FALSE)  + guides(color = 
-                                                                      guide_legend(order = 2, title = "Waze alert type")))
-  
+          scale_alpha(range = c(0.1, 0.8), guide = FALSE) 
 ```  
   
