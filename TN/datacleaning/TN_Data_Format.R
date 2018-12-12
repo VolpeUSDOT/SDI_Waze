@@ -10,6 +10,9 @@ source(file.path(codeloc, 'utility/Workstation_setup.R')) # Download necessary f
 
 library(tidyverse) # tidyverse install on SDC may require additional steps, see Package Installation Notes.Rmd 
 library(lubridate)
+library(geonames) # for time zone work
+library(httr)
+
 # Customized Functions
 sumstats = function(x) { 
   null.k <- function(x) sum(is.na(x))
@@ -137,10 +140,73 @@ round(colSums(is.na(crash))*100/nrow(crash), 2) # Large amounts of data are miss
 
 
 # Looking at missing location info by year
+# !!!! TO DO: Get correct time zone for each crash !!!!
+
+options(geonamesUsername = "waze_sdi") # set this up as a generic username, only need to run this command once 
+# source(system.file("tests", "testing.R", package = "geonames"), echo = TRUE)
+
+tn_crash <- crash %>% filter(LatDecimalNmb > 25 & LatDecimalNmb < 45 &
+                               LongDecimalNmb < -75 & LongDecimalNmb > -99)
+
+# # From SpecialEventas_WazeAndTNCrashes.R -- will apply below
+TimeZone <- vector()
+
+starttime <- Sys.time()
+
+# Problem: error 503 service unavailable can occur: e.g. 'http://ws.geonames.org/timezoneJSON?lat=35.92846&lng=-84.082&radius=0&username=waze_sdi'
+# need to deal with temporary outage by retrying, after a pause
+# BETTER SOLUTION: USE TZ SPATIAL LAYER AND CLIP
+
+for (i in 1:nrow(tn_crash)) {
+
+  query = paste0("http://ws.geonames.org/timezoneJSON?lat=", tn_crash$LatDecimalNmb[i], 
+                 "&lng=", tn_crash$LongDecimalNmb[i], 
+                 "&radius=0&username=waze_sdi")
+  
+  #as.character(GNtimezone(tn_crash$LatDecimalNmb[i], tn_crash$LongDecimalNmb[i], radius = 0)$timezoneId)
+
+  #tzres <- RETRY( "GET", query)
+  tzres <- GET(query)
+  if(http_error(tzres)) {
+    tzres <- "error"
+  } else {
+    tzres <- content(tzres)$timezoneId
+  }
+  TimeZone <- c(TimeZone, tzres)
+
+  if(i %% 1000 == 0) cat(". ")
+  if(i %% 10000 == 0) cat("i ")
+  
+}
+
+timediff <- Sys.time() -starttime
+cat(round(timediff, 2), attr(timediff, "units"), "elapsed")
+
+# 
+# se.use$StartUTC <- paste(se.use$Event_Date, se.use$StartTime)
+# se.use$StartUTC <- as.POSIXct(se.use$StartUTC, 
+#                               tz = se.use$TimeZone, 
+#                               format = "%Y-%m-%d %H:%M:%S")
+# 
+# 
+# 
+# 
+# se.use$EndDateTime <- paste(se.use$Event_Date, se.use$EndTime)
+# se.use$EndDateTime <- as.POSIXct(se.use$EndDateTime, format = "%Y-%m-%d %H:%M:%S")
+
 crash$date = as.POSIXct(strptime(crash$CollisionDte, "%Y-%m-%d %H:%M:%S", tz = "US/Central"))
 crash$year = as.numeric(format(crash$date, "%Y"))
 # Fix data types
 crash$MstrRecNbrTxt <- as.character(crash$MstrRecNbrTxt)
+
+
+
+sumstats(tn_crash[2:ncol(tn_crash)])
+
+save("tn_crash", file = "Crash/TN_Crash_Simple_2008-2018.RData")
+
+
+# Additional summaries
 
 na.lat <- crash %>%
   filter(!is.na(year)) %>%
@@ -162,13 +228,6 @@ crash1 <- crash[, var1]
 sumstats(crash1[2:ncol(crash1)])
 
 
-tn_crash <- crash %>% filter(LatDecimalNmb > 25 & LatDecimalNmb < 45 &
-         LongDecimalNmb < -75 & LongDecimalNmb > -99)
-
-sumstats(tn_crash[2:ncol(tn_crash)])
-
-
-save("tn_crash", file = "Crash/TN_Crash_Simple_2008-2018.RData")
 
 # Special Events ----
 library(readxl)
