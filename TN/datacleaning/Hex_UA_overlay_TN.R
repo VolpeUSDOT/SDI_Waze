@@ -172,7 +172,7 @@ for(g in grids){ # g = grids[1]
     
     # Check:
     if(CHECKPLOT){ 
-      jpeg(file = file.path(localdir, paste0("Figures/Checking_TN_Waze_UAoverlay_", mo, ".jpg")), width = 500, height = 500) 
+      jpeg(file = file.path(localdir, paste0("Figures/Checking_TN_Waze_UAoverlay_", g, "_", mo, ".jpg")), width = 500, height = 500) 
       plot(mb, main = paste("Pre-linking TN and Waze", mo))
       points(tn_crash, col = alpha("red", 0.2))
       plot(grid, add = T, col = alpha("grey80", 0.1))
@@ -219,7 +219,7 @@ for(g in grids){ # g = grids[1]
     
     # save the merged file to local output directory, move to S3 after
 
-    fn = paste0("merged.waze.tn.", mo, ".RData")
+    fn = paste0("merged.waze.tn.", g, "_", mo, ".RData")
     
     save(list=c("link.waze.tn", "crash.df"), file = file.path(localdir, "TN", "Overlay", fn))
     
@@ -231,7 +231,7 @@ for(g in grids){ # g = grids[1]
       lwe.sp <- SpatialPoints(link.waze.tn[!is.na(link.waze.tn$lon) | !is.na(link.waze.tn$lat),c("lon", "lat")],
                                    proj4string = CRS("+proj=longlat +datum=WGS84")) 
       lwe.sp <-spTransform(lwe.sp, CRS(proj.USGS))
-      jpeg(file = file.path(localdir, "TN", paste0("Figures/Checking2_TN_Waze_UAoverlay_",mo, ".jpg")), width = 500, height = 500) 
+      jpeg(file = file.path(localdir, "TN", paste0("Figures/Checking2_TN_Waze_UAoverlay_", g, "_", mo, ".jpg")), width = 500, height = 500) 
       plot(co_i, main = paste("Linked TN-Waze", mo))
       plot(lwe.sp, col = alpha("blue", 0.3), add=T, pch = "+")
       dev.off()
@@ -239,7 +239,7 @@ for(g in grids){ # g = grids[1]
   } # End month loop
   
   timediff <- Sys.time() - starttime_state
-  cat(round(timediff, 2), attr(timediff, "units"), "elapsed to overlay TN", "\n\n")
+  cat(round(timediff, 2), attr(timediff, "units"), "elapsed to overlay TN", g, "\n\n")
 
   stopCluster(cl); gc()
   
