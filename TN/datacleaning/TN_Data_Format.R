@@ -286,21 +286,48 @@ source(system.file("tests", "testing.R", package = "geonames"), echo = TRUE)
 
 spev$TimeZone <- NA
 
-for (i in 1:nrow(spev)) {
-  
+## Dan's code, did not work for Jessie's run.
+# for (i in 1:nrow(spev)) {
+#   
+#   query = paste0("http://ws.geonames.org/timezoneJSON?lat=", spev$LatDecimalNmb[i], 
+#                  "&lng=", spev$LongDecimalNmb[i], 
+#                  "&radius=0&username=waze_sdi")
+#   
+#   tzres <- get(query)
+#   if(http_error(tzres)) {
+#     tzres <- "error"
+#   } else {
+#     tzres <- content(tzres)$timezoneId
+#   }
+#   TimeZone <- c(TimeZone, tzres)
+#   
+#   if(i %% 1000 == 0) cat(". ")
+#   if(i %% 10000 == 0) cat("i ")
+#   
+# }
+# 
+# timediff <- Sys.time() -starttime
+# cat(round(timediff, 2), attr(timediff, "units"), "elapsed")
+
+## Michelle's code # There are three rows do not have Lon/Lat, so need to skip them.
+range <- which(!is.na(spev$Lat) & !is.na(spev$Lon))
+for (i in range) {
+
   spev$TimeZone[i] <- as.character(GNtimezone(spev$Lat[i], spev$Lon[i], radius = 0)$timezoneId)
-  
+
 }
 
-spev$StartUTC <- paste(spev$Event_Date, spev$StartTime)
-spev$StartUTC <- as.POSIXct(spev$StartUTC, 
-                              tz = spev$TimeZone, 
-                              format = "%Y-%m-%d %H:%M:%S")
+# To convert to UTC time, did not work for J. 
+# spev$StartUTC <- paste(spev$Event_Date, spev$StartTime)
+# spev$StartUTC <- as.POSIXct(paste(spev$Event_Date, spev$StartTime),
+#                               tz = spev$TimeZone,
+#                               format = "%Y-%m-%d %H:%M:%S")
 
-spev$EndDateTime <- paste(spev$Event_Date, spev$EndTime)
-spev$EndDateTime <- as.POSIXct(spev$EndDateTime, format = "%Y-%m-%d %H:%M:%S")
+## Create Date Time
+# spev$EndDateTime <- paste(spev$Event_Date, spev$EndTime)
+# spev$EndDateTime <- as.POSIXct(spev$EndDateTime, format = "%Y-%m-%d %H:%M:%S")
 
-# save spetial event data in the output
+# save special event data in the output
 save("spev", file = "SpecialEvents/TN_SpecialEvent_2008.RData")
 
 # Select a special event for the footprint analysis
