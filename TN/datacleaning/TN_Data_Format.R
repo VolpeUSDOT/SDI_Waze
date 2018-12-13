@@ -328,7 +328,14 @@ for (i in range) {
 # spev$EndDateTime <- as.POSIXct(spev$EndDateTime, format = "%Y-%m-%d %H:%M:%S")
 
 # save special event data in the output
-save("spev", file = "SpecialEvents/TN_SpecialEvent_2008.RData")
+# locate the file
+ls <- system(paste("aws s3 ls",  paste0(teambucket, "/jyang/uploaded_files/")), intern = T) # the file is saved under this folder. Need to copy it over to workingdata folder.
+# Transfer the file to workingdata folder.
+system(paste("aws s3 cp",
+             paste0(teambucket, "/jyang/uploaded_files/",ls),
+             file.path('~', 'workingdata', 'TN', 'SpecialEvents',ls))) # Cool, did the trick
+
+save("spev", file = "SpecialEvents/TN_SpecialEvent_2018.RData")
 
 # Select a special event for the footprint analysis
 
