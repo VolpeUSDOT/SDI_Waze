@@ -229,11 +229,10 @@ sumstats(crash1[2:ncol(crash1)])
 
 
 
-# Special Events ----
+# S# Special Events ----
 library(readxl)
 spev <- read_excel("SpecialEvents/2018 Special Events.xlsx")
 
-names(spev)
 dim(spev) #813*12
 
 # How many Event_Type
@@ -241,10 +240,47 @@ dim(spev) #813*12
 # "Parade"           "Race/Car Show"   "Rodeo"            "Run/Rally"        "Special"          "Special Event"    "Sporting"
 
 table(spev$Event_Type)
+# Car Show             Fair    Fair/Festival         Festival Motorcycle Rally           Parade    Race/Car Show            Rodeo 
+# 8              363               10              175                2               10                3                3 
+# Run/Rally          Special    Special Event         Sporting 
+# 13                5               81              139 
 
 # what are the x__1 to x__4?
 sum(is.na(spev$X__1)) # 811 missing, only two rows have data.
 sum(is.na(spev$X__4)) # 812 missing
+
+names(spev)
+# [1] "Event"      "Event_Date" "Lat"        "Lon"        "StartTime"  "EndTime"    "Home_flg"   "Event_Type" "X__1"       "X__2"       "X__3"      
+# [12] "X__4" 
+
+# The special event are from Jan 2018 - Dec 2018. Date Range are numeric (in excel format), need to convert to dates.
+# spev$Event_Date_format <- as.Date(as.numeric(spev$Event_Date), origin = "1899-12-30")
+# sum(is.na(spev$Event_Date_format)) # one NA created
+# spev$Event_Date[is.na(spev$Event_Date_format)]  # which row has NA?
+spev$Event_Date[spev$Event_Date == "9/15/201/"] <- as.numeric(as.Date("2018-9-15") - as.Date(0, origin = "1899-12-30", tz = "UTC")) # excel day zero (1899-12-30) is -25569 in R day zero.
+
+spev$Event_Date <- as.Date(as.numeric(spev$Event_Date), origin = "1899-12-30")
+range(spev$Event_Date) # "2018-01-01" "2019-07-01", it actually has some special events in 2019.
+sum(spev$Event_Date > "2018-12-31") # 3 special events in 2019
+
+# How many rows missing start and end time
+sum(is.na(spev$StartTime)) #643
+sum(is.na(spev$EndTime)) #726
+
+# Convert start and end time to regular time
+ymd_hms("2019-12-31 12:04:23")
+
+# spev$StartTime <- as.POSIXct(strptime(spev$StartTime, format = "%Y-%m-%d %H:%M:%S"))
+spev$StartTime <- format(ymd_hms(spev$StartTime), "%H:%M:%S")
+spev$EndTime <- format(ymd_hms(spev$EndTime), "%H:%M:%S")
+
+# There are 363 special events in the data, wondering if this is a daily event at the same location?
+table(spev$Event[spev$Event_Type == "Fair"]) # Scattered in different counties and at different date.
+
+# save spetial event data in the output
+save("spev", file = "SpecialEvents/TN_SpecialEvent_2008.RData")
+
+# Select a special event for the footprint analysis
 
 
 # look at 'SpecialEvents/2018 Special Events.xlsx'; can use read_excel function in readxl package
