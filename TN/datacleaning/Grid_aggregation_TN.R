@@ -1,8 +1,13 @@
-# TODO, update for Tennessee
-# Aggregation of Waze and EDT by grid cell
-# Goal: create a gridded data set where grid cell contain the count of 
-# Start from UrbanArea_overlay.R
+# Updated for Tennessee
+# CrashCaseID -> ID
+# edt.hex -> tn.hex
+# wazeTime.edt -> wazeTime.tn
+# link.waze.edt -> link.waze.tn
+# edt.df -> crash.df; all variable names changed for EDT aggregation steps
 
+# Aggregation of Waze and TN crash by grid cell
+# Goal: create a gridded data set where grid cell contain the count of 
+# Start from Hex_UA_Overlay_TN.R
 
 # <><><><><><><><><><><><><><><><><><><><>
 # Setup ----
@@ -15,86 +20,68 @@ library(utils)
 library(doParallel)
 library(foreach)
 
-output.loc <- "~/agg_out"
-user <- paste0( "/home/", system("whoami", intern = TRUE)) #the user directory to use
-localdir <- paste0(user, "/workingdata/") # full path for readOGR
-edtdir <- normalizePath(file.path(localdir, "EDT"))
-wazedir <- "~/tempout" # has State_Year-mo.RData files. Grab from S3 if necessary
-wazemonthdir <- "~/workingdata/Overlay" 
+#Set parameters for data to process
+grids = c("TN_01dd_fishnet",
+          "TN_1sqmile_hexagons")
 
+codeloc <- "~/SDI_Waze" 
+
+user <- paste0( "/home/", system("whoami", intern = TRUE)) # the user directory 
+localdir <- paste0(user, "/workingdata/") # full path for readOGR
+
+wazemonthdir <- "~/workingdata/TN/Overlay" # contains the merged.waze.tn.YYYY-mm_<state>.RData files
+temp.outputdir = "~/agg_out" # Will contain the WazeHexTimeList_YYYY-mm_grids_<state>.RData files
 
 teambucket <- "s3://prod-sdc-sdi-911061262852-us-east-1-bucket"
 
 source(file.path(codeloc, "utility/wazefunctions.R")) 
 
-states = c("CT", "UT", "VA", "MD")
+crashdir <- normalizePath(file.path(localdir, "TN", "Crash"))
+wazedir <- normalizePath(file.path(localdir, "TN", "Waze"))
 
-# Time zone picker:
-tzs <- data.frame(states, 
-                  tz = c("US/Eastern",
-                         "US/Mountain",
-                         "US/Eastern",
-                         "US/Eastern"
-         ),
-                  stringsAsFactors = F)
-
-
-#Set parameters for data to process
-HEXSIZE = 1# c("1", "4", "05")#[1] # Change the value in the bracket to use 1, 4, or 0.5 sq mi hexagon grids
-
-source(file.path(codeloc, "utility/wazefunctions.R")) # for movefiles() function; only need for local, obsolete on SDC
 setwd(localdir)
 
-temp.outputdir = "~/agg_out"
-
-
-# start state loop ----
-for(state in states){ # state = "TN"
+# start grid loop ----
+for(g in grids){ # g = grids[1]
   
-  #Loop through months of available merged data
-  mergefiles <- dir(wazemonthdir)[grep("^merged.waze.edt", dir(wazemonthdir))]
-  statemergefiles <- mergefiles[grep(paste0(state, ".RData"), mergefiles)]
+  # Loop through months of available merged data for this state
+  mergefiles <- dir(wazemonthdir)[grep("^merged.waze.tn", dir(wazemonthdir))]
+  gridmergefiles <- mergefiles[grep(g, mergefiles)]
   
-  avail.months = unique(substr(statemergefiles, 
-                               start = 17,
-                               stop = 23))
+  avail.months = substr(unlist(
+    lapply(strsplit(gridmergefiles, "_"), function(x) x[[4]])), 1, 7)
   
   # Look for already completed months and skip those
   tlfiles <- dir(temp.outputdir)[grep("WazeTimeEdtHexAll_", dir(temp.outputdir))]
-  state.tlfiles <- tlfiles[grep(state, tlfiles)]
-  done.months <- unlist(lapply(strsplit(state.tlfiles, "_"), function(x) x[[2]])) 
+  grid.tlfiles <- tlfiles[grep(g, tlfiles)]
+  done.months <- unlist(lapply(strsplit(grid.tlfiles, "_"), function(x) x[[2]])) 
   
   todo.months = sort(avail.months[!avail.months %in% done.months])
   
-  use.tz <- tzs$tz[tzs$states == state]
-  
-  
+  use.tz <- "America/Central"
+
   cl <- makeCluster(parallel::detectCores()) # make a cluster of all available cores
   registerDoParallel(cl)
   
-  writeLines(c(""), paste0(state, "_log.txt"))    
+  writeLines(c(""), paste0(g, "_log.txt"))    
   
   foreach(j = todo.months, .packages = c("dplyr", "lubridate", "utils")) %dopar% {
+    # j = "2017-04"  
+    sink(paste0(g, "_log.txt"), append=TRUE)
     
-    sink(paste0(state, "_log.txt"), append=TRUE)
+    cat(paste(Sys.time()), j, "\n")                                                  
     
-    cat(paste(Sys.time()), j, "\n")                                                           
+    load(file.path(wazemonthdir, paste0("merged.waze.tn.", g,"_", j, ".RData"))) # includes both waze (link.waze.tn) and TN crash (crash.df) data, with grid for central and neighboring cells
     
-    load(file.path(wazemonthdir, paste0("merged.waze.edt.", j,"_", state, ".RData"))) # includes both waze (link.waze.edt) and edt (edt.df) data, with grid for central and neighboring cells
-    
-    
-    # format(object.size(link.waze.edt), "Mb"); format(object.size(edt.df), "Mb")
-    # EDT time needs to be POSIXct, not POSIXlt. ct: seconds since beginning of 1970 in UTC. lt is a list of vectors representing seconds, min, hours, day, year. ct is better for analysis, while lt is more human-readable.
-    link.waze.edt$CrashDate_Local <- as.POSIXct(link.waze.edt$CrashDate_Local, "%Y-%m-%d %H:%M:%S", tz = use.tz)
-    edt.df$CrashDate_Local <- as.POSIXct(edt.df$CrashDate_Local, "%Y-%m-%d %H:%M:%S", tz = use.tz)
+    # format(object.size(link.waze.tn), "Mb"); format(object.size(crash.df), "Mb")
+    # TN crash time needs to be POSIXct, not POSIXlt. ct: seconds since beginning of 1970 in UTC. lt is a list of vectors representing seconds, min, hours, day, year. ct is better for analysis, while lt is more human-readable.
+    link.waze.tn$date <- as.POSIXct(link.waze.tn$date, "%Y-%m-%d %H:%M:%S", tz = use.tz)
+    crash.df$date <- as.POSIXct(crash.df$date, "%Y-%m-%d %H:%M:%S", tz = use.tz)
     
     # <><><><><><><><><><><><><><><><><><><><>
-    
-    #Read in the data frame of all Grid IDs by day of year and time of day in each month of data (subset to all grid IDs with Waze OR EDT data)
+    # Read in the data frame of all Grid IDs by day of year and time of day in each month of data (subset to all grid IDs with Waze OR EDT data)
  
-    
-    load(file.path(temp.outputdir, paste0("WazeHexTimeList_", j,"_",HEXSIZE,"mi_",state,".RData")))
-    
+    load(file.path(temp.outputdir, paste0("WazeHexTimeList_", j, "_", g, "TN.RData")))
     # aggregate: new data frame will have one row per cell, per hour, per day.
     # Response variable column: count of unique EDT events matching Waze events in this cell, within this time window. 
     # Predictor variable columns: median values for the numeric characteristics: report rating, confidence..
@@ -110,14 +97,18 @@ for(state in states){ # state = "TN"
       group_by(GRID_ID, GRID_ID_NW, GRID_ID_N, GRID_ID_NE, GRID_ID_SW, GRID_ID_S, GRID_ID_SE,
                day = format(GridDayHour, "%j"), hour = format(GridDayHour, "%H"), weekday = format(GridDayHour, "%u")) %>%
       summarize(
-        nWazeRowsInMatch = n(), #includes duplicates that match more than one EDT report (don't use in model)
+        nWazeRowsInMatch = n(), #includes duplicates that match more than one TN crash report (don't use in model)
         uniqWazeEvents= n_distinct(uuid.waze),
-        nMatchEDT_buffer = n_distinct(CrashCaseID[match=="M"]),
+        
+        Waze_UA_C = n_distinct(ID[Waze_UA_Type == "C"]),
+        Waze_UA_U = n_distinct(ID[Waze_UA_Type == "U"]),        
+        
+        nMatchTN_buffer = n_distinct(ID[match=="M"]),
       
-        nMatchEDT_buffer_Acc = n_distinct(CrashCaseID[match=="M" & alert_type=="ACCIDENT"]),
-        nMatchEDT_buffer_Jam = n_distinct(CrashCaseID[match=="M" & alert_type=="JAM"]),
-        nMatchEDT_buffer_RoadClosed = n_distinct(CrashCaseID[match=="M" & alert_type=="ROAD_CLOSED"]),
-        nMatchEDT_buffer_WorH = n_distinct(CrashCaseID[match=="M"& alert_type=="WEATHERHAZARD"]),
+        nMatchTN_buffer_Acc = n_distinct(ID[match=="M" & alert_type=="ACCIDENT"]),
+        nMatchTN_buffer_Jam = n_distinct(ID[match=="M" & alert_type=="JAM"]),
+        nMatchTN_buffer_RoadClosed = n_distinct(ID[match=="M" & alert_type=="ROAD_CLOSED"]),
+        nMatchTN_buffer_WorH = n_distinct(ID[match=="M"& alert_type=="WEATHERHAZARD"]),
         
         nMatchWaze_buffer = n_distinct(uuid.waze[match=="M"]),
         nNoMatchWaze_buffer = n_distinct(uuid.waze[match=="W"]),
@@ -180,97 +171,92 @@ for(state in states){ # state = "TN"
     EndTime <- Sys.time()-StartTime
     EndTime
     
-    #Compute grid counts for EDT data
-    #Add accident severity counts by grid cell 
-    # names(edt.df)
-    edt.hex <- 
-      edt.df %>%
-      group_by(GRID_ID.edt, day = format(CrashDate_Local, "%j"), hour = format(CrashDate_Local, "%H")) %>%
+    #Compute grid counts for TN data -- update all of these to the TN data variables
+    # Add accident severity counts by grid cell 
+    # names(crash.df)
+    tn.hex <- 
+      crash.df %>%
+      group_by(GRID_ID.TN, day = format(date, "%j"), hour = format(date, "%H")) %>%
       summarize(
-        uniqEDTreports= n_distinct(CrashCaseID),
-        nEDTMaxDamDisabling = n_distinct(CrashCaseID[MaxExtentofDamage=="Disabling Damage"]),
-        nEDTMaxDamFunctional = n_distinct(CrashCaseID[MaxExtentofDamage==" Functional Damage"]),
-        nEDTMaxDamMinor = n_distinct(CrashCaseID[MaxExtentofDamage=="Minor Damage"]),
-        nEDTMaxDamNone = n_distinct(CrashCaseID[MaxExtentofDamage==" No Damage"]),
-        nEDTMaxDamNotReported = n_distinct(CrashCaseID[MaxExtentofDamage=="Not Reported"]),
-        nEDTMaxDamUnknown = n_distinct(CrashCaseID[MaxExtentofDamage=="Unknown"]),
+        uniqeTNreports= n_distinct(MstrRecNbrTxt),
         
-        nEDTInjuryFatal = n_distinct(CrashCaseID[MaxExtentofDamage=="Fatal Injury (K)"]),
-        nEDTInjuryNone = n_distinct(CrashCaseID[MaxExtentofDamage=="No Apparent Injury (O)"]),
-        nEDTInjuryPossible = n_distinct(CrashCaseID[MaxExtentofDamage=="Possible Injury (C)"]),
-        nEDTInjurySuspMinor = n_distinct(CrashCaseID[MaxExtentofDamage=="Suspected Minor Injury(B)"]),
-        nEDTInjurySuspSerious = n_distinct(CrashCaseID[MaxExtentofDamage=="Suspected Serious Injury(A)"])
+        nTNInjuryFatal = n_distinct(MstrRecNbrTxt[NbrFatalitiesNmb > 0]),
+        nTNInjury = n_distinct(MstrRecNbrTxt[NbrInjuredNmb > 0]),
+        nTNAlcoholInd = n_distinct(MstrRecNbrTxt[AlcoholInd == "Y"]),
+        nTNIntersectionInd = n_distinct(MstrRecNbrTxt[IntersectionInd == "Y"]),
+        
+        TN_UA_C = n_distinct(MstrRecNbrTxt[EDT_UA_Type == "C"]),
+        TN_UA_U = n_distinct(MstrRecNbrTxt[EDT_UA_Type == "U"])        
         ) 
     
-    #Merge EDT counts to waze counts by hexagons
+    #Merge TN crash counts to waze counts by hexagons
     names(waze.hex)
-    names(edt.hex)
-    colnames(edt.hex)[1] <- "GRID_ID"
+    names(tn.hex)
+    colnames(tn.hex)[1] <- "GRID_ID"
     
-    wazeTime.edt.hex <- full_join(waze.hex, edt.hex, by = c("GRID_ID", "day", "hour")) %>%
+    wazeTime.tn.hex <- full_join(waze.hex, tn.hex, by = c("GRID_ID", "day", "hour")) %>%
       mutate_all(funs(replace(., is.na(.), 0)))
-    #Replace NA with zero (for the grid counts here, 0 means there were no reported Waze events or EDT crashes in the grid cell at that hour)
+    # Replace NA with zero (for the grid counts here, 0 means there were no reported Waze events or TN crashes in the grid cell at that hour)
     
     #Add columns containing data for neighboring grid cells 
-    names(wazeTime.edt.hex)
+    names(wazeTime.tn.hex)
   
     #Accident counts for neighboring cells
-    nWazeAcc <- wazeTime.edt.hex %>%
+    nWazeAcc <- wazeTime.tn.hex %>%
       ungroup()%>%
       select(GRID_ID, day, hour, nWazeAccident)%>%
-      rename(nWazeAcc_neighbor=nWazeAccident)
+      rename(nWazeAcc_neighbor = nWazeAccident)
     
-    wazeTime.edt.hex_NW <- left_join(wazeTime.edt.hex, nWazeAcc, by = c("GRID_ID_NW"="GRID_ID","day"="day", "hour"="hour")) %>%
+    wazeTime.tn.hex_NW <- left_join(wazeTime.tn.hex, nWazeAcc, by = c("GRID_ID_NW"="GRID_ID","day"="day", "hour"="hour")) %>%
       rename(nWazeAcc_NW=nWazeAcc_neighbor)
-    wazeTime.edt.hex_NW_N <- left_join(wazeTime.edt.hex_NW, nWazeAcc, by = c("GRID_ID_N"="GRID_ID","day"="day", "hour"="hour")) %>%
+    wazeTime.tn.hex_NW_N <- left_join(wazeTime.tn.hex_NW, nWazeAcc, by = c("GRID_ID_N"="GRID_ID","day"="day", "hour"="hour")) %>%
       rename(nWazeAcc_N=nWazeAcc_neighbor)
-    wazeTime.edt.hex_NW_N_NE <- left_join(wazeTime.edt.hex_NW_N, nWazeAcc, by = c("GRID_ID_NE"="GRID_ID","day"="day", "hour"="hour"))%>%
+    wazeTime.tn.hex_NW_N_NE <- left_join(wazeTime.tn.hex_NW_N, nWazeAcc, by = c("GRID_ID_NE"="GRID_ID","day"="day", "hour"="hour"))%>%
       rename(nWazeAcc_NE=nWazeAcc_neighbor)
-    wazeTime.edt.hex_NW_N_NE_SW <- left_join(wazeTime.edt.hex_NW_N_NE, nWazeAcc, by = c("GRID_ID_SW"="GRID_ID","day"="day", "hour"="hour"))%>%
+    wazeTime.tn.hex_NW_N_NE_SW <- left_join(wazeTime.tn.hex_NW_N_NE, nWazeAcc, by = c("GRID_ID_SW"="GRID_ID","day"="day", "hour"="hour"))%>%
       rename(nWazeAcc_SW=nWazeAcc_neighbor)
-    wazeTime.edt.hex_NW_N_NE_SW_S <- left_join(wazeTime.edt.hex_NW_N_NE_SW, nWazeAcc, by = c("GRID_ID_S"="GRID_ID","day"="day", "hour"="hour"))%>%
+    wazeTime.tn.hex_NW_N_NE_SW_S <- left_join(wazeTime.tn.hex_NW_N_NE_SW, nWazeAcc, by = c("GRID_ID_S"="GRID_ID","day"="day", "hour"="hour"))%>%
       rename(nWazeAcc_S=nWazeAcc_neighbor)
-    wazeTime.edt.hex_NW_N_NE_SW_S_SE <- left_join(wazeTime.edt.hex_NW_N_NE_SW_S, nWazeAcc, by = c("GRID_ID_SE"="GRID_ID","day"="day", "hour"="hour"))%>%
+    wazeTime.tn.hex_NW_N_NE_SW_S_SE <- left_join(wazeTime.tn.hex_NW_N_NE_SW_S, nWazeAcc, by = c("GRID_ID_SE"="GRID_ID","day"="day", "hour"="hour"))%>%
       rename(nWazeAcc_SE=nWazeAcc_neighbor)
     
     #Jam counts for neighboring cells
-    nWazeJam <- wazeTime.edt.hex %>%
+    nWazeJam <- wazeTime.tn.hex %>%
       ungroup()%>%
       select(GRID_ID, day, hour, nWazeJam)%>%
-      rename(nWazeJam_neighbor=nWazeJam)
+      rename(nWazeJam_neighbor = nWazeJam)
     
-    wazeTime.edt.hex <- wazeTime.edt.hex_NW_N_NE_SW_S_SE #edit names so we're not overwriting earlier df
-    wazeTime.edt.hex_NW <- left_join(wazeTime.edt.hex, nWazeJam, by = c("GRID_ID_NW"="GRID_ID","day"="day", "hour"="hour")) %>%
+    wazeTime.tn.hex <- wazeTime.tn.hex_NW_N_NE_SW_S_SE # edit names so we're not overwriting earlier df
+    wazeTime.tn.hex_NW <- left_join(wazeTime.tn.hex, nWazeJam, by = c("GRID_ID_NW"="GRID_ID","day"="day", "hour"="hour")) %>%
       rename(nWazeJam_NW=nWazeJam_neighbor)
-    wazeTime.edt.hex_NW_N <- left_join(wazeTime.edt.hex_NW, nWazeJam, by = c("GRID_ID_N"="GRID_ID","day"="day", "hour"="hour")) %>%
+    wazeTime.tn.hex_NW_N <- left_join(wazeTime.tn.hex_NW, nWazeJam, by = c("GRID_ID_N"="GRID_ID","day"="day", "hour"="hour")) %>%
       rename(nWazeJam_N=nWazeJam_neighbor)
-    wazeTime.edt.hex_NW_N_NE <- left_join(wazeTime.edt.hex_NW_N, nWazeJam, by = c("GRID_ID_NE"="GRID_ID","day"="day", "hour"="hour"))%>%
+    wazeTime.tn.hex_NW_N_NE <- left_join(wazeTime.tn.hex_NW_N, nWazeJam, by = c("GRID_ID_NE"="GRID_ID","day"="day", "hour"="hour"))%>%
       rename(nWazeJam_NE=nWazeJam_neighbor)
-    wazeTime.edt.hex_NW_N_NE_SW <- left_join(wazeTime.edt.hex_NW_N_NE, nWazeJam, by = c("GRID_ID_SW"="GRID_ID","day"="day", "hour"="hour"))%>%
+    wazeTime.tn.hex_NW_N_NE_SW <- left_join(wazeTime.tn.hex_NW_N_NE, nWazeJam, by = c("GRID_ID_SW"="GRID_ID","day"="day", "hour"="hour"))%>%
       rename(nWazeJam_SW=nWazeJam_neighbor)
-    wazeTime.edt.hex_NW_N_NE_SW_S <- left_join(wazeTime.edt.hex_NW_N_NE_SW, nWazeJam, by = c("GRID_ID_S"="GRID_ID","day"="day", "hour"="hour"))%>%
+    wazeTime.tn.hex_NW_N_NE_SW_S <- left_join(wazeTime.tn.hex_NW_N_NE_SW, nWazeJam, by = c("GRID_ID_S"="GRID_ID","day"="day", "hour"="hour"))%>%
       rename(nWazeJam_S=nWazeJam_neighbor)
-    wazeTime.edt.hex_NW_N_NE_SW_S_SE <- left_join(wazeTime.edt.hex_NW_N_NE_SW_S, nWazeJam, by = c("GRID_ID_SE"="GRID_ID","day"="day", "hour"="hour"))%>%
+    wazeTime.tn.hex_NW_N_NE_SW_S_SE <- left_join(wazeTime.tn.hex_NW_N_NE_SW_S, nWazeJam, by = c("GRID_ID_SE"="GRID_ID","day"="day", "hour"="hour"))%>%
       rename(nWazeJam_SE=nWazeJam_neighbor)
     
-    #test process - look at value for highest count in nWazeAcc_NW column (10)
-    t=filter(wazeTime.edt.hex_NW_N_NE_SW_S_SE, GRID_ID=="EG-53" & day=="141" & hour=="15")
-    t #10 - this matches, test more
+    # test process - look at value for highest count in nWazeAcc_NW column (10)
+    # t=filter(wazeTime.tn.hex_NW_N_NE_SW_S_SE, GRID_ID=="EG-53" & day=="141" & hour=="15")
+    # t #10 - this matches, test more
     
-    wazeTime.edt.hexAll <- wazeTime.edt.hex_NW_N_NE_SW_S_SE %>%
+    wazeTime.tn.hexAll <- wazeTime.tn.hex_NW_N_NE_SW_S_SE %>%
       mutate_all(funs(replace(., is.na(.), 0)))
-    #Replace NA with zero (for the grid counts here, 0 means there were no reported Waze events or EDT crashes in the neighbor grid cell at that hour)
+    # Replace NA with zero (for the grid counts here, 0 means there were no reported Waze events or EDT crashes in the neighbor grid cell at that hour)
     
-    #Update time variable 
-    hextimeChar <- paste(wazeTime.edt.hexAll$day,wazeTime.edt.hexAll$hour,sep=":")
-    wazeTime.edt.hexAll$hextime <- strptime(hextimeChar, "%j:%H", tz=)
+    # Update time variable 
+    hextimeChar <- paste(wazeTime.tn.hexAll$day, wazeTime.tn.hexAll$hour, sep=":")
+    wazeTime.tn.hexAll$hextime <- strptime(hextimeChar, "%j:%H", tz=)
   
+    class(wazeTime.tn.hexAll) <- "data.frame" # POSIX date/time not supported for grouped tbl
     
-    class(wazeTime.edt.hexAll) <- "data.frame" # POSIX date/time not supported for grouped tbl
+    fn = paste("WazeTimeEdtHexAll_", j,"_", g, ".RData", sep="")
     
-    fn = paste("WazeTimeEdtHexAll_", j,"_",HEXSIZE,"mi_", state, ".RData", sep="")
-    
-    save(list="wazeTime.edt.hexAll", file = file.path(temp.outputdir, fn))
+    save(list="wazeTime.tn.hexAll", file = file.path(temp.outputdir, fn))
 
     # Copy to S3
     system(paste("aws s3 cp",
@@ -284,29 +270,11 @@ for(state in states){ # state = "TN"
 
 } # end state loop
 
-##########################################################################################################
-##########################################################################################################
-
-# move any old files to S3 (should not be needed any more, S3 copy command is part of loop now.)
-
-SCRATCH = F
-if(SCRATCH){
-aggfiles <- dir(temp.outputdir) # consists of both the TimeList and HexAll files for each state
-for(state in states){
-  state.aggfiles <- aggfiles[grep(state, aggfiles)]
-  for(i in state.aggfiles){
-    system(paste("aws s3 cp",
-                 file.path(temp.outputdir, i),
-                 file.path(teambucket, state, i)))
-  }
-}
-} # end scratch
-
 # Check with plots -- written for ATA, needs update for SDC 2018-08-15
 
 CHECKPLOT = T
 
-
+state = "TN"
 library(rgdal)
 library(maps) # for state.fips
 
@@ -314,39 +282,35 @@ if(CHECKPLOT){
   
   co <- rgdal::readOGR(file.path(localdir, 'census'), layer = "cb_2017_us_county_500k")
 
-  FIPS = state.fips[state.fips$abb %in% states,]
+  FIPS = state.fips[state.fips$abb %in% state,]
   FIPS = FIPS[!duplicated(FIPS$abb),]
   FIPS$fips = formatC(FIPS$fips, width = 2, flag = "0")  
   
-  pdf(file.path("Figures", "Checking_Grid_agg_Multistate.pdf"), width = 11, height = 8)
-  for(state in states){ # state = 'UT'
+  pdf(file.path("Figures", "Checking_Grid_agg_TN.pdf"), width = 11, height = 8)
+  for(g in grids){ # g = grids[1]
 
   months = c("2017-04", "2017-09") # just a few for example
 
   state.co <- co[co$STATEFP == FIPS[FIPS$abb==state,"fips"],]
     
   # Read in hexagon shapefile. This is a rectangular surface of 1 sq mi area hexagons, 
-  if(state == "MD"){
-    hex = readOGR(file.path(localdir, "Hex", "MD_hexagons_shapefiles"), layer = "MD_hexagons_1mi_newExtent_neighbors")
-  } else {
-    hex = readOGR(file.path(localdir, "Hex"), layer = paste0(state, "_hexagons_1mi_neighbors"))
-  }
+  hex = readOGR(file.path(localdir, "TN", "Shapefiles"), layer = g)
     
   hex2 <- spTransform(hex, proj4string(state.co))
   
   for(j in months){
-      plot(hex2, main = paste(state, j))
+      plot(hex2, main = paste(g, j))
     
       plot(state.co, add = T, col = "red")
       
-      fn = paste0("WazeTimeEdtHexAll_", j, "_1mi_", state, ".RData")
+      fn = paste0("WazeTimeEdtHexAll_", j, "_", g, ".RData")
       
       load(file.path(temp.outputdir, fn))
       
-      class(wazeTime.edt.hexAll) <- "data.frame"
+      class(wazeTime.tn.hexAll) <- "data.frame"
       
       # Join back to hex2, just check unique grid IDs for plotting
-      w.t <- wazeTime.edt.hexAll[!duplicated(wazeTime.edt.hexAll$GRID_ID),]
+      w.t <- wazeTime.tn.hexAll[!duplicated(wazeTime.tn.hexAll$GRID_ID),]
       
       h.w <- hex2[hex2$GRID_ID %in% w.t$GRID_ID,]
       plot(h.w, col = "blue", add = T)

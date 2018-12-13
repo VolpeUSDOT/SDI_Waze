@@ -210,8 +210,8 @@ for(g in grids){ # g = grids[1]
     link.waze.tn$match <- ifelse(is.na(link.waze.tn$match), 'T', link.waze.tn$match)
     # table(link.waze.tn$match)
     
-    # Convert CrashDate_Local back to POSIX -- NEED TO RECONSIDER TIMEZONE FOR TN
-    link.waze.tn$CrashDate_Local <- strptime(link.waze.tn$date, "%Y-%m-%mb %H:%M:%S", tz = "America/Central")
+    # Convert date back to POSIX -- NEED TO RECONSIDER TIMEZONE FOR TN
+    link.waze.tn$date <- strptime(link.waze.tn$date, "%Y-%m-%mb %H:%M:%S", tz = "America/Central")
     
     # rename ID variables for compatibility with existing code
     names(link.waze.tn)[grep("id.incident", names(link.waze.tn))] = "uuid.waze"
