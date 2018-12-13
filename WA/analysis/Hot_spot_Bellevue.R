@@ -22,7 +22,7 @@ source(file.path(codeloc, 'utility/get_packages.R'))
 user <- paste0( "/home/", system("whoami", intern = TRUE)) #the user directory to use
 localdir <- paste0(user, "/workingdata") # full path for readOGR
 
-wazedir <- file.path(localdir, "WA") # has State_Year-mo.RData files. Grab from S3 if necessary
+wazedir <- file.path(localdir, "WA", "Waze") # has State_Year-mo.RData files. Grab from S3 if necessary
 
 setwd(localdir) 
 
