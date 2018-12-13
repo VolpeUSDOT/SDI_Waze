@@ -12,6 +12,7 @@ library(tidyverse) # tidyverse install on SDC may require additional steps, see 
 library(lubridate)
 library(geonames) # for time zone work
 library(httr)
+library(geonames)
 
 # Customized Functions
 sumstats = function(x) { 
@@ -276,6 +277,28 @@ spev$EndTime <- format(ymd_hms(spev$EndTime), "%H:%M:%S")
 
 # There are 363 special events in the data, wondering if this is a daily event at the same location?
 table(spev$Event[spev$Event_Type == "Fair"]) # Scattered in different counties and at different date.
+
+# Assign time zone to each special event.
+# Get timezone of event - TN has 2 timezones (eastern and central) - use geonames package 
+# NOTE: only need to run the next two lines once at the initial setup.  
+options(geonamesUsername = "waze_sdi") # set this up as a generic username, only need to run this command once 
+source(system.file("tests", "testing.R", package = "geonames"), echo = TRUE)
+
+spev$TimeZone <- NA
+
+for (i in 1:nrow(spev)) {
+  
+  spev$TimeZone[i] <- as.character(GNtimezone(spev$Lat[i], spev$Lon[i], radius = 0)$timezoneId)
+  
+}
+
+spev$StartUTC <- paste(spev$Event_Date, spev$StartTime)
+spev$StartUTC <- as.POSIXct(spev$StartUTC, 
+                              tz = spev$TimeZone, 
+                              format = "%Y-%m-%d %H:%M:%S")
+
+spev$EndDateTime <- paste(spev$Event_Date, spev$EndTime)
+spev$EndDateTime <- as.POSIXct(spev$EndDateTime, format = "%Y-%m-%d %H:%M:%S")
 
 # save spetial event data in the output
 save("spev", file = "SpecialEvents/TN_SpecialEvent_2008.RData")
