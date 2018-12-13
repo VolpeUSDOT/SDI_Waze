@@ -194,19 +194,16 @@ bin.mod.diagnostics <- function(predtab){
 
 
 # Read in hexagonally-gridded data of a specific name, prep fields, and save it as a short-named data frame
-prep.hex <- function(hexname, state, month, s3 = T, bucket = teambucket){
+prep.hex <- function(hexname, state, month, bucket = teambucket){
   # Defaults to read from S3 bucket specified with teambucket 
   # Specify month as 6-digit character value, e.g. "2017-04" for April 2017
   # Specify full path in hexname, e.g. for MD weather-overlaid files: file.path(inputdir, paste0("WazeTimeEdtHexWx_", mo,".RData"))
+  # system(paste0('aws s3 ls ', bucket, '/', state, '/'))
   
   mo = month
-  if(s3) {
-    system(paste0('aws s3 cp ', bucket, '/', state, '/', hexname, ' ~/workingdata'))
-    load(file.path("~/workingdata", hexname))
-  } else {
-    load(hexname, envir = environment())
-  }
-  
+  system(paste0('aws s3 cp ', bucket, '/', state, '/', hexname, ' ~/workingdata/', state))
+  load(file.path("~/workingdata", state, hexname))
+
   wte <- get(ls(envir = environment())[grep("WazeTime", ls(envir = environment()), ignore.case = T)])
   
   class(wte) <- "data.frame" 
@@ -226,21 +223,35 @@ prep.hex <- function(hexname, state, month, s3 = T, bucket = teambucket){
     wte$wx[is.na(wte$wx)] = 0
   }
   
-  # Going to binary for all Waze buffer match:
-  
-  wte$MatchEDT_buffer <- wte$nMatchEDT_buffer
-  wte$MatchEDT_buffer[wte$MatchEDT_buffer > 0] = 1 
-  wte$MatchEDT_buffer <- as.factor(wte$MatchEDT_buffer)
-  wte$MatchEDT_buffer_Acc <- wte$nMatchEDT_buffer_Acc
-  wte$MatchEDT_buffer_Acc[wte$MatchEDT_buffer_Acc > 0] = 1 
-  wte$MatchEDT_buffer_Acc <- as.factor(wte$MatchEDT_buffer_Acc)
-  
-  # Going to binary for all Waze Accident buffer match:
-  
-  wte$MatchEDT_buffer_Acc <- wte$nMatchEDT_buffer_Acc
-  wte$MatchEDT_buffer_Acc[wte$MatchEDT_buffer_Acc > 0] = 1 
-  wte$MatchEDT_buffer_Acc <- as.factor(wte$MatchEDT_buffer_Acc)
-  
+  if(state == "TN"){
+    # Going to binary for all Waze buffer match, for Tennessee
+    
+    wte$MatchTN_buffer <- wte$nMatchTN_buffer
+    wte$MatchTN_buffer[wte$MatchTN_buffer > 0] = 1 
+    wte$MatchTN_buffer <- as.factor(wte$MatchTN_buffer)
+    wte$MatchTN_buffer_Acc <- wte$nMatchTN_buffer_Acc
+    wte$MatchTN_buffer_Acc[wte$MatchTN_buffer_Acc > 0] = 1 
+    wte$MatchTN_buffer_Acc <- as.factor(wte$MatchTN_buffer_Acc)
+    
+    # Going to binary for all Waze Accident buffer match:
+    
+    wte$MatchTN_buffer_Acc <- wte$nMatchTN_buffer_Acc
+    wte$MatchTN_buffer_Acc[wte$MatchTN_buffer_Acc > 0] = 1 
+    wte$MatchTN_buffer_Acc <- as.factor(wte$MatchTN_buffer_Acc)
+  } else {
+    wte$MatchEDT_buffer <- wte$nMatchEDT_buffer
+    wte$MatchEDT_buffer[wte$MatchEDT_buffer > 0] = 1 
+    wte$MatchEDT_buffer <- as.factor(wte$MatchEDT_buffer)
+    wte$MatchEDT_buffer_Acc <- wte$nMatchEDT_buffer_Acc
+    wte$MatchEDT_buffer_Acc[wte$MatchEDT_buffer_Acc > 0] = 1 
+    wte$MatchEDT_buffer_Acc <- as.factor(wte$MatchEDT_buffer_Acc)
+    
+    # Going to binary for all Waze Accident buffer match:
+    
+    wte$MatchEDT_buffer_Acc <- wte$nMatchEDT_buffer_Acc
+    wte$MatchEDT_buffer_Acc[wte$MatchEDT_buffer_Acc > 0] = 1 
+    wte$MatchEDT_buffer_Acc <- as.factor(wte$MatchEDT_buffer_Acc)
+  }  
   
   # Omit grid cell x day combinations which are outside of this particular month (Waze road closures)
   yr = substr(mo, 1, 4)

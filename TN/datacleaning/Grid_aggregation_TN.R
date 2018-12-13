@@ -270,6 +270,27 @@ for(g in grids){ # g = grids[1]
 
 } # end state loop
 
+
+# Move to S3 if it failed in the loop for some reason
+for(g in grids){ # g = grids[1]
+  # Loop through months of available merged data for this state
+  mergefiles <- dir(wazemonthdir)[grep("^merged.waze.tn", dir(wazemonthdir))]
+  gridmergefiles <- mergefiles[grep(g, mergefiles)]
+  
+  avail.months = substr(unlist(
+    lapply(strsplit(gridmergefiles, "_"), function(x) x[[4]])), 1, 7)
+  
+  
+  for(j in avail.months){
+  fn = paste("WazeTimeEdtHexAll_", j,"_", g, ".RData", sep="")
+  
+  # Copy to S3
+  system(paste("aws s3 cp",
+               file.path(temp.outputdir, fn),
+               file.path(teambucket, state, fn)))
+  }
+}
+
 # Check with plots -- written for ATA, needs update for SDC 2018-08-15
 
 CHECKPLOT = T
