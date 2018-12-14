@@ -39,8 +39,10 @@ state = "WA"
 wazemonthfiles <- dir(wazedir)[grep(state, dir(wazedir))]
 wazemonthfiles <- wazemonthfiles[grep("RData$", wazemonthfiles)]
 # omit _Raw_
-omit <- grep('_Raw_', wazemonthfiles)
-wazemonthfiles = wazemonthfiles[-omit]
+
+#commented the omit step out - removes all files
+#omit <- grep('_Raw_', wazemonthfiles)
+#wazemonthfiles = wazemonthfiles[-omit]
 wazemonthfiles = wazemonthfiles[nchar(wazemonthfiles)==16]
 
 use.tz <- "US/Pacific"
@@ -181,14 +183,27 @@ ggplot(waze.ll %>% filter(alert_type == "ACCIDENT" & YM != "2017-03")) +
 
 # Omitting Highway 
 nametable <- sort(table(as.factor(w.all$street)), decreasing = T)
-nametable[1:25]
+nametable[1:100]
 
-to_omit = c("I-405", "I-90", "SR-520", "I-5")
+# Added additional exits and toll lanes - update to use Grep to find exits and "to ..."?
+to_omit = c("I-405", "I-90", "SR-520", "I-5", 
+            "to I-405 N / Everett","to I-405 S / Renton",
+            "to I-405 / Everett / Renton",
+            "I-405 N Exp Toll Ln", "I-405 S Exp Toll Ln", 
+            "to I-90 W / Seattle", "Exit 10: I-405 N / Bellevue / Everett",
+            "Exit 10: I-405 S / Renton", "Exit 10A: I-405 / Everett / Renton",
+            "Exit 10: Coal Creek Pkwy / Factoria Blvd SE",
+            "Exit 10B: Factoria Blvd",
+            "Exit 11: I-90 E / Spokane", "Exit 11: I-90 W / Seattle",
+            "Exit 11B: 148th Ave SE",
+            "to I-90 E / Spokane",
+            "to SR-520 E / Redmond", "to SR-520 W / Toll Bridge / Seattle")
 
 omits = vector()
 for(i in to_omit){
   omits = c(omits, grep(paste0("^", i), w.all$street))
 }
+length(omits)
 w.nohwy = w.all[is.na(match(1:nrow(w.all), omits)),]
 
 # also omit by road_type = 3
@@ -232,7 +247,7 @@ pdf(file = figname, width = 10, height = 10)
                                   fill = ..level.., alpha = ..level..),
                    size = 0.01, bins = 8, geom = 'polygon')
   
-  print(map.no1 + ggtitle(paste0("Waze event density (omitting highways)"))  +
+  print(map.nohwy + ggtitle(paste0("Waze event density (omitting highways)"))  +
           scale_fill_gradient(low = "blue", high = "red", 
                               guide_legend(title = "Event density")) +
           scale_alpha(range = c(0.1, 0.8), guide = FALSE) )
