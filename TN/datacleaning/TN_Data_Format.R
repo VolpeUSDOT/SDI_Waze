@@ -327,15 +327,25 @@ for (i in range) {
 # spev$EndDateTime <- paste(spev$Event_Date, spev$EndTime)
 # spev$EndDateTime <- as.POSIXct(spev$EndDateTime, format = "%Y-%m-%d %H:%M:%S")
 
-# save special event data in the output
-# locate the file
-ls <- system(paste("aws s3 ls",  paste0(teambucket, "/jyang/uploaded_files/")), intern = T) # the file is saved under this folder. Need to copy it over to workingdata folder.
-# Transfer the file to workingdata folder.
-system(paste("aws s3 cp",
-             paste0(teambucket, "/jyang/uploaded_files/",ls),
-             file.path('~', 'workingdata', 'TN', 'SpecialEvents',ls))) # Cool, did the trick
-
+## save special event data in the output
 save("spev", file = "SpecialEvents/TN_SpecialEvent_2018.RData")
+
+# locate the file that saved from outside SDC
+# step 1: find the uploaded files. intern = T will get the string of the system() output
+file_name <- system(paste("aws s3 ls",  paste0(teambucket, "/jyang/uploaded_files/")), intern = T) # the file is saved under this folder. Need to copy it over to workingdata folder.
+x <- system(paste("aws s3 ls",file.path(teambucket, "TN", "SpecialEvents/")), intern = T)
+
+# steps 2: move to common folder in teambucket
+system(paste("aws s3 mv", 
+             file.path(teambucket, system('whoami', intern = T), "uploaded_files", "TN_SpecialEvent_2008.RData"),
+             file.path(teambucket, "TN", "SpecialEvents", "TN_SpecialEvent_2018.RData"))
+)
+
+# step 3: Transfer the file to workingdata folder.
+system(paste("aws s3 cp",
+             file.path(teambucket, "TN", "SpecialEvents", "TN_SpecialEvent_2018.RData"),
+             file.path('~', 'workingdata', 'TN', 'SpecialEvents',"TN_SpecialEvent_2018.RData"))) # Cool, did the trick
+
 
 # Select a special event for the footprint analysis
 
