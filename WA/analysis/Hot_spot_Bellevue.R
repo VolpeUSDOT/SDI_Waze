@@ -185,19 +185,31 @@ ggplot(waze.ll %>% filter(alert_type == "ACCIDENT" & YM != "2017-03")) +
 nametable <- sort(table(as.factor(w.all$street)), decreasing = T)
 nametable[1:100]
 
-# Added additional exits and toll lanes - update to use Grep to find exits and "to ..."?
+# Added additional exits and toll lanes - update to use Grep to find "Exit" and variations of highway names to get "to" roads?
 to_omit = c("I-405", "I-90", "SR-520", "I-5", 
             "to I-405 N / Everett","to I-405 S / Renton",
             "to I-405 / Everett / Renton",
             "I-405 N Exp Toll Ln", "I-405 S Exp Toll Ln", 
+            "to I-405 S", "to I-405 N",
             "to I-90 W / Seattle", "Exit 10: I-405 N / Bellevue / Everett",
             "Exit 10: I-405 S / Renton", "Exit 10A: I-405 / Everett / Renton",
             "Exit 10: Coal Creek Pkwy / Factoria Blvd SE",
             "Exit 10B: Factoria Blvd",
             "Exit 11: I-90 E / Spokane", "Exit 11: I-90 W / Seattle",
             "Exit 11B: 148th Ave SE",
+            "Exit 9: Bellevue Way",
             "to I-90 E / Spokane",
-            "to SR-520 E / Redmond", "to SR-520 W / Toll Bridge / Seattle")
+            "to SR-520 E / Redmond", "to SR-520 W / Toll Bridge / Seattle",
+            "Exit 13A: NE 4th St",
+            "Exit 13: W Lake Sammamish / Lakemont Blvd SE / SE Newport Way",
+            "to SR-202 / Redmond Way",
+            "to SR-520 W / Seattle",
+            "Exit 14: SR-520 / Seattle / Redmond",
+            "to I-405 N / to I-90", "to SR-520 E", "to I-90 E", "to I-90 W",
+            "Exit 12: SE 8th St",
+            "Exit 11A: 150th Ave SE / Eastgate Way",
+            "to W Lk Sammamish Pkwy NE",
+            "Exit 14: SR-520 E / Redmond")
 
 omits = vector()
 for(i in to_omit){
@@ -205,6 +217,10 @@ for(i in to_omit){
 }
 length(omits)
 w.nohwy = w.all[is.na(match(1:nrow(w.all), omits)),]
+
+nametable.nohwy <- sort(table(as.factor(w.nohwy$street)), decreasing = T)
+nametable.nohwy[1:100]
+
 
 # also omit by road_type = 3
 table(w.nohwy$road_type)
