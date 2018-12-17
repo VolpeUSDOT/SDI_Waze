@@ -385,10 +385,12 @@ append.hex2 <- function(hexname, data.to.add, state, na.action = c("omit", "keep
       assign(data.to.add, foreign::read.dbf(file = file.path(localdir, "LODES_LEHD", state, paste0(data.to.add, ".dbf"))),
              envir = globalenv())
       
-    } 
-    # { # Build this out lodes, aadt
-    #   assign(data.to.add, rgdal::readOGR(localdir, layer = data.to.add), envir = globalenv())
-    # }
+    }
+    
+    if(length(grep("TN_SpecialEvent", data.to.add)) > 0){
+   # load prepped data
+    }
+
   }
   
   dd <- get(data.to.add)
@@ -478,7 +480,6 @@ append.hex2 <- function(hexname, data.to.add, state, na.action = c("omit", "keep
       group_by(GRID_ID) %>%
       tidyr::spread(key = F_SYSTEM_V, value = SUM_miles, fill = 0, sep = "_")
   }
-  
 
   if(length(grep("bg_rac_", data.to.add)) > 0){
     
@@ -509,6 +510,25 @@ append.hex2 <- function(hexname, data.to.add, state, na.action = c("omit", "keep
     names(dd)[2:length(names(dd))] <- paste("WAC", names(dd)[2:length(names(dd))], sep = "_")
     
   }
+  
+  # SpecialEvent prep ----
+  if(length(grep("TN_SpecialEvent", data.to.add)) > 0){
+    # Check to see if these processing steps have been done yet; don't need to re-do for each month.
+    prepname = paste("Prepared", data.to.add, g, sep="_")
+    
+    # Create vectors in w for month of year, day of week, hour of day in w. This is used for joining on the grid ID and time factors
+      dd = get(prepname, envir = globalenv()) # Use the already prepared data if present in the working enviroment
+    }
+    
+    # Extract year from file name
+    yr = substr(hexname, 3, 6)
+    date = strptime(paste(yr, w$day, sep = "-"), "%Y-%j")
+    mo = as.numeric(format(date, "%m"))
+    dow = lubridate::wday(date) # 7  = saturday, 1 = sunday.
+    w$vmt_time = paste(mo, dow, w$hour, sep="_")
+    
+  }
+  
   
   # End data type if statements, now merge with w data frame of Waze-EDT data
   # join ----

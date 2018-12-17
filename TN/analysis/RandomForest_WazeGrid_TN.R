@@ -64,8 +64,6 @@ for(mo in do.months){
   prep.hex(paste0("WazeTimeEdtHexAll_", mo, "_", g,".RData"), state = state, month = mo)
 }
 
-# TODO: pick up from here 2018-12-13 ------------
-
 # Plot to check grid IDs. Requires shapefiles to be present in ~/workingdata/Hex, download from S3 if not there.
 # This was useful when testing different grid sizes, to make sure everything was matching correctly.
 CHECKPLOT = F
@@ -91,18 +89,22 @@ na.action = "fill0"
 
 monthfiles = paste("w", do.months, sep=".")
 monthfiles = sub("-", "_", monthfiles)
-#  
+
+  
 #  # Append supplmental data. This is now a time-intensive step, with hourly VMT; consider making this parallel
 #  
-# for(w in monthfiles){ # w = "w.2017_04"
-#    append.hex2(hexname = w, data.to.add = paste0("FARS_", state, "_2012_2016_sum_annual"), state = state, na.action = na.action)
-#    
-#    # VMT   
-#    append.hex2(hexname = w, data.to.add = paste0(state, "_total_aadt_by_grid_fc_urban_VMTfactored"), state = state, na.action = na.action)
-#  
-#    append.hex2(hexname = w, data.to.add = paste0(state, "_hexagons_1mi_bg_wac_sum"), state = state, na.action = na.action)
-#    append.hex2(hexname = w, data.to.add = paste0(state, "_hexagons_1mi_bg_rac_sum"), state=state, na.action = na.action)
-#  }
+for(w in monthfiles){ # w = "w.2017_04"
+  
+   append.hex2(hexname = w, data.to.add = "TN_SpecialEvent", state = state, na.action = na.action)
+  
+   # append.hex2(hexname = w, data.to.add = paste0("FARS_", state, "_2012_2016_sum_annual"), state = state, na.action = na.action)
+   # 
+   # # VMT
+   # append.hex2(hexname = w, data.to.add = paste0(state, "_total_aadt_by_grid_fc_urban_VMTfactored"), state = state, na.action = na.action)
+   # 
+   # append.hex2(hexname = w, data.to.add = paste0(state, "_hexagons_1mi_bg_wac_sum"), state = state, na.action = na.action)
+   # append.hex2(hexname = w, data.to.add = paste0(state, "_hexagons_1mi_bg_rac_sum"), state=state, na.action = na.action)
+ }
 
 
 # Bind all months together
