@@ -9,91 +9,95 @@ library(rgdal)
 proj.USGS <- "+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs +ellps=GRS80 +towgs84=0,0,0"
 
 
-if(length(grep("TN_SpecialEvent", data.to.add)) > 0){
+load(file.path(localdir, "SpecialEvents", "TN_SpecialEvent_2018.RData"))
+
+# Check to see if these processing steps have been done yet; don't need to re-do for each month.
+prepname = paste("Prepared", "TN_SpecialEvent", g, sep="_")
+
+if(!exists(prepname)) {
   
-  assign(data.to.add, load(file.path(localdir, "SpecialEvents", "TN_SpecialEvent_2018.RData")),
-         envir = globalenv())
+  cat("Preparing", "TN_SpecialEvent", g, "\n")
   
-  # Check to see if these processing steps have been done yet; don't need to re-do for each month.
-  prepname = paste("Prepared", data.to.add, g, sep="_")
+  dd <- spev %>% filter(!is.na(Lon) | !is.na(Lat))
   
-  if(!exists(prepname)) {
-    
-    cat("Preparing", data.to.add, g, "\n")
-    
-    dd <- spev %>% filter(!is.na(Lon) | !is.na(Lat))
-    
-    # Apply to grid
-    grid_shp <- rgdal::readOGR(file.path(localdir, "Shapefiles"), layer = g)
-    grid_shp <- spTransform(grid_shp, CRS(proj.USGS))
-    
-    # Project special events
-    dd <- SpatialPointsDataFrame(dd[c("Lon", "Lat")], dd, 
-                                       proj4string = CRS("+proj=longlat +datum=WGS84"))  
-    
-    dd <- spTransform(dd, CRS(proj.USGS))
-    
-    grid_dd_pip <- over(dd, grid_shp[,"GRID_ID"]) # Match a grid ID to events
-    
-    dd@data <- data.frame(dd@data, grid_dd_pip)
-    
-    dd <- dd@data
-    # Add year, day of year
-    dd$Year = format(dd$Event_Date, "%Y")
-    dd$day = format(dd$Event_Date, "%j")    
-    
-    # TODO: Expand grid by hour
-       
-     
-  #   dd <- dd[!duplicated(with(dd, paste(GRID_ID, month, dayofweek, hour, F_SYSTEM_VN))),]
-  #   
-  #   dd.summax <- dd %>%
-  #     group_by(GRID_ID, month, dayofweek, hour) %>%
-  #     select(GRID_ID, month, dayofweek, hour, F_SYSTEM_VN, SUM_MAX_AADT_VN) %>%
-  #     tidyr::spread(key = F_SYSTEM_VN, value = SUM_MAX_AADT_VN, fill = 0, sep = "_")
-  #   
-  #   dd.hourmax <- dd %>%
-  #     group_by(GRID_ID, month, dayofweek, hour) %>%
-  #     select(GRID_ID, month, dayofweek, hour, F_SYSTEM_VN, HOURLY_MAX_AADT) %>%
-  #     tidyr::spread(key = F_SYSTEM_VN, value = HOURLY_MAX_AADT, fill = 0, sep = "_")
-  #   
-  #   # Rename columns and join
-  #   dd.summax <- dd.summax %>% 
-  #     rename(SUM_MAX_AADT_1 = F_SYSTEM_VN_1,
-  #            SUM_MAX_AADT_2 = F_SYSTEM_VN_2,
-  #            SUM_MAX_AADT_3 = F_SYSTEM_VN_3,
-  #            SUM_MAX_AADT_4 = F_SYSTEM_VN_4,
-  #            SUM_MAX_AADT_5 = F_SYSTEM_VN_5)
-  #   
-  #   dd.hourmax <- dd.hourmax %>% 
-  #     rename(HOURLY_MAX_AADT_1 = F_SYSTEM_VN_1,
-  #            HOURLY_MAX_AADT_2 = F_SYSTEM_VN_2,
-  #            HOURLY_MAX_AADT_3 = F_SYSTEM_VN_3,
-  #            HOURLY_MAX_AADT_4 = F_SYSTEM_VN_4,
-  #            HOURLY_MAX_AADT_5 = F_SYSTEM_VN_5)
-  #   
-  #   dd <- full_join(dd.summax, dd.hourmax, by = c("GRID_ID", "month", "dayofweek", "hour"))
-  #   
-  #   dd$vmt_time = with(dd, paste(month, dayofweek, hour, sep="_"))
-  #   
-  #   # Save this to global environment for other months to use
-  #   assign(prepname, dd, envir = globalenv())
-  #   
-  # } else {
-  #   
-  #   # Create vectors in w for month of year, day of week, hour of day in w. This is used for joining on the grid ID and time factors
-  #   
-  #   
-  #   dd = get(prepname, envir = globalenv()) # Use the already prepared data if present in the working enviroment
-  #   
+  # Apply to grid
+  grid_shp <- rgdal::readOGR(file.path(localdir, "Shapefiles"), layer = g)
+  grid_shp <- spTransform(grid_shp, CRS(proj.USGS))
+  
+  # Project special events
+  dd <- SpatialPointsDataFrame(dd[c("Lon", "Lat")], dd, 
+                                     proj4string = CRS("+proj=longlat +datum=WGS84"))  
+  
+  dd <- spTransform(dd, CRS(proj.USGS))
+  
+  grid_dd_pip <- over(dd, grid_shp[,"GRID_ID"]) # Match a grid ID to events
+  
+  dd@data <- data.frame(dd@data, grid_dd_pip)
+  
+  dd <- dd@data
+  # Add year, day of year
+  dd$Year = format(dd$Event_Date, "%Y")
+  dd$day = format(dd$Event_Date, "%j")    
+  
+  # Expand grid by hour
+  # If there is no start / end time, apply from 0 to 24
+  
+  # Make framework to join into
+  all.hour <- seq(from = as.POSIXct(paste(min(dd$Event_Date), "0:00"), tz = "America/Chicago"), 
+                    to = as.POSIXct(paste(max(dd$Event_Date), "0:00"), tz = "America/Chicago"),
+                    by = "hour")
+  
+  GridIDTime <- expand.grid(all.hour, unique(dd$GRID_ID))
+  names(GridIDTime) <- c("GridDayHour", "GRID_ID")
+  
+  # One solution: convert everything to central!
+  
+  start.hr <- as.numeric(format(strptime(dd$StartTime, format = "%H:%M:%S"), "%H"))
+  start.hr[dd$TimeZone == "America/New_York"] = start.hr[dd$TimeZone == "America/New_York"] - 1
+  start.hr[is.na(start.hr)] = 0 # start at midnight for all day events
+  
+  end.hr <- as.numeric(format(strptime(dd$EndTime, format = "%H:%M:%S"), "%H"))
+  end.hr[dd$TimeZone == "America/New_York"] = end.hr[dd$TimeZone == "America/New_York"] - 1
+  end.hr[is.na(end.hr)] = 23 # end at 11pm hr for all day events
+  
+  
+  
+  
+  # Attempt at individual event TZ work -- Need to apply timezones individually; vector of mixed time zone values is not accepted by strptime or as.POSIX* functions.
+  # start.hr.time <- end.hr.time <- vector()
+  
+  # for(i in 1:nrow(dd)){
+  #   start.hr.time = rbind(start.hr.time, strptime(paste(dd$Event_Date[i], start.hr[i]), "%Y-%m-%d %H", tz = dd$TimeZone[i]))
+  #   end.hr.time = c(end.hr.time, strptime(paste(dd$Event_Date[i], end.hr[i]), "%Y-%m-%d %H", tz = dd$TimeZone[i]))
   # }
-  # 
-  # # Extract year from file name
-  # yr = substr(hexname, 3, 6)
-  # date = strptime(paste(yr, w$day, sep = "-"), "%Y-%j")
-  # mo = as.numeric(format(date, "%m"))
-  # dow = lubridate::wday(date) # 7  = saturday, 1 = sunday.
-  # w$vmt_time = paste(mo, dow, w$hour, sep="_")
   
+  dd <- data.frame(dd, 
+                   start.hr = strptime(paste(dd$Event_Date, start.hr), "%Y-%m-%d %H", tz = "America/Chicago"),
+                   end.hr = strptime(paste(dd$Event_Date, end.hr), "%Y-%m-%d %H", tz = "America/Chicago"))
+  
+  StartTime <- Sys.time()
+  t.min = min(GridIDTime$GridDayHour)
+  t.max = max(GridIDTime$GridDayHour)
+  i = t.min
+  
+  spev.grid.time.all <- vector()
+  counter = 1
+  while(i+3600 <= t.max){
+    ti.GridIDTime = filter(GridIDTime, GridDayHour == i)
+    ti.spev = filter(dd, start.hr >= i & start.hr <= i+3600 | end.hr >= i & end.hr <= i+3600)
+    
+    ti.spev.hex <- inner_join(ti.GridIDTime, ti.spev, by = "GRID_ID") # Use left_join to get zeros if no match  
+    spev.grid.time.all <- rbind(spev.grid.time.all, ti.spev.hex)
+    
+    i=i+3600
+    if(counter %% 3600*24 == 0) cat(paste(i, "\n"))
+  } # end loop
+  
+  EndTime <- Sys.time() - StartTime
+  cat(round(EndTime, 2), attr(EndTime, "units"), "\n")
+  
+  spev.grid.time <- filter(spev.grid.time.all, !is.na(GRID_ID))   
+  
+  # ~ 3 min  
 }
 

@@ -518,7 +518,7 @@ append.hex2 <- function(hexname, data.to.add, state, na.action = c("omit", "keep
     
     # Create vectors in w for month of year, day of week, hour of day in w. This is used for joining on the grid ID and time factors
       dd = get(prepname, envir = globalenv()) # Use the already prepared data if present in the working enviroment
-    }
+    
     
     # Extract year from file name
     yr = substr(hexname, 3, 6)
