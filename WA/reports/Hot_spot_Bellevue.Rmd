@@ -17,7 +17,8 @@ title: "Bellevue Waze Hot Spot Mapping"
 ```{r setup, echo = F, message = F, warning=F}
 knitr::opts_chunk$set(warning = FALSE, message = FALSE, echo = F)
 # Setup ----
-# If you don't have these packages: install.packages(c("maps", "sp", "rgdal", "rgeos", "tidyverse")) 
+codeloc <- "~/SDI_Waze"
+source(file.path(codeloc, 'utility/get_packages.R'))
 # ggmap: want development version: devtools::install_github("dkahle/ggmap")
 library(maps)
 library(sp)
@@ -30,8 +31,9 @@ library(kableExtra)
 library(DT)
 
 
-codeloc <- "~/SDI_Waze"
-source(file.path(codeloc, 'utility/get_packages.R'))
+# Run once, to get all necessary data
+# source(file.path(codeloc, 'utility/Workstation_setup.R'))
+
 teambucket <- "s3://prod-sdc-sdi-911061262852-us-east-1-bucket"
 
 user <- paste0( "/home/", system("whoami", intern = TRUE)) #the user directory to use

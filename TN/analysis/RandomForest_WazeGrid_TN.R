@@ -35,9 +35,13 @@ state = "TN"
 do.months = c(paste("2017", c("04","05","06","07","08","09", "10", "11", "12"), sep="-"),
               paste("2018", c("01","02","03"), sep="-"))
 
+do.months = paste("2017", c("04","05","06"), sep="-")
+
 REASSESS = F # re-assess model fit and diagnostics using reassess.rf instead of do.rf
 
 outputdir <- file.path(localdir, "Random_Forest_Output")
+# Make outputdir if not alreday there
+system(paste('mkdir -p', outputdir))
 
 # read random forest function
 source(file.path(codeloc, "analysis/RandomForest_WazeGrid_Fx.R"))
@@ -66,9 +70,12 @@ for(mo in do.months){
 # This was useful when testing different grid sizes, to make sure everything was matching correctly.
 CHECKPLOT = F
 if(CHECKPLOT){
-  grid_shp <- rgdal::readOGR(file.path(localdir, "Hex", state), paste0(state, "_hexagons_1mi_neighbors"))
+  usemonth = do.months[1]
+  usedata <- ls()[grep(sub("-", "_", usemonth), ls())]
   
-  w.g <- match(w.2017_04$GRID_ID, grid_shp$GRID_ID)
+  grid_shp <- rgdal::readOGR(file.path(localdir, "Shapefiles"), layer = g)
+  
+  w.g <- match(get(usedata)$GRID_ID, grid_shp$GRID_ID)
   w.g <- w.g[!is.na(w.g)]
   gs <- grid_shp[w.g,]
   
@@ -76,23 +83,26 @@ if(CHECKPLOT){
   rm(w.g, gs, grid_shp)
 }
 
-# Add FARS, AADT, HPMS, jobs
- na.action = "fill0"
- 
- monthfiles = paste("w", do.months, sep=".")
- monthfiles = sub("-", "_", monthfiles)
- 
- # Append supplmental data. This is now a time-intensive step, with hourly VMT; consider making this parallel
- 
-for(w in monthfiles){ # w = "w.2017_04"
-   append.hex2(hexname = w, data.to.add = paste0("FARS_", state, "_2012_2016_sum_annual"), state = state, na.action = na.action)
-   
-   # VMT   
-   append.hex2(hexname = w, data.to.add = paste0(state, "_total_aadt_by_grid_fc_urban_VMTfactored"), state = state, na.action = na.action)
- 
-   append.hex2(hexname = w, data.to.add = paste0(state, "_hexagons_1mi_bg_wac_sum"), state = state, na.action = na.action)
-   append.hex2(hexname = w, data.to.add = paste0(state, "_hexagons_1mi_bg_rac_sum"), state=state, na.action = na.action)
- }
+# TODO: figure out what supplemental variables to include from previous work
+# Write function to apply special events and weather
+
+# # Add FARS, AADT, HPMS, jobs
+na.action = "fill0"
+
+monthfiles = paste("w", do.months, sep=".")
+monthfiles = sub("-", "_", monthfiles)
+#  
+#  # Append supplmental data. This is now a time-intensive step, with hourly VMT; consider making this parallel
+#  
+# for(w in monthfiles){ # w = "w.2017_04"
+#    append.hex2(hexname = w, data.to.add = paste0("FARS_", state, "_2012_2016_sum_annual"), state = state, na.action = na.action)
+#    
+#    # VMT   
+#    append.hex2(hexname = w, data.to.add = paste0(state, "_total_aadt_by_grid_fc_urban_VMTfactored"), state = state, na.action = na.action)
+#  
+#    append.hex2(hexname = w, data.to.add = paste0(state, "_hexagons_1mi_bg_wac_sum"), state = state, na.action = na.action)
+#    append.hex2(hexname = w, data.to.add = paste0(state, "_hexagons_1mi_bg_rac_sum"), state=state, na.action = na.action)
+#  }
 
 
 # Bind all months together
@@ -107,7 +117,7 @@ for(i in w.allmonths.named){
 
 avail.cores = parallel::detectCores()
 
-if(avail.cores > 8) avail.cores = 10 # Limit usage below max if on r4.4xlarge instance
+# if(avail.cores > 8) avail.cores = 12 # Limit usage below max if on r4.4xlarge instance. Comment this out to run largest models.
 
 # Use this to set number of decision trees to use, and key RF parameters. mtry is especially important, should consider tuning this with caret package
 # For now use same parameters for all models for comparision; tune parameters after models are selected
@@ -119,13 +129,15 @@ keyoutputs = redo_outputs = list() # to store model diagnostics
 alwaysomit = c(grep("GRID_ID", names(w.allmonths), value = T), "day", "hextime", "year", "weekday", 
                "uniqWazeEvents", "nWazeRowsInMatch", 
                "nMatchWaze_buffer", "nNoMatchWaze_buffer",
-               grep("EDT", names(w.allmonths), value = T))
+               grep("nTN", names(w.allmonths), value = T),
+               grep("MatchTN", names(w.allmonths), value = T),
+               grep("TN_UA", names(w.allmonths), value = T))
 
 alert_types = c("nWazeAccident", "nWazeJam", "nWazeRoadClosed", "nWazeWeatherOrHazard")
 
 alert_subtypes = c("nHazardOnRoad", "nHazardOnShoulder" ,"nHazardWeather", "nWazeAccidentMajor", "nWazeAccidentMinor", "nWazeHazardCarStoppedRoad", "nWazeHazardCarStoppedShoulder", "nWazeHazardConstruction", "nWazeHazardObjectOnRoad", "nWazeHazardPotholeOnRoad", "nWazeHazardRoadKillOnRoad", "nWazeJamModerate", "nWazeJamHeavy" ,"nWazeJamStandStill",  "nWazeWeatherFlood", "nWazeWeatherFog", "nWazeHazardIceRoad")
 
-response.var = "MatchEDT_buffer_Acc"
+response.var = "MatchTN_buffer_Acc"
 
 
 # A: All Waze ----
@@ -155,7 +167,7 @@ modelno = "18"
 
 if(!REASSESS){
   keyoutputs[[modelno]] = do.rf(train.dat = w.allmonths, 
-                                omits, response.var = "MatchEDT_buffer_Acc", 
+                                omits, response.var = "MatchTN_buffer_Acc", 
                                # thin.dat = 0.01,
                                 model.no = modelno, rf.inputs = rf.inputs) 
   
@@ -163,18 +175,18 @@ if(!REASSESS){
   } else {
 
 redo_outputs[[modelno]] = reassess.rf(train.dat = w.allmonths, 
-                              omits, response.var = "MatchEDT_buffer_Acc", 
+                              omits, response.var = "MatchTN_buffer_Acc", 
                               model.no = modelno, rf.inputs = rf.inputs) 
 }
 
 
-save("keyoutputs", file = paste0("Output_to_", modelno))
+save("keyoutputs", file = paste0("TN_Output_to_", modelno))
 
 timediff <- Sys.time() - starttime
 cat(round(timediff, 2), attr(timediff, "units"), "elapsed to model", modelno)
 
 
-# <><><><><><><><><><><><><><><><><><> 2018-08-15 Dan stopped here! 
+# <><><><><><><><><><><><><><><><><><> 2018-12-17 Dan stopped here! 
 
 READY = F # Use this to skip models which aren't ready for multi-state implementation yet 2018-08-15
 
@@ -199,14 +211,14 @@ omits = c(alwaysomit,
 
 if(!REASSESS){
   keyoutputs[[modelno]] = do.rf(train.dat = w.allmonths, 
-                              omits, response.var = "MatchEDT_buffer_Acc", 
+                              omits, response.var = "MatchTN_buffer_Acc", 
                               model.no = modelno, rf.inputs = rf.inputs) 
 
  save("keyoutputs", file = paste0("Output_to_", modelno))
 } else {
 
 redo_outputs[[modelno]] = reassess.rf(train.dat = w.allmonths, 
-                                      omits, response.var = "MatchEDT_buffer_Acc", 
+                                      omits, response.var = "MatchTN_buffer_Acc", 
                                       model.no = modelno, rf.inputs = rf.inputs) 
 }
 # 20 Add Weather only
@@ -228,14 +240,14 @@ omits = c(alwaysomit,
 if(!REASSESS){
 
 keyoutputs[[modelno]] = do.rf(train.dat = w.allmonths, 
-                              omits = omits, response.var = "MatchEDT_buffer_Acc", 
+                              omits = omits, response.var = "MatchTN_buffer_Acc", 
                               model.no = modelno, rf.inputs = rf.inputs) 
 
 save("keyoutputs", file = paste0("Output_to_", modelno))
 } else {
 
 redo_outputs[[modelno]] = reassess.rf(train.dat = w.allmonths, 
-                                      omits, response.var = "MatchEDT_buffer_Acc", 
+                                      omits, response.var = "MatchTN_buffer_Acc", 
                                       model.no = modelno, rf.inputs = rf.inputs) 
 }
 # 21 Add road class, AADT only
@@ -257,12 +269,12 @@ omits = c(alwaysomit,
 
 if(!REASSESS){
   keyoutputs[[modelno]] = do.rf(train.dat = w.allmonths, 
-                              omits = omits, response.var = "MatchEDT_buffer_Acc", 
+                              omits = omits, response.var = "MatchTN_buffer_Acc", 
                               model.no = modelno, rf.inputs = rf.inputs) 
 } else {
 
 redo_outputs[[modelno]] = reassess.rf(train.dat = w.allmonths, 
-                                      omits, response.var = "MatchEDT_buffer_Acc", 
+                                      omits, response.var = "MatchTN_buffer_Acc", 
                                       model.no = modelno, rf.inputs = rf.inputs) 
 }
 # 22 Add jobs only
@@ -283,12 +295,12 @@ omits = c(alwaysomit,
 
 if(!REASSESS){
   keyoutputs[[modelno]] = do.rf(train.dat = w.allmonths, 
-                              omits = c(omits), response.var = "MatchEDT_buffer_Acc", 
+                              omits = c(omits), response.var = "MatchTN_buffer_Acc", 
                               model.no = modelno, rf.inputs = rf.inputs) 
   save("keyoutputs", file = paste0("Output_to_", modelno))
 } else { 
   redo_outputs[[modelno]] = reassess.rf(train.dat = w.allmonths, 
-                                      omits, response.var = "MatchEDT_buffer_Acc", 
+                                      omits, response.var = "MatchTN_buffer_Acc", 
                                       model.no = modelno, rf.inputs = rf.inputs) 
   }
 # 23 Add all together
@@ -309,12 +321,12 @@ omits = c(alwaysomit,
 
 if(!REASSESS){
   keyoutputs[[modelno]] = do.rf(train.dat = w.allmonths, 
-                              omits = c(omits), response.var = "MatchEDT_buffer_Acc", 
+                              omits = c(omits), response.var = "MatchTN_buffer_Acc", 
                               model.no = modelno, rf.inputs = rf.inputs) 
   save("keyoutputs", file = paste0("Output_to_", modelno))
 } else {
   redo_outputs[[modelno]] = reassess.rf(train.dat = w.allmonths, 
-                                      omits, response.var = "MatchEDT_buffer_Acc", 
+                                      omits, response.var = "MatchTN_buffer_Acc", 
                                       model.no = modelno, rf.inputs = rf.inputs) 
 }
 
@@ -341,11 +353,11 @@ omits = c(alwaysomit, alert_subtypes,
 
 
 if(!REASSESS){
-  keyoutputs[[modelno]] = do.rf(train.dat = w.allmonths, omits, response.var = "MatchEDT_buffer_Acc", 
+  keyoutputs[[modelno]] = do.rf(train.dat = w.allmonths, omits, response.var = "MatchTN_buffer_Acc", 
                               model.no = modelno, rf.inputs = rf.inputs) 
 } else {
   redo_outputs[[modelno]] = reassess.rf(train.dat = w.allmonths, 
-                                      omits, response.var = "MatchEDT_buffer_Acc", 
+                                      omits, response.var = "MatchTN_buffer_Acc", 
                                       model.no = modelno, rf.inputs = rf.inputs) 
 
 }
@@ -367,12 +379,12 @@ omits = c(alwaysomit, alert_subtypes,
 
 
 if(!REASSESS){
-  keyoutputs[[modelno]] = do.rf(train.dat = w.allmonths, omits, response.var = "MatchEDT_buffer_Acc",  
+  keyoutputs[[modelno]] = do.rf(train.dat = w.allmonths, omits, response.var = "MatchTN_buffer_Acc",  
                               model.no = modelno, rf.inputs = rf.inputs) 
   save("keyoutputs", file = paste0("Output_to_", modelno))
 } else {
   redo_outputs[[modelno]] = reassess.rf(train.dat = w.allmonths, 
-                                      omits, response.var = "MatchEDT_buffer_Acc", 
+                                      omits, response.var = "MatchTN_buffer_Acc", 
                                       model.no = modelno, rf.inputs = rf.inputs) 
 }
 
@@ -396,12 +408,12 @@ omits = c(alwaysomit, alert_subtypes,
 
 
 if(!REASSESS){
-  keyoutputs[[modelno]] = do.rf(train.dat = w.allmonths, omits, response.var = "MatchEDT_buffer_Acc",  
+  keyoutputs[[modelno]] = do.rf(train.dat = w.allmonths, omits, response.var = "MatchTN_buffer_Acc",  
                               model.no = modelno, rf.inputs = rf.inputs) 
   save("keyoutputs", file = paste0("Output_to_", modelno))
 } else {
   redo_outputs[[modelno]] = reassess.rf(train.dat = w.allmonths, 
-                                      omits, response.var = "MatchEDT_buffer_Acc", 
+                                      omits, response.var = "MatchTN_buffer_Acc", 
                                       model.no = modelno, rf.inputs = rf.inputs) 
 }
 # 27 Add Weather only
@@ -421,12 +433,12 @@ omits = c(alwaysomit, alert_subtypes,
           )
 
 if(!REASSESS){
-  keyoutputs[[modelno]] = do.rf(train.dat = w.allmonths, omits, response.var = "MatchEDT_buffer_Acc",  
+  keyoutputs[[modelno]] = do.rf(train.dat = w.allmonths, omits, response.var = "MatchTN_buffer_Acc",  
                               model.no = modelno, rf.inputs = rf.inputs) 
   save("keyoutputs", file = paste0("Output_to_", modelno))
 } else {
   redo_outputs[[modelno]] = reassess.rf(train.dat = w.allmonths, 
-                                      omits, response.var = "MatchEDT_buffer_Acc", 
+                                      omits, response.var = "MatchTN_buffer_Acc", 
                                       model.no = modelno, rf.inputs = rf.inputs) 
 }
 # 28 Add road class, AADT only
@@ -446,12 +458,12 @@ omits = c(alwaysomit, alert_subtypes,
           )
 
 if(!REASSESS){
-  keyoutputs[[modelno]] = do.rf(train.dat = w.allmonths, omits, response.var = "MatchEDT_buffer_Acc",  
+  keyoutputs[[modelno]] = do.rf(train.dat = w.allmonths, omits, response.var = "MatchTN_buffer_Acc",  
                               model.no = modelno, rf.inputs = rf.inputs) 
   save("keyoutputs", file = paste0("Output_to_", modelno))
 } else {
   redo_outputs[[modelno]] = reassess.rf(train.dat = w.allmonths, 
-                                      omits, response.var = "MatchEDT_buffer_Acc", 
+                                      omits, response.var = "MatchTN_buffer_Acc", 
                                       model.no = modelno, rf.inputs = rf.inputs) 
 }
 
@@ -471,12 +483,12 @@ omits = c(alwaysomit, alert_subtypes,
           )
 
 if(!REASSESS){
-  keyoutputs[[modelno]] = do.rf(train.dat = w.allmonths, omits, response.var = "MatchEDT_buffer_Acc",  
+  keyoutputs[[modelno]] = do.rf(train.dat = w.allmonths, omits, response.var = "MatchTN_buffer_Acc",  
                               model.no = modelno, rf.inputs = rf.inputs) 
   save("keyoutputs", file = paste0("Output_to_", modelno))
 } else {
   redo_outputs[[modelno]] = reassess.rf(train.dat = w.allmonths, 
-                                      omits, response.var = "MatchEDT_buffer_Acc", 
+                                      omits, response.var = "MatchTN_buffer_Acc", 
                                       model.no = modelno, rf.inputs = rf.inputs) 
   }
 
@@ -496,12 +508,12 @@ omits = c(alwaysomit, alert_subtypes
           )
 
 if(!REASSESS){
-  keyoutputs[[modelno]] = do.rf(train.dat = w.allmonths, omits, response.var = "MatchEDT_buffer_Acc",  
+  keyoutputs[[modelno]] = do.rf(train.dat = w.allmonths, omits, response.var = "MatchTN_buffer_Acc",  
                                 model.no = modelno, rf.inputs = rf.inputs) 
   save("keyoutputs", file = paste0("Output_to_", modelno))
 } else {
   redo_outputs[[modelno]] = reassess.rf(train.dat = w.allmonths,
-                                        omits, response.var = "MatchEDT_buffer_Acc", 
+                                        omits, response.var = "MatchTN_buffer_Acc", 
                                         model.no = modelno, rf.inputs = rf.inputs) 
 }
 
@@ -515,12 +527,12 @@ EDTonlyrows <- apply(w.allmonths[c(alert_types, alert_subtypes)], 1, FUN = funct
 summary(EDTonlyrows)
 
 if(!REASSESS){
-  keyoutputs[[modelno]] = do.rf(train.dat = w.allmonths[!EDTonlyrows,], omits, response.var = "MatchEDT_buffer_Acc",  
+  keyoutputs[[modelno]] = do.rf(train.dat = w.allmonths[!EDTonlyrows,], omits, response.var = "MatchTN_buffer_Acc",  
                                  model.no = modelno, rf.inputs = rf.inputs) 
   save("keyoutputs", file = paste0("Output_to_", modelno))
 } else {
     redo_outputs[[modelno]] = reassess.rf(train.dat = w.allmonths[!EDTonlyrows,], 
-                                        omits, response.var = "MatchEDT_buffer_Acc", 
+                                        omits, response.var = "MatchTN_buffer_Acc", 
                                         model.no = modelno, rf.inputs = rf.inputs) 
 }
 
@@ -532,12 +544,12 @@ Road.closure.onlyrows <- apply(w.allmonths[c("nWazeRoadClosed","nWazeAccident","
 summary(Road.closure.onlyrows)
 
 if(!REASSESS){
-  keyoutputs[[modelno]] = do.rf(train.dat = w.allmonths[!Road.closure.onlyrows,], omits, response.var = "MatchEDT_buffer_Acc",  
+  keyoutputs[[modelno]] = do.rf(train.dat = w.allmonths[!Road.closure.onlyrows,], omits, response.var = "MatchTN_buffer_Acc",  
                                  model.no = modelno, rf.inputs = rf.inputs) 
   save("keyoutputs", file = paste0("Output_to_", modelno))
 } else {
     redo_outputs[[modelno]] = reassess.rf(train.dat = w.allmonths[!Road.closure.onlyrows,], 
-                                        omits, response.var = "MatchEDT_buffer_Acc", 
+                                        omits, response.var = "MatchTN_buffer_Acc", 
                                         model.no = modelno, rf.inputs = rf.inputs) 
 }
 
@@ -564,13 +576,13 @@ omits = c(alwaysomit, alert_types,
 
 if(!REASSESS){
   keyoutputs[[modelno]] = do.rf(train.dat = w.allmonths, 
-                              omits, response.var = "MatchEDT_buffer_Acc", 
+                              omits, response.var = "MatchTN_buffer_Acc", 
                               model.no = modelno, rf.inputs = rf.inputs) 
   save("keyoutputs", file = paste0("Output_to_", modelno))
 
 } else {
   redo_outputs[[modelno]] = reassess.rf(train.dat = w.allmonths, 
-                                      omits, response.var = "MatchEDT_buffer_Acc", 
+                                      omits, response.var = "MatchTN_buffer_Acc", 
                                       model.no = modelno, rf.inputs = rf.inputs) 
 }
 # 34 Add other Waze only (confidence, reliability, magvar, neighbors)
@@ -591,12 +603,12 @@ omits = c(alwaysomit, alert_types,
 
 if(!REASSESS){
   keyoutputs[[modelno]] = do.rf(train.dat = w.allmonths, 
-                              omits, response.var = "MatchEDT_buffer_Acc", 
+                              omits, response.var = "MatchTN_buffer_Acc", 
                               model.no = modelno, rf.inputs = rf.inputs) 
 
 } else { 
   redo_outputs[[modelno]] = reassess.rf(train.dat = w.allmonths, 
-                                      omits, response.var = "MatchEDT_buffer_Acc", 
+                                      omits, response.var = "MatchTN_buffer_Acc", 
                                       model.no = modelno, rf.inputs = rf.inputs) 
 }
 
@@ -621,11 +633,11 @@ omits = c(alwaysomit, alert_types,
 
 if(!REASSESS){
   keyoutputs[[modelno]] = do.rf(train.dat = w.allmonths, 
-                              omits, response.var = "MatchEDT_buffer_Acc", 
+                              omits, response.var = "MatchTN_buffer_Acc", 
                               model.no = modelno, rf.inputs = rf.inputs) 
 } else {
   redo_outputs[[modelno]] = reassess.rf(train.dat = w.allmonths, 
-                                      omits, response.var = "MatchEDT_buffer_Acc", 
+                                      omits, response.var = "MatchTN_buffer_Acc", 
                                       model.no = modelno, rf.inputs = rf.inputs) 
 }
 
@@ -647,11 +659,11 @@ omits = c(alwaysomit, alert_types,
 
 if(!REASSESS){
   keyoutputs[[modelno]] = do.rf(train.dat = w.allmonths, 
-                              omits, response.var = "MatchEDT_buffer_Acc", 
+                              omits, response.var = "MatchTN_buffer_Acc", 
                               model.no = modelno, rf.inputs = rf.inputs) 
 } else {
   redo_outputs[[modelno]] = reassess.rf(train.dat = w.allmonths, 
-                                      omits, response.var = "MatchEDT_buffer_Acc", 
+                                      omits, response.var = "MatchTN_buffer_Acc", 
                                       model.no = modelno, rf.inputs = rf.inputs) 
 }
 
@@ -673,12 +685,12 @@ omits = c(alwaysomit, alert_types,
 
 if(!REASSESS){
   keyoutputs[[modelno]] = do.rf(train.dat = w.allmonths, 
-                              omits, response.var = "MatchEDT_buffer_Acc", 
+                              omits, response.var = "MatchTN_buffer_Acc", 
                               model.no = modelno, rf.inputs = rf.inputs) 
   save("keyoutputs", file = paste0("Output_to_", modelno))
 } else {
   redo_outputs[[modelno]] = reassess.rf(train.dat = w.allmonths, 
-                                      omits, response.var = "MatchEDT_buffer_Acc", 
+                                      omits, response.var = "MatchTN_buffer_Acc", 
                                       model.no = modelno, rf.inputs = rf.inputs) 
 }
 # 38 Add jobs only
@@ -699,11 +711,11 @@ omits = c(alwaysomit, alert_types,
 
 if(!REASSESS){
   keyoutputs[[modelno]] = do.rf(train.dat = w.allmonths, 
-                              omits, response.var = "MatchEDT_buffer_Acc", 
+                              omits, response.var = "MatchTN_buffer_Acc", 
                               model.no = modelno, rf.inputs = rf.inputs) 
 } else {
   redo_outputs[[modelno]] = reassess.rf(train.dat = w.allmonths, 
-                                      omits, response.var = "MatchEDT_buffer_Acc", 
+                                      omits, response.var = "MatchTN_buffer_Acc", 
                                       model.no = modelno, rf.inputs = rf.inputs) 
 }
 # 39 Add all (but not Waze event sub-subtypes)
@@ -724,13 +736,13 @@ omits = c(alwaysomit, alert_types
 
 if(!REASSESS){
   keyoutputs[[modelno]] = do.rf(train.dat = w.allmonths, 
-                              omits, response.var = "MatchEDT_buffer_Acc", 
+                              omits, response.var = "MatchTN_buffer_Acc", 
                               model.no = modelno, rf.inputs = rf.inputs) 
   save("keyoutputs", file = paste0("Output_to_", modelno))
   
 } else {
   redo_outputs[[modelno]] = reassess.rf(train.dat = w.allmonths, 
-                                      omits, response.var = "MatchEDT_buffer_Acc", 
+                                      omits, response.var = "MatchTN_buffer_Acc", 
                                       model.no = modelno, rf.inputs = rf.inputs) 
 }
 # 40 Pick best and test removing EDT only rows - skipped, these are clearly worse models
@@ -762,12 +774,12 @@ omits = c(alwaysomit,
 
 if(!REASSESS){
   keyoutputs[[modelno]] = do.rf(train.dat = w.allmonths, 
-                                omits, response.var = "nMatchEDT_buffer_Acc", 
+                                omits, response.var = "nMatchTN_buffer_Acc", 
                                 model.no = modelno, rf.inputs = rf.inputs) 
   save("keyoutputs", file = paste0("Output_to_", modelno))
 } else {
   keyoutputs[[modelno]] = reassess.rf(train.dat = w.allmonths, 
-                                        omits, response.var = "nMatchEDT_buffer_Acc", 
+                                        omits, response.var = "nMatchTN_buffer_Acc", 
                                         model.no = modelno, rf.inputs = rf.inputs) 
 }
 
@@ -778,12 +790,12 @@ modelno = "43a"
 
 if(!REASSESS){
   keyoutputs[[modelno]] = do.rf(train.dat = w.allmonths[!EDTonlyrows,], 
-                                omits, response.var = "nMatchEDT_buffer_Acc", 
+                                omits, response.var = "nMatchTN_buffer_Acc", 
                                 model.no = modelno, rf.inputs = rf.inputs) 
   save("keyoutputs", file = paste0("Output_to_", modelno))
 } else {
   keyoutputs[[modelno]] = reassess.rf(train.dat = w.allmonths[!EDTonlyrows,], 
-                                        omits, response.var = "nMatchEDT_buffer_Acc", 
+                                        omits, response.var = "nMatchTN_buffer_Acc", 
                                         model.no = modelno, rf.inputs = rf.inputs) 
 }
 
@@ -794,12 +806,12 @@ modelno = "44a"
 
 if(!REASSESS){
   keyoutputs[[modelno]] = do.rf(train.dat = w.allmonths[!Road.closure.onlyrows,], 
-                                omits, response.var = "nMatchEDT_buffer_Acc", 
+                                omits, response.var = "nMatchTN_buffer_Acc", 
                                 model.no = modelno, rf.inputs = rf.inputs) 
   save("keyoutputs", file = paste0("Output_to_", modelno))
 } else {
   keyoutputs[[modelno]] = reassess.rf(train.dat = w.allmonths[!Road.closure.onlyrows,], 
-                                        omits, response.var = "nMatchEDT_buffer_Acc", 
+                                        omits, response.var = "nMatchTN_buffer_Acc", 
                                         model.no = modelno, rf.inputs = rf.inputs) 
 }
 
@@ -823,12 +835,12 @@ omits = c(alwaysomit, alert_subtypes
 
 if(!REASSESS){
   keyoutputs[[modelno]] = do.rf(train.dat = w.allmonths, 
-                                omits, response.var = "nMatchEDT_buffer_Acc", 
+                                omits, response.var = "nMatchTN_buffer_Acc", 
                                 model.no = modelno, rf.inputs = rf.inputs) 
   save("keyoutputs", file = paste0("Output_to_", modelno))
 } else {
   keyoutputs[[modelno]] = reassess.rf(train.dat = w.allmonths, 
-                                        omits, response.var = "nMatchEDT_buffer_Acc", 
+                                        omits, response.var = "nMatchTN_buffer_Acc", 
                                         model.no = modelno, rf.inputs = rf.inputs) 
 }
 
@@ -839,12 +851,12 @@ modelno = "43b"
 
 if(!REASSESS){
   keyoutputs[[modelno]] = do.rf(train.dat = w.allmonths[!EDTonlyrows,], 
-                                omits, response.var = "nMatchEDT_buffer_Acc", 
+                                omits, response.var = "nMatchTN_buffer_Acc", 
                                 model.no = modelno, rf.inputs = rf.inputs) 
   save("keyoutputs", file = paste0("Output_to_", modelno))
 } else {
   keyoutputs[[modelno]] = reassess.rf(train.dat = w.allmonths[!EDTonlyrows,], 
-                                        omits, response.var = "nMatchEDT_buffer_Acc", 
+                                        omits, response.var = "nMatchTN_buffer_Acc", 
                                         model.no = modelno, rf.inputs = rf.inputs) 
 }
 
@@ -855,12 +867,12 @@ modelno = "44b"
 
 if(!REASSESS){
   keyoutputs[[modelno]] = do.rf(train.dat = w.allmonths[!Road.closure.onlyrows,], 
-                                omits, response.var = "nMatchEDT_buffer_Acc", 
+                                omits, response.var = "nMatchTN_buffer_Acc", 
                                 model.no = modelno, rf.inputs = rf.inputs) 
   save("keyoutputs", file = paste0("Output_to_", modelno))
 } else {
   keyoutputs[[modelno]] = reassess.rf(train.dat = w.allmonths[!Road.closure.onlyrows,], 
-                                        omits, response.var = "nMatchEDT_buffer_Acc", 
+                                        omits, response.var = "nMatchTN_buffer_Acc", 
                                         model.no = modelno, rf.inputs = rf.inputs) 
 }
 

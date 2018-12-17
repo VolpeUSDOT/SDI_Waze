@@ -116,7 +116,7 @@ do.rf <- function(train.dat, omits, response.var = "MatchEDT_buffer_Acc", model.
                      sum(as.numeric(as.character(rundat[,response.var])) > 0),
                      length(rundat$nWazeAccident[train.dat$nWazeAccident>0]) )
   
-  colnames(Nobs) = c("N", "No EDT", "EDT present", "Waze accident present")
+  colnames(Nobs) = c("N", "No Crash", "Crash present", "Waze accident present")
   
   # Begin if factor response variable  
   if(class(rundat[,response.var])=="factor"){
@@ -179,7 +179,7 @@ do.rf <- function(train.dat, omits, response.var = "MatchEDT_buffer_Acc", model.
     
     
   } # end if continuous response variable
-
+  
   write.csv(out.df,
             file = file.path(outputdir, paste(model.no, "RandomForest_pred.csv", sep = "_")),
             row.names = F)
@@ -195,7 +195,7 @@ do.rf <- function(train.dat, omits, response.var = "MatchEDT_buffer_Acc", model.
   # Copy to S3
   system(paste("aws s3 cp",
                file.path(outputdir, fn),
-               file.path(teambucket, state, fn)))
+               file.path(teambucket, state, "RandomForest_Output", fn)))
   
   # Output is list of three elements: Nobs data frame, predtab table, binary model diagnotics table, and mean squared error
   if(class(rundat[,response.var])=="factor"){
