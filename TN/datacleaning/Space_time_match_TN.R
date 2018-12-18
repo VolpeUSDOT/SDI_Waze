@@ -21,7 +21,13 @@ library(maps)
 
 teambucket <- "s3://prod-sdc-sdi-911061262852-us-east-1-bucket"
 
-user <- paste0( "/home/", system("whoami", intern = TRUE)) #the user directory to use
+home.loc <- getwd()
+  
+user <- if(length(grep("@securedatacommons.com", home.loc)) > 0) {
+  paste0( "/home/", system("whoami", intern = TRUE), "@securedatacommons.com")
+  } else {
+    paste0( "/home/", system("whoami", intern = TRUE))
+  } # find the user directory to use
 
 localdir <- paste0(user, "/workingdata/TN") # full path for readOGR
 
@@ -47,8 +53,8 @@ proj <- showP4(showWKT("+init=epsg:102008"))
 
 # Start loop over months ----
 
-# Grab from S3 if necessary
-if(length(grep("TN", dir(wazedir)))==0){
+# Grab from S3 (save to tempout) if necessary
+if(length(grep(state, dir(wazedir)))==0){
   for(i in yearmonths){
   system(paste("aws s3 cp",
                file.path(teambucket, 'TN', paste0('TN_', i, '.RData')),
