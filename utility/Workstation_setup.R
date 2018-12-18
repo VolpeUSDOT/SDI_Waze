@@ -225,7 +225,7 @@ if(GETOUTPUT){
 
 for(state in states){
   Random_Forest_Output.ls <- system(paste("aws s3 ls", 
-                             file.path(teambucket, paste0(state, "/"))
+                             file.path(teambucket, state, "RandomForest_Output/")
   ),
   intern = T)
   
@@ -367,7 +367,10 @@ EXPORTREORG = F
 if(EXPORTREORG){
   system(paste("aws s3 ls", file.path(teambucket, 'export_requests/')))
   
-  
+  # re-copy some files 
+  system(paste("aws s3 cp", 
+               file.path(teambucket, 'export_requests', 'Hot_Spot_Mapping_Multiple_Figures_RasterLayers_2018-11-20.zip'),
+               
   # re-copy some files 
   system(paste("aws s3 cp", 
                file.path(teambucket, 'export_requests', 'Hot_Spot_Mapping_Multiple_Figures_RasterLayers_2018-11-20.zip'),

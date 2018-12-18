@@ -117,6 +117,17 @@ for(i in w.allmonths.named){
   w.allmonths <- rbind(w.allmonths, get(i))
 }
 
+# Save compiled object 
+save(w.allmonths, 
+     file = file.path(localdir, paste0(state, '_', do.months[1], '_to_', do.months[length(do.months)], '_', g, '.RData')))
+
+# Output for Tableau
+ # usevars = c("GRID_ID", names(w.allmonths)[c(8:25, 61:65, 80:85)])
+ # 
+ # write.csv(w.allmonths[usevars], 
+ #      file = file.path(localdir, paste0(state, '_', do.months[1], '_to_', do.months[length(do.months)], '_', g, '.csv')),
+ #                                        row.names = F)
+
 # format(object.size(w.allmonths), "Gb")
 
 avail.cores = parallel::detectCores()
@@ -915,7 +926,7 @@ outputdir = file.path(localdir, 'Random_Forest_Output')
 zipname = paste0('TN_RandomForest_Outputs_', g, "_", Sys.Date(), '.zip')
 
 system(paste('zip', file.path('~/workingdata', zipname),
-             file.path(localdir, 'TN_Output_to_34.RData'),
+             file.path(localdir, 'TN_Output_to_34'),
              file.path(outputdir, 'TN_Model_18_RandomForest_Output.RData'),
              file.path(outputdir, 'TN_Model_24_RandomForest_Output.RData'),
              file.path(outputdir, 'TN_Model_25_RandomForest_Output.RData'),
