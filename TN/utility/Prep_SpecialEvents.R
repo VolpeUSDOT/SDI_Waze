@@ -2,19 +2,20 @@
 # Need to apply points to grids
 
 # Run from RandomForest_WazeGrid_TN.R
+# already in memory are localdir and g, which repreresents the grid type to use
+
 # append.hex2(hexname = w, data.to.add = "TN_SpecialEvent", state = state, na.action = na.action)
 library(rgeos)
 library(rgdal)
 
 proj.USGS <- "+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs +ellps=GRS80 +towgs84=0,0,0"
 
-
 load(file.path(localdir, "SpecialEvents", "TN_SpecialEvent_2018.RData"))
 
-# Check to see if these processing steps have been done yet; don't need to re-do for each month.
+# Check to see if these processing steps have been done yet; load from prepared file if so
 prepname = paste("Prepared", "TN_SpecialEvent", g, sep="_")
 
-if(!exists(prepname)) {
+if(length(grep(prepname, dir(file.path(localdir, "SpecialEvents")))) == 0) { # if doen't exist in TN/SpecialEvents, make it
   
   cat("Preparing", "TN_SpecialEvent", g, "\n")
   
@@ -60,9 +61,6 @@ if(!exists(prepname)) {
   end.hr[dd$TimeZone == "America/New_York"] = end.hr[dd$TimeZone == "America/New_York"] - 1
   end.hr[is.na(end.hr)] = 23 # end at 11pm hr for all day events
   
-  
-  
-  
   # Attempt at individual event TZ work -- Need to apply timezones individually; vector of mixed time zone values is not accepted by strptime or as.POSIX* functions.
   # start.hr.time <- end.hr.time <- vector()
   
@@ -98,6 +96,17 @@ if(!exists(prepname)) {
   
   spev.grid.time <- filter(spev.grid.time.all, !is.na(GRID_ID))   
   
+  save(list = c("spev.grid.time"), 
+       file = file.path(localdir, "SpecialEvents", paste0(prepname, ".RData")))
+  
+  # Copy to S3
+  system(paste("aws s3 cp",
+               file.path(localdir, "SpecialEvents", paste0(prepname, ".RData")),
+               file.path(teambucket, state, "SpecialEvents", paste0(prepname, ".RData"))))
+  
+  
   # ~ 3 min  
+  } else {
+  load(file.path(localdir, "SpecialEvents", paste0(prepname, ".RData")))
 }
 

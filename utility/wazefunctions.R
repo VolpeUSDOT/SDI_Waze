@@ -260,6 +260,8 @@ prep.hex <- function(hexname, state, month, bucket = teambucket){
   month.1 = format(yrday, "%m")
   wte = wte[month.1 %in% month.2,]
   
+  wte$Year = yr # Add year as a variable
+  
   mo <- sub("-", "_", mo) # change e.g. from 2017-04 to 2017_04 for R object naming
   
   assign(paste("w", mo, sep="."), wte, envir = globalenv()) 
@@ -388,7 +390,8 @@ append.hex2 <- function(hexname, data.to.add, state, na.action = c("omit", "keep
     }
     
     if(length(grep("TN_SpecialEvent", data.to.add)) > 0){
-   # load prepped data
+      # load prepped data
+      assign(data.to.add, spev.grid.time) # Will be loaded already from Prep_SpecialEvents.R
     }
 
   }
@@ -513,19 +516,22 @@ append.hex2 <- function(hexname, data.to.add, state, na.action = c("omit", "keep
   
   # SpecialEvent prep ----
   if(length(grep("TN_SpecialEvent", data.to.add)) > 0){
-    # Check to see if these processing steps have been done yet; don't need to re-do for each month.
-    prepname = paste("Prepared", data.to.add, g, sep="_")
+    
+    dd$hour <- as.numeric(format(dd$GridDayHour, "%H"))
+    
+    dd <- dd %>%
+      group_by(GRID_ID, Year, day, hour) %>%
+      summarise(SpecialEvent_sum = n())
+      
+    # Save this to global environment for other months to use
+    assign(prepname, dd, envir = globalenv())
+    
+  } else {
     
     # Create vectors in w for month of year, day of week, hour of day in w. This is used for joining on the grid ID and time factors
-      dd = get(prepname, envir = globalenv()) # Use the already prepared data if present in the working enviroment
     
+    dd = get(prepname, envir = globalenv()) # Use the already prepared data if present in the working enviroment
     
-    # Extract year from file name
-    yr = substr(hexname, 3, 6)
-    date = strptime(paste(yr, w$day, sep = "-"), "%Y-%j")
-    mo = as.numeric(format(date, "%m"))
-    dow = lubridate::wday(date) # 7  = saturday, 1 = sunday.
-    w$vmt_time = paste(mo, dow, w$hour, sep="_")
     
   }
   
@@ -564,7 +570,13 @@ append.hex2 <- function(hexname, data.to.add, state, na.action = c("omit", "keep
     # format(strptime("2017-229", "%Y-%j"), "%m") 
     # lubridate::wday(strptime("2017-229", "%Y-%j")) 
     # dd[dd$GRID_ID == "1Z-48" & dd$month == 8 & dd$dayofweek == 5 & dd$hour == 16,]
+  
+  } 
+  if(length(grep("TN_SpecialEvent", data.to.add)) > 0){
     
+    w2 <- left_join(w, dd %>% ungroup(), by = c("GRID_ID", "Year", "day", "hour")) 
+    
+      
   } else {    
     w2 <- left_join(w, dd, by = "GRID_ID")
   }

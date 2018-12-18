@@ -27,7 +27,7 @@ source(file.path(codeloc, "utility/wazefunctions.R"))
 setwd(localdir)
 
 # <><><><><>
-g = grids[1] # start with square grids
+g = grids[2] # start with square grids
 state = "TN"
 # <><><><><>
 
@@ -35,7 +35,7 @@ state = "TN"
 do.months = c(paste("2017", c("04","05","06","07","08","09", "10", "11", "12"), sep="-"),
               paste("2018", c("01","02","03"), sep="-"))
 
-do.months = paste("2017", c("04","05","06"), sep="-")
+do.months = paste("2018", c("01","02","03"), sep="-")
 
 REASSESS = F # re-assess model fit and diagnostics using reassess.rf instead of do.rf
 
@@ -91,8 +91,10 @@ monthfiles = paste("w", do.months, sep=".")
 monthfiles = sub("-", "_", monthfiles)
 
   
-#  # Append supplmental data. This is now a time-intensive step, with hourly VMT; consider making this parallel
-#  
+# Append supplemental data. 
+# Just 2018 special event data for now; would like to get 2017 similar file for training.
+source(file.path(codeloc, "TN", "utility", "Prep_SpecialEvents.R")) # gives spev.grid.time
+
 for(w in monthfiles){ # w = "w.2017_04"
   
    append.hex2(hexname = w, data.to.add = "TN_SpecialEvent", state = state, na.action = na.action)
@@ -903,4 +905,27 @@ if(REASSESS) {
 timediff <- Sys.time() - starttime
 cat(round(timediff, 2), attr(timediff, "units"), "to complete script")
 
+# zip and export outputs
+
+outputdir = file.path(localdir, 'Random_Forest_Output')
+
+# Using system zip:
+# system(paste('zip ~/workingdata/zipfilename.zip ~/path/to/your/file'))
+
+zipname = paste0('TN_RandomForest_Outputs_', g, "_", Sys.Date(), '.zip')
+
+system(paste('zip', file.path('~/workingdata', zipname),
+             file.path(localdir, 'TN_Output_to_34.RData'),
+             file.path(outputdir, 'TN_Model_18_RandomForest_Output.RData'),
+             file.path(outputdir, 'TN_Model_24_RandomForest_Output.RData'),
+             file.path(outputdir, 'TN_Model_25_RandomForest_Output.RData'),
+             file.path(outputdir, 'TN_Model_33_RandomForest_Output.RData'),
+             file.path(outputdir, 'TN_Model_34_RandomForest_Output.RData')
+             ))
+
+system(paste(
+  'aws s3 cp',
+  file.path('~/workingdata', zipname),
+  file.path(teambucket, 'export_requests', zipname)
+))
 
