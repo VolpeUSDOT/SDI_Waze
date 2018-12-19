@@ -370,13 +370,9 @@ if(EXPORTREORG){
   # re-copy some files 
   system(paste("aws s3 cp", 
                file.path(teambucket, 'export_requests', 'Hot_Spot_Mapping_Multiple_Figures_RasterLayers_2018-11-20.zip'),
-               
-  # re-copy some files 
-  system(paste("aws s3 cp", 
-               file.path(teambucket, 'export_requests', 'Hot_Spot_Mapping_Multiple_Figures_RasterLayers_2018-11-20.zip'),
                file.path(teambucket, 'export_requests', 'Hot_Spot_Mapping_Multiple_Figures_RasterLayers_2018-11-21.zip')))
   
-  "Hot_Spot_Mapping_Bellevue_prep_2018-11-19.zip"
+  # "Hot_Spot_Mapping_Bellevue_prep_2018-11-19.zip"
   system(paste("aws s3 ls", file.path(teambucket, 'MD/')))
  
   

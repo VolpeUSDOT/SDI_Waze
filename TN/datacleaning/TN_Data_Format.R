@@ -158,7 +158,8 @@ starttime <- Sys.time()
 # need to deal with temporary outage by retrying, after a pause
 # BETTER SOLUTION: USE TZ SPATIAL LAYER AND CLIP
 
-for (i in 1:nrow(tn_crash)) {
+# Not run: too slow for each individaul crash
+# for (i in 1:nrow(tn_crash)) {
 
   query = paste0("http://ws.geonames.org/timezoneJSON?lat=", tn_crash$LatDecimalNmb[i], 
                  "&lng=", tn_crash$LongDecimalNmb[i], 
@@ -180,10 +181,10 @@ for (i in 1:nrow(tn_crash)) {
   
 }
 
-timediff <- Sys.time() -starttime
-cat(round(timediff, 2), attr(timediff, "units"), "elapsed")
+# timediff <- Sys.time() -starttime
+# cat(round(timediff, 2), attr(timediff, "units"), "elapsed")
 
-# 
+ 
 # se.use$StartUTC <- paste(se.use$Event_Date, se.use$StartTime)
 # se.use$StartUTC <- as.POSIXct(se.use$StartUTC, 
 #                               tz = se.use$TimeZone, 
@@ -228,19 +229,39 @@ crash1 <- crash[, var1]
 
 sumstats(crash1[2:ncol(crash1)])
 
+# Day of week and hour of day summaries
+# 1 = Sunday here
+crash$DayOfWeek <- lubridate::wday(crash$date, label = T)
+crash$hour <- format(crash$date, "%H")
 
+crash %>%
+  filter(date > "2017-04-01") %>%
+  group_by(DayOfWeek) %>%
+  count()
+  
 
-# S# Special Events ----
+byhr <- crash %>%
+  filter(date > "2017-04-01") %>%
+  group_by(hour) %>%
+  count()
+data.frame(byhr)
+
+# Special Events ----
 library(readxl)
 spev <- read_excel("SpecialEvents/2018 Special Events.xlsx")
 
-dim(spev) #813*12
+spev17 <- read_excel("SpecialEvents/EVENTS Updated 03_21_2017.xls")
 
+
+dim(spev) #813*12
+dim(spev17)
 # How many Event_Type
 # 12 types:  [1] "Car Show"         "Fair"             "Fair/Festival"    "Festival"         "Motorcycle Rally" 
 # "Parade"           "Race/Car Show"   "Rodeo"            "Run/Rally"        "Special"          "Special Event"    "Sporting"
 
 table(spev$Event_Type)
+table(spev17$Event_Type)
+
 # Car Show             Fair    Fair/Festival         Festival Motorcycle Rally           Parade    Race/Car Show            Rodeo 
 # 8              363               10              175                2               10                3                3 
 # Run/Rally          Special    Special Event         Sporting 
@@ -346,6 +367,73 @@ system(paste("aws s3 cp",
              file.path(teambucket, "TN", "SpecialEvents", "TN_SpecialEvent_2018.RData"),
              file.path('~', 'workingdata', 'TN', 'SpecialEvents',"TN_SpecialEvent_2018.RData"))) # Cool, did the trick
 
+
+# 2017 Special Event prep ----
+spev = spev17
+
+# How many rows missing start and end time
+sum(is.na(spev$StartTime)) # 487
+sum(is.na(spev$EndTime)) # 487
+
+# spev$StartTime <- as.POSIXct(strptime(spev$StartTime, format = "%Y-%m-%d %H:%M:%S"))
+spev$StartTime <- format(ymd_hms(spev$StartTime), "%H:%M:%S")
+spev$EndTime <- format(ymd_hms(spev$EndTime), "%H:%M:%S")
+
+# There are 363 special events in the data, wondering if this is a daily event at the same location?
+table(spev$Event[spev$Event_Type == "Fair"]) # Scattered in different counties and at different date.
+
+# Assign time zone to each special event.
+# Get timezone of event - TN has 2 timezones (eastern and central) - use geonames package 
+# NOTE: only need to run the next two lines once at the initial setup.  
+options(geonamesUsername = "waze_sdi") # set this up as a generic username, only need to run this command once 
+source(system.file("tests", "testing.R", package = "geonames"), echo = TRUE)
+
+spev$TimeZone <- NA
+
+# for (i in 1:nrow(spev)) {
+#   
+#   if(spev$Lat[i] != 'all' & !is.na(spev$Lat[i])){
+#   spev$TimeZone[i] <- as.character(GNtimezone(as.numeric(spev$Lat[i]), as.numeric(spev$Lon[i]), radius = 0)$timezoneId)
+#   }  
+# }
+
+TimeZone = vector()
+starttime = Sys.time()
+
+for (i in 1:nrow(spev)) {
+
+  if(spev$Lat[i] != 'all' & !is.na(spev$Lat[i])){
+    query = paste0("http://ws.geonames.org/timezoneJSON?lat=", spev$Lat[i], 4,
+                   "&lng=", spev$Lon[i],
+                   "&radius=0&username=waze_sdi")
+  
+    tzres <- httr::GET(query)
+    if(http_error(tzres)) {
+      tzres <- "error"
+    } else {
+      tzres <- content(tzres)$timezoneId
+    }
+  } else{
+    tzres = NA
+  }
+
+  TimeZone <- c(TimeZone, tzres)
+
+  if(i %% 100 == 0) cat(i, ". ")
+
+}
+
+timediff <- Sys.time() -starttime
+cat(round(timediff, 2), attr(timediff, "units"), "elapsed")
+# Five min for 2017
+
+## save special event data in the output
+save("spev", file = "SpecialEvents/TN_SpecialEvent_2017.RData")
+
+# step 3: Transfer the file to workingdata folder.
+system(paste("aws s3 cp",
+             file.path('~', 'workingdata', 'TN', 'SpecialEvents',"TN_SpecialEvent_2017.RData"),
+             file.path(teambucket, "TN", "SpecialEvents", "TN_SpecialEvent_2017.RData")))
 
 # Select a special event for the footprint analysis
 

@@ -35,7 +35,7 @@ state = "TN"
 do.months = c(paste("2017", c("04","05","06","07","08","09", "10", "11", "12"), sep="-"),
               paste("2018", c("01","02","03"), sep="-"))
 
-do.months = paste("2018", c("01","02","03"), sep="-")
+# do.months = paste("2018", c("01","02","03"), sep="-")
 
 REASSESS = F # re-assess model fit and diagnostics using reassess.rf instead of do.rf
 
