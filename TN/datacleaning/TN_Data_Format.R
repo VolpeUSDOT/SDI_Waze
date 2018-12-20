@@ -318,7 +318,7 @@ spev$TimeZone <- NA
 #                  "&lng=", spev$LongDecimalNmb[i], 
 #                  "&radius=0&username=waze_sdi")
 #   
-#   tzres <- get(query)
+#   tzres <- GET(query)
 #   if(http_error(tzres)) {
 #     tzres <- "error"
 #   } else {
@@ -402,6 +402,7 @@ spev$TimeZone <- NA
 # }
 
 TimeZone = vector()
+rowindex <- vector()
 starttime = Sys.time()
 
 for (i in 1:nrow(spev)) {
@@ -422,6 +423,7 @@ for (i in 1:nrow(spev)) {
   }
 
   TimeZone <- c(TimeZone, tzres)
+  rowindex <- c(rowindex, i)
 
   if(i %% 100 == 0) cat(i, ". ")
 
@@ -429,7 +431,11 @@ for (i in 1:nrow(spev)) {
 
 timediff <- Sys.time() -starttime
 cat(round(timediff, 2), attr(timediff, "units"), "elapsed")
-# Five min for 2017
+# Five min for 2017, Took Jessie's laptop 1.99 (1st time) and 7.79 (2nd time) mins, this probably depending on what you have running.
+
+TimeZone <- data.frame(rowindex, TimeZone)
+spev$rowindex <- as.numeric(rownames(spev))
+spev <- spev %>% left_join(rowindex) %>% select(-c("rowindex"))
 
 ## save special event data in the output
 save("spev", file = "SpecialEvents/TN_SpecialEvent_2017.RData")
