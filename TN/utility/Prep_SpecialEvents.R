@@ -10,7 +10,19 @@ library(rgdal)
 
 proj.USGS <- "+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs +ellps=GRS80 +towgs84=0,0,0"
 
-load(file.path(localdir, "SpecialEvents", "TN_SpecialEvent_2018.RData"))
+# load(file.path(localdir, "SpecialEvents", "TN_SpecialEvent_2018.RData"))
+load(file.path(localdir, "SpecialEvents", "TN_SpecialEvent_2017.RData"))
+
+# If not running from RandomForest_Wazegrid_TN.R, set it up manually.
+g = 2017
+user <- if(length(grep("@securedatacommons.com", home.loc)) > 0) {
+  paste0( "/home/", system("whoami", intern = TRUE), "@securedatacommons.com")
+} else {
+  paste0( "/home/", system("whoami", intern = TRUE))
+} # find the user directory to use
+
+localdir <- paste0(user, "/workingdata/TN") # full path for readOGR
+
 
 # Check to see if these processing steps have been done yet; load from prepared file if so
 prepname = paste("Prepared", "TN_SpecialEvent", g, sep="_")

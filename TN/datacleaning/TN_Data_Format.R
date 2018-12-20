@@ -49,7 +49,11 @@ sumstats = function(x) {
 # Location of SDC SDI Waze team S3 bucket. Files will first be written to a temporary directory in this EC2 instance, then copied to the team bucket.
 teambucket <- "s3://prod-sdc-sdi-911061262852-us-east-1-bucket"
 
-user <- paste0( "/home/", system("whoami", intern = TRUE)) # The user directory
+user <- if(length(grep("@securedatacommons.com", home.loc)) > 0) {
+  paste0( "/home/", system("whoami", intern = TRUE), "@securedatacommons.com")
+} else {
+  paste0( "/home/", system("whoami", intern = TRUE))
+} # find the user directory to use
 
 setwd("~/workingdata/TN")
 
