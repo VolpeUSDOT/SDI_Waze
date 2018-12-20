@@ -313,7 +313,7 @@ for(i in special.ls){
 # Tennessee data ----
 # TODO: make this smarter about file paths (look for TN_Roadway_Shapefiles.zip inside Shapefiles)
 
-tn.ls = c('TN.zip', 'Weather/TN_Weather_GHCN.zip', 'Shapefiles/TN_Roadway_Shapefiles.zip', 'SpecialEvents/TN_SpecialEvent_2018.RData', 'Shapefiles/timezones.shapefile.zip')
+tn.ls = c('TN.zip', 'Weather/TN_Weather_GHCN.zip', 'Shapefiles/TN_Roadway_Shapefiles.zip', 'SpecialEvents/TN_SpecialEvent_2018.RData', 'Shapefiles/timezones.shapefile.zip', "SpecialEvents/TN_SpecialEvent_2017.RData")
 
 for(i in tn.ls){
   if(length(grep(i, dir(file.path('~', 'workingdata', 'TN'))))==0){
@@ -484,7 +484,7 @@ if(MOVEFROMUPLOAD){
                file.path(teambucket, "SpecialEvents", "SpecialEvents.zip"))
   )
   
-  # Jessie add TN special event data
+  # Jessie add 2018 TN special event data
   system(paste("aws s3 mv", 
                file.path(teambucket, system('whoami', intern = T), "uploaded_files", "TN_SpecialEvent_2008.RData"),
                file.path(teambucket, "TN", "SpecialEvents", "TN_SpecialEvent_2018.RData"))

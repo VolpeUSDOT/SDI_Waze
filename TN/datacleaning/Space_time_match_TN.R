@@ -45,7 +45,6 @@ yearmonths = c(
   paste(2018, formatC(1:3, width = 2, flag = "0"), sep="-")
 )
 
-# test
 # Time zone 
 tz = "US/Central"
 

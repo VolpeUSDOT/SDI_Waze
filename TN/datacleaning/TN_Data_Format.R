@@ -356,7 +356,7 @@ save("spev", file = "SpecialEvents/TN_SpecialEvent_2018.RData")
 file_name <- system(paste("aws s3 ls",  paste0(teambucket, "/jyang/uploaded_files/")), intern = T) # the file is saved under this folder. Need to copy it over to workingdata folder.
 x <- system(paste("aws s3 ls",file.path(teambucket, "TN", "SpecialEvents/")), intern = T)
 
-# steps 2: move to common folder in teambucket
+# steps 2: move to a common folder in teambucket (this step has been added to workstation setup for records.)
 system(paste("aws s3 mv", 
              file.path(teambucket, system('whoami', intern = T), "uploaded_files", "TN_SpecialEvent_2008.RData"),
              file.path(teambucket, "TN", "SpecialEvents", "TN_SpecialEvent_2018.RData"))
