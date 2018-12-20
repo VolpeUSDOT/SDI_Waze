@@ -12,12 +12,13 @@ proj.USGS <- "+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 +x_0=0 +y_0
 
 # Combine 2017 and 2018 data
 load(file.path(localdir, "SpecialEvents", "TN_SpecialEvent_2017.RData")) # 9 columns
-spev2017 <- spev
+spev2017 <- spev # 670 rows
 load(file.path(localdir, "SpecialEvents", "TN_SpecialEvent_2018.RData")) # 13 columns
-spev2018 <- spev[,names(spev2017)]
-spev <- rbind(spev2017, spev2018)
+spev2018 <- spev[,names(spev2017)] # 813 rows
+spev <- rbind(spev2017, spev2018) # 1483 rows
+table(spev$TimeZone) # 819 rows codes with TimeZone information. There are still a lot of 2017 dataset that do not have the TimeZone coded. Jessie will re-do the TimeZone columns locally.
 
-# # If not running from RandomForest_Wazegrid_TN.R, set it up manually.
+# # If not running from RandomForest_Wazegrid_TN.R, set it up manually by running following code.
 # grids = c("TN_01dd_fishnet",
 #           "TN_1sqmile_hexagons")
 # g = grids[2]
