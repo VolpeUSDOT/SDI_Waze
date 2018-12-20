@@ -17,7 +17,12 @@ grids = c("TN_01dd_fishnet",
 
 codeloc <- "~/SDI_Waze" 
 
-user <- paste0( "/home/", system("whoami", intern = TRUE)) # the user directory 
+user <- if(length(grep("@securedatacommons.com", getwd())) > 0) {
+  paste0( "/home/", system("whoami", intern = TRUE), "@securedatacommons.com")
+} else {
+  paste0( "/home/", system("whoami", intern = TRUE))
+} # find the user directory to use
+
 localdir <- paste0(user, "/workingdata/TN") # full path for readOGR
 
 teambucket <- "s3://prod-sdc-sdi-911061262852-us-east-1-bucket"

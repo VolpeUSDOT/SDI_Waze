@@ -10,18 +10,25 @@ library(rgdal)
 
 proj.USGS <- "+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs +ellps=GRS80 +towgs84=0,0,0"
 
-# load(file.path(localdir, "SpecialEvents", "TN_SpecialEvent_2018.RData"))
-load(file.path(localdir, "SpecialEvents", "TN_SpecialEvent_2017.RData"))
+# Combine 2017 and 2018 data
+load(file.path(localdir, "SpecialEvents", "TN_SpecialEvent_2017.RData")) # 9 columns
+spev2017 <- spev
+load(file.path(localdir, "SpecialEvents", "TN_SpecialEvent_2018.RData")) # 13 columns
+spev2018 <- spev[,names(spev2017)]
+spev <- rbind(spev2017, spev2018)
 
-# If not running from RandomForest_Wazegrid_TN.R, set it up manually.
-g = 2017
-user <- if(length(grep("@securedatacommons.com", home.loc)) > 0) {
-  paste0( "/home/", system("whoami", intern = TRUE), "@securedatacommons.com")
-} else {
-  paste0( "/home/", system("whoami", intern = TRUE))
-} # find the user directory to use
-
-localdir <- paste0(user, "/workingdata/TN") # full path for readOGR
+# # If not running from RandomForest_Wazegrid_TN.R, set it up manually.
+# grids = c("TN_01dd_fishnet",
+#           "TN_1sqmile_hexagons")
+# g = grids[2]
+# 
+# user <- if(length(grep("@securedatacommons.com", getwd())) > 0) {
+#   paste0( "/home/", system("whoami", intern = TRUE), "@securedatacommons.com")
+# } else {
+#   paste0( "/home/", system("whoami", intern = TRUE))
+# } # find the user directory to use
+# 
+# localdir <- paste0(user, "/workingdata/TN") # full path for readOGR
 
 
 # Check to see if these processing steps have been done yet; load from prepared file if so
