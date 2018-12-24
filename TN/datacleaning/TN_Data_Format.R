@@ -13,6 +13,7 @@ library(lubridate)
 library(geonames) # for time zone work
 library(httr)
 library(geonames)
+library(readxl) # read excel file
 
 # Customized Functions
 sumstats = function(x) { 
@@ -251,14 +252,13 @@ byhr <- crash %>%
 data.frame(byhr)
 
 # Special Events ----
-library(readxl)
 spev <- read_excel("SpecialEvents/2018 Special Events.xlsx")
 
 spev17 <- read_excel("SpecialEvents/EVENTS Updated 03_21_2017.xls")
 
 
 dim(spev) #813*12
-dim(spev17)
+dim(spev17) # 670*8
 # How many Event_Type
 # 12 types:  [1] "Car Show"         "Fair"             "Fair/Festival"    "Festival"         "Motorcycle Rally" 
 # "Parade"           "Race/Car Show"   "Rodeo"            "Run/Rally"        "Special"          "Special Event"    "Sporting"
@@ -401,8 +401,8 @@ spev$TimeZone <- NA
 #   }  
 # }
 
-TimeZone = vector()
-rowindex <- vector()
+# TimeZone = vector()
+# rowindex <- vector()
 starttime = Sys.time()
 
 for (i in 1:nrow(spev)) {
@@ -414,16 +414,16 @@ for (i in 1:nrow(spev)) {
   
     tzres <- httr::GET(query)
     if(http_error(tzres)) {
-      tzres <- "error"
+      spev$TimeZone[i] <- "error"
     } else {
-      tzres <- content(tzres)$timezoneId
+      spev$TimeZone[i] <- content(tzres)$timezoneId
     }
   } else{
-    tzres = NA
+    spev$TimeZone[i] = NA
   }
 
-  TimeZone <- c(TimeZone, tzres)
-  rowindex <- c(rowindex, i)
+  # TimeZone <- c(TimeZone, tzres)
+  # rowindex <- c(rowindex, i)
 
   if(i %% 100 == 0) cat(i, ". ")
 
