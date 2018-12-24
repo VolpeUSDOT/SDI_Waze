@@ -390,7 +390,7 @@ table(spev$Event[spev$Event_Type == "Fair"]) # Scattered in different counties a
 # Get timezone of event - TN has 2 timezones (eastern and central) - use geonames package 
 # NOTE: only need to run the next two lines once at the initial setup.  
 options(geonamesUsername = "waze_sdi") # set this up as a generic username, only need to run this command once 
-source(system.file("tests", "testing.R", package = "geonames"), echo = TRUE)
+source(system.file("tests", "testing.R", package = "geonames"), echo = TRUE) # InternetOpenUrl failed: 'The server name or address could not be resolved'
 
 spev$TimeZone <- NA
 
