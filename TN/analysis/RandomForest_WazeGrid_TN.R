@@ -89,7 +89,7 @@ if(CHECKPLOT){
 # TODO: figure out what supplemental variables to include from previous work
 # Write function to apply special events and weather
 
-# # Add FARS, AADT, HPMS, jobs
+# Add FARS, AADT, HPMS, jobs
 na.action = "fill0"
 
 monthfiles = paste("w", do.months, sep=".")
@@ -98,7 +98,7 @@ monthfiles = sub("-", "_", monthfiles)
   
 # Append supplemental data. 
 # Just 2018 special event data for now; would like to get 2017 similar file for training.
-source(file.path(codeloc, "TN", "utility", "Prep_SpecialEvents.R")) # gives spev.grid.time
+source(file.path(codeloc, "TN", "utility", "Prep_SpecialEvents.R")) # gives spev.grid.time and spev.grid.time.holiday
 
 for(w in monthfiles){ # w = "w.2017_04"
   

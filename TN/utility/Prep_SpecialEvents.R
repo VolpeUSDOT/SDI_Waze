@@ -149,7 +149,7 @@ if(length(grep(prepname, dir(file.path(localdir, "SpecialEvents")))) == 0) { # i
     
     ti.GridIDTime = filter(GridIDTime, GridDayHour == hr)
     
-    ti.spev = filter(dd, start.hr >= hr & start.hr <= hr+3600 | end.hr >= hr & end.hr <= i+3600)
+    ti.spev = filter(dd, start.hr >= hr & start.hr <= hr+3600 | end.hr >= hr & end.hr <= hr+3600)
     
     ti.spev.hex <- inner_join(ti.GridIDTime, ti.spev, by = "GRID_ID") # Use left_join to get zeros if no match  
 
@@ -160,12 +160,38 @@ if(length(grep(prepname, dir(file.path(localdir, "SpecialEvents")))) == 0) { # i
   cat(round(EndTime, 2), attr(EndTime, "units"), "\n")
   stopCluster(cl)
   
+  # Deduplicate
+  
+  spev.grid.time.all <- spev.grid.time.all[!duplicated(spev.grid.time.all),]   
+  
   # Add holidays ----
   
+  dd <- spev %>% filter( TimeZone == 'error') 
+  
+  # for these whole days, state-wide, apply to all grid cells and hours. Simply make a new data frame by repeating grid ID by hour
+  grid_id = unique(GridIDTime$GRID_ID)
+  hours = formatC(seq(0, 23, by = 1), width = 2, flag = 0)
+  gdh.dd = vector()
+  
+  for(i in 1:nrow(dd)){ # i = 1
+    
+    dh = strptime(paste(dd$Event_Date[i], paste0(hours, ":00:00")),
+             tz = to_tz,
+             format = "%Y-%m-%d %H:%M:%S")
+    gdh =   expand.grid(GridDayHour = dh, GRID_ID = grid_id)
+
+    gdh.dd = rbind(gdh.dd, data.frame(gdh, dd[i,]) )
+    
+  } # end  loop
+
   
   spev.grid.time <- filter(spev.grid.time.all, !is.na(GRID_ID))   
   
-  save(list = c("spev.grid.time"), 
+  spev.grid.time.holiday <- rbind(spev.grid.time[names(gdh.dd)],
+                                  gdh.dd)
+  spev.grid.time.holiday = spev.grid.time.holiday[order(spev.grid.time.holiday$GridDayHour, spev.grid.time.holiday$GRID_ID),]
+  
+  save(list = c("spev.grid.time", "spev.grid.time.holiday"), 
        file = file.path(localdir, "SpecialEvents", paste0(prepname, ".RData")))
   
   # Copy to S3
@@ -174,8 +200,7 @@ if(length(grep(prepname, dir(file.path(localdir, "SpecialEvents")))) == 0) { # i
                file.path(teambucket, state, "SpecialEvents", paste0(prepname, ".RData"))))
   
   
-  # ~ 3 min  
-  } else {
+} else {
   load(file.path(localdir, "SpecialEvents", paste0(prepname, ".RData")))
 }
 
