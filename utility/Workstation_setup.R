@@ -486,8 +486,13 @@ if(MOVEFROMUPLOAD){
   
   # Jessie add 2018 TN special event data
   system(paste("aws s3 mv", 
-               file.path(teambucket, system('whoami', intern = T), "uploaded_files", "TN_SpecialEvent_2008.RData"),
+               file.path(teambucket, system('whoami', intern = T), "uploaded_files", "TN_SpecialEvent_2018.RData"),
                file.path(teambucket, "TN", "SpecialEvents", "TN_SpecialEvent_2018.RData"))
+  )
+
+  system(paste("aws s3 mv", 
+               file.path(teambucket, system('whoami', intern = T), "uploaded_files", "TN_SpecialEvent_2017.RData"),
+               file.path(teambucket, "TN", "SpecialEvents", "TN_SpecialEvent_2017.RData"))
   )
   
 }

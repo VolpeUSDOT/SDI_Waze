@@ -1,5 +1,7 @@
 # Prepare special events for random forest work
 # Need to apply points to grids
+# This now expands the special events from a point to a buffered polygon. Currently using a fixed 3 mile radius for each special event, but this can be changed; consider different radius by event type.
+# Also, now using America/Chicago for all analysis steps.
 
 # Run from RandomForest_WazeGrid_TN.R
 # already in memory are localdir and g, which repreresents the grid type to use
@@ -7,6 +9,9 @@
 # append.hex2(hexname = w, data.to.add = "TN_SpecialEvent", state = state, na.action = na.action)
 library(rgeos)
 library(rgdal)
+library(doParallel)
+library(foreach)
+
 
 proj.USGS <- "+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs +ellps=GRS80 +towgs84=0,0,0"
 
@@ -16,7 +21,8 @@ spev2017 <- spev # 670 rows
 load(file.path(localdir, "SpecialEvents", "TN_SpecialEvent_2018.RData")) # 13 columns
 spev2018 <- spev[,names(spev2017)] # 813 rows
 spev <- rbind(spev2017, spev2018) # 1483 rows
-table(spev$TimeZone) # 819 rows codes with TimeZone information. There are still a lot of 2017 dataset that do not have the TimeZone coded. Jessie will re-do the TimeZone columns locally.
+table(spev$TimeZone) # All have TimeZone information, except statewide holidays. Only have for 2017. 
+
 
 # # If not running from RandomForest_Wazegrid_TN.R, set it up manually by running following code.
 # grids = c("TN_01dd_fishnet",
@@ -35,11 +41,17 @@ table(spev$TimeZone) # 819 rows codes with TimeZone information. There are still
 # Check to see if these processing steps have been done yet; load from prepared file if so
 prepname = paste("Prepared", "TN_SpecialEvent", g, sep="_")
 
+# Apply holidays statewide later.
+
 if(length(grep(prepname, dir(file.path(localdir, "SpecialEvents")))) == 0) { # if doen't exist in TN/SpecialEvents, make it
   
   cat("Preparing", "TN_SpecialEvent", g, "\n")
   
-  dd <- spev %>% filter(!is.na(Lon) | !is.na(Lat))
+  dd <- spev %>% filter( ( !is.na(Lon) | !is.na(Lat) ) & TimeZone != 'error') 
+  
+  # Make numeric, make sure no white spaces are there
+  dd$Lat <- as.numeric(gsub("[[:space:]]", "", dd$Lat))
+  dd$Lon <- as.numeric(gsub("[[:space:]]", "", dd$Lon))
   
   # Apply to grid
   grid_shp <- rgdal::readOGR(file.path(localdir, "Shapefiles"), layer = g)
@@ -51,11 +63,29 @@ if(length(grep(prepname, dir(file.path(localdir, "SpecialEvents")))) == 0) { # i
   
   dd <- spTransform(dd, CRS(proj.USGS))
   
-  grid_dd_pip <- over(dd, grid_shp[,"GRID_ID"]) # Match a grid ID to events
+  # TODO: Consider different spatial buffers based on event type. Here just doing 3 mile radius for all.
+  # Based on Buffer_state.R snippet
+  buffdist.mi = 3 # Change this to have different buffers by event type
   
-  dd@data <- data.frame(dd@data, grid_dd_pip)
+  buffdist <- buffdist.mi * 1609.344 # units are meters in shapefiles
+  grid_dd_pip <- vector()
   
-  dd <- dd@data
+  for(b in 1:nrow(dd)){
+    xx <- gBuffer(dd[b,], width =  buffdist) # produces class SpatialPolygons
+  
+    xx <- SpatialPolygonsDataFrame(xx, data = data.frame(dd@data[b,], row.names = 'buffer'))
+  
+    g.i <- gIntersects(xx, grid_shp[,"GRID_ID"], byid = T) # over() to match one grid ID. gIntersects(byid = T) for multiple
+    
+    grid_ids <- grid_shp$GRID_ID[g.i]
+    
+    # Omit any which are outside this grid
+    if( length(grid_ids) > 0 ) {
+      grid_dd_pip <- rbind(grid_dd_pip, data.frame(dd[b,], GRID_ID = grid_ids))
+    }
+  }
+  
+  dd <- grid_dd_pip 
   # Add year, day of year
   dd$Year = format(dd$Event_Date, "%Y")
   dd$day = format(dd$Event_Date, "%j")    
@@ -63,7 +93,9 @@ if(length(grep(prepname, dir(file.path(localdir, "SpecialEvents")))) == 0) { # i
   # Expand grid by hour
   # If there is no start / end time, apply from 0 to 24
   
-  # Make framework to join into
+  # Make framework to join into. Max in 2108 now
+  dd <- dd %>% filter(Event_Date <= '2018-12-31')
+  
   all.hour <- seq(from = as.POSIXct(paste(min(dd$Event_Date), "0:00"), tz = "America/Chicago"), 
                     to = as.POSIXct(paste(max(dd$Event_Date), "0:00"), tz = "America/Chicago"),
                     by = "hour")
@@ -71,48 +103,65 @@ if(length(grep(prepname, dir(file.path(localdir, "SpecialEvents")))) == 0) { # i
   GridIDTime <- expand.grid(all.hour, unique(dd$GRID_ID))
   names(GridIDTime) <- c("GridDayHour", "GRID_ID")
   
-  # One solution: convert everything to central!
+  # Convert all to Central for consistency. We will use Central time (America/Chicago) for all analysis, and convert results back to appropriate local time as needed.
+  # Cannot pass tz arguments as a vector of mixed tz in strptime. Need to loop, unfortuantely
+  to_tz = "America/Chicago"
+  start.hr <- end.hr <- vector()
   
-  start.hr <- as.numeric(format(strptime(dd$StartTime, format = "%H:%M:%S"), "%H"))
-  start.hr[dd$TimeZone == "America/New_York"] = start.hr[dd$TimeZone == "America/New_York"] - 1
-  start.hr[is.na(start.hr)] = 0 # start at midnight for all day events
-  
-  end.hr <- as.numeric(format(strptime(dd$EndTime, format = "%H:%M:%S"), "%H"))
-  end.hr[dd$TimeZone == "America/New_York"] = end.hr[dd$TimeZone == "America/New_York"] - 1
-  end.hr[is.na(end.hr)] = 23 # end at 11pm hr for all day events
-  
-  # Attempt at individual event TZ work -- Need to apply timezones individually; vector of mixed time zone values is not accepted by strptime or as.POSIX* functions.
-  # start.hr.time <- end.hr.time <- vector()
-  
-  # for(i in 1:nrow(dd)){
-  #   start.hr.time = rbind(start.hr.time, strptime(paste(dd$Event_Date[i], start.hr[i]), "%Y-%m-%d %H", tz = dd$TimeZone[i]))
-  #   end.hr.time = c(end.hr.time, strptime(paste(dd$Event_Date[i], end.hr[i]), "%Y-%m-%d %H", tz = dd$TimeZone[i]))
-  # }
+  for(t in 1:nrow(dd)){
+    start.date.hr <- as.POSIXct(paste(dd$Event_Date[t], 
+                                      dd$StartTime[t]), tz = dd$TimeZone[t], format = "%Y-%m-%d %H:%M:%S")
+   
+    s.hr <- as.numeric(format(start.date.hr, format = "%H", tz = to_tz))
+    s.hr[is.na(s.hr)] = 0 # start at midnight for all day events
+
+    end.date.hr <- as.POSIXct(paste(dd$Event_Date[t], 
+                                      dd$EndTime[t]), tz = dd$TimeZone[t], format = "%Y-%m-%d %H:%M:%S")
+    
+    e.hr <- as.numeric(format(end.date.hr, format = "%H", tz = to_tz))
+    e.hr[is.na(e.hr)] = 23 # end at 11pm hr for all day events
+    
+    start.hr <- c(start.hr, s.hr)
+    end.hr <- c(end.hr, e.hr)
+  }
   
   dd <- data.frame(dd, 
-                   start.hr = strptime(paste(dd$Event_Date, start.hr), "%Y-%m-%d %H", tz = "America/Chicago"),
-                   end.hr = strptime(paste(dd$Event_Date, end.hr), "%Y-%m-%d %H", tz = "America/Chicago"))
+                   start.hr = as.POSIXct(paste(dd$Event_Date, 
+                                               start.hr), tz = to_tz, format = "%Y-%m-%d %H"),
+                   end.hr = as.POSIXct(paste(dd$Event_Date, 
+                                             end.hr), tz = to_tz, format = "%Y-%m-%d %H"))
+  
+  # Apply special events to GridIDTime ----
+  # Now as parallel, to speed it up
+  
+  cl <- makeCluster(parallel::detectCores())
+  registerDoParallel(cl)
   
   StartTime <- Sys.time()
   t.min = min(GridIDTime$GridDayHour)
   t.max = max(GridIDTime$GridDayHour)
-  i = t.min
   
-  spev.grid.time.all <- vector()
-  counter = 1
-  while(i+3600 <= t.max){
-    ti.GridIDTime = filter(GridIDTime, GridDayHour == i)
-    ti.spev = filter(dd, start.hr >= i & start.hr <= i+3600 | end.hr >= i & end.hr <= i+3600)
+  hr.seq <- seq(t.min, t.max, by = 3600)
+  
+  spev.grid.time.all = foreach(hr = hr.seq, 
+                              .combine = rbind,
+                              .packages = c('dplyr')) %dopar% { # hr = hr.seq[1]
+    
+    ti.GridIDTime = filter(GridIDTime, GridDayHour == hr)
+    
+    ti.spev = filter(dd, start.hr >= hr & start.hr <= hr+3600 | end.hr >= hr & end.hr <= i+3600)
     
     ti.spev.hex <- inner_join(ti.GridIDTime, ti.spev, by = "GRID_ID") # Use left_join to get zeros if no match  
-    spev.grid.time.all <- rbind(spev.grid.time.all, ti.spev.hex)
-    
-    i=i+3600
-    if(counter %% 3600*24 == 0) cat(paste(i, "\n"))
-  } # end loop
+
+    ti.spev.hex
+  } # end parallel loop
   
   EndTime <- Sys.time() - StartTime
   cat(round(EndTime, 2), attr(EndTime, "units"), "\n")
+  stopCluster(cl)
+  
+  # Add holidays ----
+  
   
   spev.grid.time <- filter(spev.grid.time.all, !is.na(GRID_ID))   
   
