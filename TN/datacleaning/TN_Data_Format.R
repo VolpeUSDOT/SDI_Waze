@@ -2,7 +2,6 @@
 
 
 # Setup ----
-
 # Check for package installations
 codeloc <- "~/SDI_Waze"
 source(file.path(codeloc, 'utility/get_packages.R')) #comment out unless needed for first setup, takes a long time to compile
@@ -57,6 +56,7 @@ user <- if(length(grep("@securedatacommons.com", getwd())) > 0) {
 } # find the user directory to use
 
 setwd("~/workingdata/TN")
+# setwd("//vntscex.local/DFS/Projects/PROJ-OS62A1/SDI Waze Phase 2/Data/TN")
 
 # Get Waze data ----
 
@@ -75,7 +75,6 @@ for(i in tn.ls){
     
   }
 }
-
 
 # Data explore
 
@@ -394,31 +393,27 @@ source(system.file("tests", "testing.R", package = "geonames"), echo = TRUE) # I
 
 spev$TimeZone <- NA
 
-# for (i in 1:nrow(spev)) {
-#   
-#   if(spev$Lat[i] != 'all' & !is.na(spev$Lat[i])){
-#   spev$TimeZone[i] <- as.character(GNtimezone(as.numeric(spev$Lat[i]), as.numeric(spev$Lon[i]), radius = 0)$timezoneId)
-#   }  
-# }
+# Trim trailing white space from lat and long 
+spev$Lat <- gsub("[[:space:]]", "", spev$Lat)
+spev$Lon <- gsub("[[:space:]]", "", spev$Lon)
 
-# TimeZone = vector()
-# rowindex <- vector()
+rowindex <- vector()
 starttime = Sys.time()
 
 for (i in 1:nrow(spev)) {
 
   if(spev$Lat[i] != 'all' & !is.na(spev$Lat[i])){
-    query = paste0("http://ws.geonames.org/timezoneJSON?lat=", spev$Lat[i], 4,
-                   "&lng=", spev$Lon[i],
+    query = paste0("http://api.geonames.org/timezoneJSON?lat=", round(as.numeric(spev$Lat[i]), 6), 4,
+                   "&lng=", round(as.numeric(spev$Lon[i]), 6),
                    "&radius=0&username=waze_sdi")
   
     tzres <- httr::GET(query)
-    if(http_error(tzres)) {
+    if(http_error(tzres) | is.null( content(tzres)$timezoneId) ) {
       spev$TimeZone[i] <- "error"
     } else {
       spev$TimeZone[i] <- content(tzres)$timezoneId
     }
-  } else{
+  } else {
     spev$TimeZone[i] = NA
   }
 
@@ -426,16 +421,25 @@ for (i in 1:nrow(spev)) {
   # rowindex <- c(rowindex, i)
 
   if(i %% 100 == 0) cat(i, ". ")
-
+  rowindex = c(rowindex, i) # just to be sure, keep track of row index i
 }
 
-timediff <- Sys.time() -starttime
+timediff <- Sys.time() - starttime
 cat(round(timediff, 2), attr(timediff, "units"), "elapsed")
 # Five min for 2017, Took Jessie's laptop 1.99 (1st time) and 7.79 (2nd time) mins, this probably depending on what you have running.
+# 2018-12-26: update from ws.geonames.org to api.geonames.org.
 
-TimeZone <- data.frame(rowindex, TimeZone)
-spev$rowindex <- as.numeric(rownames(spev))
-spev <- spev %>% left_join(rowindex) %>% select(-c("rowindex"))
+# Check NAs: these are 'all', shoudl apply to every grid ID
+spev %>%
+  filter(is.na(TimeZone))
+
+# One particular location returned error, try to manually fix
+spev %>%
+  filter(TimeZone == 'error')
+
+# Loop over row names where timezone is error. Convert from dplyr tibble format back to normal data frame to get rownames conveniently
+# Problem was white space at end of one of the longitudes, now fixed.
+
 
 ## save special event data in the output
 save("spev", file = "SpecialEvents/TN_SpecialEvent_2017.RData")
