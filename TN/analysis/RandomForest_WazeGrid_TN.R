@@ -40,7 +40,7 @@ state = "TN"
 do.months = c(paste("2017", c("04","05","06","07","08","09", "10", "11", "12"), sep="-"),
               paste("2018", c("01","02","03"), sep="-"))
 
-do.months = paste("2018", c("01","02","03"), sep="-")
+# do.months = paste("2018", c("01","02","03"), sep="-")
 
 REASSESS = F # re-assess model fit and diagnostics using reassess.rf instead of do.rf
 
@@ -98,7 +98,7 @@ monthfiles = sub("-", "_", monthfiles)
   
 # Append supplemental data. 
 # Just 2018 special event data for now; would like to get 2017 similar file for training.
-source(file.path(codeloc, "TN", "utility", "Prep_SpecialEvents.R")) # gives spev.grid.time and spev.grid.time.holiday
+source(file.path(codeloc, "TN", "utility", "Prep_SpecialEvents.R")) # gives spev.grid.time and spev.grid.time.holiday. Prep of 1sqmile ~ 4 hours, 01dd ~ 5 min.
 
 for(w in monthfiles){ # w = "w.2017_04"
   

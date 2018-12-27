@@ -64,6 +64,7 @@ if(length(grep(prepname, dir(file.path(localdir, "SpecialEvents")))) == 0) { # i
   dd <- spTransform(dd, CRS(proj.USGS))
   
   # TODO: Consider different spatial buffers based on event type. Here just doing 3 mile radius for all.
+  # TODO: Parallelize this step as well, seems very slow with 1 sq mi hex layer
   # Based on Buffer_state.R snippet
   buffdist.mi = 3 # Change this to have different buffers by event type
   
@@ -93,7 +94,7 @@ if(length(grep(prepname, dir(file.path(localdir, "SpecialEvents")))) == 0) { # i
   # Expand grid by hour
   # If there is no start / end time, apply from 0 to 24
   
-  # Make framework to join into. Max in 2108 now
+  # Make framework to join into. Max in 2018 now
   dd <- dd %>% filter(Event_Date <= '2018-12-31')
   
   all.hour <- seq(from = as.POSIXct(paste(min(dd$Event_Date), "0:00"), tz = "America/Chicago"), 
@@ -199,8 +200,14 @@ if(length(grep(prepname, dir(file.path(localdir, "SpecialEvents")))) == 0) { # i
                file.path(localdir, "SpecialEvents", paste0(prepname, ".RData")),
                file.path(teambucket, state, "SpecialEvents", paste0(prepname, ".RData"))))
   
+  rm(dd, grid_dd_pip, grid_shp, spev2017, spev2018, cl,
+     dh, g.i, gdh, gdh.dd, GridIDTime, spev, xx,
+     all.hour, b, buffdist, buffdist.mi, e.hr, end.date.hr,
+     end.hr, grid_id, grid_ids, hours, hr.seq, i, s.hr, start.date.hr, start.hr,
+     t.max, t.min, t)
   
 } else {
   load(file.path(localdir, "SpecialEvents", paste0(prepname, ".RData")))
 }
+
 
