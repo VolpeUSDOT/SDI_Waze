@@ -1,5 +1,5 @@
 # Tennesee data initial formatting and exploration
-
+# Read in raw data files, clean up variables, apply time zones, and save as .RData files for next steps.
 
 # Setup ----
 # Check for package installations
@@ -13,6 +13,8 @@ library(geonames) # for time zone work
 library(httr)
 library(geonames)
 library(readxl) # read excel file
+library(foreach)
+library(doParallel)
 
 # Customized Functions
 sumstats = function(x) { 
@@ -55,7 +57,9 @@ user <- if(length(grep("@securedatacommons.com", getwd())) > 0) {
   paste0( "/home/", system("whoami", intern = TRUE))
 } # find the user directory to use
 
-setwd("~/workingdata/TN")
+localdir <- paste0(user, "/workingdata/TN") # full path for readOGR
+
+setwd(localdir)
 # setwd("//vntscex.local/DFS/Projects/PROJ-OS62A1/SDI Waze Phase 2/Data/TN")
 
 # Get Waze data ----
@@ -76,13 +80,13 @@ for(i in tn.ls){
   }
 }
 
-# Data explore
-
+# <><><><><><><><><><><><><><><><><><>
 # Crash ----
+
 # look at Crash/vwCollision.txt
 # First time need to read from txt, afterwards can read from RData, ~ 2 seconds vs 5 minutes. Every column is read as character.
 if(length(grep("TN_Crash.RData", dir('Crash')))==0){
-  crash <- read.csv("Crash/vwCollision.txt", sep = '|')
+  crash <- read.csv("TITAN_Crash_181108/vwCollision.txt", sep = '|', stringsAsFactors = F)
   # format(object.size(crash), 'Mb')
   save(crash, file = "Crash/TN_Crash.RData")
 } else {
@@ -91,7 +95,7 @@ if(length(grep("TN_Crash.RData", dir('Crash')))==0){
 
 # examine the crash data
 names(crash)
-dim(crash) # 829,301 rows * 80 columns
+dim(crash) # 829,301 rows * 80 columns. 181108 version only 773,411 rows.
 
 # Crash ID, it is unique? Yes.
 length(unique(crash$MstrRecNbrTxt)) # 829,301, looks like this is a unique crash ID
@@ -100,7 +104,7 @@ table(crash$NbrUnitsNmb) # this column could include more than the number of veh
 # 0      1      2      3      4      5      6      7      8      9     10     11     12     13     14     15     17     18     22     26     98 
 # 3 219063 565583  37956   5359    969    243     73     18      9      8      4      1      2      1      1      1      1      1      1      1
 
-table(crash$CrashTypeCde) # need information from TN State Petrol for more information
+table(crash$CrashTypeCde) # need information from TN State Patrol for more information
 # 0      1      2      3      4      5      6     80     98 
 # 21   3627  21418  54944 114219 574395  60574     96      1 
 
@@ -144,73 +148,86 @@ colSums(is.na(crash1))*100/nrow(crash1) # percent of missing data, ~29% missing 
 round(colSums(is.na(crash))*100/nrow(crash), 2) # Large amounts of data are missing for some columns, such as BlockNbrTxt, IntersectionInd, IntersectLocalIDTxt, IntersectRoadNameTxt. If we plan to use these columns, need to understand why the missing data are not captured in is.na(). This might be due to blanks. 
 
 
-# Looking at missing location info by year
-# !!!! TO DO: Get correct time zone for each crash !!!!
-
-options(geonamesUsername = "waze_sdi") # set this up as a generic username, only need to run this command once 
-# source(system.file("tests", "testing.R", package = "geonames"), echo = TRUE)
-
-tn_crash <- crash %>% filter(LatDecimalNmb > 25 & LatDecimalNmb < 45 &
-                               LongDecimalNmb < -75 & LongDecimalNmb > -99)
-
-# # From SpecialEventas_WazeAndTNCrashes.R -- will apply below
-TimeZone <- vector()
-
-starttime <- Sys.time()
-
-# Problem: error 503 service unavailable can occur: e.g. 'http://ws.geonames.org/timezoneJSON?lat=35.92846&lng=-84.082&radius=0&username=waze_sdi'
-# need to deal with temporary outage by retrying, after a pause
-# BETTER SOLUTION: USE TZ SPATIAL LAYER AND CLIP
-
-# Not run: too slow for each individaul crash
-# for (i in 1:nrow(tn_crash)) {
-
-  query = paste0("http://ws.geonames.org/timezoneJSON?lat=", tn_crash$LatDecimalNmb[i], 
-                 "&lng=", tn_crash$LongDecimalNmb[i], 
-                 "&radius=0&username=waze_sdi")
-  
-  #as.character(GNtimezone(tn_crash$LatDecimalNmb[i], tn_crash$LongDecimalNmb[i], radius = 0)$timezoneId)
-
-  #tzres <- RETRY( "GET", query)
-  tzres <- GET(query)
-  if(http_error(tzres)) {
-    tzres <- "error"
-  } else {
-    tzres <- content(tzres)$timezoneId
+# Get columns in the right format
+numcol <- grep("Nmb$", names(crash))
+for(i in numcol){
+  crash[,i] <- as.numeric(crash[,i])
   }
-  TimeZone <- c(TimeZone, tzres)
 
-  if(i %% 1000 == 0) cat(". ")
-  if(i %% 10000 == 0) cat("i ")
-  
-}
+# Timezone ----
+# Here applying a timezone shapefile. First, filter out bad lat/long values, and bad record numbers
 
-# timediff <- Sys.time() -starttime
-# cat(round(timediff, 2), attr(timediff, "units"), "elapsed")
+crash <- crash %>% filter(LatDecimalNmb > 25 & LatDecimalNmb < 45 &
+                               LongDecimalNmb < -75 & LongDecimalNmb > -99 &
+                               nchar(MstrRecNbrTxt) == 9)
 
- 
-# se.use$StartUTC <- paste(se.use$Event_Date, se.use$StartTime)
-# se.use$StartUTC <- as.POSIXct(se.use$StartUTC, 
-#                               tz = se.use$TimeZone, 
-#                               format = "%Y-%m-%d %H:%M:%S")
-# 
-# 
-# 
-# 
-# se.use$EndDateTime <- paste(se.use$Event_Date, se.use$EndTime)
-# se.use$EndDateTime <- as.POSIXct(se.use$EndDateTime, format = "%Y-%m-%d %H:%M:%S")
+# Read tz file
+tz <- readOGR(file.path(localdir, 'dist'), layer = 'combined-shapefile')
 
-crash$date = as.POSIXct(strptime(crash$CollisionDte, "%Y-%m-%d %H:%M:%S", tz = "US/Central"))
-crash$year = as.numeric(format(crash$date, "%Y"))
-# Fix data types
-crash$MstrRecNbrTxt <- as.character(crash$MstrRecNbrTxt)
+# Project to Albers equal area, ESRI 102008
+proj <- showP4(showWKT("+init=epsg:102008"))
+# USGS version of AEA. Use this for all projections for consistency; this is what the hexagon layer is in 
+proj.USGS <- "+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs +ellps=GRS80 +towgs84=0,0,0"
+
+tz <- spTransform(tz, CRS(proj.USGS))
+
+# Project crashes
+
+crash.proj <- SpatialPointsDataFrame(coords = crash[c('LongDecimalNmb', 'LatDecimalNmb')],
+                                     data = crash,
+                                     proj4string = CRS("+proj=longlat +datum=WGS84"))
+
+crash.proj <- spTransform(crash.proj, CRS(proj.USGS))
+
+# Overlay timezone on crashes
+crash_tz <- over(crash.proj, tz[,"tzid"]) # Match a tzid name to each row in crash.proj 
 
 
+crash.proj@data <- data.frame(crash.proj@data, tz = crash_tz)
 
-sumstats(tn_crash[2:ncol(tn_crash)])
+crash <- crash.proj@data %>% filter(tzid == "America/Chicago" | tzid == "America/New_York")
 
-save("tn_crash", file = "Crash/TN_Crash_Simple_2008-2018.RData")
+pdf(file = 'Figures/Crash_TZ.pdf', width = 10, height = 10)
+  par(mar = rep(0, 4))
+  plot(crash.proj, cex = 0) 
+  plot(crash.proj[crash.proj$tzid == "America/Chicago" ,], add = T, 
+       col = scales::alpha("midnightblue", 0.01))
+  plot(crash.proj[crash.proj$tzid == "America/New_York" ,], add = T, 
+       col = scales::alpha("firebrick", 0.01))
+  plot(crash.proj[crash.proj$tzid == "Antarctica/McMurdo" ,], add = T, col = "red", 
+       cex = 3)
+  plot(tz, add = T)
+dev.off()
 
+# Now make date/time using correct time zone. Need to loop because strptime does not accept vectors of mixed time zones. Parallelized.
+crash$tzid = as.character(crash$tzid)
+
+cl <- makeCluster(parallel::detectCores())
+registerDoParallel(cl)
+
+StartTime <- Sys.time()
+
+foreach(i = 1:nrow(crash)) %dopar% {
+  crash$date[i] = as.POSIXct(strptime(crash$CollisionDte[i], "%Y-%m-%d %H:%M:%S", 
+                                      tz = crash$tzid[i]))
+  crash$year[i] = as.numeric(format(crash$date[i], "%Y"))
+  }
+EndTime <- Sys.time() - StartTime
+cat(round(EndTime, 2), attr(EndTime, "units"), "\n")
+stopCluster(cl)
+
+crash %>% 
+  group_by(tzid) %>%
+  summarize(min = min(date),
+            max = max(date),
+            n = length(date))
+
+save("crash", file = "Crash/TN_Crash_Simple_2008-2018.RData")
+
+# Transfer the file to team bucket
+system(paste("aws s3 cp",
+             file.path(localdir, 'Crash',"TN_Crash_Simple_2008-2018.RData"),
+             file.path(teambucket, "TN", "Crash", "TN_Crash_Simple_2008-2018.RData")))
 
 # Additional summaries
 
@@ -250,7 +267,8 @@ byhr <- crash %>%
   count()
 data.frame(byhr)
 
-# Special Events ----
+# <><><><><><><><><><><><><><><><><><>
+# 2018 Special Events ----
 spev <- read_excel("SpecialEvents/2018 Special Events.xlsx")
 
 spev17 <- read_excel("SpecialEvents/EVENTS Updated 03_21_2017.xls")
@@ -370,8 +388,8 @@ system(paste("aws s3 cp",
              file.path(teambucket, "TN", "SpecialEvents", "TN_SpecialEvent_2018.RData"),
              file.path('~', 'workingdata', 'TN', 'SpecialEvents',"TN_SpecialEvent_2018.RData"))) # Cool, did the trick
 
-
-# 2017 Special Event prep ----
+# <><><><><><><><><><><><><><><><><><>
+# 2017 Special Event ----
 spev = spev17
 
 # How many rows missing start and end time
@@ -455,10 +473,3 @@ system(paste("aws s3 cp",
 # look at 'SpecialEvents/2018 Special Events.xlsx'; can use read_excel function in readxl package
 # Waze data
 load("TN_2017-04.RData") # load an example Waze data to look at columns
-
-
-
-# Weather ----
-
-# script written to access forecasts in xml format. Consider what variables to use, and how to get historical weather.
-# See Get_weather_forecasts.R and Prep_historical_weather.R

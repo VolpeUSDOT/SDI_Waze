@@ -313,7 +313,10 @@ for(i in special.ls){
 # Tennessee data ----
 # TODO: make this smarter about file paths (look for TN_Roadway_Shapefiles.zip inside Shapefiles)
 
-tn.ls = c('TN.zip', 'Weather/TN_Weather_GHCN.zip', 'Shapefiles/TN_Roadway_Shapefiles.zip', 'SpecialEvents/TN_SpecialEvent_2018.RData', 'Shapefiles/timezones.shapefile.zip', "SpecialEvents/TN_SpecialEvent_2017.RData")
+tn.ls = c('TN.zip', 'Weather/TN_Weather_GHCN.zip', 
+          'Shapefiles/TN_Roadway_Shapefiles.zip', 'SpecialEvents/TN_SpecialEvent_2018.RData', 
+          'Shapefiles/timezones.shapefile.zip', "SpecialEvents/TN_SpecialEvent_2017.RData",
+          'Crash/TITAN_Crash_181108.zip', 'Crash/TN_Crash_Simple_2008-2018.RData')
 
 for(i in tn.ls){
   if(length(grep(i, dir(file.path('~', 'workingdata', 'TN'))))==0){
@@ -429,6 +432,11 @@ if(MOVEFROMUPLOAD){
                file.path(teambucket, system('whoami', intern = T), "uploaded_files/")
   ))
 
+  system(paste("aws s3 mv", 
+               file.path(teambucket, system('whoami', intern = T), "uploaded_files", "TITAN_Crash_181108.zip"),
+               file.path(teambucket, "TN", "Crash", "TITAN_Crash_181108.zip"))
+  )
+  
   system(paste("aws s3 mv", 
                file.path(teambucket, system('whoami', intern = T), "uploaded_files", "timezones.shapefile.zip"),
                file.path(teambucket, "TN", "Shapefiles", "timezones.shapefile.zip"))

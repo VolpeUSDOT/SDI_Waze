@@ -1,4 +1,4 @@
-# Prepare special events for random forest work
+# Prepare historical crash data for random forest work
 # Need to apply points to grids
 # This now expands the special events from a point to a buffered polygon. Currently using a fixed 3 mile radius for each special event, but this can be changed; consider different radius by event type.
 # Also, now using America/Chicago for all analysis steps.
