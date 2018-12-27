@@ -37,12 +37,12 @@ source(file.path(codeloc, 'utility/connect_redshift_pgsql.R'))
 # states with available EDT data for model testing. Adding NC for disaster test
 states = c("CT", "MD", "NC", "TN", "UT", "VA", "WA")
 
-# Time zone picker:
+# Time zone picker. 'USE_SHAPEFILE' flag for states with multiple timezones:
 tzs <- data.frame(states, 
                   tz = c("US/Eastern",
                          "US/Eastern",
                          "US/Eastern",
-                         "US/Eastern",
+                         "USE_SHAPEFILE",
                          "US/Mountain",
                          "US/Eastern",
                          "US/Pacific"),
@@ -141,7 +141,7 @@ starttime <- Sys.time()
   
 ym.blocks = cut(1:length(yearmonths), breaks = 4, include.lowest = T)
 
-for(i in states){ # i = "UT"
+for(i in states){ # i = "TN"
   
   for(j in levels(ym.blocks)) { # j = levels(ym.blocks)[4]
     
@@ -149,7 +149,16 @@ for(i in states){ # i = "UT"
     use.tz <- tzs$tz[tzs$states == i]
     
     # Get the data from the S3 bucket if needed (to do), saving to workingdata
-    load(file.path("~/workingdata", paste0(i, "_Buffered_Clipped_events_to_", yearmonths[length(yearmonths)],".RData")))
+    buffered_state_data =  paste0(i, "_Buffered_Clipped_events_to_", yearmonths[length(yearmonths)],".RData")
+    
+    if(length(grep(buffered_state_data, dir("~/workingdata")))==0){
+      system(paste("aws s3 cp",
+                   file.path(teambucket, i, buffered_state_data),
+                   file.path("~/workingdata", buffered_state_data)
+      ))
+    }
+      
+    load(file.path("~/workingdata", buffered_state_data))
     
     # Convert values to numeric
     numconv <- c("report_rating", "confidence", "reliability", "pub_millis", "location_lon", "location_lat", "magvar")
@@ -237,9 +246,49 @@ for(i in states){ # i = "UT"
         lx <- full_join(ll, ll2, by = 'alert_uuid')
         lx <- full_join(lx, ll3, by = 'alert_uuid')
         
-        # Format and output  
-        time <- as.POSIXct(lx$pubMillis/1000, origin = "1970-01-01", tz= use.tz) 
-        last.pull.time <- as.POSIXct(lx$last.time/1000, origin = "1970-01-01", tz= use.tz) 
+        # Format and output 
+        if(use.tz == "USE_SHAPEFILE"){
+          
+          # Read tz file
+          tz <- readOGR(file.path(localdir, 'TN', 'dist'), layer = 'combined-shapefile')
+          
+          # Project to Albers equal area, ESRI 102008
+          proj <- showP4(showWKT("+init=epsg:102008"))
+          # USGS version of AEA. Use this for all projections for consistency; this is what the hexagon layer is in 
+          proj.USGS <- "+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs +ellps=GRS80 +towgs84=0,0,0"
+          tz <- spTransform(tz, CRS(proj.USGS))
+          
+          # Project aggregated Waze data
+          
+          lx.proj <- SpatialPointsDataFrame(coords = lx[c('lon', 'lat')],
+                                               data = lx,
+                                               proj4string = CRS("+proj=longlat +datum=WGS84"))
+          
+          lx.proj <- spTransform(lx.proj, CRS(proj.USGS))
+          
+          # Overlay timezone on Waze
+          waze_tz <- over(lx.proj, tz[,"tzid"]) # Match a tzid name to each row in crash.proj 
+          
+          lx.proj@data <- data.frame(lx.proj@data, tzid = as.character(waze_tz$tzid))
+          
+          # very slow, but certain solution: loop over every row and apply the correct time zone
+          time = last.pull.time = vector()
+          for(i in 1:nrow(lx.proj)) {
+            time = c(time, format(as.POSIXct(lx.proj$pubMillis[i]/1000, origin = "1970-01-01", 
+                                 tz = as.character(lx.proj$tzid[i])),
+                                 "%Y-%m-%d %H:%M:%S", usetz = T))
+            
+            last.pull.time = c(last.pull.time, format(as.POSIXct(lx.proj$last.time[i]/1000, origin = "1970-01-01", 
+                                                       tz = as.character(lx.proj$tzid[i])),
+                                            "%Y-%m-%d %H:%M:%S", usetz = T))
+          } # end loop over rows for time and last.time
+         
+        } else {
+          
+          time <- as.POSIXct(lx$pubMillis/1000, origin = "1970-01-01", tz = use.tz) 
+          last.pull.time <- as.POSIXct(lx$last.time/1000, origin = "1970-01-01", tz= use.tz) 
+        
+        }
         
         mb <- data.frame(lx, time, last.pull.time)
         

@@ -38,7 +38,6 @@ if(length(grep(prepname, dir(file.path(localdir, "Crash")))) == 0) { # if doen't
   crash <- data.frame(crash, GRID_ID = crash_grid$GRID_ID) 
 
   crash$day = format(crash$date, "%j")    
-   
   
   save(list = c("crash"),
        file = file.path(localdir, "Crash", paste0(prepname, ".RData")))

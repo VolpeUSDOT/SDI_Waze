@@ -42,7 +42,7 @@ source(file.path(codeloc, 'utility/wazefunctions.R'))
 state = "TN"
 yearmonths = c(
   paste(2017, formatC(4:12, width = 2, flag = "0"), sep="-"),
-  paste(2018, formatC(1:3, width = 2, flag = "0"), sep="-")
+  paste(2018, formatC(1:9, width = 2, flag = "0"), sep="-")
 )
 
 # Time zone 
@@ -68,13 +68,14 @@ wazemonthfiles <- dir(wazedir)[grep(state, dir(wazedir))]
 wazemonthfiles <- wazemonthfiles[grep("RData$", wazemonthfiles)]
 # omit _Raw_
 omit <- grep('_Raw_', wazemonthfiles)
-wazemonthfiles = wazemonthfiles[-omit]
+if(length(omit) > 0) { wazemonthfiles = wazemonthfiles[-omit] }
 
 # get TN crash data 
 load("Crash/TN_Crash_Simple_2008-2018.RData")
 
 # find rows with missing lat/long
 # Discard rows with no lat long
+tn_crash <- crash
 cat(state, "TN missing lat/long, FALSE TRUE: \n", summary(is.na(tn_crash$LatDecimalNmb)), "\n")
 tn_crash <- tn_crash[!is.na(tn_crash$LatDecimalNmb) & !is.na(tn_crash$LongDecimalNmb),]
 
