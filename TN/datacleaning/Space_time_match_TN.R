@@ -29,24 +29,25 @@ user <- if(length(grep("@securedatacommons.com", home.loc)) > 0) {
     paste0( "/home/", system("whoami", intern = TRUE))
   } # find the user directory to use
 
-localdir <- paste0(user, "/workingdata/TN") # full path for readOGR
+state = "TN"
 
-wazedir <- "~/tempout" # has State_Year-mo.RData files. Grab from S3 if necessary
+localdir <- file.path(user, "workingdata", state) # full path for readOGR
+
+wazedir <- file.path(localdir, 'Waze') # has State_Year-mo.RData files. Grab from S3 if necessary
 
 setwd(localdir) 
 
 # read functions
-source(file.path(codeloc, 'utility/wazefunctions.R'))
+source(file.path(codeloc, 'TN/utility/wazefunctions_TN.R'))
 
 # Set parameters: states, yearmonths, time zone and projection
-state = "TN"
 yearmonths = c(
   paste(2017, formatC(4:12, width = 2, flag = "0"), sep="-"),
   paste(2018, formatC(1:9, width = 2, flag = "0"), sep="-")
 )
 
-# Time zone 
-tz = "US/Central"
+# Time zone - now using the tz in each row
+# tz = "US/Central"
 
 # Project to Albers equal area conic 102008. Check comparision wiht USGS version, WKID: 102039
 proj <- showP4(showWKT("+init=epsg:102008"))
@@ -116,8 +117,30 @@ for(j in months_shared){ # j = "2018-03"
   plot(d_crash, add = T, col = alpha("firebrick", 0.2), cex = 0.8)
   dev.print(jpeg, file = paste0("Figures/Link_plot_", state, "_" , j, ".jpeg"), width= 500, height = 500)
   
+  # Get time in the right format if not already
+  if(class(d$time) != "POSIXct"){
+    dt <- as.character(d$time)
+    dt.last <- as.character(d$last.pull.time)
+    dtz <- substr(dt, 21, 23) 
+    
+    new.d <- vector()
+    
+    for(tz in unique(dtz)){ # tz = "CST"
+      dx.tz = d[dtz == tz,] # subset data frame d to just rows with this time zone
+      dx.tz$time = as.POSIXct(dt[dtz == tz], tz = tz)
+      dx.tz$last.pull.time = as.POSIXct(dt.last[dtz == tz], tz = tz)
+      new.d = rbind(new.d, dx.tz@data)
+    }
+    d = new.d; rm(new.d, dt, dt.last, dtz)  
+    d <- SpatialPointsDataFrame(d[c("lon", "lat")], d, 
+                                proj4string = CRS("+proj=longlat +datum=WGS84")) # convert back to spatial points data frame
+    
+    d <- spTransform(d, CRS(proj))
+    }
+  
+  
   # <><><><><><><><><><><><><><><><><><><><><><><><>
-  link.all <- makelink(accfile = tn_crash, 
+  link.all <- makelink(accfile = tn_j, # just this month subset 
                        incfile = d,
                        acctimevar = "date",
                        inctimevar1 = "time",

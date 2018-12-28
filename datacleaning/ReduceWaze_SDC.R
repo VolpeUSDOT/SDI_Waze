@@ -17,7 +17,7 @@ library(tidyverse) # tidyverse install on SDC may require additional steps, see 
 library(lubridate)
 library(doParallel)
 library(foreach)
-
+library(rgdal)
 # Location of SDC SDI Waze team S3 bucket. Files will first be written to a temporary directory in this EC2 instance, then copied to the team bucket.
 teambucket <- "s3://prod-sdc-sdi-911061262852-us-east-1-bucket"
  
@@ -188,7 +188,7 @@ for(i in states){ # i = "TN"
     registerDoParallel(cl)
   
     # Start parallel loop over yearmonths within state ----
-    foreach(mo = unique(ym), .packages = c("dplyr", "tidyr")) %dopar% {
+    foreach(mo = unique(ym), .packages = c("dplyr", "tidyr", "rgdal")) %dopar% {
         # mo = "2017-08"
         dx <- d[ym == mo,]
         
@@ -273,13 +273,13 @@ for(i in states){ # i = "TN"
           
           # very slow, but certain solution: loop over every row and apply the correct time zone
           time = last.pull.time = vector()
-          for(i in 1:nrow(lx.proj)) {
-            time = c(time, format(as.POSIXct(lx.proj$pubMillis[i]/1000, origin = "1970-01-01", 
-                                 tz = as.character(lx.proj$tzid[i])),
+          for(k in 1:nrow(lx.proj)) {
+            time = c(time, format(as.POSIXct(lx.proj$pubMillis[k]/1000, origin = "1970-01-01", 
+                                 tz = as.character(lx.proj$tzid[k])),
                                  "%Y-%m-%d %H:%M:%S", usetz = T))
             
-            last.pull.time = c(last.pull.time, format(as.POSIXct(lx.proj$last.time[i]/1000, origin = "1970-01-01", 
-                                                       tz = as.character(lx.proj$tzid[i])),
+            last.pull.time = c(last.pull.time, format(as.POSIXct(lx.proj$last.time[k]/1000, origin = "1970-01-01", 
+                                                       tz = as.character(lx.proj$tzid[k])),
                                             "%Y-%m-%d %H:%M:%S", usetz = T))
           } # end loop over rows for time and last.time
          
@@ -325,6 +325,21 @@ for(i in states){ # i = "TN"
 # re-organized from tempout to state folders in workingdir
 for(state in states){
   state.files <- dir(output.loc)
+  
+  # torename <- state.files[nchar(state.files) > 19]
+  # newnames <- paste0("TN_", unlist(lapply(strsplit(torename, "_"), function(x) x[2])))
+  # for(sf in 1:length(torename)){
+  #   system(paste("mv", file.path(output.loc, torename[sf]),
+  #                file.path(localdir, state, 'Waze', newnames[sf])))
+  # }
+  
+  # state.files <- dir("~/workingdata/TN/Waze") 
+  # for(sf in state.files){
+  #   system(paste('aws s3 cp', 
+  #                file.path("~/workingdata/TN/Waze", sf),
+  #                file.path(teambucket, state, sf)))
+  # }
+  
   state.files <- state.files[grep(paste0("^", state, "_"), state.files)]
   for(sf in state.files){
     system(paste("mv", file.path(output.loc, sf),
