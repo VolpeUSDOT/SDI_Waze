@@ -47,7 +47,6 @@ for(g in grids){ # g = grids[1]
 
   todo.months = avail.months[!avail.months %in% done.months] #sort(avail.months)[c(1:9)]
 
-  use.tz <- "America/Central"  # Revisit this after time zones are fixed
   
   starttime <- Sys.time()
   
@@ -66,28 +65,28 @@ for(g in grids){ # g = grids[1]
     load(file.path(wazemonthdir, paste0("merged.waze.tn.", g,"_", j, ".RData"))) # includes both waze (link.waze.tn) and TN crash (crash.df) data, with grid for central and neighboring cells
     
     # format(object.size(link.waze.tn), "Mb"); format(object.size(crash.df), "Mb")
-    # EDT time needs to be POSIXct, not POSIXlt. ct: seconds since beginning of 1970 in UTC. lt is a list of vectors representing seconds, min, hours, day, year. ct is better for analysis, while lt is more human-readable.
-    link.waze.tn$date <- as.POSIXct(link.waze.tn$date, "%Y-%m-%d %H:%M:%S", tz = use.tz)
-    crash.df$date <- as.POSIXct(crash.df$date, "%Y-%m-%d %H:%M:%S", tz = use.tz)
-    
+    # TN date, Waze time all now are POSIXct, with correct time zone. ct: seconds since beginning of 1970 in UTC. lt is a list of vectors representing seconds, min, hours, day, year. ct is better for analysis, while lt is more human-readable.
+
     ##############
     # Make data frame of all Grid IDs by day of year and time of day in each month of data (subset to all grid IDs with Waze OR EDT data)
     GridIDall <- c(unique(as.character(link.waze.tn$GRID_ID)), unique(as.character(link.waze.tn$GRID_ID.TN)))
     
-    # Eliminate any rows which are not for this month -- may happen if an event began the last minute of the last day of previous month.
-    
-    link.waze.tn <- link.waze.tn[!is.na(link.waze.tn$last.pull.time),]
-    
-    year.month <- format(link.waze.tn$last.pull.time, "%Y-%m")
+    # Date/time for TN crash only events or TN/Waze matching events are stored as 'date', while Date/time for Waze only events are stored as 'time'.
+    year.month.w <- format(link.waze.tn$time, "%Y-%m")
+    year.month.t <- format(link.waze.tn$date, "%Y-%m")
+    year.month <- year.month.w
+    year.month[is.na(year.month)] <- year.month.t[is.na(year.month)]
     
     link.waze.tn <- link.waze.tn[year.month == j,]
     
-    month.days <- unique(as.numeric(format(link.waze.tn$last.pull.time, "%d")))
+    month.days.w  <- unique(as.numeric(format(link.waze.tn$time, "%d"))) # Waze event date/time
+    month.days.t  <- unique(as.numeric(format(link.waze.tn$date, "%d"))) # TN crash date/time
+    month.days = unique(c(month.days.w, month.days.t))
     
     lastday = max(month.days[!is.na(month.days)])
     
-    Month.hour <- seq(from = as.POSIXct(paste0(j,"-01 0:00"), tz = use.tz), 
-                      to = as.POSIXct(paste0(j,"-", lastday, " 23:00"), tz = use.tz),
+    Month.hour <- seq(from = as.POSIXct(paste0(j,"-01 0:00"), tz = 'America/Chicago'), 
+                      to = as.POSIXct(paste0(j,"-", lastday, " 24:00"), tz = 'America/New_York'),
                       by = "hour")
     
     GridIDTime <- expand.grid(Month.hour, GridIDall)
@@ -104,11 +103,15 @@ for(g in grids){ # g = grids[1]
     counter = 1
     while(i+3600 <= t.max){
       ti.GridIDTime = filter(GridIDTime, GridDayHour == i)
-      ti.link.waze.tn = filter(link.waze.tn, time >= i & time <= i+3600 | last.pull.time >= i & last.pull.time <=i+3600)
-    
-       ti.Waze.hex <- inner_join(ti.GridIDTime, ti.link.waze.tn, by = "GRID_ID") #Use left_join to get zeros if no match  
-       Waze.hex.time.all <- rbind(Waze.hex.time.all, ti.Waze.hex)
-  
+      ti.link.waze.tn = link.waze.tn %>% filter(time >= i & time <= i+3600 | last.pull.time >= i & last.pull.time <=i+3600)
+      ti.link.waze.tn.t = link.waze.tn %>% filter(date >= i & date <= i+3600)
+      
+      ti.Waze.hex <- inner_join(ti.GridIDTime, ti.link.waze.tn, by = "GRID_ID") #Use left_join to get zeros if no match  
+      ti.Waze.hex.t <- inner_join(ti.GridIDTime, ti.link.waze.tn.t, by = "GRID_ID") # Same, for TN only crashes
+      
+      Waze.hex.time.all <- rbind(Waze.hex.time.all, ti.Waze.hex)
+      Waze.hex.time.all <- rbind(Waze.hex.time.all, ti.Waze.hex.t)
+      
       i=i+3600
       if(counter %% 3600*24 == 0) cat(paste(i, "\n"))
      } # end loop
