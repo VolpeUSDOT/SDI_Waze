@@ -527,6 +527,33 @@ append.hex2 <- function(hexname, data.to.add, state, na.action = c("omit", "keep
     # Save this to global environment for other months to use
     assign(prepname, dd, envir = globalenv())
     
+  }
+
+  if(length(grep("crash", data.to.add)) > 0){
+    
+    dd$hour <- as.numeric(format(dd$date, "%H"))
+    
+    # Variables to create:
+    # Total crashes, by grid ID, for last 5 years prior to study period (2011-2016)
+    # Fatal/serious crashes, same
+    # Can also consider adding crashes by time block, by day of week, or by month
+    
+    dd1 <- dd %>%
+      filter(year >= 2011 & year <= 2016) %>%
+      group_by(GRID_ID) %>%
+      summarise(TotalHistCrashsum = n())
+    
+    dd2 <- dd %>%
+      filter(year >= 2011 & year <= 2016 &
+               NbrFatalitiesNmb > 0) %>%
+      group_by(GRID_ID) %>%
+      summarise(TotalFatalCrashsum = n())
+    
+    dd <- full_join(dd1, dd2, by = 'GRID_ID')
+    
+    # Save this to global environment for other months to use
+    assign(prepname, dd, envir = globalenv())
+    
   } else {
     
     # Create vectors in w for month of year, day of week, hour of day in w. This is used for joining on the grid ID and time factors

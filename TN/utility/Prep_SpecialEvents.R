@@ -13,15 +13,6 @@ library(doParallel)
 library(foreach)
 
 
-proj.USGS <- "+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs +ellps=GRS80 +towgs84=0,0,0"
-
-# Combine 2017 and 2018 data
-load(file.path(localdir, "SpecialEvents", "TN_SpecialEvent_2017.RData")) # 9 columns
-spev2017 <- spev # 670 rows
-load(file.path(localdir, "SpecialEvents", "TN_SpecialEvent_2018.RData")) # 13 columns
-spev2018 <- spev[,names(spev2017)] # 813 rows
-spev <- rbind(spev2017, spev2018) # 1483 rows
-table(spev$TimeZone) # All have TimeZone information, except statewide holidays. Only have for 2017. 
 
 
 # # If not running from RandomForest_Wazegrid_TN.R, set it up manually by running following code.
@@ -46,7 +37,18 @@ prepname = paste("Prepared", "TN_SpecialEvent", g, sep="_")
 if(length(grep(prepname, dir(file.path(localdir, "SpecialEvents")))) == 0) { # if doen't exist in TN/SpecialEvents, make it
   
   cat("Preparing", "TN_SpecialEvent", g, "\n")
+
+  proj.USGS <- "+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs +ellps=GRS80 +towgs84=0,0,0"
   
+  # Combine 2017 and 2018 data
+  load(file.path(localdir, "SpecialEvents", "TN_SpecialEvent_2017.RData")) # 9 columns
+  spev2017 <- spev # 670 rows
+  load(file.path(localdir, "SpecialEvents", "TN_SpecialEvent_2018.RData")) # 13 columns
+  spev2018 <- spev[,names(spev2017)] # 813 rows
+  spev <- rbind(spev2017, spev2018) # 1483 rows
+  table(spev$TimeZone) # All have TimeZone information, except statewide holidays. Only have for 2017. 
+
+    
   dd <- spev %>% filter( ( !is.na(Lon) | !is.na(Lat) ) & TimeZone != 'error') 
   
   # Make numeric, make sure no white spaces are there

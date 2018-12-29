@@ -21,6 +21,8 @@ library(doParallel)
 library(foreach)
 
 #Set parameters for data to process
+state = "TN"
+
 grids = c("TN_01dd_fishnet",
           "TN_1sqmile_hexagons")
 
@@ -56,7 +58,7 @@ for(g in grids){ # g = grids[1]
   grid.tlfiles <- tlfiles[grep(g, tlfiles)]
   done.months <- unlist(lapply(strsplit(grid.tlfiles, "_"), function(x) x[[2]])) 
   
-  todo.months = sort(avail.months[!avail.months %in% done.months])
+  todo.months = sort(avail.months)#[!avail.months %in% done.months])
   
   use.tz <- "America/Chicago" # This gets used only in making the hextime variable
 
