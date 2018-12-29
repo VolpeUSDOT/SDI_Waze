@@ -58,7 +58,7 @@ for(g in grids){ # g = grids[1]
   
   todo.months = sort(avail.months[!avail.months %in% done.months])
   
-  use.tz <- "America/Central"
+  use.tz <- "America/Chicago" # This gets used only in making the hextime variable
 
   cl <- makeCluster(parallel::detectCores()) # make a cluster of all available cores
   registerDoParallel(cl)
@@ -74,10 +74,8 @@ for(g in grids){ # g = grids[1]
     load(file.path(wazemonthdir, paste0("merged.waze.tn.", g,"_", j, ".RData"))) # includes both waze (link.waze.tn) and TN crash (crash.df) data, with grid for central and neighboring cells
     
     # format(object.size(link.waze.tn), "Mb"); format(object.size(crash.df), "Mb")
-    # TN crash time needs to be POSIXct, not POSIXlt. ct: seconds since beginning of 1970 in UTC. lt is a list of vectors representing seconds, min, hours, day, year. ct is better for analysis, while lt is more human-readable.
-    link.waze.tn$date <- as.POSIXct(link.waze.tn$date, "%Y-%m-%d %H:%M:%S", tz = use.tz)
-    crash.df$date <- as.POSIXct(crash.df$date, "%Y-%m-%d %H:%M:%S", tz = use.tz)
-    
+    # TN crash time and Waze time are now in POSIXct, not POSIXlt, with correct time zone for each row. ct: seconds since beginning of 1970 in UTC. lt is a list of vectors representing seconds, min, hours, day, year. ct is better for analysis, while lt is more human-readable.
+
     # <><><><><><><><><><><><><><><><><><><><>
     # Read in the data frame of all Grid IDs by day of year and time of day in each month of data (subset to all grid IDs with Waze OR EDT data)
  
@@ -95,16 +93,17 @@ for(g in grids){ # g = grids[1]
     StartTime <- Sys.time()
     waze.hex <- Waze.hex.time %>%
       group_by(GRID_ID, GRID_ID_NW, GRID_ID_N, GRID_ID_NE, GRID_ID_SW, GRID_ID_S, GRID_ID_SE,
-               day = format(GridDayHour, "%j"), hour = format(GridDayHour, "%H"), weekday = format(GridDayHour, "%u")) %>%
+               year = format(GridDayHour, "%Y"), day = format(GridDayHour, "%j"), hour = format(GridDayHour, "%H"), weekday = format(GridDayHour, "%u")) %>%
       summarize(
         nWazeRowsInMatch = n(), #includes duplicates that match more than one TN crash report (don't use in model)
-        uniqWazeEvents= n_distinct(uuid.waze),
+        uniqueWazeEvents= n_distinct(uuid.waze),
         
         Waze_UA_C = n_distinct(ID[Waze_UA_Type == "C"]),
         Waze_UA_U = n_distinct(ID[Waze_UA_Type == "U"]),        
         
         nMatchTN_buffer = n_distinct(ID[match=="M"]),
-      
+        nTN_total = n_distinct((ID[match=="M" | match=="T"])),
+        
         nMatchTN_buffer_Acc = n_distinct(ID[match=="M" & alert_type=="ACCIDENT"]),
         nMatchTN_buffer_Jam = n_distinct(ID[match=="M" & alert_type=="JAM"]),
         nMatchTN_buffer_RoadClosed = n_distinct(ID[match=="M" & alert_type=="ROAD_CLOSED"]),
@@ -178,7 +177,7 @@ for(g in grids){ # g = grids[1]
       crash.df %>%
       group_by(GRID_ID.TN, day = format(date, "%j"), hour = format(date, "%H")) %>%
       summarize(
-        uniqeTNreports= n_distinct(MstrRecNbrTxt),
+        uniqueTNreports= n_distinct(MstrRecNbrTxt),
         
         nTNInjuryFatal = n_distinct(MstrRecNbrTxt[NbrFatalitiesNmb > 0]),
         nTNInjury = n_distinct(MstrRecNbrTxt[NbrInjuredNmb > 0]),
@@ -249,8 +248,8 @@ for(g in grids){ # g = grids[1]
     # Replace NA with zero (for the grid counts here, 0 means there were no reported Waze events or EDT crashes in the neighbor grid cell at that hour)
     
     # Update time variable 
-    hextimeChar <- paste(wazeTime.tn.hexAll$day, wazeTime.tn.hexAll$hour, sep=":")
-    wazeTime.tn.hexAll$hextime <- strptime(hextimeChar, "%j:%H", tz=)
+    hextimeChar <- paste(wazeTime.tn.hexAll$year, wazeTime.tn.hexAll$day, wazeTime.tn.hexAll$hour, sep=":")
+    wazeTime.tn.hexAll$hextime <- strptime(hextimeChar, "%Y:%j:%H", tz = use.tz)
   
     class(wazeTime.tn.hexAll) <- "data.frame" # POSIX date/time not supported for grouped tbl
     
@@ -291,7 +290,7 @@ for(g in grids){ # g = grids[1]
   }
 }
 
-# Check with plots -- written for ATA, needs update for SDC 2018-08-15
+# Check with plots -- 
 
 CHECKPLOT = T
 
