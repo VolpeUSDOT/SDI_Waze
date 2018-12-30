@@ -32,7 +32,7 @@ source(file.path(codeloc, "TN", "utility/wazefunctions_TN.R"))
 setwd(localdir)
 
 # <><><><><>
-g = grids[1] # start with square grids
+g = grids[2] # start with square grids, now running 
 state = "TN"
 # <><><><><>
 
@@ -179,7 +179,7 @@ omits = c(alwaysomit,
 # Check to see what we are passing as predictors
 names(w.allmonths)[is.na(match(names(w.allmonths), omits))]
 
-modelno = "01"
+modelno = paste("01", g, sep = "_")
 
 if(!REASSESS){
   keyoutputs[[modelno]] = do.rf(train.dat = w.allmonths, 
@@ -203,7 +203,7 @@ cat(round(timediff, 2), attr(timediff, "units"), "elapsed to model", modelno)
 
 
 # 02, add base Waze features
-modelno = "02"
+modelno = paste("02", g, sep = "_")
 
 omits = c(alwaysomit,
           # grep("nWaze", names(w.allmonths), value = T), # All Waze events
@@ -231,7 +231,7 @@ redo_outputs[[modelno]] = reassess.rf(train.dat = w.allmonths,
 }
 
 # 03, add all Waze features
-modelno = "03"
+modelno = paste("03", g, sep = "_")
 
 omits = c(alwaysomit
           #grep("nWaze", names(w.allmonths), value = T), # All Waze events
@@ -278,7 +278,7 @@ omits = c(alwaysomit,
 # Check to see what we are passing as predictors
 names(w.allmonths)[is.na(match(names(w.allmonths), omits))]
 
-modelno = "04"
+modelno = paste("04", g, sep = "_")
 
 if(!REASSESS){
   keyoutputs[[modelno]] = do.rf(train.dat = w.allmonths, 
@@ -304,7 +304,7 @@ if(REASSESS) {
 
 
 # 05, add base Waze features
-modelno = "05"
+modelno = paste("05", g, sep = "_")
 
 omits = c(alwaysomit,
           # grep("nWaze", names(w.allmonths), value = T), # All Waze events
@@ -332,7 +332,7 @@ if(!REASSESS){
 }
 
 # 06, add all Waze features
-modelno = "06"
+modelno = paste("06", g, sep = "_")
 
 omits = c(alwaysomit
           #grep("nWaze", names(w.allmonths), value = T), # All Waze events
@@ -373,13 +373,13 @@ outputdir = file.path(localdir, 'Random_Forest_Output')
 zipname = paste0('TN_RandomForest_Outputs_', g, "_", Sys.Date(), '.zip')
 
 system(paste('zip', file.path('~/workingdata', zipname),
-             file.path(localdir, 'TN_Output_to_06'),
-             file.path(outputdir, 'TN_Model_01_RandomForest_Output.RData'),
-             file.path(outputdir, 'TN_Model_02_RandomForest_Output.RData'),
-             file.path(outputdir, 'TN_Model_03_RandomForest_Output.RData'),
-             file.path(outputdir, 'TN_Model_04_RandomForest_Output.RData'),
-             file.path(outputdir, 'TN_Model_05_RandomForest_Output.RData'),
-             file.path(outputdir, 'TN_Model_06_RandomForest_Output.RData')
+             file.path(localdir, paste0('Output_to_01_', g)),
+             file.path(outputdir, paste0('TN_Model_01_', g, '_RandomForest_Output.RData')),
+             file.path(outputdir, paste0('TN_Model_02_', g, '_RandomForest_Output.RData')),
+             file.path(outputdir, paste0('TN_Model_03_', g, '_RandomForest_Output.RData')),
+             file.path(outputdir, paste0('TN_Model_04_', g, '_RandomForest_Output.RData')),
+             file.path(outputdir, paste0('TN_Model_05_', g, '_RandomForest_Output.RData')),
+             file.path(outputdir, paste0('TN_Model_06_', g, '_RandomForest_Output.RData'))
              
              ))
 
