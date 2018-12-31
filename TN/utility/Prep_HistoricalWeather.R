@@ -32,6 +32,7 @@ if(length(grep(prepname, dir(file.path(localdir, "Weather")))) == 0) {
     if(length(grep('stations', k))==0){
       wxx <- read.csv(file.path(localdir, "Weather", "GHCN", k))
       wx <- rbind(wx, wxx[core_vars])
+      rm(wxx)
     }
   }
 
@@ -44,6 +45,16 @@ if(length(grep(prepname, dir(file.path(localdir, "Weather")))) == 0) {
   
   wx <- wx[order(wx$DATE, wx$STATION),]
   
+  # Make sure values are reasonable
+  # range(wx$PRCP, na.rm=T)
+  # wx %>%
+  #   filter(TMAX < 10) # Looks possible
+  # wx %>%
+  #   filter(TMIN < -10) # Replace these with NA, does not seem possible
+   
+  wx$TMIN[wx$TMIN == -99] = NA
+  wx$TMAX[wx$TMAX == -99] = NA
+
   # To match with forecast, want the following by day
   # date: yday, hour
   # high: fahrenheit
@@ -179,6 +190,10 @@ if(length(grep(prepname, dir(file.path(localdir, "Weather")))) == 0) {
     daily_result
   } # end parallel loop
    
+  
+  # Plot gridded versions of same point maps to check
+  source(file.path(codeloc, 'TN', 'datacleaning', 'Plot_weather_gridded.R'))
+  
   EndTime <- Sys.time() - StartTime
   cat(round(EndTime, 2), attr(EndTime, "units"), "\n")
    

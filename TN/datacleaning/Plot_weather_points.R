@@ -29,7 +29,7 @@ wx.prcp.proj <- spTransform(SpatialPointsDataFrame(wx.avg.ann.P[c("lon", "lat")]
                                                    proj4string = CRS("+proj=longlat +datum=WGS84")), CRS(proj.USGS))
 
 # Check with plot
-pdf(file = "Figures/WX_example_Maps_TN.pdf", width = 10, height = 8)
+pdf(file = paste0("Figures/WX_example_Maps_", g, ".pdf"), width = 10, height = 8)
 plot(grid_shp, col = 'lightgrey')
 tempcol <- colorRampPalette(c("purple", "blue", "green", "yellow", "orange", "red"))
 cuts = cut(wx.jan.proj$avgtempmin, 10)

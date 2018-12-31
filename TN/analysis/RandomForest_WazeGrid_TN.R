@@ -103,6 +103,8 @@ source(file.path(codeloc, "TN", "utility", "Prep_SpecialEvents.R")) # gives spev
 
 source(file.path(codeloc, "TN", "utility", "Prep_HistoricalCrash.R")) # gives crash
 
+source(file.path(codeloc, "TN", "utility", "Prep_HistoricalWeather.R")) # gives wx.grd.day. Weather variables, by grid ID, by day. Takes ~ 2 hrs for 0.1 dd on 16 core instance.
+
 # Add prepared special events and historical crash data, with grid ID
 for(w in monthfiles){ # w = "w.2018_01"
   
