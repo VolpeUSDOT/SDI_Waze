@@ -13,6 +13,8 @@ prepname = paste("Prepared", "Weather", g, sep="_")
 if(length(grep(prepname, dir(file.path(localdir, "Weather")))) == 0) { 
   library(gstat) # For kriging
   library(raster) # masks several functions from dplyr, use caution
+  library(doParallel)
+  library(foreach)
   
   cat("Preparing", "Weather", g, "\n")
   
@@ -46,11 +48,8 @@ if(length(grep(prepname, dir(file.path(localdir, "Weather")))) == 0) {
   # date: yday, hour
   # high: fahrenheit
   # low: fahrenheit
-  # conditions
-  # qpf_allday: in
+  # precip
   # snow_allday: in
-  # maxwind: mph
-  # avewind: mph
 
   wx <- left_join(wx, stations[1:5], by = "STATION")
   
@@ -68,190 +67,130 @@ if(length(grep(prepname, dir(file.path(localdir, "Weather")))) == 0) {
   grid_shp <- rgdal::readOGR(file.path(localdir, "Shapefiles"), layer = g)
   grid_shp <- spTransform(grid_shp, CRS(proj.USGS))
   
-  # Plot average Jan and June max temp by station to check
   wx <- wx %>%
     mutate(mo = format(DATE, "%m"))
   
-  wx.avg.jan.T <- wx %>%
-    group_by(STATION, lon, lat) %>%
-    filter(mo == "01") %>%
-    summarize(avgtempmax = mean(TMAX, na.rm=T),
-            avgtempmin = mean(TMIN, na.rm=T)
-            )
-  wx.jan.proj <- spTransform(SpatialPointsDataFrame(wx.avg.jan.T[c("lon", "lat")], 
-                                                wx.avg.jan.T,
-                                    proj4string = CRS("+proj=longlat +datum=WGS84")), CRS(proj.USGS))
-
-  wx.avg.jun.T <- wx %>%
-    group_by(STATION, lon, lat) %>%
-    filter(mo == "06") %>%
-    summarize(avgtempmax = mean(TMAX, na.rm=T),
-              avgtempmin = mean(TMIN, na.rm=T)
-    )
-  wx.jun.proj <- spTransform(SpatialPointsDataFrame(wx.avg.jun.T[c("lon", "lat")], 
-                                                wx.avg.jun.T,
-                                                proj4string = CRS("+proj=longlat +datum=WGS84")), CRS(proj.USGS))
-  
-  wx.avg.ann.P <- wx %>%
-    group_by(STATION, lon, lat) %>%
-    summarize(sumprecip = sum(PRCP, na.rm=T))
-  wx.prcp.proj <- spTransform(SpatialPointsDataFrame(wx.avg.ann.P[c("lon", "lat")], 
-                                                    wx.avg.ann.P,
-                                                    proj4string = CRS("+proj=longlat +datum=WGS84")), CRS(proj.USGS))
-  
-  # Check with plot
-  pdf(file = "Figures/WX_example_Maps_TN.pdf", width = 10, height = 8)
-    plot(grid_shp, col = 'lightgrey')
-    tempcol <- colorRampPalette(c("purple", "blue", "green", "yellow", "orange", "red"))
-    cuts = cut(wx.jan.proj$avgtempmin, 10)
-    points(wx.jan.proj$lon, wx.jan.proj$lat,
-           col = tempcol(10)[cuts], pch = 16, cex = 3)
-    legend("bottom", pch = 16, col = tempcol(10),
-           legend = levels(cuts),
-           cex = 0.8, ncol = 2, pt.cex = 2)
-    title(main = "Jan 2018 average low temperatures")
-    
-    
-    plot(grid_shp, col = 'lightgrey')
-    tempcol <- colorRampPalette(c("purple", "blue", "green", "yellow", "orange", "red"))
-    cuts = cut(wx.jun.proj$avgtempmax, 10)
-    points(wx.jun.proj$lon, wx.jun.proj$lat,
-           col = tempcol(10)[cuts], pch = 16, cex = 3)
-    legend("bottom", pch = 16, col = tempcol(10),
-           legend = levels(cuts),
-           cex = 0.8, ncol = 2, pt.cex = 2)
-    title(main = "June 2018 average high temperatures")
-    
-    plot(grid_shp, col = 'lightgrey')
-    preccol <- colorRampPalette(c("white", "bisque", "green", "cornflowerblue", "blue", "purple"))
-    cuts = cut(wx.prcp.proj$sumprecip, 10)
-    points(wx.prcp.proj$lon, wx.prcp.proj$lat,
-           col = preccol(10)[cuts], pch = 16, cex = 3)
-    legend("bottom", pch = 16, col = preccol(10),
-           legend = levels(cuts),
-           cex = 0.8, ncol = 2, pt.cex = 2)
-    title(main = "Total precipitation")
-    
-  dev.off()
+  # Plot average Jan and June max temp by station to check
+  source(file.path(codeloc, 'TN', 'datacleaning', 'Plot_weather_points.R'))
   
   # Options: nearest neighbor interpolation, inverse distance weighted, ordinary kriging...
   # Will make one raster for each variable of interest, per day, and then apply to grid/hour.
   # Here use kriging from gstat. Models are all based on spatial variance of the target variabel
   
-  # 1. Inverse distance weighting. Power should be fine tuned.
-  # Create an empty raster grid for the state; we will interpolate over this grid, then assign values from the raster to each grid cell
-  grd <- as.data.frame(spsample(grid_shp, 'regular', n = 50000))
+  # Kriging. Intercept only = ordinary kriging.
+  cl <- makeCluster(parallel::detectCores())
+  registerDoParallel(cl)
+  
+  StartTime <- Sys.time()
+  
+  # Create an empty raster grid for the state; we will interpolate over this grid, then assign values from the raster to each grid cell. Increase n for smaller raster cells (more time-intensive)
+  grd <- as.data.frame(spsample(grid_shp, 'regular', n = 10000))
   names(grd) <- c("X", "Y")
   coordinates(grd) <- c("X", "Y")
   gridded(grd) <- TRUE # for SpatialPixel
   fullgrid(grd) <- TRUE # for SpatialGrid
   proj4string(grd) <- proj4string(grid_shp)
   
-  wx.test <- wx.proj[wx.proj$DATE=="2017-04-01",]
-  
-  prcp_idw <- gstat::idw(PRCP ~ 1, 
-                         locations = wx.test[!is.na(wx.test$PRCP),], 
-                         newdata = grd, idp = 1)
-  
-  # Rasterize
-  prcp_r <- raster::raster(prcp_idw)
-  prcp_r <- mask(prcp_r, grid_shp)
-  
-  # 2. Kriging
-  f.p <- as.formula(PRCP ~ X + Y)
-  
-  
-  dat.krg <- krige(f.p, wx.test, grd, dat.fit)
-  
-  vg_prcp <- variogram(PRCP ~ 1, wx.test[!is.na(wx.test$PRCP),])
-  fit_vg_prcp <- fit.variogram(vg_prcp, vgm(model = "Nug"))
-  plot(vg_prcp, model = fit_vg_prcp, as.table=T)
-  prcp_mod <- gstat(NULL, id = "STATION", formula = PRCP ~ 1, # intercept only model
-                    locations = wx.test, model = vg_prcp)
-  
-  grid_interp_prcp <- raster::interpolate(grd, prcp_mod)
-  
-  # Apply to grid cells in year-day ----
-  
-  # Apply to grid
-  grid_shp <- rgdal::readOGR(file.path(localdir, "Shapefiles"), layer = g)
-  grid_shp <- spTransform(grid_shp, CRS(proj.USGS))
-  
-  # Project special events
-  wx.p <- SpatialPointsDataFrame(wx[c("lon", "lat")], wx, 
-                                     proj4string = CRS("+proj=longlat +datum=WGS84"))  
-  
-  wx.proj <- spTransform(wx.p, CRS(proj.USGS))
-  
+  wx.grd.day <- foreach(day = unique(wx$DATE), 
+                      .packages = c('raster','gstat','dplyr','rgdal'), 
+                      .combine = rbind) %dopar% {
+    # day = wx$DATE[1]
+    wx.day = wx.proj[wx.proj$DATE == day,]
+                        
+    f.p <- as.formula(PRCP ~ 1)
+    
+    vg_prcp <- gstat::variogram(PRCP ~ 1, locations = wx.day[!is.na(wx.day$PRCP),])
+    dat.fit <- fit.variogram(vg_prcp, fit.ranges = F, fit.sills = F,
+                             vgm(model = "Sph"))
+    # plot(vg_prcp, dat.fit) # Plot the semi variogram. 
+    dat.krg.prcp <- krige(f.p, wx.day[!is.na(wx.day$PRCP),], grd, dat.fit)
+    
+    # Rasterize
+    prcp_r <- raster::raster(dat.krg.prcp)
+    prcp_r <- mask(prcp_r, grid_shp)
+    # plot(prcp_r,  
+    #      main = "Map of precipitation on 2017-04-01")
+     
+    # Plot the 95% confidence intervals
+    # prcp_ci <- sqrt(raster(dat.krg.prcp, layer = 'var1.var')) * 1.96
+    # prcp_ci <- mask(prcp_ci, grid_shp)
+    # plot(prcp_ci, main = "95% CI map of precipitation on 2017-04-01",
+    #      sub = "Smaller values = greater confidence")
+    
+    # Now do tmin, tmax, and snow
+    f.tmin <- as.formula(TMIN ~ 1)
+    vg_tmin <- variogram(TMIN ~ 1, wx.day[!is.na(wx.day$TMIN),])
+    dat.fit <- fit.variogram(vg_tmin, fit.ranges = F, fit.sills = F,
+                             vgm(model = "Sph"))
+    dat.krg.tmin <- krige(f.tmin, wx.day[!is.na(wx.day$TMIN),], grd, dat.fit)
+    tmin_r <- raster::raster(dat.krg.tmin)
+    tmin_r <- mask(tmin_r, grid_shp)
+    
+    f.tmax <- as.formula(TMAX ~ 1)
+    vg_tmax <- variogram(TMAX ~ 1, wx.day[!is.na(wx.day$TMAX),])
+    dat.fit <- fit.variogram(vg_tmax, fit.ranges = F, fit.sills = F,
+                             vgm(model = "Sph"))
+    dat.krg.tmax <- krige(f.tmax, wx.day[!is.na(wx.day$TMAX),], grd, dat.fit)
+    tmax_r <- raster::raster(dat.krg.tmax)
+    tmax_r <- mask(tmax_r, grid_shp)
+    
+    f.snow <- as.formula(SNOW ~ 1)
+    vg_snow <- variogram(SNOW ~ 1, wx.day[!is.na(wx.day$SNOW),])
+    dat.fit <- fit.variogram(vg_snow, fit.ranges = F, fit.sills = F,
+                             vgm(model = "Sph"))
+    dat.krg.snow <- krige(f.snow, wx.day[!is.na(wx.day$SNOW),], grd, dat.fit)
+    snow_r <- raster::raster(dat.krg.snow)
+    snow_r <- mask(snow_r, grid_shp)
+    
+    # Apply to grid cells in year-day ----
+    
+    # Need to extract values from the raster layers to the polygons
+    prcp_extr <- raster::extract(x = prcp_r,   # Raster object
+                                 y = grid_shp, # SpatialPolygons
+                                 fun = mean,
+                                 df = TRUE)
+    names(prcp_extr)[2] = "PRCP"
+    daily_result <- data.frame(day, prcp_extr)
+    
+    tmin_extr <- raster::extract(x = tmin_r,   # Raster object
+                                 y = grid_shp, # SpatialPolygons
+                                 fun = mean,
+                                 df = TRUE)
+    names(tmin_extr)[2] = "TMIN"
+    
+    daily_result <- full_join(daily_result, tmin_extr)
+    
+    tmax_extr <- raster::extract(x = tmax_r,   # Raster object
+                                 y = grid_shp, # SpatialPolygons
+                                 fun = mean,
+                                 df = TRUE)
+    names(tmax_extr)[2] = "TMAX"
+    
+    daily_result <- full_join(daily_result, tmax_extr)
+    
+    snow_extr <- raster::extract(x = snow_r,   # Raster object
+                                 y = grid_shp, # SpatialPolygons
+                                 fun = mean,
+                                 df = TRUE)
+    names(snow_extr)[2] = "SNOW"
+    
+    daily_result <- full_join(daily_result, snow_extr)
+    
+    daily_result
+  } # end parallel loop
+   
+  EndTime <- Sys.time() - StartTime
+  cat(round(EndTime, 2), attr(EndTime, "units"), "\n")
+   
+  save(list = c("wx.grd.day"), 
+       file = file.path(localdir, "Weather", paste0(prepname, ".RData")))
 
-  #   grid_dd_pip <- over(dd, grid_shp[,"GRID_ID"]) # Match a grid ID to events
-  # 
-  # dd@data <- data.frame(dd@data, grid_dd_pip)
-  # 
-  # dd <- dd@data
-  # # Add year, day of year
-  # dd$Year = format(dd$Event_Date, "%Y")
-  # dd$day = format(dd$Event_Date, "%j")    
-  # 
-  # # Expand grid by hour
-  # # If there is no start / end time, apply from 0 to 24
-  # 
-  # # Make framework to join into
-  # all.hour <- seq(from = as.POSIXct(paste(min(dd$Event_Date), "0:00"), tz = "America/Chicago"), 
-  #                   to = as.POSIXct(paste(max(dd$Event_Date), "0:00"), tz = "America/Chicago"),
-  #                   by = "hour")
-  # 
-  # GridIDTime <- expand.grid(all.hour, unique(dd$GRID_ID))
-  # names(GridIDTime) <- c("GridDayHour", "GRID_ID")
-  # 
-  # # One solution: convert everything to central!
-  # 
-  # start.hr <- as.numeric(format(strptime(dd$StartTime, format = "%H:%M:%S"), "%H"))
-  # start.hr[dd$TimeZone == "America/New_York"] = start.hr[dd$TimeZone == "America/New_York"] - 1
-  # start.hr[is.na(start.hr)] = 0 # start at midnight for all day events
-  # 
-  # end.hr <- as.numeric(format(strptime(dd$EndTime, format = "%H:%M:%S"), "%H"))
-  # end.hr[dd$TimeZone == "America/New_York"] = end.hr[dd$TimeZone == "America/New_York"] - 1
-  # end.hr[is.na(end.hr)] = 23 # end at 11pm hr for all day events
-  # 
-  # dd <- data.frame(dd, 
-  #                  start.hr = strptime(paste(dd$Event_Date, start.hr), "%Y-%m-%d %H", tz = "America/Chicago"),
-  #                  end.hr = strptime(paste(dd$Event_Date, end.hr), "%Y-%m-%d %H", tz = "America/Chicago"))
-  # 
-  # StartTime <- Sys.time()
-  # t.min = min(GridIDTime$GridDayHour)
-  # t.max = max(GridIDTime$GridDayHour)
-  # i = t.min
-  # 
-  # weather.grid.time.all <- vector()
-  # counter = 1
-  # while(i+3600 <= t.max){
-  #   ti.GridIDTime = filter(GridIDTime, GridDayHour == i)
-  #   ti.weather = filter(dd, start.hr >= i & start.hr <= i+3600 | end.hr >= i & end.hr <= i+3600)
-  #   
-  #   ti.weather.hex <- inner_join(ti.GridIDTime, ti.weather, by = "GRID_ID") # Use left_join to get zeros if no match  
-  #   weather.grid.time.all <- rbind(weather.grid.time.all, ti.weather.hex)
-  #   
-  #   i=i+3600
-  #   if(counter %% 3600*24 == 0) cat(paste(i, "\n"))
-  # } # end loop
-  # 
-  # EndTime <- Sys.time() - StartTime
-  # cat(round(EndTime, 2), attr(EndTime, "units"), "\n")
-  # 
-  # weather.grid.time <- filter(weather.grid.time.all, !is.na(GRID_ID))   
-  # 
-  # save(list = c("weather.grid.time"), 
-  #      file = file.path(localdir, "Weather", paste0(prepname, ".RData")))
-  # 
-  # # Copy to S3
-  # system(paste("aws s3 cp",
-  #              file.path(localdir, "Weather", paste0(prepname, ".RData")),
-  #              file.path(teambucket, state, "Weather", paste0(prepname, ".RData"))))
-  # 
-  # 
-  # # ~ 3 min  
-  # } else {
-  # load(file.path(localdir, "Weather", paste0(prepname, ".RData")))
+  # Copy to S3
+  system(paste("aws s3 cp",
+               file.path(localdir, "Weather", paste0(prepname, ".RData")),
+               file.path(teambucket, state, "Weather", paste0(prepname, ".RData"))))
+
+  } else {
+  load(file.path(localdir, "Weather", paste0(prepname, ".RData")))
 }
 
