@@ -32,7 +32,7 @@ source(file.path(codeloc, "TN", "utility/wazefunctions_TN.R"))
 setwd(localdir)
 
 # <><><><><>
-g = grids[2] # start with square grids, now running 
+g = grids[1] # start with square grids, now running hex also
 state = "TN"
 # <><><><><>
 

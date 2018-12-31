@@ -26,7 +26,7 @@ if(length(grep(prepname, dir(file.path(localdir, "Crash")))) == 0) { # if doen't
   grid_shp <- rgdal::readOGR(file.path(localdir, "Shapefiles"), layer = g)
   grid_shp <- spTransform(grid_shp, CRS(proj.USGS))
 
-  # Project special events
+  # Project crashes
   crash.proj <- SpatialPointsDataFrame(crash[c("LongDecimalNmb", "LatDecimalNmb")], 
                                        crash,
                                      proj4string = CRS("+proj=longlat +datum=WGS84"))

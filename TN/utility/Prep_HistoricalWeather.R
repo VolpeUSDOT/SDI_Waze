@@ -4,12 +4,15 @@
 # already in memory are localdir and g, which repreresents the grid type to use
 # Next step after this script is to run append.hex function to add 
 
+
 proj.USGS <- "+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs +ellps=GRS80 +towgs84=0,0,0"
 
 # Check to see if these processing steps have been done yet; load from prepared file if so
 prepname = paste("Prepared", "Weather", g, sep="_")
 
 if(length(grep(prepname, dir(file.path(localdir, "Weather")))) == 0) { 
+  library(gstat) # For kriging
+  library(raster) # masks several functions from dplyr, use caution
   
   cat("Preparing", "Weather", g, "\n")
   
@@ -51,11 +54,124 @@ if(length(grep(prepname, dir(file.path(localdir, "Weather")))) == 0) {
 
   wx <- left_join(wx, stations[1:5], by = "STATION")
   
-  
-  # Next steps: 
-  # interpolate to state level using kriging or other methods, see 
+  # Interpolate over state ----
   # http://rspatial.org/analsis/rst/4-interpolation.html
-  # then apply to grid cells in year-day 
+  # First, make this a spatial points data frame
+  # Project crashes
+  wx.proj <- SpatialPointsDataFrame(wx[c("lon", "lat")], 
+                                       wx,
+                                       proj4string = CRS("+proj=longlat +datum=WGS84"))
+  
+  wx.proj <- spTransform(wx.proj, CRS(proj.USGS))
+  
+  # Read in grid
+  grid_shp <- rgdal::readOGR(file.path(localdir, "Shapefiles"), layer = g)
+  grid_shp <- spTransform(grid_shp, CRS(proj.USGS))
+  
+  # Plot average Jan and June max temp by station to check
+  wx <- wx %>%
+    mutate(mo = format(DATE, "%m"))
+  
+  wx.avg.jan.T <- wx %>%
+    group_by(STATION, lon, lat) %>%
+    filter(mo == "01") %>%
+    summarize(avgtempmax = mean(TMAX, na.rm=T),
+            avgtempmin = mean(TMIN, na.rm=T)
+            )
+  wx.jan.proj <- spTransform(SpatialPointsDataFrame(wx.avg.jan.T[c("lon", "lat")], 
+                                                wx.avg.jan.T,
+                                    proj4string = CRS("+proj=longlat +datum=WGS84")), CRS(proj.USGS))
+
+  wx.avg.jun.T <- wx %>%
+    group_by(STATION, lon, lat) %>%
+    filter(mo == "06") %>%
+    summarize(avgtempmax = mean(TMAX, na.rm=T),
+              avgtempmin = mean(TMIN, na.rm=T)
+    )
+  wx.jun.proj <- spTransform(SpatialPointsDataFrame(wx.avg.jun.T[c("lon", "lat")], 
+                                                wx.avg.jun.T,
+                                                proj4string = CRS("+proj=longlat +datum=WGS84")), CRS(proj.USGS))
+  
+  wx.avg.ann.P <- wx %>%
+    group_by(STATION, lon, lat) %>%
+    summarize(sumprecip = sum(PRCP, na.rm=T))
+  wx.prcp.proj <- spTransform(SpatialPointsDataFrame(wx.avg.ann.P[c("lon", "lat")], 
+                                                    wx.avg.ann.P,
+                                                    proj4string = CRS("+proj=longlat +datum=WGS84")), CRS(proj.USGS))
+  
+  # Check with plot
+  pdf(file = "Figures/WX_example_Maps_TN.pdf", width = 10, height = 8)
+    plot(grid_shp, col = 'lightgrey')
+    tempcol <- colorRampPalette(c("purple", "blue", "green", "yellow", "orange", "red"))
+    cuts = cut(wx.jan.proj$avgtempmin, 10)
+    points(wx.jan.proj$lon, wx.jan.proj$lat,
+           col = tempcol(10)[cuts], pch = 16, cex = 3)
+    legend("bottom", pch = 16, col = tempcol(10),
+           legend = levels(cuts),
+           cex = 0.8, ncol = 2, pt.cex = 2)
+    title(main = "Jan 2018 average low temperatures")
+    
+    
+    plot(grid_shp, col = 'lightgrey')
+    tempcol <- colorRampPalette(c("purple", "blue", "green", "yellow", "orange", "red"))
+    cuts = cut(wx.jun.proj$avgtempmax, 10)
+    points(wx.jun.proj$lon, wx.jun.proj$lat,
+           col = tempcol(10)[cuts], pch = 16, cex = 3)
+    legend("bottom", pch = 16, col = tempcol(10),
+           legend = levels(cuts),
+           cex = 0.8, ncol = 2, pt.cex = 2)
+    title(main = "June 2018 average high temperatures")
+    
+    plot(grid_shp, col = 'lightgrey')
+    preccol <- colorRampPalette(c("white", "bisque", "green", "cornflowerblue", "blue", "purple"))
+    cuts = cut(wx.prcp.proj$sumprecip, 10)
+    points(wx.prcp.proj$lon, wx.prcp.proj$lat,
+           col = preccol(10)[cuts], pch = 16, cex = 3)
+    legend("bottom", pch = 16, col = preccol(10),
+           legend = levels(cuts),
+           cex = 0.8, ncol = 2, pt.cex = 2)
+    title(main = "Total precipitation")
+    
+  dev.off()
+  
+  # Options: nearest neighbor interpolation, inverse distance weighted, ordinary kriging...
+  # Will make one raster for each variable of interest, per day, and then apply to grid/hour.
+  # Here use kriging from gstat. Models are all based on spatial variance of the target variabel
+  
+  # 1. Inverse distance weighting. Power should be fine tuned.
+  # Create an empty raster grid for the state; we will interpolate over this grid, then assign values from the raster to each grid cell
+  grd <- as.data.frame(spsample(grid_shp, 'regular', n = 50000))
+  names(grd) <- c("X", "Y")
+  coordinates(grd) <- c("X", "Y")
+  gridded(grd) <- TRUE # for SpatialPixel
+  fullgrid(grd) <- TRUE # for SpatialGrid
+  proj4string(grd) <- proj4string(grid_shp)
+  
+  wx.test <- wx.proj[wx.proj$DATE=="2017-04-01",]
+  
+  prcp_idw <- gstat::idw(PRCP ~ 1, 
+                         locations = wx.test[!is.na(wx.test$PRCP),], 
+                         newdata = grd, idp = 1)
+  
+  # Rasterize
+  prcp_r <- raster::raster(prcp_idw)
+  prcp_r <- mask(prcp_r, grid_shp)
+  
+  # 2. Kriging
+  f.p <- as.formula(PRCP ~ X + Y)
+  
+  
+  dat.krg <- krige(f.p, wx.test, grd, dat.fit)
+  
+  vg_prcp <- variogram(PRCP ~ 1, wx.test[!is.na(wx.test$PRCP),])
+  fit_vg_prcp <- fit.variogram(vg_prcp, vgm(model = "Nug"))
+  plot(vg_prcp, model = fit_vg_prcp, as.table=T)
+  prcp_mod <- gstat(NULL, id = "STATION", formula = PRCP ~ 1, # intercept only model
+                    locations = wx.test, model = vg_prcp)
+  
+  grid_interp_prcp <- raster::interpolate(grd, prcp_mod)
+  
+  # Apply to grid cells in year-day ----
   
   # Apply to grid
   grid_shp <- rgdal::readOGR(file.path(localdir, "Shapefiles"), layer = g)
