@@ -88,8 +88,6 @@ if(CHECKPLOT){
 
 # TODO: figure out what supplemental variables to include from previous work
 # Write function to apply special events and weather
-
-# Add FARS, AADT, HPMS, jobs
 na.action = "fill0"
 
 monthfiles = paste("w", do.months, sep=".")
@@ -110,7 +108,10 @@ for(w in monthfiles){ # w = "w.2018_01"
   
    append.hex2(hexname = w, data.to.add = "TN_SpecialEvent", state = state, na.action = na.action)
   
-  append.hex2(hexname = w, data.to.add = "crash", state = state, na.action = na.action)
+   append.hex2(hexname = w, data.to.add = "crash", state = state, na.action = na.action)
+   
+   append.hex2(hexname = w, data.to.add = "wx.grd.day", state = state, na.action = na.action)
+   
 }
 
 

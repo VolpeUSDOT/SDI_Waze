@@ -234,11 +234,11 @@ prep.hex <- function(hexname, state, month, bucket = teambucket){
     wte$MatchTN_buffer_Acc[wte$MatchTN_buffer_Acc > 0] = 1 
     wte$MatchTN_buffer_Acc <- as.factor(wte$MatchTN_buffer_Acc)
     
-    # Going to binary for all Waze Accident buffer match:
+    # Going to binary for all TN crahes:
+    wte$TN_crash <- wte$nTN_total
+    wte$TN_crash[wte$TN_crash > 0] = 1 
+    wte$TN_crash <- as.factor(wte$TN_crash)
     
-    wte$MatchTN_buffer_Acc <- wte$nMatchTN_buffer_Acc
-    wte$MatchTN_buffer_Acc[wte$MatchTN_buffer_Acc > 0] = 1 
-    wte$MatchTN_buffer_Acc <- as.factor(wte$MatchTN_buffer_Acc)
   } else {
     wte$MatchEDT_buffer <- wte$nMatchEDT_buffer
     wte$MatchEDT_buffer[wte$MatchEDT_buffer > 0] = 1 
