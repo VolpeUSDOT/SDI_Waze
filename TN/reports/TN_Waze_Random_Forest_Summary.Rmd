@@ -1,0 +1,209 @@
+---
+title: ''
+output:
+  html_document:
+    df_print: paged
+    toc: yes
+    toc_depth: 3
+    toc_float:
+      collapsed: yes
+      smooth_scroll: yes
+---
+
+```{r setup, include=FALSE, echo = FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+
+codeloc <- "~/SDI_Waze" 
+teambucket <- "s3://prod-sdc-sdi-911061262852-us-east-1-bucket"
+user <- file.path( "/home", system("whoami", intern = TRUE)) # the user directory
+localdir <- file.path(user, "workingdata", "TN") # full path for readOGR
+outputdir <- file.path(localdir, 'Random_Forest_Output')
+
+library(tidyverse)
+library(knitr)
+library(kableExtra)
+library(randomForest)
+library(pander)
+library(DT)
+# Run this if you don't have these packages:
+# source(file.path(codeloc, 'utility/get_packages.R'))
+
+knitr::opts_knit$set(root.dir = localdir)
+
+# read utility functions
+source(file.path(codeloc, 'utility/wazefunctions.R'))
+
+# read random forest functions
+source(file.path(codeloc, "analysis/RandomForest_WazeGrid_Fx.R"))
+```
+
+```{r getfiles, message=FALSE, warning=FALSE, eval = FALSE}
+
+# TODO for TN -- fix then set eval = T
+ 
+# Pull down model outputs from S3 if necessary
+tn.files <-  c(
+  'MD_VMT_Output_to_30.RData',
+  'MD_Model_30_RandomForest_Output.RData',
+  'MD_Model_63_RandomForest_Output.RData',
+  'MD_Model_62_RandomForest_Output.RData',
+  'MD_Model_61_RandomForest_Output.RData')
+
+# TN files
+#  system(paste("aws s3 ls", file.path(teambucket, 'TN/')))
+#  system(paste("aws s3 ls", file.path(teambucket, 'TN/RandomForest_Output/')))
+
+for(i in md.files){
+  if(length(grep(i, dir(outputdir))) == 0){
+    system(paste("aws s3 cp",
+                 file.path(teambucket, "MD", i),
+                 file.path(outputdir, i)))
+  }
+}
+
+ct.files <-  c(
+  'CT_VMT_Output_to_30.RData',
+  'CT_Model_30_RandomForest_Output.RData',
+  'CT_Model_63_RandomForest_Output.RData',
+  'CT_Model_62_RandomForest_Output.RData',
+  'CT_Model_61_RandomForest_Output.RData')
+
+# CT files
+#  system(paste("aws s3 ls", file.path(teambucket, 'CT/')))
+
+for(i in ct.files){
+  if(length(grep(i, dir(outputdir))) == 0){
+    system(paste("aws s3 cp",
+                 file.path(teambucket, "CT", i),
+                 file.path(outputdir, i)))
+  }
+}
+
+```
+
+
+#### TN 0.1 dd models
+
+```{r 01dd_metrics, echo = F}
+# Get outputs
+load(file.path(localdir, "Output_to_06"))
+
+tabl <- vector()
+for(i in c(names(keyoutputs)[1:3])){ tabl <- rbind(tabl, c(100*keyoutputs[[i]]$diag, round(keyoutputs[[i]]$auc, 4)))}
+
+colnames(tabl)[1:5] = c("Accuracy", "Precision", "Recall", "False Positive Rate", "AUC")
+rownames(tabl) =  c("No Waze", "Base Waze", "All Waze")
+datatable(tabl, 
+          caption = "Tennessee 0.1 decimal degree Hourly model comparisons",
+          rownames = T,
+          options = list(dom = "t",
+                         order = list(list(5, 'desc')),
+                         pageLength = 5)
+          ) %>% formatCurrency(1:4, currency = "", digits = 2) %>% formatCurrency(5, currency = "", digits = 3) %>%
+          formatStyle(1, background = styleEqual(max(tabl[,1]), 'lightgreen'))%>%
+          formatStyle(2, background = styleEqual(max(tabl[,2]), 'lightgreen'))%>%
+          formatStyle(3, background = styleEqual(max(tabl[,3]), 'lightgreen'))%>%
+          formatStyle(4, background = styleEqual(min(tabl[,4]), 'lightgreen'))%>%
+          formatStyle(5, background = styleEqual(max(tabl[,5]), 'lightgreen'))
+```   
+
+
+#### TN 1 sq mile hex models
+
+```{r 1mihex_metrics, echo = F}
+# Get outputs
+load(file.path(localdir, "Output_to_01_TN_1sqmile_hexagons"))
+
+tabl <- vector()
+for(i in paste(c("01","02","03"), "TN_1sqmile_hexagons", sep = "_")){ tabl <- rbind(tabl, c(100*keyoutputs[[i]]$diag, round(keyoutputs[[i]]$auc, 4)))}
+
+colnames(tabl)[1:5] = c("Accuracy", "Precision", "Recall", "False Positive Rate", "AUC")
+rownames(tabl) =  c("No Waze", "Base Waze", "All Waze")
+datatable(tabl, 
+          caption = "Tennessee 1 square mile hexagons Hourly model comparisons",
+          rownames = T,
+          options = list(dom = "t",
+                         order = list(list(5, 'desc')),
+                         pageLength = 5)
+          ) %>% formatCurrency(1:4, currency = "", digits = 2) %>% formatCurrency(5, currency = "", digits = 3) %>%
+          formatStyle(1, background = styleEqual(max(tabl[,1]), 'lightgreen'))%>%
+          formatStyle(2, background = styleEqual(max(tabl[,2]), 'lightgreen'))%>%
+          formatStyle(3, background = styleEqual(max(tabl[,3]), 'lightgreen'))%>%
+          formatStyle(4, background = styleEqual(min(tabl[,4]), 'lightgreen'))%>%
+          formatStyle(5, background = styleEqual(max(tabl[,5]), 'lightgreen'))
+```   
+
+
+## Importance of variables
+
+```{r 01_1sqmi_varimp_table, eval=T}
+load(file.path(outputdir, "TN_Model_01_RandomForest_Output.RData"))
+dd_01_rf.out = rf.out
+
+load(file.path(outputdir, "TN_Model_03_RandomForest_Output.RData"))
+dd_03_rf.out = rf.out
+
+
+load(file.path(outputdir, "TN_Model_01_TN_1sqmile_hexagons_RandomForest_Output.RData"))
+hex_01_rf.out = rf.out
+
+load(file.path(outputdir, "TN_Model_03_TN_1sqmile_hexagons_RandomForest_Output.RData"))
+hex_03_rf.out = rf.out
+
+nimp = 100
+
+dd_01_rf.out$importance = 100*dd_01_rf.out$importance / sum(dd_01_rf.out$importance)
+dd_03_rf.out$importance = 100*dd_03_rf.out$importance / sum(dd_03_rf.out$importance)
+hex_01_rf.out$importance = 100*hex_01_rf.out$importance / sum(hex_01_rf.out$importance)
+hex_03_rf.out$importance = 100*hex_03_rf.out$importance / sum(hex_03_rf.out$importance)
+
+dd_01_imp = dd_01_rf.out$importance[order(dd_01_rf.out$importance, decreasing = T)[1:nimp],]
+dd_03_imp = dd_03_rf.out$importance[order(dd_03_rf.out$importance, decreasing = T)[1:nimp],]
+hex_01_imp = hex_01_rf.out$importance[order(hex_01_rf.out$importance, decreasing = T)[1:nimp],]
+hex_03_imp = hex_03_rf.out$importance[order(hex_03_rf.out$importance, decreasing = T)[1:nimp],]
+
+dd_01_imp = data.frame(var = names(dd_01_imp),
+                    dd_01_rank = 1:nimp,
+                    dd_01_Importance = dd_01_imp)
+
+dd_03_imp = data.frame(var = names(dd_03_imp),
+                    dd_03_rank = 1:nimp,
+                    dd_03_Importance = dd_03_imp)
+
+hex_01_imp = data.frame(var = names(hex_01_imp),
+                    hex_01_rank = 1:nimp,
+                    hex_01_Importance = hex_01_imp)
+hex_03_imp = data.frame(var = names(hex_03_imp),
+                    hex_03_rank = 1:nimp,
+                    hex_03_Importance = hex_03_imp)
+
+dd_01_imp$var <- as.character(dd_01_imp$var)
+dd_03_imp$var <- as.character(dd_03_imp$var)
+hex_01_imp$var <- as.character(hex_01_imp$var)
+hex_03_imp$var <- as.character(hex_03_imp$var)
+
+
+dd_01_dd_03_imp = full_join(dd_01_imp %>% filter(!is.na(var)), 
+                            dd_03_imp %>% filter(!is.na(var)), by = "var")
+All_imp = full_join(dd_01_dd_03_imp, 
+                    hex_01_imp  %>% filter(!is.na(var)), by = "var")
+All_imp = full_join(All_imp, 
+                    hex_03_imp  %>% filter(!is.na(var)), by = "var")
+
+datatable(All_imp,
+          rownames = FALSE,
+          colnames = c("Variable", "0.1 dd 01 Rank", "0.1 dd 01 Importance",
+                       "0.1 dd 03 Rank", "0.1 dd 03 Importance",
+                       "1sq mi hex 01 Rank", "1sq mi hex 01 Importance",
+                       "1sq mi hex 03 Rank", "1sq mi hex 03 Importance"),
+          caption = "Importance of variables for the two grid sizes and two of the levels of Waze data",
+           options = list(dom = "t",
+                          order = list(0, 'asc'),
+                          autoWidth = T)
+          ) %>% formatCurrency(c(3, 5, 7, 9), currency = "", digits = 2)
+
+```
+
+
+
+
