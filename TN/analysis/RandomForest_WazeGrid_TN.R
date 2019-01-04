@@ -31,7 +31,7 @@ source(file.path(codeloc, "TN", "utility/wazefunctions_TN.R"))
 setwd(localdir)
 
 # <><><><><>
-g = grids[2] # start with square grids, now running hex also. Change between 1 and 2.
+g = grids[1] # start with square grids, now running hex also. Change between 1 and 2.
 state = "TN"
 # <><><><><>
 
@@ -105,7 +105,7 @@ for(w in monthfiles){ # w = "w.2017_04"
    append.hex(hexname = w, data.to.add = "crash", state = state, na.action = na.action)
    
    # Historical weather not yet ready for 1sqmile hex
-   if(g == "TN_01dd_fisnet") {
+   if(g == "TN_01dd_fishnet") {
      append.hex(hexname = w, data.to.add = "wx.grd.day", state = state, na.action = na.action)
    } 
 }
@@ -130,11 +130,12 @@ save(w.allmonths,
                                         row.names = F)
 
 # format(object.size(w.allmonths), "Gb")
-
+# To save for export, after running both grid sizes for these months:
+# source(file.path(codeloc, "TN", "analysis/scratch/bundle_RF_inputs.R"))
+ 
 } # End data prep 
 # <><><><><><><><><><><><><><><><><><><><><><><><>
 
-# source(file.path(codeloc, "TN", "analysis/scratch/bundle_RF_inputs.R"))
 
 # Start from prepared data
  

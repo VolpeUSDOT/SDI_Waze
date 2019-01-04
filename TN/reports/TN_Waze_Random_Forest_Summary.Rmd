@@ -39,54 +39,70 @@ source(file.path(codeloc, "analysis/RandomForest_WazeGrid_Fx.R"))
 
 ```{r getfiles, message=FALSE, warning=FALSE, eval = FALSE}
 
-# TODO for TN -- fix then set eval = T
+# TODO for TN -- fix to also grab the Output_to_Model_xxx diagnostic files, then set eval = T
  
 # Pull down model outputs from S3 if necessary
 tn.files <-  c(
-  'MD_VMT_Output_to_30.RData',
-  'MD_Model_30_RandomForest_Output.RData',
-  'MD_Model_63_RandomForest_Output.RData',
-  'MD_Model_62_RandomForest_Output.RData',
-  'MD_Model_61_RandomForest_Output.RData')
+  'TN_Model_01_TN_01dd_fishnet_RandomForest_Output.RData',
+  'TN_Model_02_TN_01dd_fishnet_RandomForest_Output.RData',
+  'TN_Model_03_TN_01dd_fishnet_RandomForest_Output.RData',
+  'TN_Model_04_TN_01dd_fishnet_RandomForest_Output.RData',
+  'TN_Model_05_TN_01dd_fishnet_RandomForest_Output.RData',
+  'TN_Model_06_TN_01dd_fishnet_RandomForest_Output.RData',
+  'TN_Model_01_TN_1sqmile_hexagons_RandomForest_Output.RData',
+  'TN_Model_02_TN_1sqmile_hexagons_RandomForest_Output.RData',
+  'TN_Model_03_TN_1sqmile_hexagons_RandomForest_Output.RData',
+  'TN_Model_04_TN_1sqmile_hexagons_RandomForest_Output.RData',
+  'TN_Model_05_TN_1sqmile_hexagons_RandomForest_Output.RData',
+  'TN_Model_06_TN_1sqmile_hexagons_RandomForest_Output.RData'
+  )
 
 # TN files
 #  system(paste("aws s3 ls", file.path(teambucket, 'TN/')))
 #  system(paste("aws s3 ls", file.path(teambucket, 'TN/RandomForest_Output/')))
 
-for(i in md.files){
+for(i in tn.files){
   if(length(grep(i, dir(outputdir))) == 0){
     system(paste("aws s3 cp",
-                 file.path(teambucket, "MD", i),
-                 file.path(outputdir, i)))
-  }
-}
-
-ct.files <-  c(
-  'CT_VMT_Output_to_30.RData',
-  'CT_Model_30_RandomForest_Output.RData',
-  'CT_Model_63_RandomForest_Output.RData',
-  'CT_Model_62_RandomForest_Output.RData',
-  'CT_Model_61_RandomForest_Output.RData')
-
-# CT files
-#  system(paste("aws s3 ls", file.path(teambucket, 'CT/')))
-
-for(i in ct.files){
-  if(length(grep(i, dir(outputdir))) == 0){
-    system(paste("aws s3 cp",
-                 file.path(teambucket, "CT", i),
+                 file.path(teambucket, "TN", "RandomForest_Output", i),
                  file.path(outputdir, i)))
   }
 }
 
 ```
 
+# Matching Waze accidents as response
 
-#### TN 0.1 dd models
+Running initial models for April 2017 - March 2018, splitting the data 70/30 randomly by grid cell and hour into training and test data sets. The same random forest model parameters are applied to all models shown here; these can be tuned for the next round. In particular, `mtry`, the number of variables to use in each tree, and the cutoff to turn probabilities into predicted crashes can have a large influence on model performance.
+
+Brief notes for this set of 6 models:
+
+- `MatchTN_buffer_Acc` as response variable in the model.
+- Two grid sizes, 0.1 decimal degree grids, matching the Tennessee current model (1203 grid cells for the whole state), and 1 square mile hexagons (150,000 grid cells for the whole state, with some buffer around).
+- Three levels of Waze information:
+  + None, just with weather (0.1 dd only for now), special events, and historical crashes in that grid cell / hour combination
+  + Base Waze, with just count of Waze events by alert type in this grid cell/hour
+  + All Waze, including counts subtypes, neighboring grid cells
+
+The first level (no Waze), has the following variables, below. The weather variables are mean values within a grid cell, from a spatial interpolation of daily weather station data. See Word document on data preparation for more details. These weather variables are not yet prepared for the 1 sq mile hexagon layer.
+
+- Year
+- mo             
+- DayOfWeek
+- hour
+- SpecialEvent_sum  
+- TotalHistCrashsum
+- TotalFatalCrashsum
+- PRCP
+- TMIN              
+- TMAX
+- SNOW
+
+## TN 0.1 dd models
 
 ```{r 01dd_metrics, echo = F}
 # Get outputs
-load(file.path(localdir, "Output_to_06"))
+load(file.path(localdir, "Output_to_06_TN_01dd_fishnet"))
 
 tabl <- vector()
 for(i in c(names(keyoutputs)[1:3])){ tabl <- rbind(tabl, c(100*keyoutputs[[i]]$diag, round(keyoutputs[[i]]$auc, 4)))}
@@ -94,7 +110,7 @@ for(i in c(names(keyoutputs)[1:3])){ tabl <- rbind(tabl, c(100*keyoutputs[[i]]$d
 colnames(tabl)[1:5] = c("Accuracy", "Precision", "Recall", "False Positive Rate", "AUC")
 rownames(tabl) =  c("No Waze", "Base Waze", "All Waze")
 datatable(tabl, 
-          caption = "Tennessee 0.1 decimal degree Hourly model comparisons",
+          caption = "`MatchTN_buffer_Acc`, Tennessee 0.1 decimal degree Hourly model comparisons",
           rownames = T,
           options = list(dom = "t",
                          order = list(list(5, 'desc')),
@@ -108,11 +124,11 @@ datatable(tabl,
 ```   
 
 
-#### TN 1 sq mile hex models
+## TN 1 sq mile hex models
 
 ```{r 1mihex_metrics, echo = F}
 # Get outputs
-load(file.path(localdir, "Output_to_01_TN_1sqmile_hexagons"))
+load(file.path(localdir, "Output_to_06_TN_1sqmile_hexagons"))
 
 tabl <- vector()
 for(i in paste(c("01","02","03"), "TN_1sqmile_hexagons", sep = "_")){ tabl <- rbind(tabl, c(100*keyoutputs[[i]]$diag, round(keyoutputs[[i]]$auc, 4)))}
@@ -120,7 +136,7 @@ for(i in paste(c("01","02","03"), "TN_1sqmile_hexagons", sep = "_")){ tabl <- rb
 colnames(tabl)[1:5] = c("Accuracy", "Precision", "Recall", "False Positive Rate", "AUC")
 rownames(tabl) =  c("No Waze", "Base Waze", "All Waze")
 datatable(tabl, 
-          caption = "Tennessee 1 square mile hexagons Hourly model comparisons",
+          caption = "`MatchTN_buffer_Acc`, Tennessee 1 square mile hexagons Hourly model comparisons",
           rownames = T,
           options = list(dom = "t",
                          order = list(list(5, 'desc')),
@@ -137,10 +153,10 @@ datatable(tabl,
 ## Importance of variables
 
 ```{r 01_1sqmi_varimp_table, eval=T}
-load(file.path(outputdir, "TN_Model_01_RandomForest_Output.RData"))
+load(file.path(outputdir, "TN_Model_01_TN_01dd_fishnet_RandomForest_Output.RData"))
 dd_01_rf.out = rf.out
 
-load(file.path(outputdir, "TN_Model_03_RandomForest_Output.RData"))
+load(file.path(outputdir, "TN_Model_03_TN_01dd_fishnet_RandomForest_Output.RData"))
 dd_03_rf.out = rf.out
 
 
@@ -192,12 +208,148 @@ All_imp = full_join(All_imp,
 
 datatable(All_imp,
           rownames = FALSE,
-          colnames = c("Variable", "0.1 dd 01 Rank", "0.1 dd 01 Importance",
-                       "0.1 dd 03 Rank", "0.1 dd 03 Importance",
-                       "1sq mi hex 01 Rank", "1sq mi hex 01 Importance",
-                       "1sq mi hex 03 Rank", "1sq mi hex 03 Importance"),
-          caption = "Importance of variables for the two grid sizes and two of the levels of Waze data",
-           options = list(dom = "t",
+          colnames = c("Variable", "dd 01 Rank", "dd 01 Imp",
+                       "dd 03 Rank", "dd 03 Imp",
+                       "hex 01 Rank", "hex 01 Imp",
+                       "hex 03 Rank", "hex 03 Imp"),
+          caption = "`MatchTN_buffer_Acc`, Importance of variables for the two grid sizes and two of the levels of Waze data",
+           options = list(dom = "ftp",
+                          order = list(0, 'asc'),
+                          autoWidth = T)
+          ) %>% formatCurrency(c(3, 5, 7, 9), currency = "", digits = 2)
+
+```
+
+
+
+# Matching all Tennessee crashes as response
+
+Same as for the above models, but now with a binary indicator of presence of any crash in the Tennessee database, rather than buffer matching on Waze accident reports.
+
+Brief notes for this set of 6 models:
+
+- `TN_crash` as response variable in the model.
+- Two grid sizes, 0.1 decimal degree grids, matching the Tennessee current model (1203 grid cells for the whole state), and 1 square mile hexagons (150,000 grid cells for the whole state, with some buffer around).
+- Three levels of Waze information:
+  + None, just with weather (0.1 dd only for now), special events, and historical crashes in that grid cell / hour combination
+  + Base Waze, with just count of Waze events by alert type in this grid cell/hour
+  + All Waze, including counts subtypes, neighboring grid cells
+
+## TN 0.1 dd models
+
+```{r 01dd_metrics2, echo = F}
+# Get outputs
+load(file.path(localdir, "Output_to_06_TN_01dd_fishnet"))
+
+tabl <- vector()
+for(i in c(names(keyoutputs)[4:6])){ tabl <- rbind(tabl, c(100*keyoutputs[[i]]$diag, round(keyoutputs[[i]]$auc, 4)))}
+
+colnames(tabl)[1:5] = c("Accuracy", "Precision", "Recall", "False Positive Rate", "AUC")
+rownames(tabl) =  c("No Waze", "Base Waze", "All Waze")
+datatable(tabl, 
+          caption = "`TN_crash` as response, Tennessee 0.1 decimal degree Hourly model comparisons",
+          rownames = T,
+          options = list(dom = "t",
+                         order = list(list(5, 'desc')),
+                         pageLength = 5)
+          ) %>% formatCurrency(1:4, currency = "", digits = 2) %>% formatCurrency(5, currency = "", digits = 3) %>%
+          formatStyle(1, background = styleEqual(max(tabl[,1]), 'lightgreen'))%>%
+          formatStyle(2, background = styleEqual(max(tabl[,2]), 'lightgreen'))%>%
+          formatStyle(3, background = styleEqual(max(tabl[,3]), 'lightgreen'))%>%
+          formatStyle(4, background = styleEqual(min(tabl[,4]), 'lightgreen'))%>%
+          formatStyle(5, background = styleEqual(max(tabl[,5]), 'lightgreen'))
+```   
+
+
+## TN 1 sq mile hex models
+
+```{r 1mihex_metrics2, echo = F}
+# Get outputs
+load(file.path(localdir, "Output_to_06_TN_1sqmile_hexagons"))
+
+tabl <- vector()
+for(i in paste(c("04","05","06"), "TN_1sqmile_hexagons", sep = "_")){ tabl <- rbind(tabl, c(100*keyoutputs[[i]]$diag, round(keyoutputs[[i]]$auc, 4)))}
+
+colnames(tabl)[1:5] = c("Accuracy", "Precision", "Recall", "False Positive Rate", "AUC")
+rownames(tabl) =  c("No Waze", "Base Waze", "All Waze")
+datatable(tabl, 
+          caption = "`TN_crash` as response, Tennessee 1 square mile hexagons Hourly model comparisons",
+          rownames = T,
+          options = list(dom = "t",
+                         order = list(list(5, 'desc')),
+                         pageLength = 5)
+          ) %>% formatCurrency(1:4, currency = "", digits = 2) %>% formatCurrency(5, currency = "", digits = 3) %>%
+          formatStyle(1, background = styleEqual(max(tabl[,1]), 'lightgreen'))%>%
+          formatStyle(2, background = styleEqual(max(tabl[,2]), 'lightgreen'))%>%
+          formatStyle(3, background = styleEqual(max(tabl[,3]), 'lightgreen'))%>%
+          formatStyle(4, background = styleEqual(min(tabl[,4]), 'lightgreen'))%>%
+          formatStyle(5, background = styleEqual(max(tabl[,5]), 'lightgreen'))
+```   
+
+
+## Importance of variables
+
+```{r 01_1sqmi_varimp_table2, eval=T}
+load(file.path(outputdir, "TN_Model_04_TN_01dd_fishnet_RandomForest_Output.RData"))
+dd_01_rf.out = rf.out
+
+load(file.path(outputdir, "TN_Model_06_TN_01dd_fishnet_RandomForest_Output.RData"))
+dd_03_rf.out = rf.out
+
+load(file.path(outputdir, "TN_Model_04_TN_1sqmile_hexagons_RandomForest_Output.RData"))
+hex_01_rf.out = rf.out
+
+load(file.path(outputdir, "TN_Model_06_TN_1sqmile_hexagons_RandomForest_Output.RData"))
+hex_03_rf.out = rf.out
+
+nimp = 100
+
+dd_01_rf.out$importance = 100*dd_01_rf.out$importance / sum(dd_01_rf.out$importance)
+dd_03_rf.out$importance = 100*dd_03_rf.out$importance / sum(dd_03_rf.out$importance)
+hex_01_rf.out$importance = 100*hex_01_rf.out$importance / sum(hex_01_rf.out$importance)
+hex_03_rf.out$importance = 100*hex_03_rf.out$importance / sum(hex_03_rf.out$importance)
+
+dd_01_imp = dd_01_rf.out$importance[order(dd_01_rf.out$importance, decreasing = T)[1:nimp],]
+dd_03_imp = dd_03_rf.out$importance[order(dd_03_rf.out$importance, decreasing = T)[1:nimp],]
+hex_01_imp = hex_01_rf.out$importance[order(hex_01_rf.out$importance, decreasing = T)[1:nimp],]
+hex_03_imp = hex_03_rf.out$importance[order(hex_03_rf.out$importance, decreasing = T)[1:nimp],]
+
+dd_01_imp = data.frame(var = names(dd_01_imp),
+                    dd_01_rank = 1:nimp,
+                    dd_01_Importance = dd_01_imp)
+
+dd_03_imp = data.frame(var = names(dd_03_imp),
+                    dd_03_rank = 1:nimp,
+                    dd_03_Importance = dd_03_imp)
+
+hex_01_imp = data.frame(var = names(hex_01_imp),
+                    hex_01_rank = 1:nimp,
+                    hex_01_Importance = hex_01_imp)
+hex_03_imp = data.frame(var = names(hex_03_imp),
+                    hex_03_rank = 1:nimp,
+                    hex_03_Importance = hex_03_imp)
+
+dd_01_imp$var <- as.character(dd_01_imp$var)
+dd_03_imp$var <- as.character(dd_03_imp$var)
+hex_01_imp$var <- as.character(hex_01_imp$var)
+hex_03_imp$var <- as.character(hex_03_imp$var)
+
+
+dd_01_dd_03_imp = full_join(dd_01_imp %>% filter(!is.na(var)), 
+                            dd_03_imp %>% filter(!is.na(var)), by = "var")
+All_imp = full_join(dd_01_dd_03_imp, 
+                    hex_01_imp  %>% filter(!is.na(var)), by = "var")
+All_imp = full_join(All_imp, 
+                    hex_03_imp  %>% filter(!is.na(var)), by = "var")
+
+datatable(All_imp,
+          rownames = FALSE,
+          colnames = c("Variable", "dd 04 Rank", "dd 04 Imp",
+                       "dd 06 Rank", "dd 06 Imp",
+                       "hex 04 Rank", "hex 04 Imp",
+                       "hex 06 Rank", "hex 06 Imp"),
+          caption = "`TN_crash` as response, Importance of variables for the two grid sizes and two of the levels of Waze data",
+           options = list(dom = "ftp",
                           order = list(0, 'asc'),
                           autoWidth = T)
           ) %>% formatCurrency(c(3, 5, 7, 9), currency = "", digits = 2)
