@@ -1,5 +1,4 @@
-# Starting random forest model of crash estimation for TN
-
+# Random forest models of crash estimation for TN
 
 # Setup ---- 
 rm(list=ls()) # Start fresh
@@ -32,13 +31,13 @@ source(file.path(codeloc, "TN", "utility/wazefunctions_TN.R"))
 setwd(localdir)
 
 # <><><><><>
-g = grids[1] # start with square grids, now running hex also
+g = grids[2] # start with square grids, now running hex also. Change between 1 and 2.
 state = "TN"
 # <><><><><>
 
 # Manually setting months to run here; could also scan S3 for months available for this state
 do.months = c(paste("2017", c("04","05","06","07","08","09", "10", "11", "12"), sep="-"),
-              paste("2018", c("01","02","03"), sep="-"))
+              paste("2018", c("01","02","03"), sep="-"))#,"04","05","06","07","08","09"), sep="-"))
 
 # do.months = paste("2018", c("01","02","03"), sep="-")
 
@@ -51,18 +50,15 @@ system(paste('mkdir -p', outputdir))
 # read random forest function
 source(file.path(codeloc, "analysis/RandomForest_WazeGrid_Fx.R"))
 
-# TODO: update for TN additional variables
-
-# # check if already completed transfer of necessary supplemental data on this instance
-# if(length(dir(localdir)[grep("aadt_by_grid", dir(file.path(localdir, 'AADT')))]) == 0){
-# 
-#   source(file.path(codeloc, "utility/Workstation_setup.R"))
-#   # move any files which are in an unnecessary "shapefiles" folder up to the top level of the localdir
-#   system("mv -v ~/workingdata/shapefiles/* ~/workingdata/")
-# }
-
 # View the files available in S3 for this state: system(paste0('aws s3 ls ', teambucket, '/', state, '/'))
 
+Waze_Prepared_Data = paste0(state, '_', do.months[1], '_to_', do.months[length(do.months)], '_', g)
+
+# <><><><><><><><><><><><><><><><><><><><><><><><>
+# Start data prep. Run this if the data for this time period and grid size are not ready yet, otherwise read from prepared data.
+
+if(length(grep(Waze_Prepared_Data, dir(localdir))) == 0){
+  
 # rename data files by month. For each month, prep time and response variables
 # See prep.hex() in wazefunctions.R for details.
 for(mo in do.months){
@@ -86,14 +82,10 @@ if(CHECKPLOT){
   rm(w.g, gs, grid_shp)
 }
 
-# TODO: figure out what supplemental variables to include from previous work
-# Write function to apply special events and weather
-na.action = "fill0"
-
+na.action = "fill0" # This is an argument in append.hex, below
 monthfiles = paste("w", do.months, sep=".")
 monthfiles = sub("-", "_", monthfiles)
 
-  
 # Append supplemental data ----
 
 # Both 2017 and 2018 special event data now
@@ -101,19 +93,22 @@ source(file.path(codeloc, "TN", "utility", "Prep_SpecialEvents.R")) # gives spev
 
 source(file.path(codeloc, "TN", "utility", "Prep_HistoricalCrash.R")) # gives crash
 
-source(file.path(codeloc, "TN", "utility", "Prep_HistoricalWeather.R")) # gives wx.grd.day. Weather variables, by grid ID, by day. Takes ~ 2 hrs for 0.1 dd on 16 core instance.
+if(g == "TN_01dd_fishnet"){
+  source(file.path(codeloc, "TN", "utility", "Prep_HistoricalWeather.R")) # gives wx.grd.day. Weather variables, by grid ID, by day. Takes ~ 2 hrs for 0.1 dd on 16 core instance.
+} # Run for 1sqmile hex when SDC has funding again. !!! WILL TAKE 9 DAYS !!!
 
 # Add prepared special events and historical crash data, with grid ID
-for(w in monthfiles){ # w = "w.2018_01"
-  
-   append.hex2(hexname = w, data.to.add = "TN_SpecialEvent", state = state, na.action = na.action)
-  
-   append.hex2(hexname = w, data.to.add = "crash", state = state, na.action = na.action)
-   
-   append.hex2(hexname = w, data.to.add = "wx.grd.day", state = state, na.action = na.action)
-   
-}
+for(w in monthfiles){ # w = "w.2017_04"
+   cat(w, ". ")
+   append.hex(hexname = w, data.to.add = "TN_SpecialEvent", state = state, na.action = na.action)
 
+   append.hex(hexname = w, data.to.add = "crash", state = state, na.action = na.action)
+   
+   # Historical weather not yet ready for 1sqmile hex
+   if(g == "TN_01dd_fisnet") {
+     append.hex(hexname = w, data.to.add = "wx.grd.day", state = state, na.action = na.action)
+   } 
+}
 
 # Bind all months together
 w.allmonths.named <- monthfiles
@@ -125,17 +120,26 @@ for(i in w.allmonths.named){
 
 # Save compiled object 
 save(w.allmonths, 
-     file = file.path(localdir, paste0(state, '_', do.months[1], '_to_', do.months[length(do.months)], '_', g, '.RData')))
+     file = file.path(localdir, paste0(Waze_Prepared_Data, ".RData")))
 
 # Output for Tableau
- # usevars = c("GRID_ID", names(w.allmonths)[c(8:25, 61:65, 80:85)])
- # 
- # write.csv(w.allmonths[usevars], 
- #      file = file.path(localdir, paste0(state, '_', do.months[1], '_to_', do.months[length(do.months)], '_', g, '.csv')),
- #                                        row.names = F)
+ usevars = c("GRID_ID", names(w.allmonths)[c(8:44, 63:69, 83:ncol(w.allmonths))])
+
+ write.csv(w.allmonths[usevars],
+      file = file.path(localdir, paste0(Waze_Prepared_Data, ".csv")),
+                                        row.names = F)
 
 # format(object.size(w.allmonths), "Gb")
 
+} # End data prep 
+# <><><><><><><><><><><><><><><><><><><><><><><><>
+
+# source(file.path(codeloc, "TN", "analysis/scratch/bundle_RF_inputs.R"))
+
+# Start from prepared data
+ 
+load(file.path(localdir, paste0(Waze_Prepared_Data, ".RData")))
+                  
 avail.cores = parallel::detectCores()
 
 # if(avail.cores > 8) avail.cores = 12 # Limit usage below max if on r4.4xlarge instance. Comment this out to run largest models.
@@ -149,7 +153,7 @@ keyoutputs = redo_outputs = list() # to store model diagnostics
 # Omit as predictors in this vector:
 alwaysomit = c(grep("GRID_ID", names(w.allmonths), value = T), "day", "hextime", "year", "weekday", 
                "uniqueWazeEvents", "nWazeRowsInMatch", 
-               "uniqueTNreports",
+               "uniqueTNreports", "TN_crash", "date",
                "nMatchWaze_buffer", "nNoMatchWaze_buffer",
                grep("nTN", names(w.allmonths), value = T),
                grep("MatchTN", names(w.allmonths), value = T),
@@ -159,7 +163,7 @@ alert_types = c("nWazeAccident", "nWazeJam", "nWazeRoadClosed", "nWazeWeatherOrH
 
 alert_subtypes = c("nHazardOnRoad", "nHazardOnShoulder" ,"nHazardWeather", "nWazeAccidentMajor", "nWazeAccidentMinor", "nWazeHazardCarStoppedRoad", "nWazeHazardCarStoppedShoulder", "nWazeHazardConstruction", "nWazeHazardObjectOnRoad", "nWazeHazardPotholeOnRoad", "nWazeHazardRoadKillOnRoad", "nWazeJamModerate", "nWazeJamHeavy" ,"nWazeJamStandStill",  "nWazeWeatherFlood", "nWazeWeatherFog", "nWazeHazardIceRoad")
 
-response.var = "MatchTN_buffer_Acc" # now could use nTN_total, for all TN crashes in this grid cell, this hour
+response.var = "MatchTN_buffer_Acc" # now could use nTN_total, for all TN crashes in this grid cell, this hour. Or TN_crash, binary indicator of if any TN crash occurred in this grid cell/hours 
 
 
 # A: Hourly, match buffer ----
@@ -187,7 +191,6 @@ modelno = paste("01", g, sep = "_")
 if(!REASSESS){
   keyoutputs[[modelno]] = do.rf(train.dat = w.allmonths, 
                                 omits, response.var = "MatchTN_buffer_Acc", 
-                               # thin.dat = 0.01,
                                 model.no = modelno, rf.inputs = rf.inputs) 
   
   save("keyoutputs", file = paste0("Output_to_", modelno))
@@ -197,9 +200,6 @@ redo_outputs[[modelno]] = reassess.rf(train.dat = w.allmonths,
                               omits, response.var = "MatchTN_buffer_Acc", 
                               model.no = modelno, rf.inputs = rf.inputs) 
 }
-
-
-save("keyoutputs", file = paste0("TN_Output_to_", modelno))
 
 timediff <- Sys.time() - starttime
 cat(round(timediff, 2), attr(timediff, "units"), "elapsed to model", modelno)
@@ -261,7 +261,7 @@ if(!REASSESS){
 }
 
 
-# B: Hourly, response is all TN crashes ----
+# B: Hourly, response is all TN crashes, binary ----
 
 # 04 - No Waze info
 # 05 - Add base Waze variables
@@ -285,8 +285,7 @@ modelno = paste("04", g, sep = "_")
 
 if(!REASSESS){
   keyoutputs[[modelno]] = do.rf(train.dat = w.allmonths, 
-                                omits, response.var = "nTN_total", 
-                                # thin.dat = 0.01,
+                                omits, response.var = "TN_crash", 
                                 model.no = modelno, rf.inputs = rf.inputs) 
   
   save("keyoutputs", file = paste0("Output_to_", modelno))
@@ -296,15 +295,6 @@ if(!REASSESS){
                                         omits, response.var = "nTN_total", 
                                         model.no = modelno, rf.inputs = rf.inputs)
 }
-
-save("keyoutputs", file = paste0("TN_Output_to_", modelno))
-
-if(REASSESS) {
-  save("keyoutputs", file = paste0(state, "_Reassess_Output_to_", modelno)) 
-} else {
-  save("keyoutputs", file = paste0(state, "_Output_to_", modelno))
-}
-
 
 # 05, add base Waze features
 modelno = paste("05", g, sep = "_")
@@ -323,7 +313,7 @@ omits = c(alwaysomit,
 
 if(!REASSESS){
   keyoutputs[[modelno]] = do.rf(train.dat = w.allmonths, 
-                                omits, response.var = "nTN_total", 
+                                omits, response.var = "TN_crash", 
                                 model.no = modelno, rf.inputs = rf.inputs) 
   
   save("keyoutputs", file = paste0("Output_to_", modelno))
@@ -350,7 +340,7 @@ omits = c(alwaysomit
 
 if(!REASSESS){
   keyoutputs[[modelno]] = do.rf(train.dat = w.allmonths, 
-                                omits, response.var = "nTN_total", 
+                                omits, response.var = "TN_crash", 
                                 model.no = modelno, rf.inputs = rf.inputs) 
   
   save("keyoutputs", file = paste0("Output_to_", modelno))
@@ -376,7 +366,7 @@ outputdir = file.path(localdir, 'Random_Forest_Output')
 zipname = paste0('TN_RandomForest_Outputs_', g, "_", Sys.Date(), '.zip')
 
 system(paste('zip', file.path('~/workingdata', zipname),
-             file.path(localdir, paste0('Output_to_01_', g)),
+             file.path(localdir, paste0('Output_to_06_', g)),
              file.path(outputdir, paste0('TN_Model_01_', g, '_RandomForest_Output.RData')),
              file.path(outputdir, paste0('TN_Model_02_', g, '_RandomForest_Output.RData')),
              file.path(outputdir, paste0('TN_Model_03_', g, '_RandomForest_Output.RData')),

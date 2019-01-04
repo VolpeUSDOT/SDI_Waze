@@ -268,103 +268,15 @@ prep.hex <- function(hexname, state, month, bucket = teambucket){
   assign(paste("w", mo, sep="."), wte, envir = globalenv()) 
   }
 
-# Append jobs, road class, or future other gridded data.
-# This version will be superceded by 'append.hex2', but keeping here for compatibility with previous scripts
+# Append historical crash, weather, special events, or other supplemental data such as jobs, road class, and other variables by grid ID, year and day.
 
 # Assumptions: 
-# 1. There are already files like "w.04" representing gridded, hourly Waze-EDT data fusions in the working environment. This script appends static data to the hourly gridded data, repeating the static values for each hour.
+# 1. There are already files like "w.2017_04" representing gridded, hourly Waze-crash data fusions in the working environment. This script appends static data to the hourly gridded data, repeating the static values for each hour.
 # 2. There are paths like the S3 bucket, inputdir, localdir, all in working environment
 # 3. rgdal and tidyverse libraries are loaded
 # 4. The data files to add are unzipped files in the localdir (i.e., they have already been copied over from the S3 bucket, and are sitting on the instance)
 
-append.hex <- function(hexname, data.to.add, na.action = c("omit", "keep", "fill0"), IDprefix = "1"){
-  # hexname: string of data frame names in working memory like "w.04"
-  # data.to.add: string of unzipped file set in the localdir, like "hexagons_1mi_routes_sum", "hexagons_1mi_bg_rac_sum", "hexagons_1mi_bg_lodes_sum"
-  # na.action: what to do if missing any values; applies this action across the whole data frame, not just the appended data
-  if(missing(na.action)) { na.action = "omit" } # set default value
-  na.action <- match.arg(na.action) # match partially entered values
-  
-  w <- get(hexname)
-  
-  # Check to see if this shapefile has been read in already. For FARS multipoint data, simply read DBF file
-  if(!exists(data.to.add)){
-    if(length(grep("FARS_MD", data.to.add)) > 0){
-      assign(data.to.add, foreign::read.dbf(file = file.path(localdir, paste0(data.to.add, ".dbf"))), envir = globalenv())
-    } else {
-    assign(data.to.add, rgdal::readOGR(localdir, layer = data.to.add), envir = globalenv())
-    }
-  }
-  
-  dd <- get(data.to.add)
-  
-  
-  
-  if(length(grep("routes_AADT_total_sum", data.to.add)) > 0){
-    dd <- dd@data
-  }
-  
-  if(length(grep("routes_sum", data.to.add)) > 0){
-    dd <- dd@data %>% 
-      group_by(GRID_ID) %>%
-      tidyr::spread(key = F_SYSTEM_V, value = SUM_miles, fill = 0, sep = "_")
-  }
-
-  if(length(grep("FARS_MD", data.to.add)) > 0){
-    dd <- dd %>% 
-      group_by(GRID_ID) %>%
-      summarise(CRASH_SUM = sum(CRASH_SUM),
-                FATALS_SUM = sum(FATALS_SUM))
-  }
-  
-
-  if(length(grep("bg_rac_", data.to.add)) > 0){
-    
-    dd <- dd@data 
-    dd <- dd[c("GRID_ID", 
-               "SUM_C000",                                                            # Total jobs
-#               "SUM_CA01", "SUM_CA02", "SUM_CA03",                                    # By age category
-               "SUM_CE01", "SUM_CE02", "SUM_CE03"                                    # By earnings
-#               ,"SUM_CD01", "SUM_CD02", "SUM_CD03", "SUM_CD04",                        # By educational attainment
-#               "SUM_CS01", "SUM_CS02"                                                 # By sex
-    )]
-    names(dd)[2:length(names(dd))] <- paste("RAC", names(dd)[2:length(names(dd))], sep = "_")
-    
-  }
-  
-  if(length(grep("bg_lodes_", data.to.add)) > 0){
-    
-    dd <- dd@data 
-    dd <- dd[c("GRID_ID", 
-               "SUM_C000",                                                            # Total jobs
-#               "SUM_CA01", "SUM_CA02", "SUM_CA03",                                    # By age category
-               "SUM_CE01", "SUM_CE02", "SUM_CE03",                                    # By earnings
-#              "SUM_CD01", "SUM_CD02", "SUM_CD03", "SUM_CD04",                        # By educational attainment
-               "SUM_CS01", "SUM_CS02",                                                # By sex
-#             "SUM_CFA01", "SUM_CFA02" ,"SUM_CFA03" ,"SUM_CFA04", "SUM_CFA05",       # By firm age
-               "SUM_CFS01", "SUM_CFS02", "SUM_CFS03", "SUM_CFS04",  "SUM_CFS05"       # By firm size
-    )]
-    names(dd)[2:length(names(dd))] <- paste("WAC", names(dd)[2:length(names(dd))], sep = "_")
-    
-  }
-  
-  # Match with new grid ID 
-  if(sum(dd$GRID_ID %in% w$GRID_ID) == 0 & substr(dd$GRID_ID[1], 1, 1)=="A"){
-    cat("Appending", IDprefix, "to GRID_ID \n")
-    dd$GRID_ID <- paste0(IDprefix, dd$GRID_ID)
-  }
-  
-  w2 <- left_join(w, dd, by = "GRID_ID")
-  # Consider assigning 0 to NA values after joining; e.g. no road info available, give 0 miles
-  if(na.action == "fill0") { w2[is.na(w2)] = 0 }
-  if(na.action == "omit") { w2 = w2[complete.cases(w2),] }
-  
-  assign(hexname, w2, envir = globalenv()) 
-  
-}
-
-# Another version of append.hex, updated for SDC and the new supplemental data, including VMT.
-
-append.hex2 <- function(hexname, data.to.add, state, na.action = c("omit", "keep", "fill0"), IDprefix = "1"){
+append.hex <- function(hexname, data.to.add, state, na.action = c("omit", "keep", "fill0")){
   # hexname: string of data frame names in working memory like "w.04"
   # data.to.add: string of unzipped file set in the localdir, including sub-directory path and state name, like "FARS/CT/FARS_CT_2015_2016_sum_fclass"
   # na.action: what to do if missing any values; applies this action across the whole data frame, not just the appended data
@@ -373,163 +285,26 @@ append.hex2 <- function(hexname, data.to.add, state, na.action = c("omit", "keep
   
   w <- get(hexname)
   
-  # Check to see if this shapefile has been read in already. For FARS multipoint data, simply read DBF file
-  if(!exists(data.to.add)){
-    if(length(grep("FARS", data.to.add)) > 0){
-      assign(data.to.add, foreign::read.dbf(file = file.path(localdir, "FARS", state, paste0(data.to.add, ".dbf"))), envir = globalenv())
-    }
-    if(length(grep("aadt", data.to.add)) > 0){
-      assign(data.to.add, read.csv(file = file.path(localdir, "AADT", paste0(data.to.add, ".txt"))),
-             envir = globalenv())
-      
-      } 
-    
-    if(length(grep("bg_wac", data.to.add)) > 0 | length(grep("bg_rac", data.to.add)) > 0 ){
-      assign(data.to.add, foreign::read.dbf(file = file.path(localdir, "LODES_LEHD", state, paste0(data.to.add, ".dbf"))),
-             envir = globalenv())
-      
-    }
-    
-    if(length(grep("TN_SpecialEvent", data.to.add)) > 0){
-      # load prepped data
-      assign(data.to.add, spev.grid.time) # Will be loaded already from Prep_SpecialEvents.R
-    }
-
-  }
+  # Prepare data ----
   
-  dd <- get(data.to.add)
-  
-  if(length(grep("FARS", data.to.add)) > 0){
-    dd <- dd %>% 
-      group_by(GRID_ID) %>%
-      summarise(CRASH_SUM = sum(CRASH_SUM),
-                FATALS_SUM = sum(FATALS_SUM))
-  }
-  
-  # Expand VMT from month / day of week / hour to day of year / hour of day, for each grid cell
-  
-  if(length(grep("max_aadt_by_grid", data.to.add)) > 0){
-    # Check to see if these processing steps have been done yet; don't need to re-do for each month.
-    prepname = paste("Prepared", data.to.add, sep="_")
-    
-    if(!exists(prepname)) {
-    
-    cat("Preparing", data.to.add, "\n")
-    # Spread for multiple columns by road functional class
-    
-    # dd.vol <- dd %>% 
-    #   group_by(GRID_ID, month, dayofweek, hour) %>%
-    #   tidyr::spread(key = F_SYSTEM_VN, value = volume, fill = 0, sep = "_")
-    
-    # Rows ahave to be uniquely described by grid id, month, dayofweek, hour, and road class
-    # summary(duplicated(with(dd, paste(GRID_ID, month, dayofweek, hour, F_SYSTEM_VN))))
-    dd <- dd[!duplicated(with(dd, paste(GRID_ID, month, dayofweek, hour, F_SYSTEM_VN))),]
-      
-    dd.summax <- dd %>%
-      group_by(GRID_ID, month, dayofweek, hour) %>%
-      select(GRID_ID, month, dayofweek, hour, F_SYSTEM_VN, SUM_MAX_AADT_VN) %>%
-      tidyr::spread(key = F_SYSTEM_VN, value = SUM_MAX_AADT_VN, fill = 0, sep = "_")
-
-    dd.hourmax <- dd %>%
-      group_by(GRID_ID, month, dayofweek, hour) %>%
-      select(GRID_ID, month, dayofweek, hour, F_SYSTEM_VN, HOURLY_MAX_AADT) %>%
-      tidyr::spread(key = F_SYSTEM_VN, value = HOURLY_MAX_AADT, fill = 0, sep = "_")
-
-    # Rename columns and join
-    dd.summax <- dd.summax %>% 
-      rename(SUM_MAX_AADT_1 = F_SYSTEM_VN_1,
-             SUM_MAX_AADT_2 = F_SYSTEM_VN_2,
-             SUM_MAX_AADT_3 = F_SYSTEM_VN_3,
-             SUM_MAX_AADT_4 = F_SYSTEM_VN_4,
-             SUM_MAX_AADT_5 = F_SYSTEM_VN_5)
-
-    dd.hourmax <- dd.hourmax %>% 
-      rename(HOURLY_MAX_AADT_1 = F_SYSTEM_VN_1,
-             HOURLY_MAX_AADT_2 = F_SYSTEM_VN_2,
-             HOURLY_MAX_AADT_3 = F_SYSTEM_VN_3,
-             HOURLY_MAX_AADT_4 = F_SYSTEM_VN_4,
-             HOURLY_MAX_AADT_5 = F_SYSTEM_VN_5)
-    
-    dd <- full_join(dd.summax, dd.hourmax, by = c("GRID_ID", "month", "dayofweek", "hour"))
-    
-    dd$vmt_time = with(dd, paste(month, dayofweek, hour, sep="_"))
-    
-    # Save this to global environment for other months to use
-    assign(prepname, dd, envir = globalenv())
-    
-      } else {
-      
-      # Create vectors in w for month of year, day of week, hour of day in w. This is used for joining on the grid ID and time factors
-      
-     
-      dd = get(prepname, envir = globalenv()) # Use the already prepared data if present in the working enviroment
-      
-  }
-    
-    # Extract year from file name
-    yr = substr(hexname, 3, 6)
-    date = strptime(paste(yr, w$day, sep = "-"), "%Y-%j")
-    mo = as.numeric(format(date, "%m"))
-    dow = lubridate::wday(date) # 7  = saturday, 1 = sunday.
-    w$vmt_time = paste(mo, dow, w$hour, sep="_")
-    
-  }
-  
-  if(length(grep("routes_AADT_total_sum", data.to.add)) > 0){
-    dd <- dd@data
-  }
-  
-  if(length(grep("routes_sum", data.to.add)) > 0){
-    dd <- dd@data %>% 
-      group_by(GRID_ID) %>%
-      tidyr::spread(key = F_SYSTEM_V, value = SUM_miles, fill = 0, sep = "_")
-  }
-
-  if(length(grep("bg_rac_", data.to.add)) > 0){
-    
-    #dd <- dd@data 
-    dd <- dd[c("GRID_ID", 
-               "SUM_C000",                                                            # Total jobs
-               #               "SUM_CA01", "SUM_CA02", "SUM_CA03",                                    # By age category
-               "SUM_CE01", "SUM_CE02", "SUM_CE03"                                    # By earnings
-               #               ,"SUM_CD01", "SUM_CD02", "SUM_CD03", "SUM_CD04",                        # By educational attainment
-               #               "SUM_CS01", "SUM_CS02"                                                 # By sex
-    )]
-    names(dd)[2:length(names(dd))] <- paste("RAC", names(dd)[2:length(names(dd))], sep = "_")
-    
-  }
-  
-  if(length(grep("bg_wac_", data.to.add)) > 0){
-    
-    #dd <- dd 
-    dd <- dd[c("GRID_ID", 
-               "SUM_C000",                                                            # Total jobs
-               #               "SUM_CA01", "SUM_CA02", "SUM_CA03",                                    # By age category
-               "SUM_CE01", "SUM_CE02", "SUM_CE03",                                    # By earnings
-               #              "SUM_CD01", "SUM_CD02", "SUM_CD03", "SUM_CD04",                        # By educational attainment
-               "SUM_CS01", "SUM_CS02",                                                # By sex
-               #             "SUM_CFA01", "SUM_CFA02" ,"SUM_CFA03" ,"SUM_CFA04", "SUM_CFA05",       # By firm age
-               "SUM_CFS01", "SUM_CFS02", "SUM_CFS03", "SUM_CFS04",  "SUM_CFS05"       # By firm size
-    )]
-    names(dd)[2:length(names(dd))] <- paste("WAC", names(dd)[2:length(names(dd))], sep = "_")
-    
-  }
-  
-  # SpecialEvent prep ----
+  # SpecialEvent prep
   if(length(grep("TN_SpecialEvent", data.to.add)) > 0){
+    
+    dd <- spev.grid.time
     
     dd$hour <- as.numeric(format(dd$GridDayHour, "%H"))
     
     dd <- dd %>%
       group_by(GRID_ID, Year, day, hour) %>%
       summarise(SpecialEvent_sum = n())
-      
-    # Save this to global environment for other months to use
-    assign(prepname, dd, envir = globalenv())
+   
+    dd$GRID_ID <- as.character(dd$GRID_ID)
+    class(dd) <- "data.frame"
     
   }
 
   if(length(grep("crash", data.to.add)) > 0){
+    dd <- crash
     
     dd$hour <- as.numeric(format(dd$date, "%H"))
     
@@ -550,63 +325,44 @@ append.hex2 <- function(hexname, data.to.add, state, na.action = c("omit", "keep
       summarise(TotalFatalCrashsum = n())
     
     dd <- full_join(dd1, dd2, by = 'GRID_ID')
-    
-    # Save this to global environment for other months to use
-    assign(prepname, dd, envir = globalenv())
-    
-  } else {
-    
-    # Create vectors in w for month of year, day of week, hour of day in w. This is used for joining on the grid ID and time factors
-    
-    dd = get(prepname, envir = globalenv()) # Use the already prepared data if present in the working enviroment
-    
-    
+      
   }
   
+  if(length(grep("wx.grd.day", data.to.add)) > 0){
+    
+    dd <- wx.grd.day
+    
+    dd$date <- dd$day
+    dd$Year <- format(dd$date, "%Y")
+    dd$day <- formatC(format(dd$date, "%j"), width = 3, flag = 0)
+    names(dd)[which(names(dd)=="ID")] = "GRID_ID"
+    dd$GRID_ID = as.character(dd$GRID_ID)
+    
+  } 
   
-  # End data type if statements, now merge with w data frame of Waze-EDT data
+  # End data type if statements, now merge with w data frame of Waze-crash data
   # join ----
-  
-  # Match with new grid ID 
-  if(sum(dd$GRID_ID %in% w$GRID_ID) == 0 & substr(dd$GRID_ID[1], 1, 1)=="A"){
-    cat("Appending", IDprefix, "to GRID_ID \n")
-    dd$GRID_ID <- paste0(IDprefix, dd$GRID_ID)
-  }
-  
-  # For Maryland! Match with old grid ID
-  if(sum(dd$GRID_ID %in% w$GRID_ID) == 0 & substr(w$GRID_ID[1], 1, 1)=="A"){
-    cat("Appending", IDprefix, "to w$GRID_ID \n")
-    w$GRID_ID <- paste0(IDprefix, w$GRID_ID)
-  }
   
   dd$GRID_ID <- as.character(dd$GRID_ID)
   
-  if(length(grep("max_aadt_by_grid", data.to.add)) > 0){
-    
-    # summary(unique(w$GRID_ID) %in% unique(dd$GRID_ID)) # should be all T, but there are 1620 F in April MD? 
-    # summary(w$vmt_time %in% dd$vmt_time) # all T
-    
-    # month / day of week / hour of day is duplicated within GRID ID in w, which is expected
-    # summary(duplicated(paste(w$GRID_ID, w$vmt_time)))
-    # summary(duplicated(paste(dd$GRID_ID, dd$vmt_time))) # should be all F
-    # summary(duplicated(paste(dd$GRID_ID, dd$month, dd$dayofweek, dd$hour))) 
-    
-    w2 <- left_join(w, dd %>% ungroup() %>% select(-month, -dayofweek, -hour), by = c("GRID_ID", "vmt_time")) 
-  
-    # check:
-    # 1Z-48, day 229 (August, dayofweek = 5) hour 16: max hourly 4 = 0.809305; 5 = 0.066670
-    # format(strptime("2017-229", "%Y-%j"), "%m") 
-    # lubridate::wday(strptime("2017-229", "%Y-%j")) 
-    # dd[dd$GRID_ID == "1Z-48" & dd$month == 8 & dd$dayofweek == 5 & dd$hour == 16,]
-  
-  } 
+
   if(length(grep("TN_SpecialEvent", data.to.add)) > 0){
     
-    w2 <- left_join(w, dd %>% ungroup(), by = c("GRID_ID", "Year", "day", "hour")) 
+    class(dd) = "data.frame"
+    w2 <- left_join(w, dd, by = c("GRID_ID", "Year", "day", "hour")) 
+     
+  } 
+  
+  if(length(grep("wx.grd.day", data.to.add)) > 0){
     
-      
-  } else {    
+    w2 <- left_join(w, dd, by = c("GRID_ID", "Year", "day")) 
+    
+  } 
+  
+  if(length(grep("crash", data.to.add)) > 0){
+    
     w2 <- left_join(w, dd, by = "GRID_ID")
+  
   }
   
   # Consider assigning 0 to NA values after joining; e.g. no road info available, give 0 miles

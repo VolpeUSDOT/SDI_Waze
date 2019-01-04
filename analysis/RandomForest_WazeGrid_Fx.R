@@ -8,7 +8,7 @@ require(pROC)
 
 # omits - Vector of column names in the data to omit from the model. Used to generate the model formula, if the formula is not otherwise provided in the `formula` argument.
 
-# response.var - Vector of the data to use as the response variable, e.g. MatchEDT_buffer_Acc or nMatchEDT_buffer_Acc
+# response.var - Vector of the data to use as the response variable, e.g. MatchEDT_buffer_Acc, nMatchEDT_buffer_Acc, TN_crash, nTN_total
 
 # model.no - character value to keep track of model number used; cannot be left blank
 
@@ -26,7 +26,7 @@ do.rf <- function(train.dat, omits, response.var = "MatchEDT_buffer_Acc", model.
                   test.dat = NULL, test.split = .30,
                   split.by = NULL,
                   thin.dat = NULL,
-                  cutoff = c(0.775, 0.225),
+                  cutoff = c(0.9, 0.1),
                   rf.inputs = list(ntree.use = 500, avail.cores = 4, mtry = NULL, maxnodes = NULL, nodesize = 5)){
   
   if(!is.null(test.dat) & !missing(test.split)) stop("Specify either test.dat or test.split, but not both")
@@ -130,7 +130,7 @@ do.rf <- function(train.dat, omits, response.var = "MatchEDT_buffer_Acc", model.
   levels(rf.pred) = c("NoCrash","Crash")
   
   reference.vec <-as.factor(as.character(reference.vec))
-  rf.pred <-as.factor(as.character(rf.pred))
+  rf.pred <- as.factor(as.character(rf.pred))
   
   (predtab <- table(rf.pred, reference.vec, 
                     dnn = c("Predicted","Observed"))) 
@@ -146,10 +146,10 @@ do.rf <- function(train.dat, omits, response.var = "MatchEDT_buffer_Acc", model.
        ylim = c(0, 1), xlim = c(1, 0))
   legend("bottomright", legend = round(model_auc, 4), title = "AUC", inset = 0.25)
   
-  #dev.print(device = jpeg, file = paste0("AUC_", model.no, ".jpg"), width = 500, height = 500)
+  # dev.print(device = jpeg, file = paste0("AUC_", model.no, ".jpg"), width = 500, height = 500)
   dev.off()
 
-  out.df <- data.frame(test.dat.use[, c("GRID_ID", "day", "hour", response.var)], rf.pred, rf.prob)
+  out.df <- data.frame(test.dat.use[, c("GRID_ID", "Year", "day", "hour", response.var)], rf.pred, rf.prob)
   out.df$day <- as.numeric(out.df$day)
   names(out.df)[4:7] <- c("Obs", "Pred", "Prob.Noncrash", "Prob.Crash")
   out.df = data.frame(out.df,
@@ -168,7 +168,7 @@ do.rf <- function(train.dat, omits, response.var = "MatchEDT_buffer_Acc", model.
 
     rf.pred <- cut(rf.prob, breaks = c(-100, cutoff[2], 100), include.lowest = T, labels = c("NoCrash","Crash"))
 
-    out.df <- data.frame(test.dat.use[, c("GRID_ID", "day", "hour", response.var)], rf.pred, rf.prob)
+    out.df <- data.frame(test.dat.use[, c("GRID_ID", "Year", "day", "hour", response.var)], rf.pred, rf.prob)
     out.df$day <- as.numeric(out.df$day)
     names(out.df)[4:6] <- c("Obs", "Pred", "Prob.Crash")
     out.df = data.frame(out.df,
