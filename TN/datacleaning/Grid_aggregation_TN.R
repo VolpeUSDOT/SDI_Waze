@@ -28,7 +28,14 @@ grids = c("TN_01dd_fishnet",
 
 codeloc <- "~/SDI_Waze" 
 
-user <- paste0( "/home/", system("whoami", intern = TRUE)) # the user directory 
+home.loc <- getwd()
+
+user <- if(length(grep("@securedatacommons.com", home.loc)) > 0) {
+  paste0( "/home/", system("whoami", intern = TRUE), "@securedatacommons.com")
+} else {
+  paste0( "/home/", system("whoami", intern = TRUE))
+} # find the user directory to use
+
 localdir <- paste0(user, "/workingdata/") # full path for readOGR
 
 wazemonthdir <- "~/workingdata/TN/Overlay" # contains the merged.waze.tn.YYYY-mm_<state>.RData files
