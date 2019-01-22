@@ -11,6 +11,7 @@
 
 # <><><><><><><><><><><><><><><><><><><><>
 # Setup ----
+rm(list = ls())
 codeloc <- "~/SDI_Waze"
 source(file.path(codeloc, 'utility/get_packages.R'))
 

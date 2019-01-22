@@ -155,7 +155,8 @@ for(j in months_shared){ # j = "2018-03"
   # table(tn_j@data$hour[!tn_j@data$MstrRecNbrTxt %in% unique(link.all$id.accident)]) # still most of the unmatched TN crashes happened in day time, "2017-04"
   # # 00  01  02  03  04  05  06  07  08  09  10  11  12  13  14  15  16  17  18  19  20  21  22  23
   # # 371  54  51  44  40  69 105 208 136 139 161 234 249 268 294 358 310 286 203 159 184 150 134 125
-  # 
+  
+  # Save linked data
   write.csv(link.all, file.path(localdir, "Link", paste0("TN_Waze_link_", j, "_", state, ".csv")), row.names = F)
   
   timediff <- round(Sys.time()-starttime_month, 2)

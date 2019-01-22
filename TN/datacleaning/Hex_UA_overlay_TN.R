@@ -5,6 +5,7 @@
 # <><><><><><><><><><><><><><><><><><><><>
 # Setup ----
 # Check for package installations
+rm(list = ls())
 codeloc <- "~/SDI_Waze"
 source(file.path(codeloc, 'utility/get_packages.R'))
 
@@ -19,7 +20,13 @@ library(doParallel)
 state = "TN"
 
 output.loc <- "~/tempout"
-user <- paste0( "/home/", system("whoami", intern = TRUE)) #the user directory to use
+home.loc <- getwd()
+user <- if(length(grep("@securedatacommons.com", home.loc)) > 0) {
+  paste0( "/home/", system("whoami", intern = TRUE), "@securedatacommons.com")
+} else {
+  paste0( "/home/", system("whoami", intern = TRUE))
+} # find the user directory to use
+
 localdir <- file.path(user, "workingdata") # full path for readOGR
 crashdir <- normalizePath(file.path(localdir, state, "Crash"))
 wazedir <- normalizePath(file.path(localdir, state, "Waze")) # has State_Year-mo.RData files. Grab from S3 if necessary
@@ -66,13 +73,13 @@ grids = c("TN_01dd_fishnet",
 
 for(g in grids){ # g = grids[1]
   
-  grid = readOGR(file.path(localdir, state, "Shapefiles"), layer = g)
+  grid = readOGR(file.path(localdir, state, "Shapefiles"), layer = g) # the grid layer
   grid <- spTransform(grid, CRS(proj.USGS))
   # grid column names
   gridcols <- names(grid)[grep("^GRID", names(grid))]
   
-  FIPS_i = formatC(state.fips[state.fips$abb == state, "fips"][1], width = 2, flag = "0")
-  co_i <- co[co$STATEFP == FIPS_i,]
+  FIPS_i = formatC(state.fips[state.fips$abb == state, "fips"][1], width = 2, flag = "0") # find the FIPS ID of TN
+  co_i <- co[co$STATEFP == FIPS_i,] # find all counties fall in TN
   
   # Files -- 
   # load(file.path(localdir, state, "Crash", "TN_Crash.RData")) # 791 Mb version, 80 columns 829,301 rows 
@@ -102,6 +109,7 @@ for(g in grids){ # g = grids[1]
   
   # Restrict TN crash data to just shared months
   tn_crash <- tn_crash[!is.na(match(tn_crash$YM, months_shared)),]
+  dim(tn_crash) # 123,124
   
   avail.cores <- parallel::detectCores()
   if(avail.cores > length(months_shared)) avail.cores = length(months_shared) # use only cores necessary
@@ -124,7 +132,7 @@ for(g in grids){ # g = grids[1]
     }
     
     # Get time and last.pull.time as POSIXct
-    if(class(mb$time) != "POSIXct"){
+    if(!("POSIXct" %in% class(mb$time))){
       mbt <- as.character(mb$time)
       mbt.last <- as.character(mb$last.pull.time)
       mbtz <- substr(mbt, 21, 23) 
@@ -161,10 +169,13 @@ for(g in grids){ # g = grids[1]
     # <><><><><><><><><><><><><><><><><><><><>
     # Urban area overlay ----
     
-    waze_ua_pip <- over(mb, ua[,c("NAME10","UATYP10")]) # Match a urban area name and type to each row in mb. 
+    waze_ua_pip <- over(mb, ua[,c("NAME10","UATYP10")]) # Match a urban area name and type to each row in mb (Waze events data). UATYPE10 is Census 2010 Urban Type, U = Urban Area, C = Urban Cluster, R = Rural
+    table(ua$UATYP10) # no Urban type was found.
+    # C    U 
+    # 3104  497 
     edt_ua_pip <- over(tn_crash, ua[,c("NAME10","UATYP10")]) # Match a urban area name and type to each row in tn_crash. 
     mb@data <- data.frame(mb@data, waze_ua_pip)
-    names(mb@data)[(length(mb@data)-1):length(mb@data)] <- c("Waze_UA_Name", "Waze_UA_Type")
+    names(mb@data)[(length(mb@data)-1):length(mb@data)] <- c("Waze_UA_Name", "Waze_UA_Type") # Rename the two added columns
     
     tn_crash@data <- data.frame(tn_crash@data, edt_ua_pip)
     names(tn_crash@data)[(length(tn_crash@data)-1):length(tn_crash@data)] <- c("EDT_UA_Name", "EDT_UA_Type")
@@ -200,7 +211,7 @@ for(g in grids){ # g = grids[1]
     # names(crash.df)
     
     # before carrying out the join, rename the TN crash grid cell columns 
-    names(crash.df)[grep("^GRID", names(crash.df))] <- paste(names(crash.df)[grep("^GRID", names(crash.df))], "TN", sep = ".")
+    names(crash.df)[grep("^GRID", names(crash.df))] <- paste(names(crash.df)[grep("^GRID", names(crash.df))], state, sep = ".")
     
     # Join Waze data to link table (full join)
     link.waze <- full_join(link, waze.df, by=c("id.incidents"="alert_uuid"))
@@ -208,7 +219,7 @@ for(g in grids){ # g = grids[1]
     # Add W code to match column to indicate only Waze data
     link.waze$match <- ifelse(is.na(link.waze$match), 'W', link.waze$match)
     
-    # now has M for rows with matching TN crahes, and W for all others
+    # now has M for rows with matching TN crahes, and W for all others in column "match"
     # summary(as.factor(link.waze$match))
     
     # Join TN crash data to Waze-link table (full join)
