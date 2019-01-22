@@ -55,16 +55,15 @@ proj <- showP4(showWKT("+init=epsg:102008"))
 
 # Start loop over months ----
 
-# Grab from S3 (save to tempout) if necessary
-if(length(grep(state, dir(wazedir)))==0){
-  for(i in yearmonths){
-  system(paste("aws s3 cp",
-               file.path(teambucket, 'TN', paste0('TN_', i, '.RData')),
-               file.path('~', 'tempout', paste0('TN_', i, '.RData'))))
-    }
-  
-}
-  
+# # Grab from S3 (save to tempout) if necessary. if have downloaded from S3, this step can ignore
+# if(length(grep(state, dir(wazedir)))==0){
+#   for(i in yearmonths){
+#   system(paste("aws s3 cp",
+#                file.path(teambucket, 'TN', paste0('TN_', i, '.RData')),
+#                file.path('~', 'tempout', paste0('TN_', i, '.RData'))))
+#     }
+#   
+# }
   
 wazemonthfiles <- dir(wazedir)[grep(state, dir(wazedir))]
 wazemonthfiles <- wazemonthfiles[grep("RData$", wazemonthfiles)]
@@ -78,7 +77,7 @@ load("Crash/TN_Crash_Simple_2008-2018.RData")
 # find rows with missing lat/long
 # Discard rows with no lat long
 tn_crash <- crash
-cat(state, "TN missing lat/long, FALSE TRUE: \n", summary(is.na(tn_crash$LatDecimalNmb)), "\n")
+cat(state, "TN missing lat/long, FALSE: \n", summary(is.na(tn_crash$LatDecimalNmb)), "\n")
 tn_crash <- tn_crash[!is.na(tn_crash$LatDecimalNmb) & !is.na(tn_crash$LongDecimalNmb),]
 
 tnmonths <- sort(unique(format(tn_crash$date, "%Y-%m")))
@@ -119,10 +118,10 @@ for(j in months_shared){ # j = "2018-03"
   dev.print(jpeg, file = paste0("Figures/Link_plot_", state, "_" , j, ".jpeg"), width= 500, height = 500)
   
   # Get time in the right format if not already
-  if(class(d$time) != "POSIXct"){
+  if(!("POSIXct" %in% class(d$time))){  # class(d$time) has two elements
     dt <- as.character(d$time)
     dt.last <- as.character(d$last.pull.time)
-    dtz <- substr(dt, 21, 23) 
+    dtz <- substr(dt, 21, 23) # Get the 3 timezone letters
     
     new.d <- vector()
     
