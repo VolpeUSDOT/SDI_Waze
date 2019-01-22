@@ -13,6 +13,7 @@
 # Setup ----
 codeloc <- "~/SDI_Waze"
 source(file.path(codeloc, 'utility/get_packages.R'))
+source(file.path(codeloc, 'utility/Workstation_setup.R')) # Download necessary files from S3
 
 library(sp)
 library(tidyverse)
