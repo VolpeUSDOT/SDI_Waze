@@ -21,7 +21,7 @@ makelink <- function(accfile = edt.april, incfile = waze.april,
   linktable <- vector()
   
   starttime <- Sys.time()
-  writeLines("", paste0("TN_Waze_log_", i, "_", Sys.Date(), ".txt")) # to store messages by year-month i
+  writeLines("", paste0("TN_Waze_log_", j, "_", Sys.Date(), ".txt")) # to store messages by year-month i, now it is "j" in months_shared
   
   # Start of %dopar% loop
   linktable <- foreach(i=1:nrow(accfile), .combine = rbind, .packages = "sp") %dopar% {
@@ -41,11 +41,12 @@ makelink <- function(accfile = edt.april, incfile = waze.april,
     
     # ei: was EDT events, now TN crashes. We want to look from the time of crash event -60 minutes to crash event +60 minutes, and find Waze events in this window
     # d.sp: Waze events. inctimevar2 is the *end* of the event and inctimevar1 is the *start* of the event. We look to see if the end of the event is greater than EDT event -60 minutes and see if the start of the Waze event is less than the EDT event +60 minutes.
+    # hist(as.numeric(d.sp[,inctimevar2] - d.sp[,inctimevar1])) # some Waze events have large difference between the two, the range of the Waze events do not matter.
     
     d.t <- d.sp[d.sp[,inctimevar2] >= ei[,acctimevar]-60*60 & d.sp[,inctimevar1] <= ei[,acctimevar]+60*60,] 
     
-    id.accident <- rep(as.character(ei[,accidvar]), nrow(d.t)) # Waze
-    id.incidents <- as.character(d.t[,incidvar]) # EDT
+    id.accident <- rep(as.character(ei[,accidvar]), nrow(d.t)) # TN crash ID
+    id.incidents <- as.character(d.t[,incidvar]) # Waze events ID
     
     if(i %% 50000 == 0) {
       timediff <- round(Sys.time()-starttime, 2)

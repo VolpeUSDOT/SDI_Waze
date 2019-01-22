@@ -11,6 +11,7 @@
 # modified for multiple states, on SDC
 
 # Setup ----
+rm(list = ls())
 codeloc <- "~/SDI_Waze"
 source(file.path(codeloc, 'utility/get_packages.R'))
 source(file.path(codeloc, 'utility/Workstation_setup.R')) # Download necessary files from S3
@@ -104,7 +105,7 @@ for(j in months_shared){ # j = "2018-03"
   tn_crash <- SpatialPointsDataFrame(tn_crash[c("LongDecimalNmb", "LatDecimalNmb")], tn_crash, 
                               proj4string = CRS("+proj=longlat +datum=WGS84"))  #  make sure TN data is a SPDF
   
-  tn_crash <- spTransform(tn_crash, CRS(proj))
+  tn_crash <- spTransform(tn_crash, CRS(proj)) # Project the data
   }
   
   # Check with a plot:
@@ -148,7 +149,13 @@ for(j in months_shared){ # j = "2018-03"
                        accidvar = "MstrRecNbrTxt",
                        incidvar = "alert_uuid")
   # <><><><><><><><><><><><><><><><><><><><><><><><>
-  
+  # # check how many are matched
+  # length(unique(link.all$id.accident))/nrow(tn_j@data) # 2562/6894  for "2017-04"
+  # length(unique(link.all$id.incidents))/nrow(d@data) # 13231/281937   for "2017-04"
+  # table(tn_j@data$hour[!tn_j@data$MstrRecNbrTxt %in% unique(link.all$id.accident)]) # still most of the unmatched TN crashes happened in day time, "2017-04"
+  # # 00  01  02  03  04  05  06  07  08  09  10  11  12  13  14  15  16  17  18  19  20  21  22  23
+  # # 371  54  51  44  40  69 105 208 136 139 161 234 249 268 294 358 310 286 203 159 184 150 134 125
+  # 
   write.csv(link.all, file.path(localdir, "Link", paste0("TN_Waze_link_", j, "_", state, ".csv")), row.names = F)
   
   timediff <- round(Sys.time()-starttime_month, 2)
