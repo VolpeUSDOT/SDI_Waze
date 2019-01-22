@@ -3,6 +3,7 @@
 
 # <><><><><><><><><><><><><><><><><><><><>
 # Setup ----
+rm(list = ls())
 library(tidyverse)
 library(lubridate)
 library(utils)
@@ -15,11 +16,16 @@ grids = c("TN_01dd_fishnet",
 
 codeloc <- "~/SDI_Waze" 
 
-user <- paste0( "/home/", system("whoami", intern = TRUE)) #the user directory to use
+home.loc <- getwd()
+user <- if(length(grep("@securedatacommons.com", home.loc)) > 0) {
+  paste0( "/home/", system("whoami", intern = TRUE), "@securedatacommons.com")
+} else {
+  paste0( "/home/", system("whoami", intern = TRUE))
+} # find the user directory to use
 localdir <- paste0(user, "/workingdata/") # full path for readOGR
 
 wazemonthdir <- "~/workingdata/TN/Overlay" # contains the merged.waze.tn.YYYY-mm_<state>.RData files
-temp.outputdir = "~/agg_out" # Will contain the WazeHexTimeList_YYYY-mm_grids_<state>.RData files
+temp.outputdir = "~/agg_out" # Will contain the WazeHexTimeList_YYYY-mm_grids_<state>.RData files # Which code generated this? Jessie does not have this file.
 
 teambucket <- "s3://prod-sdc-sdi-911061262852-us-east-1-bucket"
   
@@ -69,7 +75,9 @@ for(g in grids){ # g = grids[1]
 
     ##############
     # Make data frame of all Grid IDs by day of year and time of day in each month of data (subset to all grid IDs with Waze OR EDT data)
-    GridIDall <- c(unique(as.character(link.waze.tn$GRID_ID)), unique(as.character(link.waze.tn$GRID_ID.TN)))
+    GridIDall <- unique(c(unique(as.character(link.waze.tn$GRID_ID)), unique(as.character(link.waze.tn$GRID_ID.TN))))
+    # x <- data.frame(length(unique(as.character(link.waze.tn$GRID_ID))), length(unique(as.character(link.waze.tn$GRID_ID.TN))), length(GridIDall), length(unique(GridIDall)))
+    # 837, 698, 1535, 922 # using "2017-04" as an example, apparently, we have some duplication in GridIDall
     
     # Date/time for TN crash only events or TN/Waze matching events are stored as 'date', while Date/time for Waze only events are stored as 'time'.
     year.month.w <- format(link.waze.tn$time, "%Y-%m")
