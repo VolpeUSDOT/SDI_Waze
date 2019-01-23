@@ -7,7 +7,7 @@ rm(list = ls())
 library(tidyverse)
 library(lubridate)
 library(utils)
-library(doParallel)
+library(doParallel) # DoParallel package is a "parallel backend" for the foreach package, it provides a mechanism needed to execute foreach loops in parallel.
 library(foreach)
 
 #Set parameters for data to process
@@ -61,9 +61,9 @@ for(g in grids){ # g = grids[1]
   
   writeLines(c(""), paste(g, "log.txt", sep = "_"))    
   
-  foreach(j = todo.months, .packages = c("dplyr", "lubridate", "utils")) %dopar% { # j="2017-04"
+  foreach(j = todo.months, .packages = c("dplyr", "lubridate", "utils")) %dopar% { # j="2017-04" 
 
-    sink(paste(g, "log.txt", sep = "_"), append=TRUE)
+    sink(paste(g, "log.txt", sep = "_"), append=TRUE) # sink() function diverts R output to a connection and stops such diversions. Starting from this point, all output in console will be saved in the log file in the working directory.
     
     cat(paste(Sys.time()), g, j, "\n")                                                           
                                                              
@@ -94,7 +94,7 @@ for(g in grids){ # g = grids[1]
     lastday = max(month.days[!is.na(month.days)])
     
     Month.hour <- seq(from = as.POSIXct(paste0(j,"-01 0:00"), tz = 'America/Chicago'), 
-                      to = as.POSIXct(paste0(j,"-", lastday, " 24:00"), tz = 'America/New_York'),
+                      to = as.POSIXct(paste0(j,"-", lastday, " 24:00"), tz = 'America/New_York'), # Why timezone of from and to are different? Looks like the code only used CDT
                       by = "hour")
     
     GridIDTime <- expand.grid(Month.hour, GridIDall)
@@ -103,16 +103,16 @@ for(g in grids){ # g = grids[1]
     # Temporally matching
     # Match between the first reported time and last pull time of the Waze event. 
     StartTime <- Sys.time()
-    t.min = min(GridIDTime$GridDayHour)
-    t.max = max(GridIDTime$GridDayHour)
+    t.min = min(Month.hour) # format(min(Month.hour), "%Y-%m-%d %H:%M:%S %Z") # the datetime format of the first hour showed as date only format. When reformat using format() function, it did not work.
+    t.max = max(Month.hour) # format(max(Month.hour), "%Y-%m-%d %H:%M:%S %Z")
     i = t.min
     
     Waze.hex.time.all <- vector()
     counter = 1
     while(i+3600 <= t.max){
       ti.GridIDTime = filter(GridIDTime, GridDayHour == i)
-      ti.link.waze.tn = link.waze.tn %>% filter(time >= i & time <= i+3600 | last.pull.time >= i & last.pull.time <=i+3600)
-      ti.link.waze.tn.t = link.waze.tn %>% filter(date >= i & date <= i+3600)
+      ti.link.waze.tn = link.waze.tn %>% filter(time >= i & time <= i+3600 | last.pull.time >= i & last.pull.time <=i+3600) # Match Waze events time
+      ti.link.waze.tn.t = link.waze.tn %>% filter(date >= i & date <= i+3600) # Match TN crash time
       
       ti.Waze.hex <- inner_join(ti.GridIDTime, ti.link.waze.tn, by = "GRID_ID") #Use left_join to get zeros if no match  
       ti.Waze.hex.t <- inner_join(ti.GridIDTime, ti.link.waze.tn.t, by = "GRID_ID") # Same, for TN only crashes
