@@ -75,7 +75,9 @@ for(g in grids){ # g = grids[1]
 
     ##############
     # Make data frame of all Grid IDs by day of year and time of day in each month of data (subset to all grid IDs with Waze OR EDT data)
-    GridIDall <- unique(c(unique(as.character(link.waze.tn$GRID_ID)), unique(as.character(link.waze.tn$GRID_ID.TN))))
+    GridIDall <- unique(c(as.character(link.waze.tn$GRID_ID), # Grid ID for a Waze event
+                          as.character(link.waze.tn$GRID_ID.TN)) # Grid ID for a TN crash
+                        )
     # x <- data.frame(length(unique(as.character(link.waze.tn$GRID_ID))), length(unique(as.character(link.waze.tn$GRID_ID.TN))), length(GridIDall), length(unique(GridIDall)))
     # 837, 698, 1535, 922 # using "2017-04" as an example, apparently, we have some duplication in GridIDall
     
@@ -94,7 +96,7 @@ for(g in grids){ # g = grids[1]
     lastday = max(month.days[!is.na(month.days)])
     
     Month.hour <- seq(from = as.POSIXct(paste0(j,"-01 0:00"), tz = 'America/Chicago'), 
-                      to = as.POSIXct(paste0(j,"-", lastday, " 24:00"), tz = 'America/New_York'), # Why timezone of from and to are different? Looks like the code only used CDT
+                      to = as.POSIXct(paste0(j,"-", lastday, " 24:00"), tz = 'America/Chicago'), # Why timezone of from and to are different? Looks like the code only used CDT
                       by = "hour")
     
     GridIDTime <- expand.grid(Month.hour, GridIDall)
@@ -112,9 +114,11 @@ for(g in grids){ # g = grids[1]
     while(i+3600 <= t.max){
       ti.GridIDTime = filter(GridIDTime, GridDayHour == i)
       ti.link.waze.tn = link.waze.tn %>% filter(time >= i & time <= i+3600 | last.pull.time >= i & last.pull.time <=i+3600) # Match Waze events time
+      # table(format(link.waze.tn$time, "%Z")) # all Waze events are in EDT timezone.
       ti.link.waze.tn.t = link.waze.tn %>% filter(date >= i & date <= i+3600) # Match TN crash time
+      # table(format(link.waze.tn$date, "%Z")) # All TN crashes are in CDT timezone. One solution is to format the original dataset by setting the local time with accurate timezone information. Any events fall in one Eastern timezone will have "EDT" in their timestamp.
       
-      ti.Waze.hex <- inner_join(ti.GridIDTime, ti.link.waze.tn, by = "GRID_ID") #Use left_join to get zeros if no match  
+      ti.Waze.hex <- inner_join(ti.GridIDTime, ti.link.waze.tn, by = "GRID_ID") # Use left_join to get zeros if no match  
       ti.Waze.hex.t <- inner_join(ti.GridIDTime, ti.link.waze.tn.t, by = "GRID_ID") # Same, for TN only crashes
       
       Waze.hex.time.all <- rbind(Waze.hex.time.all, ti.Waze.hex)
@@ -127,7 +131,8 @@ for(g in grids){ # g = grids[1]
     EndTime <- Sys.time() - StartTime
     cat(round(EndTime, 2), attr(EndTime, "units"), "\n")
     
-    Waze.hex.time <- filter(Waze.hex.time.all, !is.na(GRID_ID))
+    Waze.hex.time <- unique(Waze.hex.time.all) # Rows with match = "M" are duplicated, so we want to remove the duplicates.
+    Waze.hex.time <- filter(Waze.hex.time, !is.na(GRID_ID))
     
     #Save list of Grid cells and time windows with EDT or Waze data  
     fn = paste0("WazeHexTimeList_", j,"_", g, "TN.RData")
