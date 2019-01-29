@@ -336,7 +336,7 @@ for(i in tn.ls){
 
 # Bellevue data ----
 
-wa.ls = c('Shapefiles/Bellevue_Roadway.zip', 'Crashes/Bellevue_Crash.zip')
+wa.ls = c('Shapefiles/Bellevue_Roadway.zip', 'Crashes/Bellevue_Crash.zip', "Roadway/RoadNetwork_Jurisdiction.csv")
 
 for(i in wa.ls){
   if(length(grep(i, dir(file.path('~', 'workingdata', 'WA'))))==0){
@@ -502,6 +502,13 @@ if(MOVEFROMUPLOAD){
                file.path(teambucket, system('whoami', intern = T), "uploaded_files", "TN_SpecialEvent_2017.RData"),
                file.path(teambucket, "TN", "SpecialEvents", "TN_SpecialEvent_2017.RData"))
   )
+  
+  #Erika Files
+  system(paste("aws s3 mv", 
+               file.path(teambucket, system('whoami', intern = T), "uploaded_files", "RoadNetwork_Jurisdiction.csv"),
+               file.path(teambucket, "WA", "Roadway", "RoadNetwork_Jurisdiction.csv"))
+  )
+  
   
 }
 
