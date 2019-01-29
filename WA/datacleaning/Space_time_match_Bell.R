@@ -1,9 +1,9 @@
 # Step 2 of the data cleaning pipeline, follows ReduceWaze_SDC.R
 # Time-space match points
-# Matching Tennessee crashes and Waze events.
+# Matching Bellevue crashes and Waze events.
 
-# Goal: for a given crash in the historical TN data, find the matching Waze events within 60 min on either side, within a 0.5 mi radius.
-# Location in TN is in LatDecimalNmb and LongDecimalNmb, time is in date field.
+# Goal: for a given crash in the historical Bell data, find the matching Waze events within 60 min on either side, on the same or a neighboring road segment.
+# Location in Bell is in LatDecimalNmb and LongDecimalNmb, time is in date field.
 # Location in Waze is in lon and lat, time is in time.
 
 # use spDists from sp package to get distances from each TN crash to each Waze event. 
