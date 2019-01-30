@@ -35,9 +35,9 @@ grids = c("TN_01dd_fishnet", "TN_1sqmile_hexagons")
 do.months = c(paste("2017", c("04","05","06","07","08","09", "10", "11", "12"), sep="-"),
               paste("2018", c("01","02","03"), sep="-"))
 
-do.months = paste("2018", c("01","02","03"), sep="-")
+# do.months = paste("2018", c("01","02","03"), sep="-")
 state = "TN"
-cutoff.crash = 0.3 
+cutoff.crash = c(0.1, 0.05) # 0.1 for MatchWaze_Accident, 0.08 for TN_crash as response 
 
 # Bundle data for Tableau
 
@@ -74,13 +74,14 @@ for(g in grids){ # g = grids[1]
   #                file.path('~', 'workingdata', 'TN', 'Random_Forest_Output', g)))
   # }
   # 
-  mods = dir(file.path(localdir, "Random_Forest_Output", g))[grep("RandomForest_Output.RData$", dir(file.path(localdir, "Random_Forest_Output", g)))]
+  mods = dir(file.path(localdir, "Random_Forest_Output"))[grep(paste0(g, "_RandomForest_Output.RData$"), dir(file.path(localdir, "Random_Forest_Output")))]
   
   modelnos = substr(mods, 10, 11)
   
-  diagnostics = dir(file.path(localdir, "Random_Forest_Output", g))[grep("_Output_to_", dir(file.path(localdir, "Random_Forest_Output", g)))]
+  diagnostics = dir(file.path(localdir))[grep("^Output_to_", dir(file.path(localdir)))]
+  diagnostics = diagnostics[grep(g, diagnostics)]
   
-  load(file.path(localdir, "Random_Forest_Output", g, sort(diagnostics, decreasing = T)[1])) 
+  load(file.path(localdir, sort(diagnostics, decreasing = T)[1])) 
   
   tabl <- vector()
   for(i in names(keyoutputs)){ 
@@ -90,30 +91,42 @@ for(g in grids){ # g = grids[1]
   colnames(tabl)[1:5] = c("Accuracy", "Precision", "Recall", "False Positive Rate", "AUC")
   rownames(tabl) =  names(keyoutputs)
   
-  write.csv(tabl, row.names = T, file = file.path(localdir, "Random_Forest_Output", "To_Export", paste0(diagnostics, "_", g, ".csv")))
+  write.csv(tabl, row.names = T, file = file.path(localdir, "Random_Forest_Output", "To_Export", 
+                                                  paste0(sort(diagnostics, decreasing = T)[1], "_", g, ".csv")))
   
   # For each model, make a rose plot and output the estimates as .csv
   for(j in 1:length(modelnos)){ # j = 1
-    load(file.path(localdir, "Random_Forest_Output", g, mods[j]))
+    load(file.path(localdir, "Random_Forest_Output", mods[j]))
     
     modelno = modelnos[j]  
     
     cat("\n", rep("<>", 10), "\n", g, modelno,"\n\n")
   
   # Load prepared input data
-  load(file.path(localdir, paste0(state, '_', do.months[1], '_to_', do.months[length(do.months)], '.RData')))
+  load(file.path(localdir, paste0(state, '_', do.months[1], '_to_', do.months[length(do.months)], "_", g, '.RData')))
   
   # Load Model <modelno> outputs ----
   # producing <state>_All_Model_<modelno>.csv
   
-  response.var = "MatchTN_buffer_Acc"
+  if(modelno %in% c("01", "02", "03") ) {
+    response.var = "MatchTN_buffer_Acc"
+    cutoff.crash.use = cutoff.crash[1]
+  }
+  if(modelno %in% c("04", "05", "06") ) {
+    response.var = "TN_crash"
+    cutoff.crash.use = cutoff.crash[2]
+    
+  }
+  
   # Omit as predictors in this vector:
-  alwaysomit = c(grep("GRID_ID", names(w.allmonths), value = T), "day", "hextime", "year", "weekday", "vmt_time",
-                 "uniqWazeEvents", "nWazeRowsInMatch", 
+  alwaysomit = c(grep("GRID_ID", names(w.allmonths), value = T), "day", "hextime", "year", "weekday", 
+                 "uniqueWazeEvents", "nWazeRowsInMatch", 
+                 "uniqueTNreports", "TN_crash", "date",
                  "nMatchWaze_buffer", "nNoMatchWaze_buffer",
                  grep("nTN", names(w.allmonths), value = T),
                  grep("MatchTN", names(w.allmonths), value = T),
                  grep("TN_UA", names(w.allmonths), value = T))
+  
   
   alert_types = c("nWazeAccident", "nWazeJam", "nWazeRoadClosed", "nWazeWeatherOrHazard")
   
@@ -124,7 +137,7 @@ for(g in grids){ # g = grids[1]
   train.dat = w.allmonths
   test.dat = w.allmonths # run on all hours of this time period, not 30% sample
   
-  cutoff = c(1-cutoff.crash, cutoff.crash)
+  cutoff = c(1-cutoff.crash.use, cutoff.crash.use)
   cc <- complete.cases(test.dat[,fitvars])
   test.dat <- test.dat[cc,]
   
@@ -146,9 +159,9 @@ for(g in grids){ # g = grids[1]
   
   model_auc <- pROC::auc(test.dat[,response.var], Fit_all.prob[,colnames(Fit_all.prob)=="1"])
   
-  out.df <- data.frame(test.dat[, c("GRID_ID", "day", "hour", response.var)], Fit_all.pred, Fit_all.prob)
+  out.df <- data.frame(test.dat[, c("GRID_ID", 'year', "day", "hour", response.var)], Fit_all.pred, Fit_all.prob)
   out.df$day <- as.numeric(out.df$day)
-  names(out.df)[4:7] <- c("Obs", "Pred", "Prob.Noncrash", "Prob.Crash")
+  names(out.df)[5:8] <- c("Obs", "Pred", "Prob.Noncrash", "Prob.Crash")
   out.df = data.frame(out.df,
                       TN = out.df$Obs == 0 &  out.df$Pred == "NoCrash",
                       FP = out.df$Obs == 0 &  out.df$Pred == "Crash",
@@ -169,30 +182,35 @@ for(g in grids){ # g = grids[1]
   
   grp  <- as.factor(w.group$group)
   
-  out.df$Pred = ifelse(out.df$Pred=="Crash", 1, 0)
-  # !!!! Will need to save year in out.df to cross years !!!
-  out.df$DayOfWeek = lubridate::wday(strptime(paste0("2018-", formatC(out.df$day, width = 3, flag = "0")), "%Y-%j"))
+  # out.df$Pred = ifelse(out.df$Pred=="Crash", 1, 0)
+  
+  out.df$DayOfWeek = lubridate::wday(strptime(paste0(out.df$year, "-", formatC(out.df$day, width = 3, flag = "0")), "%Y-%j"))
   out.df$day <- as.character(out.df$day)
-  out.df$Hour <- strptime(paste0("2018-", formatC(out.df$day, width = 3, flag = "0"), " ", out.df$hour), "%Y-%j %H")
+  out.df$Hour <- strptime(paste0(out.df$year, "-", formatC(out.df$day, width = 3, flag = "0"), " ", out.df$hour), "%Y-%j %H")
   
-  dd <- data.frame(out.df, Pred.grp = grp, w.allmonths[c("nMatchTN_buffer_Acc", fitvars, alert_subtypes)]) 
-  
-  
-  
+  dd <- data.frame(out.df, Pred.grp = grp, w.allmonths[c("nMatchTN_buffer_Acc", "MatchTN_buffer_Acc", "TN_crash", "nTN_total", unique(c(fitvars, alert_types, alert_subtypes)))]) 
+
     #### Performance by time of day plot
       
     dim(dd)
     
-    d2 <- dd %>% select(-Hour) %>% 
+    if(modelno %in% c("01", "02", "03") ) {
+      obs_var_to_plot = "nMatchTN_buffer_Acc"
+    }
+    if(modelno %in% c("04", "05", "06") ) {
+      obs_var_to_plot = "nTN_total"
+    }
+    
+    d2 <- dd %>% dplyr::select(-Hour) %>% 
       group_by(hour) %>%
       summarize(N = n(),
                 TotalWazeAcc = sum(nWazeAccident),
-                TotalObserved = sum(nMatchTN_buffer_Acc),
-                TotalEstimated = sum(Pred == 1),
+                TotalObserved = sum(get(obs_var_to_plot)),
+                TotalEstimated = sum(Pred == 'Crash'),
                 Obs_Est_diff = TotalObserved - TotalEstimated,
                 Pct_Obs_Est = 100 *TotalEstimated / TotalObserved)
     
-    ggplot(d2, aes(x = hour, y = Pct_Obs_Est)) + geom_line() + ylim(c(0, 150)) +
+    ggplot(d2, aes(x = hour, y = Pct_Obs_Est)) + geom_line() + ylim(c(70, 120)) +
       ylab("Percent of Observed TN crashes Estimated")
     
     paste(rep(seq(0, 12, 2), 2), c("AM", "PM"))
@@ -217,8 +235,35 @@ for(g in grids){ # g = grids[1]
     
     # Export as csv for Tableau
     
-    
-    write.csv(dd, file.path(localdir, "Random_Forest_Output", "To_Export", paste0("TN_Model_",modelno, "_", g, ".csv")), row.names = F)
+    write.csv(dd, file.path(localdir, "Random_Forest_Output", "To_Export", paste0("TN_Model_", modelno, "_", g, ".csv")), row.names = F)
   } # end model loop
 } # end grid loop
+
+
+
+# Bundle outputs for Tableau andfigures
+
+zipname = paste0('TN_Tableau_Out', "_", Sys.Date(), '.zip')
+
+outfiles <- figfiles <- vector()
+
+for(g in grids){ 
+  for(j in 1:length(modelnos)){
+    outfiles <- c(outfiles, file.path(localdir, "Random_Forest_Output", "To_Export", paste0("TN_Model_", modelno, "_", g, ".csv")))
+    figfiles <- c(figfiles, file.path(localdir, "Figures", paste0("TN_Obs_Est_", modelno, "_", g, "_rose.jpg")))
+  }
+}
+
+system(paste('zip -j', file.path('~/workingdata', zipname),
+             file.path(localdir, "Random_Forest_Output", "To_Export", 'Output_to_06_TN_01dd_fishnet_TN_01dd_fishnet.csv'),
+             file.path(localdir, "Random_Forest_Output", "To_Export", 'Output_to_06_TN_1sqmile_hexagons_TN_1sqmile_hexagons.csv'),
+              paste(outfiles, collapse = " "),
+              paste(figfiles, collapse = " "))
+             )
+
+system(paste(
+  'aws s3 cp',
+  file.path('~/workingdata', zipname),
+  file.path(teambucket, 'export_requests', zipname)
+))
 
