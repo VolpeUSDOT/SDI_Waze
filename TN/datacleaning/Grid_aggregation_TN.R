@@ -91,7 +91,7 @@ for(g in grids){ # g = grids[1]
  
     load(file.path(temp.outputdir, paste0("WazeHexTimeList_", j, "_", g, "TN.RData")))
     # aggregate: new data frame will have one row per cell, per hour, per day.
-    # Response variable column: count of unique EDT events matching Waze events in this cell, within this time window. 
+    # Response variable column: count of unique TN Crash events matching Waze events in this cell, within this time window. 
     # Predictor variable columns: median values for the numeric characteristics: report rating, confidence..
     # Counts for the number of waze events of each alert_type and sub_type, inside this grid cell at this time.
     # The same, but for each of the neighboring grid cells (N, NE, SE, S, SW, NW). 
@@ -106,13 +106,13 @@ for(g in grids){ # g = grids[1]
                year = format(GridDayHour, "%Y"), day = format(GridDayHour, "%j"), hour = format(GridDayHour, "%H"), weekday = format(GridDayHour, "%u")) %>%
       summarize(
         nWazeRowsInMatch = n(), #includes duplicates that match more than one TN crash report (don't use in model)
-        uniqueWazeEvents= n_distinct(uuid.waze),
+        uniqueWazeEvents= n_distinct(uuid.waze), # number of unique Waze events.
         
         Waze_UA_C = n_distinct(ID[Waze_UA_Type == "C"]),
         Waze_UA_U = n_distinct(ID[Waze_UA_Type == "U"]),        
         
-        nMatchTN_buffer = n_distinct(ID[match=="M"]),
-        nTN_total = n_distinct((ID[match=="M" | match=="T"])),
+        nMatchTN_buffer = n_distinct(ID[match=="M"]), # what's the difference between this one and the next row?
+        nTN_total = n_distinct((ID[match=="M" | match=="T"])), # did no observe any "T" value in the match column, this is the response for the Waze only model, # of unique TN crashes that find a match with Waze events
         
         nMatchTN_buffer_Acc = n_distinct(ID[match=="M" & alert_type=="ACCIDENT"]),
         nMatchTN_buffer_Jam = n_distinct(ID[match=="M" & alert_type=="JAM"]),
@@ -166,7 +166,7 @@ for(g in grids){ # g = grids[1]
         nWazeRT20 = n_distinct(uuid.waze[road_type=="20"]),
         nWazeRT17 = n_distinct(uuid.waze[road_type=="17"]),
         
-        medLastRepRate = median(last.reportRating),
+        medLastRepRate = median(last.reportRating), # median is going to be affected if Waze.hex.time table has duplicates 
         medLastConf = median(last.confidence),
         medLastReliab = median(last.reliability),
         
