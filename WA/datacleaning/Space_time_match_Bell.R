@@ -7,14 +7,14 @@
 # Location in Waze is in lon and lat, time is in time.
 
 # use spDists from sp package to get distances from each TN crash to each Waze event. 
-# Produce a link table which has a two columns: TN crashes and the Waze events which match them; repeat TN crash in the column for all matching Waze events.
-# modified for multiple states, on SDC
+# Produce a link table which has a two columns: Bell crashes and the Waze events which match them; repeat Bell crash in the column for all matching Waze events.
+
 
 # Setup ----
 rm(list = ls())
 codeloc <- "~/SDI_Waze"
 source(file.path(codeloc, 'utility/get_packages.R'))
-source(file.path(codeloc, 'utility/Workstation_setup.R')) # Download necessary files from S3
+#source(file.path(codeloc, 'utility/Workstation_setup.R')) # Download necessary files from S3
 
 library(sp)
 library(tidyverse)
@@ -23,24 +23,50 @@ library(maps)
 
 teambucket <- "s3://prod-sdc-sdi-911061262852-us-east-1-bucket"
 
+#Get files from team bucket
+# Bellevue data ----
+
+wa.ls = c('Shapefiles/Bellevue_Roadway.zip', 'Crashes/Bellevue_Crash.zip', "Roadway/RoadNetwork_Jurisdiction.csv")
+
+for(i in wa.ls){
+  if(length(grep(i, dir(file.path('~', 'workingdata', 'WA'))))==0){
+    
+    system(paste("aws s3 cp",
+                 file.path(teambucket, 'WA', i),
+                 file.path('~', 'workingdata', 'WA', i)))
+    if(length(grep('zip$', i))!=0) {
+      system(paste('unzip -o', file.path('~', 'workingdata', 'WA', i), '-d',
+                   file.path('~', 'workingdata', 'WA/')))
+      
+      
+      
+    }
+  }
+}
+
+
 home.loc <- getwd()
-  
+
 user <- if(length(grep("@securedatacommons.com", home.loc)) > 0) {
   paste0( "/home/", system("whoami", intern = TRUE), "@securedatacommons.com")
   } else {
     paste0( "/home/", system("whoami", intern = TRUE))
   } # find the user directory to use
 
-state = "TN"
+state = "WA"
 
 localdir <- file.path(user, "workingdata", state) # full path for readOGR
 
-wazedir <- file.path(localdir, 'Waze') # has State_Year-mo.RData files. Grab from S3 if necessary
+wazedir <- file.path(localdir, 'Roadway') # has State_Year-mo.RData files. Grab from S3 if necessary
 
 setwd(localdir) 
 
 # read functions
-source(file.path(codeloc, 'TN/utility/wazefunctions_TN.R'))
+source(file.path(codeloc, 'WA/utility/wazefunctions_WA.R'))
+
+#test file import
+dir(wazedir)
+segments <- read.csv(file.path(wazedir,"RoadNetwork_Jurisdiction.csv")) 
 
 # Set parameters: states, yearmonths, time zone and projection
 yearmonths = c(
@@ -68,6 +94,7 @@ proj <- showP4(showWKT("+init=epsg:102008"))
   
 wazemonthfiles <- dir(wazedir)[grep(state, dir(wazedir))]
 wazemonthfiles <- wazemonthfiles[grep("RData$", wazemonthfiles)]
+
 # omit _Raw_
 omit <- grep('_Raw_', wazemonthfiles)
 if(length(omit) > 0) { wazemonthfiles = wazemonthfiles[-omit] }
