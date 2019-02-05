@@ -46,14 +46,13 @@ for(g in grids){ # g = grids[1]
   avail.months = substr(unlist(lapply(strsplit(gridmergefiles, "_"), function(x) x[[4]])),
                         1, 7)
   
-  # Look for already completed months and skip those
+  # Look for already completed months and skip those. Edit to todo.months = avail.months to re-run (or just delete previously completed WazeHexTimeList files)
   tlfiles <- dir(temp.outputdir)[grep("WazeHexTimeList_", dir(temp.outputdir))]
   g.tlfiles <- tlfiles[grep(g, tlfiles)]
   done.months <- unlist(lapply(strsplit(g.tlfiles, "_"), function(x) x[[2]])) 
 
   todo.months = avail.months[!avail.months %in% done.months] #sort(avail.months)[c(1:9)]
 
-  
   starttime <- Sys.time()
   
   cl <- makeCluster(parallel::detectCores()) # make a cluster of all available cores
@@ -66,7 +65,6 @@ for(g in grids){ # g = grids[1]
     sink(paste(g, "log.txt", sep = "_"), append=TRUE) # sink() function diverts R output to a connection and stops such diversions. Starting from this point, all output in console will be saved in the log file in the working directory.
     
     cat(paste(Sys.time()), g, j, "\n")                                                           
-                                                             
     
     load(file.path(wazemonthdir, paste0("merged.waze.tn.", g,"_", j, ".RData"))) # includes both waze (link.waze.tn) and TN crash (crash.df) data, with grid for central and neighboring cells
     
@@ -96,36 +94,56 @@ for(g in grids){ # g = grids[1]
     lastday = max(month.days[!is.na(month.days)])
     
     Month.hour <- seq(from = as.POSIXct(paste0(j,"-01 0:00"), tz = 'America/Chicago'), 
-                      to = as.POSIXct(paste0(j,"-", lastday, " 24:00"), tz = 'America/Chicago'), # Why timezone of from and to are different? Looks like the code only used CDT
+                      to = as.POSIXct(paste0(j,"-", lastday, " 24:00"), tz = 'America/Chicago'), 
                       by = "hour")
     
-    GridIDTime <- expand.grid(Month.hour, GridIDall)
+    # Remove time zone to put everything in local time
+    Date <- format(Month.hour, "%Y-%m-%d")
+    Hour <- format(Month.hour, "%H")
+    Date.hour <- paste(Date, Hour)
+    
+    # Make the same format for Waze and TN crash data
+    link.waze.tn$wDate <- format(link.waze.tn$time, "%Y-%m-%d")
+    link.waze.tn$wHour <- as.numeric(format(link.waze.tn$time, "%H"))
+    
+    link.waze.tn$wDate.last <- format(link.waze.tn$last.pull.time, "%Y-%m-%d")
+    link.waze.tn$wHour.last <- as.numeric(format(link.waze.tn$last.pull.time, "%H"))
+
+    link.waze.tn$tDate <- format(link.waze.tn$date, "%Y-%m-%d")
+    link.waze.tn$tHour <- as.numeric(format(link.waze.tn$date, "%H"))
+
+    GridIDTime <- expand.grid(Date.hour, GridIDall)
     names(GridIDTime) <- c("GridDayHour", "GRID_ID")
-  
+    GridIDTime$Date <- substr(GridIDTime$GridDayHour, 1, 10)
+    GridIDTime$Hour <- as.numeric(substr(GridIDTime$GridDayHour, 12, 13))
+    
     # Temporally matching
     # Match between the first reported time and last pull time of the Waze event. 
     StartTime <- Sys.time()
-    t.min = min(Month.hour) # format(min(Month.hour), "%Y-%m-%d %H:%M:%S %Z") # the datetime format of the first hour showed as date only format. When reformat using format() function, it did not work.
-    t.max = max(Month.hour) # format(max(Month.hour), "%Y-%m-%d %H:%M:%S %Z")
+    t.min = min(Date.hour) 
+    t.max = max(Date.hour)
     i = t.min
     
     Waze.hex.time.all <- vector()
-    counter = 1
-    while(i+3600 <= t.max){
-      ti.GridIDTime = filter(GridIDTime, GridDayHour == i)
-      ti.link.waze.tn = link.waze.tn %>% filter(time >= i & time <= i+3600 | last.pull.time >= i & last.pull.time <=i+3600) # Match Waze events time
-      # table(format(link.waze.tn$time, "%Z")) # all Waze events are in EDT timezone.
-      ti.link.waze.tn.t = link.waze.tn %>% filter(date >= i & date <= i+3600) # Match TN crash time
-      # table(format(link.waze.tn$date, "%Z")) # All TN crashes are in CDT timezone. One solution is to format the original dataset by setting the local time with accurate timezone information. Any events fall in one Eastern timezone will have "EDT" in their timestamp.
+
+    for(t in 1:length(Date.hour)){ # t = 1
+      ti.GridIDTime = filter(GridIDTime, GridDayHour == Date.hour[t])
       
+      ti.link.waze.tn = link.waze.tn %>% 
+        filter(wDate == unique(ti.GridIDTime$Date) &
+                 wHour == unique(ti.GridIDTime$Hour) | wHour.last == unique(ti.GridIDTime$Hour)) # Match Waze events time. Unique() must result in a single value for Date and Hour.
+      
+      ti.link.waze.tn.t = link.waze.tn %>% 
+        filter(tDate == unique(ti.GridIDTime$Date) &
+                 tHour == unique(ti.GridIDTime$Hour) ) # Match TN events time. 
+
       ti.Waze.hex <- inner_join(ti.GridIDTime, ti.link.waze.tn, by = "GRID_ID") # Use left_join to get zeros if no match  
       ti.Waze.hex.t <- inner_join(ti.GridIDTime, ti.link.waze.tn.t, by = "GRID_ID") # Same, for TN only crashes
       
       Waze.hex.time.all <- rbind(Waze.hex.time.all, ti.Waze.hex)
       Waze.hex.time.all <- rbind(Waze.hex.time.all, ti.Waze.hex.t)
       
-      i=i+3600
-      if(counter %% 3600*24 == 0) cat(paste(i, "\n"))
+      if(unique(ti.GridIDTime$Hour) == 0) cat(paste(Date.hour[t], "\n"))
      } # end loop
     
     EndTime <- Sys.time() - StartTime
@@ -134,7 +152,7 @@ for(g in grids){ # g = grids[1]
     Waze.hex.time <- unique(Waze.hex.time.all) # Rows with match = "M" are duplicated, so we want to remove the duplicates.
     Waze.hex.time <- filter(Waze.hex.time, !is.na(GRID_ID))
     
-    #Save list of Grid cells and time windows with EDT or Waze data  
+    # Save list of Grid cells and time windows with EDT or Waze data  
     fn = paste0("WazeHexTimeList_", j,"_", g, "TN.RData")
     
     save(list="Waze.hex.time", file = file.path(temp.outputdir, fn))

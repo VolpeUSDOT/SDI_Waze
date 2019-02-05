@@ -196,9 +196,12 @@ for(g in grids){ # g = grids[1]
     
     if(modelno %in% c("01", "02", "03") ) {
       obs_var_to_plot = "nMatchTN_buffer_Acc"
+      obs_var_to_plot_bin = "MatchTN_buffer_Acc"
     }
     if(modelno %in% c("04", "05", "06") ) {
       obs_var_to_plot = "nTN_total"
+      obs_var_to_plot_bin = "TN_crash"
+      
     }
     
     d2 <- dd %>% dplyr::select(-Hour) %>% 
@@ -212,6 +215,19 @@ for(g in grids){ # g = grids[1]
     
     ggplot(d2, aes(x = hour, y = Pct_Obs_Est)) + geom_line() + ylim(c(70, 120)) +
       ylab("Percent of Observed TN crashes Estimated")
+    
+    
+    d2 <- dd %>% dplyr::select(-Hour) %>% 
+      group_by(hour) %>%
+      summarize(N = n(),
+                TotalWazeAcc = sum(nWazeAccident),
+                TotalObserved = sum(get(obs_var_to_plot_bin)==1),
+                TotalEstimated = sum(Pred == 'Crash'),
+                Obs_Est_diff = TotalObserved - TotalEstimated,
+                Pct_Obs_Est = 100 *TotalEstimated / TotalObserved)
+    
+    ggplot(d2, aes(x = hour, y = Pct_Obs_Est)) + geom_line() + ylim(c(70, 120)) +
+      ylab("Percent of Observed TN crashes Estimated") 
     
     paste(rep(seq(0, 12, 2), 2), c("AM", "PM"))
     labs <- c("12 AM", "2 AM", "4 AM", "6 AM", "8 AM", "10 AM",
@@ -241,14 +257,14 @@ for(g in grids){ # g = grids[1]
 
 
 
-# Bundle outputs for Tableau andfigures
+# Bundle outputs for Tableau and figures
 
 zipname = paste0('TN_Tableau_Out', "_", Sys.Date(), '.zip')
 
 outfiles <- figfiles <- vector()
 
 for(g in grids){ 
-  for(j in 1:length(modelnos)){
+  for(modelno in formatC(1:6, width = 2, flag = 0)){ # modelno = '01'
     outfiles <- c(outfiles, file.path(localdir, "Random_Forest_Output", "To_Export", paste0("TN_Model_", modelno, "_", g, ".csv")))
     figfiles <- c(figfiles, file.path(localdir, "Figures", paste0("TN_Obs_Est_", modelno, "_", g, "_rose.jpg")))
   }
