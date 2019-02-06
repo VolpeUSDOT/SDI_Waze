@@ -10,6 +10,9 @@ library(utils)
 library(doParallel) # DoParallel package is a "parallel backend" for the foreach package, it provides a mechanism needed to execute foreach loops in parallel.
 library(foreach)
 
+# usecorepct = # .4 # Options: manually set percent of cores to use, to try to prevent unserialize(socklist[[n]]) error, which can happen when RAM gets used up. This is a workaround; other method would be to estimate how much RAM will be needed for a process and then set the limit, or work backwards from free RAM.
+# Comment out to use all cores, or set to 1.
+
 #Set parameters for data to process
 grids = c("TN_01dd_fishnet",
           "TN_1sqmile_hexagons")
@@ -51,11 +54,19 @@ for(g in grids){ # g = grids[1]
   g.tlfiles <- tlfiles[grep(g, tlfiles)]
   done.months <- unlist(lapply(strsplit(g.tlfiles, "_"), function(x) x[[2]])) 
 
-  todo.months = avail.months[!avail.months %in% done.months] #sort(avail.months)[c(1:9)]
+  todo.months = avail.months#[!avail.months %in% done.months] #sort(avail.months)[c(1:9)]
 
   starttime <- Sys.time()
   
-  cl <- makeCluster(parallel::detectCores()) # make a cluster of all available cores
+  if(exists('usecorepct')) {
+      # make a cluster with limited number of cores 
+      usecores = round(parallel::detectCores()*usecorepct)
+      cl <- makeCluster(usecores) 
+  
+    } else {
+      # make a cluster of all available cores 
+      cl <- makeCluster(parallel::detectCores()) 
+    }
   registerDoParallel(cl)
   
   writeLines(c(""), paste(g, "log.txt", sep = "_"))    
@@ -117,21 +128,23 @@ for(g in grids){ # g = grids[1]
     GridIDTime$Date <- substr(GridIDTime$GridDayHour, 1, 10)
     GridIDTime$Hour <- as.numeric(substr(GridIDTime$GridDayHour, 12, 13))
     
+    # GRID_ID as character to for faster joining in the loop 
+    GridIDTime$GRID_ID <- as.character(GridIDTime$GRID_ID)
+    link.waze.tn$GRID_ID <- as.character(link.waze.tn$GRID_ID)
+    
     # Temporally matching
     # Match between the first reported time and last pull time of the Waze event. 
     StartTime <- Sys.time()
-    t.min = min(Date.hour) 
-    t.max = max(Date.hour)
-    i = t.min
     
     Waze.hex.time.all <- vector()
-
+    
+    # Loop over all hours of this month
     for(t in 1:length(Date.hour)){ # t = 1
-      ti.GridIDTime = filter(GridIDTime, GridDayHour == Date.hour[t])
+      ti.GridIDTime = GridIDTime %>% filter(GridDayHour == Date.hour[t])
       
       ti.link.waze.tn = link.waze.tn %>% 
         filter(wDate == unique(ti.GridIDTime$Date) &
-                 wHour == unique(ti.GridIDTime$Hour) | wHour.last == unique(ti.GridIDTime$Hour)) # Match Waze events time. Unique() must result in a single value for Date and Hour.
+                 ( wHour == unique(ti.GridIDTime$Hour) | wHour.last == unique(ti.GridIDTime$Hour) ) ) # Match Waze events time. Unique() must result in a single value for Date and Hour.
       
       ti.link.waze.tn.t = link.waze.tn %>% 
         filter(tDate == unique(ti.GridIDTime$Date) &
