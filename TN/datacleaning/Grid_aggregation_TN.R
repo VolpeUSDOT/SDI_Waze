@@ -66,21 +66,18 @@ for(g in grids){ # g = grids[1]
   grid.tlfiles <- tlfiles[grep(g, tlfiles)]
   done.months <- unlist(lapply(strsplit(grid.tlfiles, "_"), function(x) x[[2]])) 
   
-  todo.months = sort(avail.months)#[!avail.months %in% done.months])
+  todo.months = sort(avail.months)[!avail.months %in% done.months]
   
-  use.tz <- "America/Chicago" # This gets used only in making the hextime variable
-
   cl <- makeCluster(parallel::detectCores()) # make a cluster of all available cores
   registerDoParallel(cl)
   
-  writeLines(c(""), paste0(g, "_log.txt"))    
+  writeLines(c(""), paste0("GridAgg", g, "_log.txt"))    
   
   foreach(j = todo.months, .packages = c("dplyr", "lubridate", "utils")) %dopar% {
-    # j = "2017-04"  
-    sink(paste0(g, "_log.txt"), append=TRUE)
+    # j = "2018-08"  
+    sink(paste0("GridAgg", g, "_log.txt"), append=TRUE)
     
     cat(paste(Sys.time()), j, "\n")                                                  
-    
     load(file.path(wazemonthdir, paste0("merged.waze.tn.", g,"_", j, ".RData"))) # includes both waze (link.waze.tn) and TN crash (crash.df) data, with grid for central and neighboring cells
     
     # format(object.size(link.waze.tn), "Mb"); format(object.size(crash.df), "Mb")
@@ -102,8 +99,9 @@ for(g in grids){ # g = grids[1]
     
     StartTime <- Sys.time()
     waze.hex <- Waze.hex.time %>%
+      mutate(Date = as.POSIXct(Date)) %>%
       group_by(GRID_ID, GRID_ID_NW, GRID_ID_N, GRID_ID_NE, GRID_ID_SW, GRID_ID_S, GRID_ID_SE,
-               year = format(GridDayHour, "%Y"), day = format(GridDayHour, "%j"), hour = format(GridDayHour, "%H"), weekday = format(GridDayHour, "%u")) %>%
+               year = format(Date, "%Y"), day = format(Date, "%j"), hour = formatC(Hour, width = 2, flag = '0'), weekday = format(Date, "%u")) %>%
       summarize(
         nWazeRowsInMatch = n(), #includes duplicates that match more than one TN crash report (don't use in model)
         uniqueWazeEvents= n_distinct(uuid.waze), # number of unique Waze events.
@@ -177,15 +175,13 @@ for(g in grids){ # g = grids[1]
         nMagVar180to240 = n_distinct(uuid.waze[magvar>= 180 & magvar<240]),
         nMagVar240to360 = n_distinct(uuid.waze[magvar>= 240 & magvar<360])) 
   
-    EndTime <- Sys.time()-StartTime
-    EndTime
-    
+
     #Compute grid counts for TN data -- update all of these to the TN data variables
     # Add accident severity counts by grid cell 
     # names(crash.df)
     tn.hex <- 
       crash.df %>%
-      group_by(GRID_ID.TN, day = format(date, "%j"), hour = format(date, "%H")) %>%
+      group_by(GRID_ID.TN, year = format(date, "%Y"), day = format(date, "%j"), hour = format(date, "%H")) %>%
       summarize(
         uniqueTNreports= n_distinct(MstrRecNbrTxt),
         
@@ -203,7 +199,7 @@ for(g in grids){ # g = grids[1]
     names(tn.hex)
     colnames(tn.hex)[1] <- "GRID_ID"
     
-    wazeTime.tn.hex <- full_join(waze.hex, tn.hex, by = c("GRID_ID", "day", "hour")) %>%
+    wazeTime.tn.hex <- full_join(waze.hex, tn.hex, by = c("GRID_ID", "year", "day", "hour")) %>%
       mutate_all(funs(replace(., is.na(.), 0)))
     # Replace NA with zero (for the grid counts here, 0 means there were no reported Waze events or TN crashes in the grid cell at that hour)
     
@@ -258,8 +254,8 @@ for(g in grids){ # g = grids[1]
     # Replace NA with zero (for the grid counts here, 0 means there were no reported Waze events or EDT crashes in the neighbor grid cell at that hour)
     
     # Update time variable 
-    hextimeChar <- paste(wazeTime.tn.hexAll$year, wazeTime.tn.hexAll$day, wazeTime.tn.hexAll$hour, sep=":")
-    wazeTime.tn.hexAll$hextime <- strptime(hextimeChar, "%Y:%j:%H", tz = use.tz)
+    hextimeChar <- paste(paste(wazeTime.tn.hexAll$year, wazeTime.tn.hexAll$day, sep = "-"), wazeTime.tn.hexAll$hour, sep=" ")
+    wazeTime.tn.hexAll$hextime <- hextimeChar #strptime(hextimeChar, "%Y:%j:%H", tz = use.tz)
   
     class(wazeTime.tn.hexAll) <- "data.frame" # POSIX date/time not supported for grouped tbl
     
@@ -272,14 +268,19 @@ for(g in grids){ # g = grids[1]
                  file.path(temp.outputdir, fn),
                  file.path(teambucket, state, fn)))
     
+    EndTime <- Sys.time()-StartTime
+    cat(j, 'completed', round(EndTime, 2), attr(EndTime, 'units'), '\n')
+
   } # End month aggregation loop ----
   
   
   stopCluster(cl)
 
-} # end state loop
+} # end grid loop
 
+REUPLOAD = F
 
+if(REUPLOAD){
 # Move to S3 if it failed in the loop for some reason
 for(g in grids){ # g = grids[1]
   # Loop through months of available merged data for this state
@@ -299,7 +300,7 @@ for(g in grids){ # g = grids[1]
                file.path(teambucket, state, fn)))
   }
 }
-
+}
 # Check with plots -- 
 
 CHECKPLOT = T

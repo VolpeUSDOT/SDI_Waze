@@ -54,7 +54,7 @@ for(g in grids){ # g = grids[1]
   g.tlfiles <- tlfiles[grep(g, tlfiles)]
   done.months <- unlist(lapply(strsplit(g.tlfiles, "_"), function(x) x[[2]])) 
 
-  todo.months = avail.months#[!avail.months %in% done.months] #sort(avail.months)[c(1:9)]
+  todo.months = avail.months[!avail.months %in% done.months] 
 
   starttime <- Sys.time()
   
@@ -71,7 +71,7 @@ for(g in grids){ # g = grids[1]
   
   writeLines(c(""), paste(g, "log.txt", sep = "_"))    
   
-  foreach(j = todo.months, .packages = c("dplyr", "lubridate", "utils")) %dopar% { # j="2017-04" 
+  foreach(j = todo.months, .packages = c("dplyr", "lubridate", "utils")) %dopar% { # j="2018-08" 
 
     sink(paste(g, "log.txt", sep = "_"), append=TRUE) # sink() function diverts R output to a connection and stops such diversions. Starting from this point, all output in console will be saved in the log file in the working directory.
     
@@ -88,7 +88,7 @@ for(g in grids){ # g = grids[1]
                           as.character(link.waze.tn$GRID_ID.TN)) # Grid ID for a TN crash
                         )
     # x <- data.frame(length(unique(as.character(link.waze.tn$GRID_ID))), length(unique(as.character(link.waze.tn$GRID_ID.TN))), length(GridIDall), length(unique(GridIDall)))
-    # 837, 698, 1535, 922 # using "2017-04" as an example, apparently, we have some duplication in GridIDall
+    # No more duplication in GridIDall 
     
     # Date/time for TN crash only events or TN/Waze matching events are stored as 'date', while Date/time for Waze only events are stored as 'time'.
     year.month.w <- format(link.waze.tn$time, "%Y-%m")
@@ -163,6 +163,9 @@ for(g in grids){ # g = grids[1]
     cat(round(EndTime, 2), attr(EndTime, "units"), "\n")
     
     Waze.hex.time <- unique(Waze.hex.time.all) # Rows with match = "M" are duplicated, so we want to remove the duplicates.
+    
+    # Use TN-only grid IDs if no Waze event present. Otherwise, TN only events (match==T) are omitted.
+    Waze.hex.time$GRID_ID[is.na(Waze.hex.time$GRID_ID)] = Waze.hex.time$GRID_ID.TN[is.na(Waze.hex.time$GRID_ID)]
     Waze.hex.time <- filter(Waze.hex.time, !is.na(GRID_ID))
     
     # Save list of Grid cells and time windows with EDT or Waze data  
