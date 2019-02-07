@@ -31,7 +31,7 @@ source(file.path(codeloc, "TN", "utility/wazefunctions_TN.R"))
 setwd(localdir)
 
 # <><><><><>
-g = grids[1] # start with square grids, now running hex also. Change between 1 and 2.
+g = grids[2] # start with square grids, now running hex also. Change between 1 and 2.
 state = "TN"
 # <><><><><>
 
@@ -152,7 +152,7 @@ rf.inputs = list(ntree.use = avail.cores * 50, avail.cores = avail.cores, mtry =
 keyoutputs = redo_outputs = list() # to store model diagnostics
 
 # Omit as predictors in this vector:
-alwaysomit = c(grep("GRID_ID", names(w.allmonths), value = T), "day", "hextime", "year", "weekday", 
+alwaysomit = c(grep("GRID_ID", names(w.allmonths), value = T), "day", "hextime", "year", "weekday", 'wDate', 'wHour', 'tDate', 'tHour',
                "uniqueWazeEvents", "nWazeRowsInMatch", 
                "uniqueTNreports", "TN_crash", "date",
                "nMatchWaze_buffer", "nNoMatchWaze_buffer",
@@ -192,7 +192,10 @@ modelno = paste("01", g, sep = "_")
 if(!REASSESS){
   keyoutputs[[modelno]] = do.rf(train.dat = w.allmonths, 
                                 omits, response.var = "MatchTN_buffer_Acc", 
-                                model.no = modelno, rf.inputs = rf.inputs) 
+                                model.no = modelno, rf.inputs = rf.inputs,
+                                cutoff = c(0.95, 0.05)
+                                #, thin.dat = 0.2
+                                ) 
   
   save("keyoutputs", file = paste0("Output_to_", modelno))
   } else {
@@ -224,7 +227,8 @@ omits = c(alwaysomit,
 if(!REASSESS){
   keyoutputs[[modelno]] = do.rf(train.dat = w.allmonths, 
                               omits, response.var = "MatchTN_buffer_Acc", 
-                              model.no = modelno, rf.inputs = rf.inputs) 
+                              model.no = modelno, rf.inputs = rf.inputs,
+                              cutoff = c(0.95, 0.05)) 
 
  save("keyoutputs", file = paste0("Output_to_", modelno))
 } else {
@@ -251,7 +255,8 @@ omits = c(alwaysomit
 if(!REASSESS){
   keyoutputs[[modelno]] = do.rf(train.dat = w.allmonths, 
                                 omits, response.var = "MatchTN_buffer_Acc", 
-                                model.no = modelno, rf.inputs = rf.inputs) 
+                                model.no = modelno, rf.inputs = rf.inputs,
+                                cutoff = c(0.95, 0.05)) 
   
   save("keyoutputs", file = paste0("Output_to_", modelno))
 } else {
@@ -287,7 +292,9 @@ modelno = paste("04", g, sep = "_")
 if(!REASSESS){
   keyoutputs[[modelno]] = do.rf(train.dat = w.allmonths, 
                                 omits, response.var = "TN_crash", 
-                                model.no = modelno, rf.inputs = rf.inputs) 
+                                model.no = modelno, rf.inputs = rf.inputs,
+                                cutoff = c(0.9, 0.1)) 
+  
   
   save("keyoutputs", file = paste0("Output_to_", modelno))
 } else {
@@ -315,7 +322,8 @@ omits = c(alwaysomit,
 if(!REASSESS){
   keyoutputs[[modelno]] = do.rf(train.dat = w.allmonths, 
                                 omits, response.var = "TN_crash", 
-                                model.no = modelno, rf.inputs = rf.inputs) 
+                                model.no = modelno, rf.inputs = rf.inputs,
+                                cutoff = c(0.9, 0.1))  
   
   save("keyoutputs", file = paste0("Output_to_", modelno))
 } else {
@@ -342,7 +350,8 @@ omits = c(alwaysomit
 if(!REASSESS){
   keyoutputs[[modelno]] = do.rf(train.dat = w.allmonths, 
                                 omits, response.var = "TN_crash", 
-                                model.no = modelno, rf.inputs = rf.inputs) 
+                                model.no = modelno, rf.inputs = rf.inputs,
+                                cutoff = c(0.9, 0.1))  
   
   save("keyoutputs", file = paste0("Output_to_", modelno))
 } else {

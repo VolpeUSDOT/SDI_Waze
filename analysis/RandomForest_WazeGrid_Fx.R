@@ -26,7 +26,7 @@ do.rf <- function(train.dat, omits, response.var = "MatchEDT_buffer_Acc", model.
                   test.dat = NULL, test.split = .30,
                   split.by = NULL,
                   thin.dat = NULL,
-                  cutoff = c(0.9, 0.1),
+                  cutoff = c(0.8, 0.2),
                   rf.inputs = list(ntree.use = 500, avail.cores = 4, mtry = NULL, maxnodes = NULL, nodesize = 5)){
   
   if(!is.null(test.dat) & !missing(test.split)) stop("Specify either test.dat or test.split, but not both")

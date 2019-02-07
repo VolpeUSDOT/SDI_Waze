@@ -233,11 +233,11 @@ for(g in grids){ # g = grids[1]
     labs <- c("12 AM", "2 AM", "4 AM", "6 AM", "8 AM", "10 AM",
               "12 PM", "2 PM", "4 PM", "6 PM", "8 PM", "10 PM")
     
-    ggplot(d2, aes(x= hour, y= Pct_Obs_Est, fill = TotalWazeAcc)) +
+    ggplot(d2, aes(x= hour, y= Pct_Obs_Est
+                   , fill = TotalWazeAcc)) +
       geom_line(aes(y = 100, x = 0:23), lwd = 1.5, col = "darkgreen") +
       geom_bar(stat="identity")+
       coord_polar()+
-     # ylim(c(0, 150)) + 
       ylab("") +
       xlab("Hour of Day") + 
       scale_y_continuous(labels = "", breaks = 1) +
@@ -246,6 +246,37 @@ for(g in grids){ # g = grids[1]
       ggtitle(paste("TN Model", modelno, g, ": Estimated TN crashes / observed \n By hour of day"))
     
     ggsave(file = paste0("TN_Obs_Est_", modelno, "_", g, "_rose.jpg"), device = 'jpeg', 
+           path = "~/workingdata/TN/Figures", 
+           width = 7, height = 7, units = 'in')
+    
+    
+    ggplot(d2, aes(x= hour, y= TotalEstimated
+                   , fill = TotalWazeAcc)) +
+      #geom_line(aes(y = 100, x = 0:23), lwd = 1.5, col = "darkgreen") +
+      geom_bar(stat="identity")+
+      coord_polar() +
+      xlab("Hour of Day") + 
+      #scale_y_continuous(labels = "", breaks = 1) +
+      scale_x_continuous(labels = labs,
+                         breaks= seq(0, 23, 2)) +
+      ggtitle(paste("TN Model", modelno, g, ": Estimated TN crashes \n By hour of day"))
+    
+    ggsave(file = paste0("TN_Est_", modelno, "_", g, "_rose.jpg"), device = 'jpeg', 
+           path = "~/workingdata/TN/Figures", 
+           width = 7, height = 7, units = 'in')
+    
+    ggplot(d2, aes(x= hour, y= TotalObserved
+                   , fill = TotalWazeAcc)) +
+      #geom_line(aes(y = 100, x = 0:23), lwd = 1.5, col = "darkgreen") +
+      geom_bar(stat="identity")+
+      coord_polar() +
+      xlab("Hour of Day") + 
+      #scale_y_continuous(labels = "", breaks = 1) +
+      scale_x_continuous(labels = labs,
+                         breaks= seq(0, 23, 2)) +
+      ggtitle(paste("TN Model", modelno, g, ": Observed TN crashes \n By hour of day"))
+    
+    ggsave(file = paste0("TN_Obs_", modelno, "_", g, "_rose.jpg"), device = 'jpeg', 
            path = "~/workingdata/TN/Figures", 
            width = 7, height = 7, units = 'in')
     
