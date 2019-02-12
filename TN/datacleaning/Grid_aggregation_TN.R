@@ -106,9 +106,10 @@ for(g in grids){ # g = grids[1]
         nWazeRowsInMatch = n(), #includes duplicates that match more than one TN crash report (don't use in model)
         uniqueWazeEvents= n_distinct(uuid.waze), # number of unique Waze events.
         
-        Waze_UA_C = n_distinct(ID[Waze_UA_Type == "C"]),
-        Waze_UA_U = n_distinct(ID[Waze_UA_Type == "U"]),        
-        
+        UA_Cluster = 1*any(Waze_UA_Type == "C" & !is.na(Waze_UA_Type)),
+        UA_Urban = 1*any(Waze_UA_Type == "U" & !is.na(Waze_UA_Type)),
+        UA_Rural = 1*any(is.na(Waze_UA_Type)),
+    
         nMatchTN_buffer = n_distinct(ID[match=="M"]), # what's the difference between this one and the next row?
         nTN_total = n_distinct((ID[match=="M" | match=="T"])), # did no observe any "T" value in the match column, this is the response for the Waze only model, # of unique TN crashes that find a match with Waze events
         
@@ -188,10 +189,7 @@ for(g in grids){ # g = grids[1]
         nTNInjuryFatal = n_distinct(MstrRecNbrTxt[NbrFatalitiesNmb > 0]),
         nTNInjury = n_distinct(MstrRecNbrTxt[NbrInjuredNmb > 0]),
         nTNAlcoholInd = n_distinct(MstrRecNbrTxt[AlcoholInd == "Y"]),
-        nTNIntersectionInd = n_distinct(MstrRecNbrTxt[IntersectionInd == "Y"]),
-        
-        TN_UA_C = n_distinct(MstrRecNbrTxt[EDT_UA_Type == "C"]),
-        TN_UA_U = n_distinct(MstrRecNbrTxt[EDT_UA_Type == "U"])        
+        nTNIntersectionInd = n_distinct(MstrRecNbrTxt[IntersectionInd == "Y"])
         ) 
     
     #Merge TN crash counts to waze counts by hexagons

@@ -3,6 +3,7 @@
 # Run from RandomForest_WazeGrid_TN.R
 # already in memory are localdir and g, which repreresents the grid type to use
 # Next step after this script is to run append.hex function to add 
+censusdir <- paste0(user, "/workingdata/census") # full path for readOGR, for buffered state shapefile created in first step of data pipeline, ReduceWaze_SDC.R
 
 
 proj.USGS <- "+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs +ellps=GRS80 +towgs84=0,0,0"
@@ -50,7 +51,7 @@ if(length(grep(prepname, dir(file.path(localdir, "Weather")))) == 0) {
   # wx %>%
   #   filter(TMAX < 10) # Looks possible
   # wx %>%
-  #   filter(TMIN < -10) # Replace these with NA, does not seem possible
+  #   filter(TMIN < -10) # Replace -99 with NA
    
   wx$TMIN[wx$TMIN == -99] = NA
   wx$TMAX[wx$TMAX == -99] = NA
@@ -78,6 +79,13 @@ if(length(grep(prepname, dir(file.path(localdir, "Weather")))) == 0) {
   grid_shp <- rgdal::readOGR(file.path(localdir, "Shapefiles"), layer = g)
   grid_shp <- spTransform(grid_shp, CRS(proj.USGS))
   
+  # Read in buffered state shapefile
+  tn_buff <- readOGR(censusdir, layer = "TN_buffered")
+  tn_buff <- spTransform(tn_buff, CRS(proj.USGS))
+  
+  # Clip grid to county shapefile
+  grid_shp2 <- gIntersection(grid_shp, tn_buff, byid = T)
+  
   wx <- wx %>%
     mutate(mo = format(DATE, "%m"))
   
@@ -92,8 +100,6 @@ if(length(grep(prepname, dir(file.path(localdir, "Weather")))) == 0) {
   cl <- makeCluster(parallel::detectCores())
   registerDoParallel(cl)
   
-  StartTime <- Sys.time()
-  
   # Create an empty raster grid for the state; we will interpolate over this grid, then assign values from the raster to each grid cell. Increase n for smaller raster cells (more time-intensive)
   grd <- as.data.frame(spsample(grid_shp, 'regular', n = 10000))
   names(grd) <- c("X", "Y")
@@ -102,10 +108,20 @@ if(length(grep(prepname, dir(file.path(localdir, "Weather")))) == 0) {
   fullgrid(grd) <- TRUE # for SpatialGrid
   proj4string(grd) <- proj4string(grid_shp)
   
+  StartTime <- Sys.time()
+  
+  writeLines(c(""), paste0("Prep_Weather_", g, "_log.txt"))    
+  
+  # Start parallel loop ----
+  
   wx.grd.day <- foreach(day = unique(wx$DATE), 
                       .packages = c('raster','gstat','dplyr','rgdal'), 
                       .combine = rbind) %dopar% {
-    # day = wx$DATE[1]
+    # day = unique(wx$DATE)[1]
+    sink(paste0("Prep_Weather_", g, "_log.txt"), append=TRUE)
+                        
+    cat(paste(Sys.time()), day, "\n") 
+                        
     wx.day = wx.proj[wx.proj$DATE == day,]
                         
     f.p <- as.formula(PRCP ~ 1)
@@ -155,6 +171,11 @@ if(length(grep(prepname, dir(file.path(localdir, "Weather")))) == 0) {
     
     # Apply to grid cells in year-day ----
     
+    # Trying to speed up with rasterize
+    clip1 <- crop(prcp_r, extent(grid_shp))
+    grid_rst <- rasterize(grid_shp, clip1, mask = T) # still slow, but faster than extract
+    prcp_extr_r <- getValues(grid_rst) # instant
+    
     # Need to extract values from the raster layers to the polygons
     prcp_extr <- raster::extract(x = prcp_r,   # Raster object
                                  y = grid_shp, # SpatialPolygons
@@ -186,6 +207,19 @@ if(length(grep(prepname, dir(file.path(localdir, "Weather")))) == 0) {
     names(snow_extr)[2] = "SNOW"
     
     daily_result <- full_join(daily_result, snow_extr)
+    
+    # Save to S3 as temporary location in case the process is interrupted
+    fn = paste("Prep_Weather_Daily_", day,"_", g, ".RData", sep="")
+    
+    save(list="wazeTime.tn.hexAll", file = file.path(temp.outputdir, fn))
+    
+    # Copy to S3
+    system(paste("aws s3 cp",
+                 file.path(temp.outputdir, fn),
+                 file.path(teambucket, state, fn)))
+    
+    EndTime <- Sys.time()-StartTime
+    cat(day, 'completed', round(EndTime, 2), attr(EndTime, 'units'), '\n')
     
     daily_result
   } # end parallel loop
