@@ -5,6 +5,7 @@
 # Next step after this script is to run append.hex function to add 
 censusdir <- paste0(user, "/workingdata/census") # full path for readOGR, for buffered state shapefile created in first step of data pipeline, ReduceWaze_SDC.R
 
+temp.outputdir <- "~/tempout" # to hold daily output files as they are generated, and then sent to team bucket
 
 proj.USGS <- "+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs +ellps=GRS80 +towgs84=0,0,0"
 
@@ -84,7 +85,7 @@ if(length(grep(prepname, dir(file.path(localdir, "Weather")))) == 0) {
   tn_buff <- spTransform(tn_buff, CRS(proj.USGS))
   
   # Clip grid to county shapefile
-  grid_shp2 <- gIntersection(grid_shp, tn_buff, byid = T)
+  grid_shp <- gIntersection(grid_shp, tn_buff, byid = T)
   
   wx <- wx %>%
     mutate(mo = format(DATE, "%m"))
@@ -171,16 +172,19 @@ if(length(grep(prepname, dir(file.path(localdir, "Weather")))) == 0) {
     
     # Apply to grid cells in year-day ----
     
-    # Trying to speed up with rasterize
-    clip1 <- crop(prcp_r, extent(grid_shp))
-    grid_rst <- rasterize(grid_shp, clip1, mask = T) # still slow, but faster than extract
-    prcp_extr_r <- getValues(grid_rst) # instant
-    
+    # Trying to speed up with rasterize. Doesn't help, because converts to the grid cell dimensions of the raster object, we need to preserve the polygon geometry
+    # extracttimestart <- Sys.time()
+    # clip1 <- crop(prcp_r, extent(grid_shp))
+    # grid_rst <- rasterize(grid_shp, clip1, mask = T) # still slow, but faster than extract
+    # prcp_extr_r <- getValues(grid_rst) # instant
+    # cat(Sys.time()-extracttimestart)
+    # extracttimestart <- Sys.time()
     # Need to extract values from the raster layers to the polygons
     prcp_extr <- raster::extract(x = prcp_r,   # Raster object
                                  y = grid_shp, # SpatialPolygons
                                  fun = mean,
                                  df = TRUE)
+
     names(prcp_extr)[2] = "PRCP"
     daily_result <- data.frame(day, prcp_extr)
     
@@ -211,12 +215,12 @@ if(length(grep(prepname, dir(file.path(localdir, "Weather")))) == 0) {
     # Save to S3 as temporary location in case the process is interrupted
     fn = paste("Prep_Weather_Daily_", day,"_", g, ".RData", sep="")
     
-    save(list="wazeTime.tn.hexAll", file = file.path(temp.outputdir, fn))
+    save(list="daily_result", file = file.path(temp.outputdir, fn))
     
     # Copy to S3
     system(paste("aws s3 cp",
                  file.path(temp.outputdir, fn),
-                 file.path(teambucket, state, fn)))
+                 file.path(teambucket, state, 'Daily_Weather_Prep', fn)))
     
     EndTime <- Sys.time()-StartTime
     cat(day, 'completed', round(EndTime, 2), attr(EndTime, 'units'), '\n')
