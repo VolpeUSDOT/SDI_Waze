@@ -9,6 +9,10 @@ temp.outputdir <- "~/tempout" # to hold daily output files as they are generated
 
 proj.USGS <- "+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs +ellps=GRS80 +towgs84=0,0,0"
 
+# Problem with parallel process after 10 months:
+# Error in { : task 285 failed - "sink stack is full"
+# Needed to add sink() at end of foreach loop to close that diversion of output
+
 # Check to see if these processing steps have been done yet; load from prepared file if so
 prepname = paste("Prepared", "Weather", g, sep="_")
 
@@ -114,15 +118,31 @@ if(length(grep(prepname, dir(file.path(localdir, "Weather")))) == 0) {
   writeLines(c(""), paste0("Prep_Weather_", g, "_log.txt"))    
   
   # Start parallel loop ----
-  
+
   wx.grd.day <- foreach(day = unique(wx$DATE), 
                       .packages = c('raster','gstat','dplyr','rgdal'), 
                       .combine = rbind) %dopar% {
     # day = unique(wx$DATE)[1]
-    sink(paste0("Prep_Weather_", g, "_log.txt"), append=TRUE)
                         
-    cat(paste(Sys.time()), day, "\n") 
-                        
+    cat(paste(Sys.time()), as.character(day), "\n", 
+        file = paste0("Prep_Weather_", g, "_log.txt"), append = T) 
+        
+    # Scan team bucket for completed daily weather prep ----
+    fn = paste("Prep_Weather_Daily_", day,"_", g, ".RData", sep="")
+    
+    # See if exists in S3. Load if so. If not, carry out kriging steps.
+    exists_fn <- length(
+      system(paste("aws s3 ls",
+                 file.path(teambucket, state, 'Daily_Weather_Prep', fn)), intern= T)) > 0
+    
+    if(exists_fn){
+      system(paste("aws s3 cp",
+                   file.path(teambucket, state, 'Daily_Weather_Prep', fn),
+                   file.path(temp.outputdir, fn)
+      ))
+      load(file.path(temp.outputdir, fn))
+    } else {
+    
     wx.day = wx.proj[wx.proj$DATE == day,]
                         
     f.p <- as.formula(PRCP ~ 1)
@@ -223,12 +243,13 @@ if(length(grep(prepname, dir(file.path(localdir, "Weather")))) == 0) {
                  file.path(teambucket, state, 'Daily_Weather_Prep', fn)))
     
     EndTime <- Sys.time()-StartTime
-    cat(day, 'completed', round(EndTime, 2), attr(EndTime, 'units'), '\n')
+    cat(as.character(day), 'completed', round(EndTime, 2), attr(EndTime, 'units'), '\n',
+        file = paste0("Prep_Weather_", g, "_log.txt"), append = T) 
     
+    } # end if exists_fn
     daily_result
   } # end parallel loop
    
-  
   # Plot gridded versions of same point maps to check
   source(file.path(codeloc, 'TN', 'datacleaning', 'Plot_weather_gridded.R'))
   
