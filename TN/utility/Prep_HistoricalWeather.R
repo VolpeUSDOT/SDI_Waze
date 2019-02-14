@@ -10,8 +10,8 @@ temp.outputdir <- "~/tempout" # to hold daily output files as they are generated
 proj.USGS <- "+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs +ellps=GRS80 +towgs84=0,0,0"
 
 # Problem with parallel process after 10 months:
-# Error in { : task 285 failed - "sink stack is full"
-# Needed to add sink() at end of foreach loop to close that diversion of output
+# Error in { : task 285 failed - "sink stack is full". 
+# Needed to add sink() at end of foreach loop to close that diversion of output. Now avoiding by not using sink() at all, just cat(append=T).
 
 # Check to see if these processing steps have been done yet; load from prepared file if so
 prepname = paste("Prepared", "Weather", g, sep="_")
