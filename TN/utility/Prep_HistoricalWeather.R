@@ -89,7 +89,9 @@ if(length(grep(prepname, dir(file.path(localdir, "Weather")))) == 0) {
   tn_buff <- spTransform(tn_buff, CRS(proj.USGS))
   
   # Clip grid to county shapefile
-  grid_shp <- gIntersection(grid_shp, tn_buff, byid = T)
+  grid_intersects <- gIntersects(tn_buff, grid_shp, byid = T)
+  
+  grid_shp <- grid_shp[as.vector(grid_intersects),]
   
   wx <- wx %>%
     mutate(mo = format(DATE, "%m"))
@@ -118,8 +120,12 @@ if(length(grep(prepname, dir(file.path(localdir, "Weather")))) == 0) {
   writeLines(c(""), paste0("Prep_Weather_", g, "_log.txt"))    
   
   # Start parallel loop ----
-
-  wx.grd.day <- foreach(day = unique(wx$DATE), 
+  # limit to dates in the set of months we are using, see do.months specified in the RandomForest_WazeGrids file.
+  all_wx_days = unique(wx$DATE)
+  all_wx_ym = format(all_wx_days, "%Y-%m")
+  use_wx_days = all_wx_days[all_wx_ym %in% do.months]
+  
+  wx.grd.day <- foreach(day = use_wx_days, 
                       .packages = c('raster','gstat','dplyr','rgdal'), 
                       .combine = rbind) %dopar% {
     # day = unique(wx$DATE)[1]
@@ -206,6 +212,8 @@ if(length(grep(prepname, dir(file.path(localdir, "Weather")))) == 0) {
                                  df = TRUE)
 
     names(prcp_extr)[2] = "PRCP"
+    prcp_extr$ID = grid_shp$GRID_ID
+    
     daily_result <- data.frame(day, prcp_extr)
     
     tmin_extr <- raster::extract(x = tmin_r,   # Raster object
@@ -213,6 +221,7 @@ if(length(grep(prepname, dir(file.path(localdir, "Weather")))) == 0) {
                                  fun = mean,
                                  df = TRUE)
     names(tmin_extr)[2] = "TMIN"
+    tmin_extr$ID = grid_shp$GRID_ID
     
     daily_result <- full_join(daily_result, tmin_extr)
     
@@ -221,6 +230,7 @@ if(length(grep(prepname, dir(file.path(localdir, "Weather")))) == 0) {
                                  fun = mean,
                                  df = TRUE)
     names(tmax_extr)[2] = "TMAX"
+    tmax_extr$ID = grid_shp$GRID_ID
     
     daily_result <- full_join(daily_result, tmax_extr)
     
@@ -229,6 +239,7 @@ if(length(grep(prepname, dir(file.path(localdir, "Weather")))) == 0) {
                                  fun = mean,
                                  df = TRUE)
     names(snow_extr)[2] = "SNOW"
+    snow_extr$ID = grid_shp$GRID_ID
     
     daily_result <- full_join(daily_result, snow_extr)
     

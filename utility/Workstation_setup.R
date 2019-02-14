@@ -370,6 +370,19 @@ EXPORTREORG = F
 if(EXPORTREORG){
   system(paste("aws s3 ls", file.path(teambucket, 'export_requests/')))
   
+  
+  system(paste("aws s3 ls", file.path(teambucket, 'TN', 'Daily_Weather_Prep/')))
+  system(paste("aws s3 cp", 
+               file.path(teambucket, 'TN', 'Daily_Weather_Prep'),
+               file.path(teambucket, 'TN', 'Daily_Weather_Prep_prev'),
+               '--recursive'
+               ))
+  
+  system(paste("aws s3 rm", 
+               file.path(teambucket, 'TN', 'Daily_Weather_Prep'),
+               '--recursive'
+  ))
+  
   # re-copy some files 
   system(paste("aws s3 cp", 
                file.path(teambucket, 'export_requests', 'Hot_Spot_Mapping_Multiple_Figures_RasterLayers_2018-11-20.zip'),
