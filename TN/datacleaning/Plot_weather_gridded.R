@@ -60,24 +60,26 @@ pdf(paste0("WX_Gridded_to_", g, ".pdf"), width = 8, height = 8)
   plotgrid <- grid_shp
   plotgrid@data <- left_join(plotgrid@data, wx.by.id, by = c("GRID_ID"="ID"))
   
+  plotgrid@data[plotgrid@data==-Inf] = NA
+  
   # Make maxTmax, maxS, and sumP maps
   tempcol <- colorRampPalette(c("purple", "blue", "green", "yellow", "orange", "red"))
   cuts = cut(plotgrid@data$maxTmax, 10)
-  plot(plotgrid, col = tempcol(10)[cuts])
+  plot(plotgrid, col = tempcol(10)[cuts], border =  tempcol(10)[cuts])
   legend("bottom", pch = 16, col = tempcol(10),
          legend = levels(cuts),
          cex = 0.8, ncol = 2, pt.cex = 2)
   title(main = "Max temperatures over study period")
   
   cuts = cut(plotgrid@data$avg.01.tempmin, 10)
-  plot(plotgrid, col = tempcol(10)[cuts])
+  plot(plotgrid, col = tempcol(10)[cuts], border =  tempcol(10)[cuts])
   legend("bottom", pch = 16, col = tempcol(10),
          legend = levels(cuts),
          cex = 0.8, ncol = 2, pt.cex = 2)
   title(main = "Average January low temperatures")
   
   cuts = cut(plotgrid@data$avg.06.tempmax, 10)
-  plot(plotgrid, col = tempcol(10)[cuts])
+  plot(plotgrid, col = tempcol(10)[cuts], border =  tempcol(10)[cuts])
   legend("bottom", pch = 16, col = tempcol(10),
          legend = levels(cuts),
          cex = 0.8, ncol = 2, pt.cex = 2)
@@ -85,7 +87,7 @@ pdf(paste0("WX_Gridded_to_", g, ".pdf"), width = 8, height = 8)
   
   preccol <- colorRampPalette(c("white", "bisque", "green", "cornflowerblue", "blue", "purple"))
   cuts = cut(plotgrid@data$sumP, 10)
-  plot(plotgrid, col = preccol(10)[cuts])
+  plot(plotgrid, col = preccol(10)[cuts], border =  tempcol(10)[cuts])
   legend("bottom", pch = 16, col = preccol(10),
          legend = levels(cuts),
          cex = 0.8, ncol = 2, pt.cex = 2)
