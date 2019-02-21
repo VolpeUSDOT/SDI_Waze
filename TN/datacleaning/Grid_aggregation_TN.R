@@ -52,7 +52,7 @@ wazedir <- normalizePath(file.path(localdir, "TN", "Waze"))
 setwd(localdir)
 
 # start grid loop ----
-for(g in grids){ # g = grids[1]
+for(g in grids){ # g = grids[2]
   
   # Loop through months of available merged data for this state
   mergefiles <- dir(wazemonthdir)[grep("^merged.waze.tn", dir(wazemonthdir))]
@@ -66,7 +66,7 @@ for(g in grids){ # g = grids[1]
   grid.tlfiles <- tlfiles[grep(g, tlfiles)]
   done.months <- unlist(lapply(strsplit(grid.tlfiles, "_"), function(x) x[[2]])) 
   
-  todo.months = sort(avail.months)[!avail.months %in% done.months]
+  todo.months = sort(avail.months)#[!avail.months %in% done.months]
   
   cl <- makeCluster(parallel::detectCores()) # make a cluster of all available cores
   registerDoParallel(cl)

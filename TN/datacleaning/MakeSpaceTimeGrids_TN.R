@@ -40,7 +40,7 @@ setwd(wazemonthdir)
 # <><><><><><><><><><><><><><><><><><><><>
 
 # start grid loop ----
-for(g in grids){ # g = grids[1]
+for(g in grids){ # g = grids[2]
 
   # Loop through months of available merged data for this state
   mergefiles <- dir(wazemonthdir)[grep("^merged.waze.tn", dir(wazemonthdir))]
@@ -76,7 +76,6 @@ for(g in grids){ # g = grids[1]
     sink(paste(g, "log.txt", sep = "_"), append=TRUE) # sink() function diverts R output to a connection and stops such diversions. Starting from this point, all output in console will be saved in the log file in the working directory.
     
     cat(paste(Sys.time()), g, j, "\n")                                                           
-    
     load(file.path(wazemonthdir, paste0("merged.waze.tn.", g,"_", j, ".RData"))) # includes both waze (link.waze.tn) and TN crash (crash.df) data, with grid for central and neighboring cells
     
     # format(object.size(link.waze.tn), "Mb"); format(object.size(crash.df), "Mb")
@@ -165,6 +164,8 @@ for(g in grids){ # g = grids[1]
     Waze.hex.time <- unique(Waze.hex.time.all) # Rows with match = "M" are duplicated, so we want to remove the duplicates.
     
     # Use TN-only grid IDs if no Waze event present. Otherwise, TN only events (match==T) are omitted.
+    Waze.hex.time$GRID_ID.TN = as.character(Waze.hex.time$GRID_ID.TN)
+    
     Waze.hex.time$GRID_ID[is.na(Waze.hex.time$GRID_ID)] = Waze.hex.time$GRID_ID.TN[is.na(Waze.hex.time$GRID_ID)]
     Waze.hex.time <- filter(Waze.hex.time, !is.na(GRID_ID))
     

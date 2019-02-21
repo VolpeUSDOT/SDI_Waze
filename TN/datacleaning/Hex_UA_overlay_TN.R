@@ -14,6 +14,7 @@ library(tidyverse)
 library(sp)
 library(maps) # for mapping base layers
 library(rgdal) # for readOGR(), needed for reading in ArcM shapefiles
+library(rgeos) # for gIntersects
 library(foreach)
 library(doParallel)
 
@@ -71,7 +72,7 @@ co <- spTransform(co, CRS(proj.USGS))
 grids = c("TN_01dd_fishnet",
           "TN_1sqmile_hexagons")
 
-for(g in grids){ # g = grids[1]
+for(g in grids){ # g = grids[2]
   
   grid = readOGR(file.path(localdir, state, "Shapefiles"), layer = g) # the grid layer
   grid <- spTransform(grid, CRS(proj.USGS))
@@ -80,6 +81,11 @@ for(g in grids){ # g = grids[1]
   
   FIPS_i = formatC(state.fips[state.fips$abb == state, "fips"][1], width = 2, flag = "0") # find the FIPS ID of TN
   co_i <- co[co$STATEFP == FIPS_i,] # find all counties fall in TN
+  
+  # Limit grid to only cells which touch a county in this state
+  grid_o <- gIntersects(grid, co_i, byid = T)
+  instate <- apply(grid_o, 2, function(x) any(x))
+  grid <- grid[instate,]
   
   # Files -- 
   # load(file.path(localdir, state, "Crash", "TN_Crash.RData")) # 791 Mb version, 80 columns 829,301 rows 
@@ -128,7 +134,7 @@ for(g in grids){ # g = grids[1]
       mb <- SpatialPointsDataFrame(mb[c("lon", "lat")], mb, 
                                     proj4string = CRS("+proj=longlat +datum=WGS84"))  #  make sure Waze data is a SPDF
       
-      mb <-spTransform(mb, CRS(proj.USGS))
+      mb <- spTransform(mb, CRS(proj.USGS))
     }
     
     # Get time and last.pull.time as POSIXct
@@ -169,8 +175,8 @@ for(g in grids){ # g = grids[1]
     # <><><><><><><><><><><><><><><><><><><><>
     # Urban area overlay ----
     
-    waze_ua_pip <- over(mb, ua[,c("NAME10","UATYP10")]) # Match a urban area name and type to each row in mb (Waze events data). UATYPE10 is Census 2010 Urban Type, U = Urban Area, C = Urban Cluster, R = Rural
-    table(ua$UATYP10) # no Urban type was found.
+    waze_ua_pip <- over(mb, ua[,c("NAME10","UATYP10")]) # Match a urban area name and type to each row in mb (Waze events data). UATYPE10 is Census 2010 Urban Type, U = Urban Area, C = Urban Cluster.
+    table(ua$UATYP10) # have C and U, no R as named type
     # C    U 
     # 3104  497 
     edt_ua_pip <- over(tn_crash, ua[,c("NAME10","UATYP10")]) # Match a urban area name and type to each row in tn_crash. 
@@ -181,7 +187,7 @@ for(g in grids){ # g = grids[1]
     names(tn_crash@data)[(length(tn_crash@data)-1):length(tn_crash@data)] <- c("EDT_UA_Name", "EDT_UA_Type")
     
     # <><><><><><><><><><><><><><><><><><><><>
-    # Hexagon overlay ----
+    # Grid overlay ----
     
     waze_hex_pip <- over(mb, grid[,gridcols]) # Match hexagon names to each row in mb. 
     edt_hex_pip <- over(tn_crash, grid[,gridcols]) # Match hexagon names to each row in tn_crash. 
@@ -214,6 +220,8 @@ for(g in grids){ # g = grids[1]
     names(crash.df)[grep("^GRID", names(crash.df))] <- paste(names(crash.df)[grep("^GRID", names(crash.df))], state, sep = ".")
     
     # Join Waze data to link table (full join)
+    link$id.incidents = as.character(link$id.incidents)
+
     link.waze <- full_join(link, waze.df, by=c("id.incidents"="alert_uuid"))
     
     # Add W code to match column to indicate only Waze data
