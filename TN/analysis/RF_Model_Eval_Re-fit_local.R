@@ -12,7 +12,7 @@ grids = c("TN_01dd_fishnet",
 # <><><><><><>
 # Select grid model number, and version (by export date) to evaluate
 g = grids[1] # Manually select 1 or 2, or can build a loop.
-modelno = "06" # 01 to 06, manually select or loop
+modelno = "05" # 01 to 06, manually select or loop
 version = "2019-02-07"
 state = "TN"
 # <><><><><><>
@@ -53,6 +53,9 @@ pdf(file.path(localdir, "Figures", paste0(state, "_Visualzing_classification_Mod
 
 out.df$CorrectPred = out.df$TN | out.df$TP
 levels(out.df$Obs) = c("Obs = NoCrash", "Obs = Crash")
+
+out.df <- out.df %>%
+  mutate(Obs.bin = 1*Obs > 0)
 
 gp1 <- ggplot(out.df, aes(Prob.Crash, fill = Obs)) + 
   geom_histogram(alpha = 0.5, position = "identity", binwidth = 0.01) + 
@@ -111,6 +114,7 @@ gp3 <- ggplot(pct.diff.grid, aes(Pct.diff, fill = cut(Pct.diff,
 #  scale_color_gradient(low = 'red', high = 'midnightblue')
 
 print(gp3)
+
 # Choosing cutoffs ----
 # Low value is most greedy for non-crashes, high value is more greedy for crashes
 response.var = 'TN_crash'
@@ -119,6 +123,9 @@ fitvars <- rownames(rf.out$importance)
 test.dat.use = w.all[testrows,]
 reference.vec <- test.dat.use[,response.var]
 levels(reference.vec) = c("NoCrash", "Crash")
+
+# Test to make sure all fit variables are present in the w.all data frame
+stopifnot(sum(fitvars %in% names(w.all)) == 0)
 
 co = seq(0.1, 0.9, by = 0.1)
 pt.vec <- vector()
