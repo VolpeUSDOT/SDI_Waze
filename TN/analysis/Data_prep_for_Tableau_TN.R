@@ -161,7 +161,7 @@ for(g in grids){ # g = grids[1]
   
   out.df <- data.frame(test.dat[, c("GRID_ID", 'year', "day", "hour", response.var)], Fit_all.pred, Fit_all.prob)
   out.df$day <- as.numeric(out.df$day)
-  names(out.df)[5:8] <- c("Obs", "Pred", "Prob.Noncrash", "Prob.Crash")
+  names(out.df)[6:9] <- c("Obs", "Pred", "Prob.Noncrash", "Prob.Crash")
   out.df = data.frame(out.df,
                       TN = out.df$Obs == 0 &  out.df$Pred == "NoCrash",
                       FP = out.df$Obs == 0 &  out.df$Pred == "Crash",

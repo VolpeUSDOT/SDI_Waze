@@ -4,18 +4,55 @@
 library(randomForest)
 library(tidyverse)
 
+codeloc = '~/git/SDI_Waze'
 volpedrive = "//vntscex.local/DFS/Projects/PROJ-OS62A1/SDI Waze Phase 2/Output/TN"
 
 grids = c("TN_01dd_fishnet",
           "TN_1sqmile_hexagons")
 
+source(file.path(codeloc, 'utility', 'wazefunctions.R'))
+
 # <><><><><><>
 # Select grid model number, and version (by export date) to evaluate
-g = grids[1] # Manually select 1 or 2, or can build a loop.
+g = grids[2] # Manually select 1 or 2, or can build a loop.
 modelno = "05" # 01 to 06, manually select or loop
-version = "2019-02-07"
+version = "2019-02-22"
 state = "TN"
 # <><><><><><>
+
+# Extract values ----
+
+
+rfdir <- file.path(volpedrive, paste0('Random_Forest_Output_', version))
+
+modfiles <- dir(rfdir)[grep(g, dir(rfdir))]
+modfiles <- modfiles[grep('.RData$', modfiles)]
+
+counts = vector()
+
+for(i in modfiles){ # i = modfiles[1]
+  cat(i, "\n")
+  load(file.path(rfdir, i))
+  
+  names(out.df)[4:8] <- c("hour", "Obs", "Pred", "Prob.Noncrash", "Prob.Crash")
+  out.df = data.frame(out.df[1:8],
+                      TN = out.df$Obs == 0 &  out.df$Pred == "NoCrash",
+                      FP = out.df$Obs == 0 &  out.df$Pred == "Crash",
+                      FN = out.df$Obs == 1 &  out.df$Pred == "NoCrash",
+                      TP = out.df$Obs == 1 &  out.df$Pred == "Crash")
+  
+  co = out.df %>%
+    summarize(TN = sum(TN),
+              FP = sum(FP),
+              FN = sum(FN),
+              TP = sum(TP))
+  
+  counts = rbind(counts, co)
+  write.csv(counts, file = file.path(rfdir, paste0("Confusion_matrix_counts_", g, ".csv")))
+  }
+
+
+# Refit -----
 
 # Load full input data
 w.all <- read.csv(file.path(volpedrive, paste0("Random_Forest_Output_", version), paste0("TN_2017-04_to_2018-03_", g, ".csv")))
