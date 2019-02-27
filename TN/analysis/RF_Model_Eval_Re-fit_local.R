@@ -15,13 +15,111 @@ source(file.path(codeloc, 'utility', 'wazefunctions.R'))
 # <><><><><><>
 # Select grid model number, and version (by export date) to evaluate
 g = grids[2] # Manually select 1 or 2, or can build a loop.
-modelno = "05" # 01 to 06, manually select or loop
 version = "2019-02-22"
 state = "TN"
 # <><><><><><>
 
-# Extract values ----
 
+# Refit just on output csv files ----
+
+rfdir <- file.path(volpedrive, paste0('Output_', version))
+
+modfiles <- dir(rfdir)[grep(g, dir(rfdir))]
+modfiles <- modfiles[grep('.csv$', modfiles)]
+modfiles <- modfiles[grep('^TN_Model_', modfiles)]
+
+count = vector() # To store confusion matrix outputs
+
+for(i in modfiles){ # i = modfiles[4]
+  
+  cat(i, "\n")
+  
+  out.df = read.csv(file.path(rfdir, i))
+  
+  # Get correct reference vector 
+  if(any(!is.na(match(c('TN_Model_01', 'TN_Model_02', 'TN_Model_03'), substr(i, 1, 11)))) ) {
+        reference.vec = out.df$MatchTN_buffer_Acc
+  } else {
+        reference.vec = out.df$TN_crash
+  }
+  reference.vec <- ifelse(reference.vec == 0, 'NoCrash', 'Crash')
+  reference.vec <- as.factor(as.character(reference.vec)) 
+  
+  
+  # look at cutoffs  
+  co = c(seq(0.005, 0.01, by = 0.001),
+         c(0.02, 0.03, 0.04),
+         seq(0.05, 0.5, by = 0.05))
+  
+  pt.vec = vector()
+  
+  for(coi in co){ # coi = co[1]
+    predx = ifelse(out.df$Prob.Crash >= coi, 'Crash', 'NoCrash')
+    predx <- as.factor(as.character(predx)) # Crash is first
+    
+    predtab <- table(predx, reference.vec, 
+                     dnn = c("Predicted","Observed")) 
+    if(sum(dim(predtab))==4 ) {bin.diag = bin.mod.diagnostics(predtab)} else {bin.diag = NA}
+    
+    pt.vec <- cbind(pt.vec, bin.diag)
+    cat(coi, ". ")
+    
+  }
+  
+  pt.vec = as.data.frame(pt.vec); colnames(pt.vec) = co
+  prec.recall <- pt.vec %>%
+    gather()
+  
+  prec.recall$Metric = rep(c(1, 3, 2, 4), ncol(pt.vec))
+  prec.recall$Metric <- factor(prec.recall$Metric, labels = c("Accuracy", "Recall","Precision", "False Positive Rate"))
+  names(prec.recall)[1:2] = c("Cutoff", "Value")
+  
+  gp4 <- ggplot(prec.recall, aes(x = Cutoff, y = Value, group = Metric)) + 
+    geom_line(aes(color = Metric), size = 2) +
+    ggtitle(paste0("Crash classification tradeoffs \n", i)) + 
+    theme_bw() +
+    annotate("text",
+             x = 0.5,
+             y = c(0.95, 0.05, 0.46,0.81),
+             hjust = 0,
+             label = c("Accuracy", "False Positive Rate", "Precision", "Recall"))
+  print(gp4); ggsave(filename = file.path(volpedrive, paste0(i, '_Prec_recall_tradoff.jpg')),
+                     width = 8, height = 7)      
+  
+  recall_prec_diff = pt.vec['recall',]-pt.vec['precision',]
+  
+  best_cutoff = as.numeric(names(recall_prec_diff[which(recall_prec_diff==min(abs(recall_prec_diff)))][1]))
+  # After setting cutoffs, run this:
+  
+  out.df$Pred = ifelse(out.df$Prob.Crash >= best_cutoff, 'Crash', 'NoCrash')
+   
+  names(out.df)[4:8] <- c("hour", "Obs", "Pred", "Prob.Noncrash", "Prob.Crash")
+  out.df = data.frame(out.df[1:8],
+                      TN = out.df$Obs == 0 &  out.df$Pred == "NoCrash",
+                      FP = out.df$Obs == 0 &  out.df$Pred == "Crash",
+                      FN = out.df$Obs == 1 &  out.df$Pred == "NoCrash",
+                      TP = out.df$Obs == 1 &  out.df$Pred == "Crash")
+
+  co = out.df %>%
+    summarize(TN = sum(TN),
+              FP = sum(FP),
+              FN = sum(FN),
+              TP = sum(TP))
+
+  predtab <- table(predx, reference.vec, 
+                   dnn = c("Predicted","Observed")) 
+  if(sum(dim(predtab))==4 ) {bin.diag = bin.mod.diagnostics(predtab)} else {bin.diag = NA}
+  
+  co = data.frame(co, t(bin.diag))
+  
+  counts = rbind(counts, co)
+  write.csv(out.df, file = file.path(volpedrive, 'Refit', i))
+  
+}
+write.csv(counts, file = file.path(volpedrive, 'Refit', paste0("Confusion_matrix_counts_", g, ".csv")))
+
+
+# Extract values from RF objects ----
 
 rfdir <- file.path(volpedrive, paste0('Random_Forest_Output_', version))
 
@@ -49,7 +147,7 @@ for(i in modfiles){ # i = modfiles[1]
   
   counts = rbind(counts, co)
   write.csv(counts, file = file.path(rfdir, paste0("Confusion_matrix_counts_", g, ".csv")))
-  }
+}
 
 
 # Refit -----
@@ -153,6 +251,7 @@ gp3 <- ggplot(pct.diff.grid, aes(Pct.diff, fill = cut(Pct.diff,
 print(gp3)
 
 # Choosing cutoffs ----
+
 # Low value is most greedy for non-crashes, high value is more greedy for crashes
 response.var = 'TN_crash'
 
