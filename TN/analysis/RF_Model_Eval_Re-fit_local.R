@@ -30,7 +30,7 @@ modfiles <- modfiles[grep('^TN_Model_', modfiles)]
 
 counts = vector() # To store confusion matrix outputs
 
-for(i in modfiles){ # i = modfiles[4]
+for(i in modfiles){ # i = modfiles[5]
   
   cat(i, "\n")
   
@@ -98,8 +98,21 @@ for(i in modfiles){ # i = modfiles[4]
                       TN = out.df$Obs == 0 &  out.df$Pred == "NoCrash",
                       FP = out.df$Obs == 0 &  out.df$Pred == "Crash",
                       FN = out.df$Obs == 1 &  out.df$Pred == "NoCrash",
-                      TP = out.df$Obs == 1 &  out.df$Pred == "Crash")
+                      TP = out.df$Obs == 1 &  out.df$Pred == "Crash"
+                      , out.df[c('DayOfWeek','Hour','Year')]
+                      )
 
+  w.group <- data.frame(TN = out.df$TN, TP = out.df$TP, FP = out.df$FP, FN = out.df$FN)
+  
+  w.group$TN[w.group$TN==TRUE] = "TN"
+  w.group$TP[w.group$TP==TRUE] = "TP"
+  w.group$FP[w.group$FP==TRUE] = "FP"
+  w.group$FN[w.group$FN==TRUE] = "FN"
+  
+  w.group$group <- apply(w.group, 1, function(x) x[x!=FALSE][1])
+  
+  out.df$Pred.grp <- as.factor(w.group$group)
+  
   co = out.df %>%
     summarize(TN = sum(TN),
               FP = sum(FP),
@@ -110,7 +123,11 @@ for(i in modfiles){ # i = modfiles[4]
                    dnn = c("Predicted","Observed")) 
   if(sum(dim(predtab))==4 ) {bin.diag = bin.mod.diagnostics(predtab)} else {bin.diag = NA}
   
-  co = data.frame(co, t(bin.diag))
+  # plot(pROC::roc(out.df$Obs, out.df$Prob.Crash, auc = TRUE))
+  
+  (model_auc <- pROC::auc(out.df$Obs, out.df$Prob.Crash))
+  
+  co = data.frame(co, t(bin.diag), AUC = as.numeric(model_auc))
   
   counts = rbind(counts, co)
   write.csv(out.df, file = file.path(rfdir, 'Refit', i), row.names=F)
@@ -128,7 +145,7 @@ modfiles <- modfiles[grep('.RData$', modfiles)]
 
 counts = vector()
 
-for(i in modfiles){ # i = modfiles[1]
+for(i in modfiles){ # i = modfiles[6]
   cat(i, "\n")
   load(file.path(rfdir, i))
   
@@ -152,6 +169,8 @@ for(i in modfiles){ # i = modfiles[1]
 
 # Refit -----
 
+modelno = '06'
+
 # Load full input data
 w.all <- read.csv(file.path(volpedrive, paste0("Random_Forest_Output_", version), paste0("TN_2017-04_to_2018-03_", g, ".csv")))
 
@@ -167,12 +186,30 @@ w.grid <- w.all %>%
             TotalWazeAccidents_major = sum(nWazeAccidentMajor),
             TotalWazeAccidents_minor = sum(nWazeAccidentMinor),
             TotalTNcrash = sum(nTN_total),
-            Urban = max(Waze_UA_U)>1)
+            Urban = sum(UA_Urban)>1,
+            RoadClosed = sum(nWazeRoadClosed))
   
 ggplot(w.grid) + 
   geom_point(aes(TotalTNcrash, TotalWazeAccidents, color = TotalWazeAccidents_major)) +
   facet_wrap(~Urban) +
   geom_abline(slope = 1, intercept = 0)
+
+ggplot(w.grid) + 
+  geom_point(aes(TotalTNcrash, TotalWazeAccidents, color = RoadClosed)) +
+  facet_wrap(~Urban) +
+  geom_abline(slope = 1, intercept = 0)
+
+# There are a few grid cells with high road closure counts and high crash counts.  5 grid cells with over 2000 UUID distinct reports of road closures! For 1 sq mile. HQ-104 = 4,644 road closure reports, and 4,048 crash reports (2,632 Waze accident reports). However, another one PM-79 had almost 10,000 road closure reports but only 8 crashes (10 Waze accident reports) 
+
+# For 01dd, even more pronounced relationship. 12 of these have > 2000 road closure counts. Grid 766 has 54,000 distinct Waze road closure reports! And also coincidentlaly 54,425 TN crashes, but 127,221 Waze accident reports. This is the center of Nashville. 
+
+ggplot(w.grid) + 
+  geom_point(aes(TotalTNcrash, RoadClosed, color = TotalWazeAccidents)) +
+  facet_wrap(~Urban) +
+  geom_abline(slope = 1, intercept = 0)
+
+w.grid %>% 
+  filter(RoadClosed > 2000)
 
 # variable importance ----
 pdf(file.path(localdir, "Figures", paste0(state, "_Variable_Importance_Model_", modelno, ".pdf")), width = 8, height = 8)
