@@ -14,7 +14,7 @@ source(file.path(codeloc, 'utility', 'wazefunctions.R'))
 
 # <><><><><><>
 # Select grid model number, and version (by export date) to evaluate
-g = grids[2] # Manually select 1 or 2, or can build a loop.
+g = grids[1] # Manually select 1 or 2, or can build a loop.
 version = "2019-02-22"
 state = "TN"
 # <><><><><><>
@@ -28,7 +28,7 @@ modfiles <- dir(rfdir)[grep(g, dir(rfdir))]
 modfiles <- modfiles[grep('.csv$', modfiles)]
 modfiles <- modfiles[grep('^TN_Model_', modfiles)]
 
-count = vector() # To store confusion matrix outputs
+counts = vector() # To store confusion matrix outputs
 
 for(i in modfiles){ # i = modfiles[4]
   
@@ -88,7 +88,7 @@ for(i in modfiles){ # i = modfiles[4]
   
   recall_prec_diff = pt.vec['recall',]-pt.vec['precision',]
   
-  best_cutoff = as.numeric(names(recall_prec_diff[which(recall_prec_diff==min(abs(recall_prec_diff)))][1]))
+  best_cutoff = as.numeric(names(recall_prec_diff[which(abs(recall_prec_diff)==min(abs(recall_prec_diff)))][1]))
   # After setting cutoffs, run this:
   
   out.df$Pred = ifelse(out.df$Prob.Crash >= best_cutoff, 'Crash', 'NoCrash')
@@ -113,10 +113,10 @@ for(i in modfiles){ # i = modfiles[4]
   co = data.frame(co, t(bin.diag))
   
   counts = rbind(counts, co)
-  write.csv(out.df, file = file.path(volpedrive, 'Refit', i))
+  write.csv(out.df, file = file.path(rfdir, 'Refit', i), row.names=F)
   
 }
-write.csv(counts, file = file.path(volpedrive, 'Refit', paste0("Confusion_matrix_counts_", g, ".csv")))
+write.csv(counts, file = file.path(rfdir, 'Refit', paste0("Confusion_matrix_counts_", g, ".csv")))
 
 
 # Extract values from RF objects ----
