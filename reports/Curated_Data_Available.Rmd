@@ -150,7 +150,9 @@ library(plotly)
 
 df$usetext <- with(df, paste(State, "\n", Month, "\n",  format(Objects, big.mark = ",", digits = 0, scientific = F), "Objects", "\n", Size.h))
 
-gp.focal <- ggplot(df %>% filter(State %in% c("AK", "AL", "CT", "DC", "FL", "IL", "IN", "MA", "MD", "NY", "PA", "TN", "TX", "UT", "WY")),
+focal_states = c("CT", "MA", "MD", "NY", "PA", "TN", "TX", "UT", "WA")
+
+gp.focal <- ggplot(df %>% filter(State %in% focal_states),
              aes(x = Month, 
                  y = Objects,
                  group = State,
@@ -179,7 +181,7 @@ library(plotly)
 
 df$usetext <- with(df, paste(State, "\n", Month, "\n",  format(Objects, big.mark = ",", digits = 0, scientific = F), "Objects", "\n", Size.h))
 
-gp.focal <- ggplot(df %>% filter(State %in% c("AK", "AL", "CT", "DC", "FL", "IL", "IN", "MA", "MD", "NY", "PA", "TN", "TX", "UT", "WY")),
+gp.focal <- ggplot(df %>% filter(State %in% focal_states),
              aes(x = Month, 
                  y = Size/1000000,
                  group = State,
@@ -200,12 +202,13 @@ ggplotly(gp.focal2, tooltip = "usetext")
 
 ```
 
+<!-- focus on just 2018 now
 
 # 2017 Production
 
 2017 curated data, version as of 2018-07-20. Same tests as above.
 
-```{r curatedavail2017prod, message = F, warning=F}
+```{r curatedavail2017prod, message = F, warning=F, eval=F}
 # Loop over states to find which ones have complete data in 2017, using new production version
 avail.mo = vector()
 use.states = sort(c(state.abb, c("DC", "CA1", "CA2", "CA3")))
@@ -227,7 +230,7 @@ DT::datatable(avail.mo) %>% formatStyle(2:13, background = styleEqual('TRUE', 'l
 
 Now looking in the contents of each month/state, counting objects and total size of contents. 
 
-```{r curatedavail2017prod_byday, message = F, warning=F}
+```{r curatedavail2017prod_byday, message = F, warning=F, eval=F}
 # Loop over states and months, to find which ones have complete days of data in 2017, using new production version.
 # Also track object number and size of month folder. 
 
@@ -359,6 +362,7 @@ ggplotly(gp.focal2, tooltip = "usetext")
 
 ```
 
+-->
 
 
 <!-- old
