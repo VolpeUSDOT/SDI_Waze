@@ -1,4 +1,4 @@
-# Review Bellevue Data
+# Review Bellevue Network Data
 
 # Setup ----
 # If you don't have these packages: install.packages(c("maps", "sp", "rgdal", "rgeos", "tidyverse")) 
@@ -35,9 +35,57 @@ proj <- showP4(showWKT("+init=epsg:102008"))
 # RoadNetwork data ----
 # Michelle regenerated a shapefile of Bellevue Roadnetwork by excluding the highway/freeway/interstate: RoadNetwork_Jurisdiction.shp
 # Jessie convert it to an txt file: RoadNetwork_Jurisdiction.csv
-roadnet <- read.csv(file = file.path(data.loc, "Shapefiles/RoadNetwork_Jurisdiction.csv"))
+roadnettb <- read.csv(file = file.path(data.loc, "Shapefiles/RoadNetwork_Jurisdiction.csv"))
+names(roadnettb)
 
-count_FC <- roadnet %>% group_by(FunctionCl) %>% summarize(n = n()
-                                                           , length_ft = mean(Shape_STLe))
+# Rename the columns based on the full names
+names(roadnettb) <- c("FID",
+                      "OBJECTID",
+                      "StreetSegmentID",
+                      "LifeCycleStatus",
+                      "OfficialStreetName",
+                      "FromAddressLeft",
+                      "FromAddressRight",
+                      "ToAddressLeft",
+                      "ToAddressRight",
+                      "LeftJurisdiction",
+                      "RightJurisdiction",
+                      "LeftZip",
+                      "RightZip",
+                      "OneWay",
+                      "SpeedLimit",
+                      "ArterialClassification",
+                      "FunctionClassDescription",
+                      "ArterialSweepingFrequencyCode",
+                      "EmergencyEvacuationRoute",
+                      "EmergencyResponsePriorityRoute",
+                      "SnowResponsePriorityCode",
+                      "TruckRouteNumber",
+                      "IsAddressable",
+                      "IsPrivate",
+                      "IsAccessRoad",
+                      "AnomalyType",
+                      "StreetNameAnno",
+                      "StreetBlockNumber",
+                      #"SHAPE", # do not exist in csv
+                      "Shape_STLength"
+)
 
-  
+
+# ArterialClaffication, FunctionClassDescription
+count_AC <- roadnettb %>% group_by(ArterialClassification) %>% summarize(n = n()
+                                                             , length_ft = mean(Shape_STLength))
+
+count_FC <- roadnettb %>% group_by(FunctionClassDescription) %>% summarize(n = n()
+                                                                       , length_ft = mean(Shape_STLength))
+
+count_FC_AC <- roadnettb %>% group_by(ArterialClassification, FunctionClassDescription) %>% summarize(n = n(), length_ft = mean(Shape_STLength))
+
+# Speedlimit
+table(roadnettb$SpeedLimit)
+
+# OneWay
+table(roadnettb$OneWay) # what do "From" "To" imply?
+
+# IsPrivate
+table(roadnettb$IsPrivate)

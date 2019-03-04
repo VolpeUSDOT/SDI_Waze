@@ -4,18 +4,172 @@
 library(randomForest)
 library(tidyverse)
 
+codeloc = '~/git/SDI_Waze'
 volpedrive = "//vntscex.local/DFS/Projects/PROJ-OS62A1/SDI Waze Phase 2/Output/TN"
 
 grids = c("TN_01dd_fishnet",
           "TN_1sqmile_hexagons")
 
+source(file.path(codeloc, 'utility', 'wazefunctions.R'))
+
 # <><><><><><>
 # Select grid model number, and version (by export date) to evaluate
 g = grids[1] # Manually select 1 or 2, or can build a loop.
-modelno = "05" # 01 to 06, manually select or loop
-version = "2019-02-07"
+version = "2019-02-22"
 state = "TN"
 # <><><><><><>
+
+
+# Refit just on output csv files ----
+
+rfdir <- file.path(volpedrive, paste0('Output_', version))
+
+modfiles <- dir(rfdir)[grep(g, dir(rfdir))]
+modfiles <- modfiles[grep('.csv$', modfiles)]
+modfiles <- modfiles[grep('^TN_Model_', modfiles)]
+
+counts = vector() # To store confusion matrix outputs
+
+for(i in modfiles){ # i = modfiles[5]
+  
+  cat(i, "\n")
+  
+  out.df = read.csv(file.path(rfdir, i))
+  
+  # Get correct reference vector 
+  if(any(!is.na(match(c('TN_Model_01', 'TN_Model_02', 'TN_Model_03'), substr(i, 1, 11)))) ) {
+        reference.vec = out.df$MatchTN_buffer_Acc
+  } else {
+        reference.vec = out.df$TN_crash
+  }
+  reference.vec <- ifelse(reference.vec == 0, 'NoCrash', 'Crash')
+  reference.vec <- as.factor(as.character(reference.vec)) 
+  
+  
+  # look at cutoffs  
+  co = c(seq(0.005, 0.01, by = 0.001),
+         c(0.02, 0.03, 0.04),
+         seq(0.05, 0.5, by = 0.05))
+  
+  pt.vec = vector()
+  
+  for(coi in co){ # coi = co[1]
+    predx = ifelse(out.df$Prob.Crash >= coi, 'Crash', 'NoCrash')
+    predx <- as.factor(as.character(predx)) # Crash is first
+    
+    predtab <- table(predx, reference.vec, 
+                     dnn = c("Predicted","Observed")) 
+    if(sum(dim(predtab))==4 ) {bin.diag = bin.mod.diagnostics(predtab)} else {bin.diag = NA}
+    
+    pt.vec <- cbind(pt.vec, bin.diag)
+    cat(coi, ". ")
+    
+  }
+  
+  pt.vec = as.data.frame(pt.vec); colnames(pt.vec) = co
+  prec.recall <- pt.vec %>%
+    gather()
+  
+  prec.recall$Metric = rep(c(1, 3, 2, 4), ncol(pt.vec))
+  prec.recall$Metric <- factor(prec.recall$Metric, labels = c("Accuracy", "Recall","Precision", "False Positive Rate"))
+  names(prec.recall)[1:2] = c("Cutoff", "Value")
+  
+  gp4 <- ggplot(prec.recall, aes(x = Cutoff, y = Value, group = Metric)) + 
+    geom_line(aes(color = Metric), size = 2) +
+    ggtitle(paste0("Crash classification tradeoffs \n", i)) + 
+    theme_bw() +
+    annotate("text",
+             x = 0.5,
+             y = c(0.95, 0.05, 0.46,0.81),
+             hjust = 0,
+             label = c("Accuracy", "False Positive Rate", "Precision", "Recall"))
+  print(gp4); ggsave(filename = file.path(volpedrive, paste0(i, '_Prec_recall_tradoff.jpg')),
+                     width = 8, height = 7)      
+  
+  recall_prec_diff = pt.vec['recall',]-pt.vec['precision',]
+  
+  best_cutoff = as.numeric(names(recall_prec_diff[which(abs(recall_prec_diff)==min(abs(recall_prec_diff)))][1]))
+  # After setting cutoffs, run this:
+  
+  out.df$Pred = ifelse(out.df$Prob.Crash >= best_cutoff, 'Crash', 'NoCrash')
+   
+  names(out.df)[4:8] <- c("hour", "Obs", "Pred", "Prob.Noncrash", "Prob.Crash")
+  out.df = data.frame(out.df[1:8],
+                      TN = out.df$Obs == 0 &  out.df$Pred == "NoCrash",
+                      FP = out.df$Obs == 0 &  out.df$Pred == "Crash",
+                      FN = out.df$Obs == 1 &  out.df$Pred == "NoCrash",
+                      TP = out.df$Obs == 1 &  out.df$Pred == "Crash"
+                      , out.df[c('DayOfWeek','Hour','Year')]
+                      )
+
+  w.group <- data.frame(TN = out.df$TN, TP = out.df$TP, FP = out.df$FP, FN = out.df$FN)
+  
+  w.group$TN[w.group$TN==TRUE] = "TN"
+  w.group$TP[w.group$TP==TRUE] = "TP"
+  w.group$FP[w.group$FP==TRUE] = "FP"
+  w.group$FN[w.group$FN==TRUE] = "FN"
+  
+  w.group$group <- apply(w.group, 1, function(x) x[x!=FALSE][1])
+  
+  out.df$Pred.grp <- as.factor(w.group$group)
+  
+  co = out.df %>%
+    summarize(TN = sum(TN),
+              FP = sum(FP),
+              FN = sum(FN),
+              TP = sum(TP))
+
+  predtab <- table(predx, reference.vec, 
+                   dnn = c("Predicted","Observed")) 
+  if(sum(dim(predtab))==4 ) {bin.diag = bin.mod.diagnostics(predtab)} else {bin.diag = NA}
+  
+  # plot(pROC::roc(out.df$Obs, out.df$Prob.Crash, auc = TRUE))
+  
+  (model_auc <- pROC::auc(out.df$Obs, out.df$Prob.Crash))
+  
+  co = data.frame(co, t(bin.diag), AUC = as.numeric(model_auc))
+  
+  counts = rbind(counts, co)
+  write.csv(out.df, file = file.path(rfdir, 'Refit', i), row.names=F)
+  
+}
+write.csv(counts, file = file.path(rfdir, 'Refit', paste0("Confusion_matrix_counts_", g, ".csv")))
+
+
+# Extract values from RF objects ----
+
+rfdir <- file.path(volpedrive, paste0('Random_Forest_Output_', version))
+
+modfiles <- dir(rfdir)[grep(g, dir(rfdir))]
+modfiles <- modfiles[grep('.RData$', modfiles)]
+
+counts = vector()
+
+for(i in modfiles){ # i = modfiles[6]
+  cat(i, "\n")
+  load(file.path(rfdir, i))
+  
+  names(out.df)[4:8] <- c("hour", "Obs", "Pred", "Prob.Noncrash", "Prob.Crash")
+  out.df = data.frame(out.df[1:8],
+                      TN = out.df$Obs == 0 &  out.df$Pred == "NoCrash",
+                      FP = out.df$Obs == 0 &  out.df$Pred == "Crash",
+                      FN = out.df$Obs == 1 &  out.df$Pred == "NoCrash",
+                      TP = out.df$Obs == 1 &  out.df$Pred == "Crash")
+  
+  co = out.df %>%
+    summarize(TN = sum(TN),
+              FP = sum(FP),
+              FN = sum(FN),
+              TP = sum(TP))
+  
+  counts = rbind(counts, co)
+  write.csv(counts, file = file.path(rfdir, paste0("Confusion_matrix_counts_", g, ".csv")))
+}
+
+
+# Refit -----
+
+modelno = '06'
 
 # Load full input data
 w.all <- read.csv(file.path(volpedrive, paste0("Random_Forest_Output_", version), paste0("TN_2017-04_to_2018-03_", g, ".csv")))
@@ -32,12 +186,30 @@ w.grid <- w.all %>%
             TotalWazeAccidents_major = sum(nWazeAccidentMajor),
             TotalWazeAccidents_minor = sum(nWazeAccidentMinor),
             TotalTNcrash = sum(nTN_total),
-            Urban = max(Waze_UA_U)>1)
+            Urban = sum(UA_Urban)>1,
+            RoadClosed = sum(nWazeRoadClosed))
   
 ggplot(w.grid) + 
   geom_point(aes(TotalTNcrash, TotalWazeAccidents, color = TotalWazeAccidents_major)) +
   facet_wrap(~Urban) +
   geom_abline(slope = 1, intercept = 0)
+
+ggplot(w.grid) + 
+  geom_point(aes(TotalTNcrash, TotalWazeAccidents, color = RoadClosed)) +
+  facet_wrap(~Urban) +
+  geom_abline(slope = 1, intercept = 0)
+
+# There are a few grid cells with high road closure counts and high crash counts.  5 grid cells with over 2000 UUID distinct reports of road closures! For 1 sq mile. HQ-104 = 4,644 road closure reports, and 4,048 crash reports (2,632 Waze accident reports). However, another one PM-79 had almost 10,000 road closure reports but only 8 crashes (10 Waze accident reports) 
+
+# For 01dd, even more pronounced relationship. 12 of these have > 2000 road closure counts. Grid 766 has 54,000 distinct Waze road closure reports! And also coincidentlaly 54,425 TN crashes, but 127,221 Waze accident reports. This is the center of Nashville. 
+
+ggplot(w.grid) + 
+  geom_point(aes(TotalTNcrash, RoadClosed, color = TotalWazeAccidents)) +
+  facet_wrap(~Urban) +
+  geom_abline(slope = 1, intercept = 0)
+
+w.grid %>% 
+  filter(RoadClosed > 2000)
 
 # variable importance ----
 pdf(file.path(localdir, "Figures", paste0(state, "_Variable_Importance_Model_", modelno, ".pdf")), width = 8, height = 8)
@@ -116,6 +288,7 @@ gp3 <- ggplot(pct.diff.grid, aes(Pct.diff, fill = cut(Pct.diff,
 print(gp3)
 
 # Choosing cutoffs ----
+
 # Low value is most greedy for non-crashes, high value is more greedy for crashes
 response.var = 'TN_crash'
 
