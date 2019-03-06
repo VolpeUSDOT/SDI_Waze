@@ -1,9 +1,9 @@
 ##### Review Bellevue Data ####
 # 1. Roadnetwork
 # 2. Crash points
-# 3. Waze  event points
-# 4. Shapefiles with the links between Waze event and segments
-# 5. Shapefiles with the links between crash accidents and segments
+# 3. Shapefiles with the links between crash accidents and segments
+# 4. Waze  event points
+# 5. Shapefiles with the links between Waze event and segments
 # 6. Emergency response geo-coordinate data from NORCOM
 
 # Setup ----
@@ -98,4 +98,13 @@ table(roadnettb$IsPrivate)
 
 
 # 2. Crash points ----
+crashtb <- read.csv(file = file.path(data.loc, "Crash","20181127_All_roads_Bellevue.csv"))
+names(crashtb) # Looks like this is a full crash database
+dim(crashtb) # 4417  254, a total of 4417 crashes.
 
+# Columns that may be of interest
+crashtb <- crashtb[,1:45]
+str(crashtb)
+nacounts <- colSums(is.na(crashtb)) # Milepost, Dista.From.ref.point, COUNTY.RD.ONLY..INTERSECTING.CO.RD.MILEPOST, ARM have some NAs, all other columns are clean.
+
+# What about the crash points with all the calculated fields with counts?
