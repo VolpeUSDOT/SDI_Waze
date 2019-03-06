@@ -1,4 +1,10 @@
-# Review Bellevue Network Data
+##### Review Bellevue Data ####
+# 1. Roadnetwork
+# 2. Crash points
+# 3. Waze  event points
+# 4. Shapefiles with the links between Waze event and segments
+# 5. Shapefiles with the links between crash accidents and segments
+# 6. Emergency response geo-coordinate data from NORCOM
 
 # Setup ----
 # If you don't have these packages: install.packages(c("maps", "sp", "rgdal", "rgeos", "tidyverse")) 
@@ -32,7 +38,7 @@ source(file.path(codeloc, 'utility/wazefunctions.R'))
 # Project to Albers equal area conic 102008. Check comparision wiht USGS version, WKID: 102039
 proj <- showP4(showWKT("+init=epsg:102008"))
 
-# RoadNetwork data ----
+# 1. RoadNetwork data ----
 # Michelle regenerated a shapefile of Bellevue Roadnetwork by excluding the highway/freeway/interstate: RoadNetwork_Jurisdiction.shp
 # Jessie convert it to an txt file: RoadNetwork_Jurisdiction.csv
 roadnettb <- read.csv(file = file.path(data.loc, "Shapefiles/RoadNetwork_Jurisdiction.csv"))
@@ -89,3 +95,7 @@ table(roadnettb$OneWay) # what do "From" "To" imply?
 
 # IsPrivate
 table(roadnettb$IsPrivate)
+
+
+# 2. Crash points ----
+
