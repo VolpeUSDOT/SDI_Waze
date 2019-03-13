@@ -3,75 +3,37 @@
 
 # <><><><><><><><><><><><><><><><><><><><>
 # Setup ----
-rm(list = ls())
+rm(list= ls())
+library(maps) # for mapping base layers
+library(sp)
+library(rgdal) # for readOGR(),writeOGR () needed for reading/writing in ArcM shapefiles
+library(rgeos) # gintersection
+library(ggmap)
+library(spatstat) # for ppp density estimation. devtools::install_github('spatstat/spatstat')
 library(tidyverse)
-library(lubridate)
-library(utils)
-library(doParallel) # DoParallel package is a "parallel backend" for the foreach package, it provides a mechanism needed to execute foreach loops in parallel.
-library(foreach)
 
-#Set parameters for data to process
-segments = "Roadway/RoadNetwork_Jurisdiction.csv"
+codeloc <- "~/GitHub/SDI_Waze"
+source(file.path(codeloc, 'utility/get_packages.R'))
 
-codeloc <- "~/SDI_Waze" 
-
-home.loc <- getwd()
-user <- if(length(grep("@securedatacommons.com", home.loc)) > 0) {
-  paste0( "/home/", system("whoami", intern = TRUE), "@securedatacommons.com")
-} else {
-  paste0( "/home/", system("whoami", intern = TRUE))
-} # find the user directory to use
-localdir <- paste0(user, "/workingdata/") # full path for readOGR
-
-wazemonthdir <- "~/workingdata/TN/Overlay" # contains the merged.waze.tn.YYYY-mm_<state>.RData files
-temp.outputdir = "~/agg_out" # Will contain the WazeHexTimeList_YYYY-mm_grids_<state>.RData files # Which code generated this? Jessie does not have this file.
-
-teambucket <- "s3://prod-sdc-sdi-911061262852-us-east-1-bucket"
-  
-source(file.path(codeloc, "utility/wazefunctions.R")) 
-
-setwd(wazemonthdir)
-
+## Working on shared drive
+wazeshareddir <- "//vntscex.local/DFS/Projects/PROJ-OS62A1/SDI Waze Phase 2"
+output.loc <- file.path(wazeshareddir, "Output/WA")
+data.loc <- file.path(wazeshareddir, "Data/Bellevue")
 
 # <><><><><><><><><><><><><><><><><><><><>
+# TO DO:
+#   1. Need the timestamp of the Waze events
+
+# Make a segment time all table
+
+# Assign Waze points to the table
+
+# Assign Bellevue points to the table
+
+
+
 
 # start segment loop ----
-for(g in grids){ # g = grids[1]
-
-  # Loop through months of available merged data for this state
-  mergefiles <- dir(wazemonthdir)[grep("^merged.waze.tn", dir(wazemonthdir))]
-  gridmergefiles <- mergefiles[grep(g, mergefiles)]
- 
-  avail.months = substr(unlist(lapply(strsplit(gridmergefiles, "_"), function(x) x[[4]])),
-                        1, 7)
-  
-  # Look for already completed months and skip those
-  tlfiles <- dir(temp.outputdir)[grep("WazeHexTimeList_", dir(temp.outputdir))]
-  g.tlfiles <- tlfiles[grep(g, tlfiles)]
-  done.months <- unlist(lapply(strsplit(g.tlfiles, "_"), function(x) x[[2]])) 
-
-  todo.months = avail.months[!avail.months %in% done.months] #sort(avail.months)[c(1:9)]
-
-  
-  starttime <- Sys.time()
-  
-  cl <- makeCluster(parallel::detectCores()) # make a cluster of all available cores
-  registerDoParallel(cl)
-  
-  writeLines(c(""), paste(g, "log.txt", sep = "_"))    
-  
-  foreach(j = todo.months, .packages = c("dplyr", "lubridate", "utils")) %dopar% { # j="2017-04" 
-
-    sink(paste(g, "log.txt", sep = "_"), append=TRUE) # sink() function diverts R output to a connection and stops such diversions. Starting from this point, all output in console will be saved in the log file in the working directory.
-    
-    cat(paste(Sys.time()), g, j, "\n")                                                           
-                                                             
-    
-    load(file.path(wazemonthdir, paste0("merged.waze.tn.", g,"_", j, ".RData"))) # includes both waze (link.waze.tn) and TN crash (crash.df) data, with grid for central and neighboring cells
-    
-    # format(object.size(link.waze.tn), "Mb"); format(object.size(crash.df), "Mb")
-    # TN date, Waze time all now are POSIXct, with correct time zone. ct: seconds since beginning of 1970 in UTC. lt is a list of vectors representing seconds, min, hours, day, year. ct is better for analysis, while lt is more human-readable.
-
     ##############
     # Make data frame of all Grid IDs by day of year and time of day in each month of data (subset to all grid IDs with Waze OR EDT data)
     GridIDall <- unique(c(as.character(link.waze.tn$GRID_ID), # Grid ID for a Waze event

@@ -1,6 +1,6 @@
 ##### Review Bellevue Data ####
-# 1. Roadnetwork
-# 2. Raw Crash points
+# 1. RoadNetwork (street layer) data, highway excluded
+# 2. Raw Crash points - potential to add additional variables to the final model
 # 3. Crash Points shapefile that has been filtered and matched with a filtered segment
 # 4. Waze event points
 # 5. Shapefiles of waze points that link the segments
@@ -11,6 +11,7 @@
 # Setup ----
 # If you don't have these packages: install.packages(c("maps", "sp", "rgdal", "rgeos", "tidyverse")) 
 # ggmap: want development version: devtools::install_github("dkahle/ggmap")
+rm(list= ls())
 library(maps) # for mapping base layers
 library(sp)
 library(rgdal) # for readOGR(),writeOGR () needed for reading/writing in ArcM shapefiles
@@ -35,6 +36,7 @@ data.loc <- file.path(wazeshareddir, "Data/Bellevue")
 # 
 # setwd(localdir) 
 
+# Spatial data process and basic layers ----
 # read functions
 source(file.path(codeloc, 'utility/wazefunctions.R'))
 
@@ -46,7 +48,20 @@ tzs <- data.frame(states,
 
 # Project to NAD_1983_2011_StatePlane_Washington_North_FIPS_4601_Ft_US, WKID: 6597
 proj <- showP4(showWKT("+init=epsg:6597"))
-proj.USGS <- "+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs +ellps=GRS80 +towgs84=0,0,0" # why do we need an USGS version? and how to convert it from the wkid?
+# proj.USGS <- "+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs +ellps=GRS80 +towgs84=0,0,0" # why do we need an USGS version? and how to convert it from the wkid?
+
+city <- readOGR(dsn = file.path(data.loc, "Roadway","OSTSafetyInitiative_20181121"), layer = "CityBoundary")
+city <- spTransform(city, CRS(proj))
+plot(city)
+
+PedFac <- readOGR(dsn = file.path(data.loc, "Roadway","OSTSafetyInitiative_20181121"), layer = "PedestrainFacilities")
+PedFac <- spTransform(PedFac, CRS(proj)) # 4232*10
+plot(PedFac, add = T, col = "grey")
+
+zoning <- readOGR(dsn = file.path(data.loc, "Roadway","OSTSafetyInitiative_20181121"), layer = "Zoning")
+zoning <- spTransform(zoning, CRS(proj)) # 983*22
+plot(zoning, add = T, col = "grey")
+
 
 # 1. RoadNetwork (street layer) data, highway excluded ----
 # Michelle regenerated a shapefile of Bellevue Roadnetwork by excluding the highway/freeway/interstate: RoadNetwork_Jurisdiction.shp
@@ -111,7 +126,7 @@ crashtb <- read.csv(file = file.path(data.loc, "Crash","20181127_All_roads_Belle
 names(crashtb) # Looks like this is a full crash database
 dim(crashtb) # 4417  254, a total of 4417 crashes.
 
-# Columns that may be of interest
+# Columns that may be of interest, the first 45 columns
 crashtb <- crashtb[,1:45]
 str(crashtb)
 nacounts <- colSums(is.na(crashtb)) # Milepost, Dista.From.ref.point, COUNTY.RD.ONLY..INTERSECTING.CO.RD.MILEPOST, ARM have some NAs, all other columns are clean.
@@ -130,16 +145,23 @@ plot(crash_snapped, col = "red")
 wazetb <- read.csv(file = file.path(data.loc, "Export","WA_Bellevue_Prep_Export.csv"))
 names(wazetb) # "lat", "lon", "alert_type", "time", "roadclass", "sub_type", "city", "street", "magvar"
 dim(wazetb) # 637629*9
-
+# the time column is in "2017-04-04 16:30:29" format
 
 # 5. Shapefiles of waze points that link the segments ----
 # Shapefiles\WazeReports_Snapped50ft_MatchName.shp
 waze_snapped <- readOGR(dsn = file.path(data.loc, "Shapefiles"), layer = "WazeReports_Snapped50ft_MatchName")
 waze_snapped <- spTransform(waze_snapped, CRS(proj))
-#  114614 rows * 15 columns
+#  114614 rows * 15 columns (18% of Waze were snapped to the segments)
 names(waze_snapped@data) # where does the added columns come from? segment layer?
 # [1] "OBJECTID"   "lat"        "lon"        "alert_type" "time"       "roadclass"  "sub_type"   "city"      
 # [9] "street"     "magvar"     "NEAR_FID"   "OfficialSt" "StreetSegm" "HourOfDay"  "MinOfDay"  
+# the time column is in "2017/04/11" format, we need the full timestamp, at least the month of the Waze event.
+table(waze_snapped@data$alert_type)
+# ACCIDENT           JAM   ROAD_CLOSED WEATHERHAZARD 
+# 1908         84826          2637         25243
+
+# how many unique segment are Waze events link?
+length(unique(waze_snapped@data$NEAR_FID)) # 1,846, 28% of all segments
 
 # overlay crash and waze events
 plot(waze_snapped, col = "blue")
@@ -152,6 +174,13 @@ roadnettb_snapped <- spTransform(roadnettb_snapped, CRS(proj))
 names(roadnettb_snapped@data)
 # [1] "OBJECTID"   "StreetSegm" "OfficialSt" "OneWay"     "SpeedLimit" "ArterialCl" "FunctionCl" "Length_FT" 
 # [9] "End1_IntID" "End2_IntID" "nWz_Acc"    "nCrashes"   "nCrashEnd1" "nCrashEnd2"  
+
+# a.	nWz_Acc  =  the total number of Waze accidents on that segment.  
+# b.	nCrashes  =  the total number of Bellevue reported crashes on that segment.  
+# c.	End1_IntID  =  the intersection ID for the first (e.g. starting point) of that segment.  
+# d.	End2_IntID  =  the intersection ID for the second (e.g. ending point) of that segment.  
+# e.	nCrashEnd1  =  the number of Bellevue reported crashes on that segment associated with the first intersection (End1_IntID). 
+# f.	nCrashEnd2  =  the number of Bellevue reported crashes on that segment associated with the section intersection (End2_IntID).  
 
 plot(roadnettb_snapped)
      
