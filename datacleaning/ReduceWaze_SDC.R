@@ -35,13 +35,15 @@ source(file.path(codeloc, 'utility/connect_redshift_pgsql.R'))
 
 # Query parameters
 # states with available EDT data for model testing. Adding NC for disaster test
-states = c("CT", "MD", "NC", "TN", "UT", "VA", "WA")
+# states = c("CT", "MD", "NC", "TN", "UT", "VA", "WA")
+
+states = c("CT", "MD", "TN", "UT", "VA", "WA")
 
 # Time zone picker. 'USE_SHAPEFILE' flag for states with multiple timezones:
 tzs <- data.frame(states, 
                   tz = c("US/Eastern",
                          "US/Eastern",
-                         "US/Eastern",
+                         #"US/Eastern",
                          "USE_SHAPEFILE",
                          "US/Mountain",
                          "US/Eastern",
@@ -53,8 +55,8 @@ tzs <- data.frame(states,
 
 # Get year/month, year/month/day, and last day of month vectors to create the SQL queries
 yearmonths = c(
-  paste(2017, formatC(4:12, width = 2, flag = "0"), sep="-"),
-  paste(2018, formatC(1:11, width = 2, flag = "0"), sep="-")
+#  paste(2017, formatC(4:12, width = 2, flag = "0"), sep="-"),
+  paste(2018, formatC(1:12, width = 2, flag = "0"), sep="-")
 )
 yearmonths.1 <- paste(yearmonths, "01", sep = "-")
 lastdays <- days_in_month(as.POSIXct(yearmonths.1)) # from lubridate
