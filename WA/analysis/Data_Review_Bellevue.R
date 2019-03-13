@@ -1,18 +1,20 @@
 ##### Review Bellevue Data ####
 # 1. Roadnetwork
-# 2. Crash points
-# 3. Shapefiles with the links between crash accidents and segments
-# 4. Waze  event points
-# 5. Shapefiles with the links between Waze event and segments
-# 6. Emergency response geo-coordinate data from NORCOM
+# 2. Raw Crash points
+# 3. Crash Points shapefile that has been filtered and matched with a filtered segment
+# 4. Waze event points
+# 5. Shapefiles of waze points that link the segments
+# 6. Road network with additional calculated columns
+# 7. Shapefiles of intersections, linked with segment ID (important)
+# 8. Emergency response geo-coordinate data from NORCOM
 
 # Setup ----
 # If you don't have these packages: install.packages(c("maps", "sp", "rgdal", "rgeos", "tidyverse")) 
 # ggmap: want development version: devtools::install_github("dkahle/ggmap")
-library(maps)
+library(maps) # for mapping base layers
 library(sp)
-library(rgdal)
-library(rgeos)
+library(rgdal) # for readOGR(),writeOGR () needed for reading/writing in ArcM shapefiles
+library(rgeos) # gintersection
 library(ggmap)
 library(spatstat) # for ppp density estimation. devtools::install_github('spatstat/spatstat')
 library(tidyverse)
@@ -25,7 +27,7 @@ wazeshareddir <- "//vntscex.local/DFS/Projects/PROJ-OS62A1/SDI Waze Phase 2"
 output.loc <- file.path(wazeshareddir, "Output/WA")
 data.loc <- file.path(wazeshareddir, "Data/Bellevue")
 
-## Working on SDC
+## Working on SDC - comment as we will be mainly based off the shared drive instead of SDC
 # user <- paste0( "/home/", system("whoami", intern = TRUE)) #the user directory to use
 # localdir <- paste0(user, "/workingdata") # full path for readOGR
 # 
@@ -35,13 +37,22 @@ data.loc <- file.path(wazeshareddir, "Data/Bellevue")
 
 # read functions
 source(file.path(codeloc, 'utility/wazefunctions.R'))
-# Project to Albers equal area conic 102008. Check comparision wiht USGS version, WKID: 102039
-proj <- showP4(showWKT("+init=epsg:102008"))
 
-# 1. RoadNetwork data ----
+# Time zone picker:
+states = c("MD")
+tzs <- data.frame(states, 
+                  tz = c("US/Eastern"),
+                  stringsAsFactors = F)
+
+# Project to NAD_1983_2011_StatePlane_Washington_North_FIPS_4601_Ft_US, WKID: 6597
+proj <- showP4(showWKT("+init=epsg:6597"))
+proj.USGS <- "+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs +ellps=GRS80 +towgs84=0,0,0" # why do we need an USGS version? and how to convert it from the wkid?
+
+# 1. RoadNetwork (street layer) data, highway excluded ----
 # Michelle regenerated a shapefile of Bellevue Roadnetwork by excluding the highway/freeway/interstate: RoadNetwork_Jurisdiction.shp
 # Jessie convert it to an txt file: RoadNetwork_Jurisdiction.csv
 roadnettb <- read.csv(file = file.path(data.loc, "Shapefiles/RoadNetwork_Jurisdiction.csv"))
+dim(roadnettb) # 6647   29
 names(roadnettb)
 
 # Rename the columns based on the full names
@@ -77,7 +88,6 @@ names(roadnettb) <- c("FID",
                       "Shape_STLength"
 )
 
-
 # ArterialClaffication, FunctionClassDescription
 count_AC <- roadnettb %>% group_by(ArterialClassification) %>% summarize(n = n()
                                                              , length_ft = mean(Shape_STLength))
@@ -96,8 +106,7 @@ table(roadnettb$OneWay) # what do "From" "To" imply?
 # IsPrivate
 table(roadnettb$IsPrivate)
 
-
-# 2. Crash points ----
+# 2. Raw Crash points - potential to add additional variables to the final model----
 crashtb <- read.csv(file = file.path(data.loc, "Crash","20181127_All_roads_Bellevue.csv"))
 names(crashtb) # Looks like this is a full crash database
 dim(crashtb) # 4417  254, a total of 4417 crashes.
@@ -107,4 +116,58 @@ crashtb <- crashtb[,1:45]
 str(crashtb)
 nacounts <- colSums(is.na(crashtb)) # Milepost, Dista.From.ref.point, COUNTY.RD.ONLY..INTERSECTING.CO.RD.MILEPOST, ARM have some NAs, all other columns are clean.
 
-# What about the crash points with all the calculated fields with counts?
+# 3. Crash Points that has been filtered and matched with a filtered segment ----
+# load Shapefiles\CrashReports_Snapped50ft_MatchName.shp (WKID: 6597)
+crash_snapped <- readOGR(dsn = file.path(data.loc, "Shapefiles"), layer = "CrashReports_Snapped50ft_MatchName")
+crash_snapped <- spTransform(crash_snapped, CRS(proj)) # 2085 rows * 29 columns
+# Shapefiles\CrashReports_Snapped50ft_MatchName_withIntersections.shp
+crash_snapped <- readOGR(dsn = file.path(data.loc, "Shapefiles"), layer = "CrashReports_Snapped50ft_MatchName_withIntersections") # 2085 rows * 30 columns
+crash_snapped <- spTransform(crash_snapped, CRS(proj))
+
+plot(crash_snapped, col = "red")
+
+# 4. Waze event points ----
+wazetb <- read.csv(file = file.path(data.loc, "Export","WA_Bellevue_Prep_Export.csv"))
+names(wazetb) # "lat", "lon", "alert_type", "time", "roadclass", "sub_type", "city", "street", "magvar"
+dim(wazetb) # 637629*9
+
+
+# 5. Shapefiles of waze points that link the segments ----
+# Shapefiles\WazeReports_Snapped50ft_MatchName.shp
+waze_snapped <- readOGR(dsn = file.path(data.loc, "Shapefiles"), layer = "WazeReports_Snapped50ft_MatchName")
+waze_snapped <- spTransform(waze_snapped, CRS(proj))
+#  114614 rows * 15 columns
+names(waze_snapped@data) # where does the added columns come from? segment layer?
+# [1] "OBJECTID"   "lat"        "lon"        "alert_type" "time"       "roadclass"  "sub_type"   "city"      
+# [9] "street"     "magvar"     "NEAR_FID"   "OfficialSt" "StreetSegm" "HourOfDay"  "MinOfDay"  
+
+# overlay crash and waze events
+plot(waze_snapped, col = "blue")
+plot(crash_snapped, col = "red", add=T)
+
+# 6. Road network with additional calculated columns
+# Shapefiles\CrashReports_Snapped50ft_MatchName_withIntersections.shp
+roadnettb_snapped <- readOGR(dsn = file.path(data.loc, "Shapefiles"), layer = "RoadNetwork_Jurisdiction_withIntersections_FullCrash") # 6647 * 14
+roadnettb_snapped <- spTransform(roadnettb_snapped, CRS(proj))
+names(roadnettb_snapped@data)
+# [1] "OBJECTID"   "StreetSegm" "OfficialSt" "OneWay"     "SpeedLimit" "ArterialCl" "FunctionCl" "Length_FT" 
+# [9] "End1_IntID" "End2_IntID" "nWz_Acc"    "nCrashes"   "nCrashEnd1" "nCrashEnd2"  
+
+plot(roadnettb_snapped)
+     
+# 7. Shapefiles of intersections, linked with segment ID (important) ----
+#	Shapefiles\Intersections_withSegmentIDs.shp  
+seg_int_link <- readOGR(dsn = file.path(data.loc, "Shapefiles"), layer = "Intersections_withSegmentIDs") #
+seg_int_link <- spTransform(seg_int_link, CRS(proj))
+names(seg_int_link@data)
+# [1] "Int_ID"     "StreetSeg1" "StreetSeg2" "StreetSeg3" "StreetSeg4" "StreetSeg5" "StreetSeg6"
+plot(seg_int_link)
+
+# 8. Emergency response geo-coordinate data from NORCOM ----
+# Shapefiles\Tableau_WazeReports_CrashReports_NORCOM_Merged.shp
+norcom <- readOGR(dsn = file.path(data.loc, "Shapefiles"), layer = "Tableau_WazeReports_CrashReports_NORCOM_Merged") # 8795 rows * 8 columns
+norcom <- spTransform(norcom, CRS(proj))
+names(norcom@data)
+# [1] "OBJECTID"   "DATE"       "NEAR_FID"   "OfficialSt" "StreetSegm" "HourOfDay"  "MinOfDay"   "Dataset" 
+
+plot(norcom)
