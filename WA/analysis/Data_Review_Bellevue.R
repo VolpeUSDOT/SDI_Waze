@@ -7,6 +7,7 @@
 # 6. Road network with additional calculated columns
 # 7. Shapefiles of intersections, linked with segment ID (important)
 # 8. Emergency response geo-coordinate data from NORCOM
+# 9. Bike/Ped Location data
 
 # Setup ----
 # If you don't have these packages: install.packages(c("maps", "sp", "rgdal", "rgeos", "tidyverse")) 
@@ -46,9 +47,11 @@ tzs <- data.frame(states,
                   tz = c("US/Eastern"),
                   stringsAsFactors = F)
 
-# Project to NAD_1983_2011_StatePlane_Washington_North_FIPS_4601_Ft_US, WKID: 6597
+# Project to NAD_1983_2011_StatePlane_Washington_North_FIPS_4601_Ft_US, (Well-Known)WKID: 6597
+# USGS ID: 102039
 proj <- showP4(showWKT("+init=epsg:6597"))
-# proj.USGS <- "+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs +ellps=GRS80 +towgs84=0,0,0" # why do we need an USGS version? and how to convert it from the wkid?
+# proj.USGS <- "+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs +ellps=GRS80 +towgs84=0,0,0" 
+# Hexogon grids need a flat space, and USGS is more commonly used for that purpose. We want to keep the Bellevue network in WKID 6597 as Bellevue is already using it.
 
 city <- readOGR(dsn = file.path(data.loc, "Roadway","OSTSafetyInitiative_20181121"), layer = "CityBoundary")
 city <- spTransform(city, CRS(proj))
@@ -154,7 +157,9 @@ waze_snapped <- spTransform(waze_snapped, CRS(proj))
 #  114614 rows * 15 columns (18% of Waze were snapped to the segments)
 names(waze_snapped@data) # where does the added columns come from? segment layer?
 # [1] "OBJECTID"   "lat"        "lon"        "alert_type" "time"       "roadclass"  "sub_type"   "city"      
-# [9] "street"     "magvar"     "NEAR_FID"   "OfficialSt" "StreetSegm" "HourOfDay"  "MinOfDay"  
+# [9] "street"     "magvar"     "NEAR_FID"   "OfficialSt" "StreetSegm" "HourOfDay"  "MinOfDay"
+# NEAR_FID is the ObjectID of the streetlayer data.
+
 # the time column is in "2017/04/11" format, we need the full timestamp, at least the month of the Waze event.
 table(waze_snapped@data$alert_type)
 # ACCIDENT           JAM   ROAD_CLOSED WEATHERHAZARD 
@@ -168,7 +173,7 @@ plot(waze_snapped, col = "blue")
 plot(crash_snapped, col = "red", add=T)
 
 # 6. Road network with additional calculated columns
-# Shapefiles\CrashReports_Snapped50ft_MatchName_withIntersections.shp
+# Shapefiles\RoadNetwork_Jurisdiction_withIntersections_FullCrash.shp
 roadnettb_snapped <- readOGR(dsn = file.path(data.loc, "Shapefiles"), layer = "RoadNetwork_Jurisdiction_withIntersections_FullCrash") # 6647 * 14
 roadnettb_snapped <- spTransform(roadnettb_snapped, CRS(proj))
 names(roadnettb_snapped@data)
@@ -182,6 +187,8 @@ names(roadnettb_snapped@data)
 # e.	nCrashEnd1  =  the number of Bellevue reported crashes on that segment associated with the first intersection (End1_IntID). 
 # f.	nCrashEnd2  =  the number of Bellevue reported crashes on that segment associated with the section intersection (End2_IntID).  
 
+# If a IntID = 0, it is NULL.
+
 plot(roadnettb_snapped)
      
 # 7. Shapefiles of intersections, linked with segment ID (important) ----
@@ -189,7 +196,7 @@ plot(roadnettb_snapped)
 seg_int_link <- readOGR(dsn = file.path(data.loc, "Shapefiles"), layer = "Intersections_withSegmentIDs") #
 seg_int_link <- spTransform(seg_int_link, CRS(proj))
 names(seg_int_link@data)
-# [1] "Int_ID"     "StreetSeg1" "StreetSeg2" "StreetSeg3" "StreetSeg4" "StreetSeg5" "StreetSeg6"
+# [1] "Int_ID"     "StreetSeg1" "StreetSeg2" "StreetSeg3" "StreetSeg4" "StreetSeg5" "StreetSeg6" # ordered by the segment ID from smallest to largest.
 plot(seg_int_link)
 
 # 8. Emergency response geo-coordinate data from NORCOM ----
@@ -200,3 +207,9 @@ names(norcom@data)
 # [1] "OBJECTID"   "DATE"       "NEAR_FID"   "OfficialSt" "StreetSegm" "HourOfDay"  "MinOfDay"   "Dataset" 
 
 plot(norcom)
+
+# The Norcom data is not complete, we are waiting to get a better data (csv format), and do a snap.
+
+# 9 Bike/Ped Conflict data (Raw) ----
+# Michelle may need to snap it using some columns, such as location description.
+
