@@ -22,6 +22,13 @@ stopifnot(identical(ll.hash, all.hash))
 # add: subtype, city, street, and direction of travel (magvar)
 
 waze.ll <- data.frame(waze.ll, w.all[c("sub_type", "city", "street", "magvar")])
+waze.ll.proj <- data.frame(waze.ll.proj, w.all[c("sub_type", "city", "street", "magvar")])
+
+# Order by time and alert type
+waze.ll <- waze.ll[order(waze.ll$time),]
+waze.ll.proj <- waze.ll.proj[order(waze.ll.proj$time),]
+
+stopifnot(identical(waze.ll$SDC_uuid, waze.ll.proj$SDC_uuid))
 
 fn.export = paste(state, 
                   "Bellevue_Prep_Export", sep="_")

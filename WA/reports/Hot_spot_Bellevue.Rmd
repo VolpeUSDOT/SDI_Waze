@@ -29,6 +29,7 @@ library(ggmap)
 library(tidyverse)
 library(kableExtra)
 library(DT)
+library(uuid) # install.packages('uuid')
 
 
 # Run once, to get all necessary data
@@ -51,7 +52,7 @@ proj <- showP4(showWKT("+init=epsg:102008"))
 
 ## Overview
 
-Mapping of compiled Waze events from April 2017 to November 2018 in Bellevue, WA.
+Mapping of compiled Waze events for all of 2018 in Bellevue, WA.
 Events within 6 miles of the center of Bellevue were included in this initial work, and the 'city' field in the Waze data was used to remove events where were labeled as being outside of Bellevue. One of the next steps will be to clip to the city boundary shapefile. In addition, the Bellevue road network has not yet been incorporated in these maps. A base layer derived from Open Street Maps is used for these maps.
 
 ```{r load_data}
@@ -118,6 +119,9 @@ for(i in 1:length(wazemonthfiles)){ # Start loop; i = 1
  
 } # End compile Waze event loop
 
+# Add uuids for export, different from Waze-generate UUIDs
+
+waze.ll$SDC_uuid <- waze.ll.proj$SDC_uuid <- sapply(1:nrow(waze.ll), function(x) UUIDgenerate(use.time = T))
 
 # Save for plotting (will need to expand filename if doing multiple special events in a month) 
 # w.all     Waze events for selected area, as spatial points data frame, with all variables
