@@ -311,7 +311,6 @@ for(i in special.ls){
 }
 
 # Tennessee data ----
-# TODO: make this smarter about file paths (look for TN_Roadway_Shapefiles.zip inside Shapefiles)
 
 tn.ls = c('TN.zip', 'Weather/TN_Weather_GHCN.zip', 
           'Shapefiles/TN_Roadway_Shapefiles.zip', 'SpecialEvents/TN_SpecialEvent_2018.RData', 
@@ -319,39 +318,71 @@ tn.ls = c('TN.zip', 'Weather/TN_Weather_GHCN.zip',
           'Crash/TITAN_Crash_181108.zip', 'Crash/TN_Crash_Simple_2008-2018.RData')
 
 for(i in tn.ls){
-  if(length(grep(i, dir(file.path('~', 'workingdata', 'TN'))))==0){
+  subdir = as.character(lapply(strsplit(i, '/'), function(x) x[1]))
+  fileinsubdir = as.character(lapply(strsplit(i, '/'), function(x) x[2]))
+  
+  if(!is.na(fileinsubdir)){
     
-    system(paste("aws s3 cp",
-                 file.path(teambucket, 'TN', i),
-                 file.path('~', 'workingdata', 'TN', i)))
-    if(length(grep('zip$', i))!=0) {
-       system(paste('unzip -o', file.path('~', 'workingdata', 'TN', i), '-d',
-                                                file.path('~', 'workingdata', 'TN/')))
+    if(length(grep(fileinsubdir, dir(file.path('~', 'workingdata', 'TN', subdir))))==0){
       
-      
-      
+      system(paste("aws s3 cp",
+                   file.path(teambucket, 'TN', i),
+                   file.path('~', 'workingdata', 'TN', i)))
+      if(length(grep('zip$', i))!=0) {
+        system(paste('unzip -o', file.path('~', 'workingdata', 'TN', i), '-d',
+                     file.path('~', 'workingdata', 'TN', paste0(subdir, '/'))))
       }
-  }
+    }
+    # If no sub directory:
+  } else {
+    if(length(grep(i, dir(file.path('~', 'workingdata', 'TN'))))==0){
+      
+      system(paste("aws s3 cp",
+                   file.path(teambucket, 'TN', i),
+                   file.path('~', 'workingdata', 'TN', i)))
+      if(length(grep('zip$', i))!=0) {
+        system(paste('unzip -o', file.path('~', 'workingdata', 'TN', i), '-d',
+                     file.path('~', 'workingdata', 'TN/')))
+      }    
+      
+    }
+  } # end if else for subdirectory
 }
 
 # Bellevue data ----
 
-wa.ls = c('Shapefiles/Bellevue_Roadway.zip', 'Crashes/Bellevue_Crash.zip', "Roadway/RoadNetwork_Jurisdiction.csv")
+wa.ls = c('Shapefiles/Bellevue_Roadway.zip', 'Crashes/Bellevue_Crash.zip', "Roadway/RoadNetwork_Jurisdiction.csv", "Weather/Bellevue_2018_GHCN_Weather.zip")
 
 for(i in wa.ls){
-  if(length(grep(i, dir(file.path('~', 'workingdata', 'WA'))))==0){
+  subdir = as.character(lapply(strsplit(i, '/'), function(x) x[1]))
+  fileinsubdir = as.character(lapply(strsplit(i, '/'), function(x) x[2]))
+  
+  if(!is.na(fileinsubdir)){
     
-    system(paste("aws s3 cp",
-                 file.path(teambucket, 'WA', i),
-                 file.path('~', 'workingdata', 'WA', i)))
-    if(length(grep('zip$', i))!=0) {
-      system(paste('unzip -o', file.path('~', 'workingdata', 'WA', i), '-d',
-                   file.path('~', 'workingdata', 'WA/')))
+    if(length(grep(fileinsubdir, dir(file.path('~', 'workingdata', 'WA', subdir))))==0){
       
-      
+      system(paste("aws s3 cp",
+                   file.path(teambucket, 'WA', i),
+                   file.path('~', 'workingdata', 'WA', i)))
+      if(length(grep('zip$', i))!=0) {
+          system(paste('unzip -o', file.path('~', 'workingdata', 'WA', i), '-d',
+                     file.path('~', 'workingdata', 'WA', paste0(subdir, '/'))))
+      }
+    }
+    # If no sub directory:
+    } else {
+      if(length(grep(i, dir(file.path('~', 'workingdata', 'WA'))))==0){
+        
+        system(paste("aws s3 cp",
+                     file.path(teambucket, 'WA', i),
+                     file.path('~', 'workingdata', 'WA', i)))
+        if(length(grep('zip$', i))!=0) {
+                system(paste('unzip -o', file.path('~', 'workingdata', 'WA', i), '-d',
+                       file.path('~', 'workingdata', 'WA/')))
+        }    
       
     }
-  }
+  } # end if else for subdirectory
 }
 
 # Reorganize unzipped directories if necessary
@@ -445,6 +476,11 @@ if(MOVEFROMUPLOAD){
                file.path(teambucket, system('whoami', intern = T), "uploaded_files/")
   ))
 
+  system(paste("aws s3 mv", 
+               file.path(teambucket, system('whoami', intern = T), "uploaded_files", "Bellevue_2018_GHCN_Weather.zip"),
+               file.path(teambucket, "WA", "Weather", "Bellevue_2018_GHCN_Weather.zip"))
+  )
+  
   system(paste("aws s3 mv", 
                file.path(teambucket, system('whoami', intern = T), "uploaded_files", "TITAN_Crash_181108.zip"),
                file.path(teambucket, "TN", "Crash", "TITAN_Crash_181108.zip"))
