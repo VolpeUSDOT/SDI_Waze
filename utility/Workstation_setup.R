@@ -29,7 +29,7 @@ for (i in toplevel){
 # Create directories within 'workingdata' 
 
 workinglevel = c('census', 'EDT', 'Figures', 'Hex', 'Link', 'Overlay', 'Random_Forest_Output',
-                 'AADT', 'FARS', 'LODES_LEHD', 'SpecialEvents')
+                 'AADT', 'FARS', 'LODES_LEHD', 'SpecialEvents', 'Weather')
 
 for (i in workinglevel){
   system(paste('mkdir -p', file.path("~", "workingdata", i)))
@@ -310,6 +310,29 @@ for(i in special.ls){
   }
 }
 
+# Weather ----
+
+# GHCN data 
+
+wx.ls <- system(paste("aws s3 ls", 
+                          file.path(teambucket, "Weather/")
+),
+intern = T)
+
+wx.ls <- unlist(lapply(strsplit(wx.ls, " "), function(x) x[[length(x)]]))
+
+for(i in wx.ls){
+  if(length(grep(i, dir(file.path('~', 'workingdata', 'Weather'))))==0){
+    system(paste("aws s3 cp",
+                 file.path(teambucket, 'Weather', i),
+                 file.path('~', 'workingdata', 'Weather', i)))
+    if(length(grep('zip$', i))!=0) {
+      system(paste('unzip -o', file.path('~', 'workingdata', 'Weather', i), '-d',
+                   file.path('~', 'workingdata', 'Weather/')))
+    }   
+  }
+}
+
 # Tennessee data ----
 
 tn.ls = c('TN.zip', 'Weather/TN_Weather_GHCN.zip', 
@@ -477,6 +500,11 @@ if(MOVEFROMUPLOAD){
   ))
 
   system(paste("aws s3 mv", 
+               file.path(teambucket, system('whoami', intern = T), "uploaded_files", "CTMDUTVA_2018_Weather.zip"),
+               file.path(teambucket, "Weather", "CTMDUTVA_2018_Weather.zip"))
+  )
+
+    system(paste("aws s3 mv", 
                file.path(teambucket, system('whoami', intern = T), "uploaded_files", "Bellevue_2018_GHCN_Weather.zip"),
                file.path(teambucket, "WA", "Weather", "Bellevue_2018_GHCN_Weather.zip"))
   )
