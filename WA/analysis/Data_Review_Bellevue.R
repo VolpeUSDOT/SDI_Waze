@@ -52,6 +52,9 @@ tzs <- data.frame(states,
 proj <- showP4(showWKT("+init=epsg:6597"))
 # proj.USGS <- "+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs +ellps=GRS80 +towgs84=0,0,0" 
 # Hexogon grids need a flat space, and USGS is more commonly used for that purpose. We want to keep the Bellevue network in WKID 6597 as Bellevue is already using it.
+network <- readOGR(dsn = file.path(data.loc, "Roadway","OSTSafetyInitiative_20181121"), layer = "RoadNetwork")
+network <- spTransform(network, CRS(proj)) # 10320*28, it has 10,320 segments in the original data sent to us.
+plot(network)
 
 city <- readOGR(dsn = file.path(data.loc, "Roadway","OSTSafetyInitiative_20181121"), layer = "CityBoundary")
 city <- spTransform(city, CRS(proj))
@@ -188,6 +191,9 @@ names(roadnettb_snapped@data)
 # f.	nCrashEnd2  =  the number of Bellevue reported crashes on that segment associated with the section intersection (End2_IntID).  
 
 # If a IntID = 0, it is NULL.
+
+# If all segments have unique ID, the only unique IF is the objectedID, which does not link to the original data. Suggest that we gave all segments a unique ID and carrier it over to the subset.
+length(unique(roadnettb_snapped$OBJECTID)) # 6647
 
 plot(roadnettb_snapped)
      
