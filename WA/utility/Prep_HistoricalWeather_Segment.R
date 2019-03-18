@@ -259,7 +259,7 @@ if(length(grep(prepname, dir(file.path(localdir, "Weather")))) == 0) {
   } # end parallel loop
    
   # Plot gridded versions of same point maps to check
-  source(file.path(codeloc, 'TN', 'datacleaning', 'Plot_weather_gridded.R'))
+  source(file.path(codeloc, 'WA', 'datacleaning', 'Plot_weather_segmented.R'))
   
   EndTime <- Sys.time() - StartTime
   cat(round(EndTime, 2), attr(EndTime, "units"), "\n")
@@ -276,3 +276,30 @@ if(length(grep(prepname, dir(file.path(localdir, "Weather")))) == 0) {
   load(file.path(localdir, "Weather", paste0(prepname, ".RData")))
 }
 
+
+# 51 days with all NA for PRCP, check what is going on. No PRCP for any station on these days?
+no_prcp = wx.grd.day %>% 
+  filter(is.na(PRCP)) %>%
+  group_by(day) %>%
+  count()
+
+# Export ----
+# Export for joining with other road segment data and modeling off SDC
+format(object.size(wx.grd.day), 'Mb') # 187.4 Mb
+dim(wx.grd.day) # 3.7 M rows
+
+
+write.csv(wx.grd.day, file = file.path(localdir, 'Weather', 'Prepared_Bellevue_Wx_2018.csv'), row.names = F)
+
+zipname = paste0('Prepared_Bellevue_Wx_2018_', Sys.Date(), '.zip')
+
+system(paste('zip -j', file.path('~/workingdata', zipname),
+             file.path(localdir, "Weather", paste0(prepname, ".RData")),
+             file.path(localdir, 'Weather', 'Prepared_Bellevue_Wx_2018.csv')
+             ))
+
+system(paste(
+  'aws s3 cp',
+  file.path('~/workingdata', zipname),
+  file.path(teambucket, 'export_requests', zipname)
+))

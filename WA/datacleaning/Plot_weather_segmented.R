@@ -37,22 +37,22 @@ wx.avg.jun.T <- wx.grd.day %>%
   summarize(avg.06.tempmax = mean(TMAX, na.rm=T),
             avg.06.tempmin = mean(TMIN, na.rm=T))
 
-pdf(paste0("WX_Gridded_to_", g, ".pdf"), width = 8, height = 8)
+pdf("Figures/WX_Segmenged_Bellevue.pdf", width = 8, height = 8)
 
   par(mfrow=c(2,2))
-  hist(mins$minTmin, main = "Min TMIN by grid cell", col = "purple")
-  hist(mins$minTmax, main = "Min TMAX by grid cell", col = "tomato")
-  hist(mins$minP, main = "Min PRCP by grid cell", col = "cornflowerblue")
-  hist(mins$minS, main = "Min SNOW by grid cell", col = "beige")
+  hist(mins$minTmin, main = "Min TMIN by segment", col = "purple")
+  hist(mins$minTmax, main = "Min TMAX by segment", col = "tomato")
+  hist(mins$minP, main = "Min PRCP by segment", col = "cornflowerblue")
+  hist(mins$minS, main = "Min SNOW by segment", col = "beige")
   
-  hist(maxs$maxTmin, main = "Max TMIN by grid cell", col = "purple")
-  hist(maxs$maxTmax, main = "Max TMAX by grid cell", col = "tomato")
-  hist(maxs$maxP, main = "Max PRCP by grid cell", col = "cornflowerblue")
-  hist(maxs$maxS, main = "Max SNOW by grid cell", col = "beige")
+  hist(maxs$maxTmin, main = "Max TMIN by segment", col = "purple")
+  hist(maxs$maxTmax, main = "Max TMAX by segment", col = "tomato")
+  hist(maxs$maxP, main = "Max PRCP by segment", col = "cornflowerblue")
+  hist(maxs$maxS, main = "Max SNOW by segment", col = "beige")
 
   par(mfrow=c(1,1))
   
-  # Join to grid cells, make similar summaries as before
+  # Join to segments, make similar summaries as before
   wx.by.id <- left_join(mins, maxs)
   wx.by.id <- left_join(wx.by.id, sumPS)
   wx.by.id <- left_join(wx.by.id, wx.avg.jan.T)
@@ -60,40 +60,40 @@ pdf(paste0("WX_Gridded_to_", g, ".pdf"), width = 8, height = 8)
   
   wx.by.id$ID <- as.character(wx.by.id$ID)
   
-  plotgrid <- grid_shp
-  plotgrid@data <- left_join(plotgrid@data, wx.by.id, by = c("GRID_ID"="ID"))
+  plot_rd <- rd_shp
+  plot_rd@data <- left_join(plot_rd@data, wx.by.id, by = c("OBJECTID"="ID"))
   
-  plotgrid@data[plotgrid@data==-Inf] = NA
+  plot_rd@data[plot_rd@data==-Inf] = NA
   
   # Make maxTmax, maxS, and sumP maps
   tempcol <- colorRampPalette(c("purple", "blue", "green", "yellow", "orange", "red"))
-  cuts = cut(plotgrid@data$maxTmax, 10)
-  plot(plotgrid, col = tempcol(10)[cuts], border =  tempcol(10)[cuts])
-  legend("bottom", pch = 16, col = tempcol(10),
+  cuts = cut(plot_rd@data$maxTmax, 10)
+  plot(plot_rd, col = tempcol(12)[cuts])
+  legend("left", pch = 15, col = tempcol(12),
          legend = levels(cuts),
-         cex = 0.8, ncol = 2, pt.cex = 2)
+         cex = 0.7, ncol = 1, pt.cex = 2)
   title(main = "Max temperatures over study period")
   
-  cuts = cut(plotgrid@data$avg.01.tempmin, 10)
-  plot(plotgrid, col = tempcol(10)[cuts], border =  tempcol(10)[cuts])
-  legend("bottom", pch = 16, col = tempcol(10),
+  cuts = cut(plot_rd@data$avg.01.tempmin, 10)
+  plot(plot_rd, col = tempcol(12)[cuts])
+  legend("left", pch = 15, col = tempcol(12),
          legend = levels(cuts),
-         cex = 0.8, ncol = 2, pt.cex = 2)
+         cex = 0.7, ncol = 1, pt.cex = 2)
   title(main = "Average January low temperatures")
   
-  cuts = cut(plotgrid@data$avg.06.tempmax, 10)
-  plot(plotgrid, col = tempcol(10)[cuts], border =  tempcol(10)[cuts])
-  legend("bottom", pch = 16, col = tempcol(10),
+  cuts = cut(plot_rd@data$avg.06.tempmax, 10)
+  plot(plot_rd, col = tempcol(12)[cuts])
+  legend("left", pch = 15, col = tempcol(12),
          legend = levels(cuts),
-         cex = 0.8, ncol = 2, pt.cex = 2)
+         cex = 0.7, ncol = 1, pt.cex = 2)
   title(main = "Average June high temperatures")
   
   preccol <- colorRampPalette(c("white", "bisque", "green", "cornflowerblue", "blue", "purple"))
-  cuts = cut(plotgrid@data$sumP, 10)
-  plot(plotgrid, col = preccol(10)[cuts], border =  tempcol(10)[cuts])
-  legend("bottom", pch = 16, col = preccol(10),
+  cuts = cut(plot_rd@data$sumP, 10)
+  plot(plot_rd, col = preccol(12)[cuts])
+  legend("left", pch = 15, col = preccol(12),
          legend = levels(cuts),
-         cex = 0.8, ncol = 2, pt.cex = 2)
+         cex = 0.7, ncol = 1, pt.cex = 2)
   title(main = "Sum of precipitation across the study period")
   
   
