@@ -24,15 +24,15 @@ data.loc <- file.path(wazeshareddir, "Data/Bellevue")
 proj <- showP4(showWKT("+init=epsg:6597"))
 
 # Load the network data
-roadnettb_snapped <- readOGR(dsn = file.path(data.loc, "Shapefiles"), layer = "RoadNetwork_Jurisdiction_withIntersections_FullCrash") # 6647 * 14
+roadnettb_snapped <- readOGR(dsn = file.path(data.loc, "Shapefiles", "Archive"), layer = "RoadNetwork_Jurisdiction_withIntersections_FullCrash") # 6647 * 14
 roadnettb_snapped <- spTransform(roadnettb_snapped, CRS(proj))
 
 # Load Waze data
-waze_snapped <- readOGR(dsn = file.path(data.loc, "Shapefiles"), layer = "WazeReports_Snapped50ft_MatchName")
+waze_snapped <- readOGR(dsn = file.path(data.loc, "Shapefiles", "Archive"), layer = "WazeReports_Snapped50ft_MatchName")
 waze_snapped <- spTransform(waze_snapped, CRS(proj))
 
 # Load Crash data
-crash_snapped <- readOGR(dsn = file.path(data.loc, "Shapefiles"), layer = "CrashReports_Snapped50ft_MatchName")
+crash_snapped <- readOGR(dsn = file.path(data.loc, "Shapefiles", "Archive"), layer = "CrashReports_Snapped50ft_MatchName")
 crash_snapped <- spTransform(crash_snapped, CRS(proj))
 
 # <><><><><><><><><><><><><><><><><><><><>
@@ -43,33 +43,57 @@ crash_snapped <- spTransform(crash_snapped, CRS(proj))
 # For now, using the objectID as the unique ID of a segment, renames it as segment ID
 SegIDall <- roadnettb_snapped$OBJECTID
 
-# Format month, day
-year.month.w <- format(link.waze.tn$time, "%Y-%m")
-year.month.t <- format(link.waze.tn$date, "%Y-%m")
-year.month <- year.month.w
-year.month[is.na(year.month)] <- year.month.t[is.na(year.month)]
+# All year, month, and hour
+# Calendar year 2018
+# Convert Waze time with time stamp
+waze_snapped$time <- as.Date(waze_snapped$time, format='%Y/%M/%d')
+crash_snapped$DATE <- as.Date(crash_snapped$DATE, format = '%Y/%M/%d')
 
-link.waze.tn <- link.waze.tn[year.month == j,]
+# Rename OBJECTIDs
+colnames(waze_snapped@data)[colnames(waze_snapped@data)=="OBJECTID"] <- "OBJECTID_waze"
+colnames(crash_snapped@data)[colnames(crash_snapped@data)=="OBJECTID"] <- "OBJECTID_crash"
+ 
+colnames(waze_snapped@data)[colnames(waze_snapped@data)=="HourOfDay"] <- "HourOfDay_waze"
+colnames(crash_snapped@data)[colnames(crash_snapped@data)=="HourOfDay"] <- "HourOfDay_crash"
 
-month.days.w  <- unique(as.numeric(format(link.waze.tn$time, "%d"))) # Waze event date/time
-month.days.t  <- unique(as.numeric(format(link.waze.tn$date, "%d"))) # TN crash date/time
-month.days = unique(c(month.days.w, month.days.t))
+colnames(waze_snapped@data)[colnames(waze_snapped@data)=="MinOfDay"] <- "MinOfDay_waze"
+colnames(crash_snapped@data)[colnames(crash_snapped@data)=="MinOfDay"] <- "MinOfDay_crash"
 
-lastday = max(month.days[!is.na(month.days)])
+# Outerjoining all three datasets.
+link.waze.bell <-  waze_snapped@data %>% full_join(crash_snapped@data, by = "NEAR_FID")
 
-Month.hour <- seq(from = as.POSIXct(paste0(j,"-01 0:00"), tz = 'America/Chicago'), 
-                  to = as.POSIXct(paste0(j,"-", lastday, " 24:00"), tz = 'America/Chicago'), # Why timezone of from and to are different? Looks like the code only used CDT
-                  by = "hour")
+# list of all months
+todo.months = format(seq(from = as.Date("2018-01-01"), to = as.Date("2018-12-31"), by = "month"), "%Y-%m")
 
-# Make a segment time all table
-GridIDTime <- expand.grid(Month.hour, GridIDall)
-names(GridIDTime) <- c("GridDayHour", "GRID_ID")
-
-# Assign Waze points to the table
-
-# Assign Bellevue points to the table
-
-
+foreach(j = todo.months, .packages = c("dplyr", "lubridate", "utils")) %dopar% {
+    # Format month, day
+    year.month.w <- format(link.waze.bell$time, "%Y-%m")
+    year.month.t <- format(link.waze.bell$DATE, "%Y-%m")
+    year.month <- year.month.w
+    year.month[is.na(year.month)] <- year.month.t[is.na(year.month)]
+    
+    link.waze.bell <- link.waze.bell[year.month == j,]
+    
+    month.days.w  <- unique(as.numeric(format(link.waze.bell$time, "%d"))) # Waze event date/time
+    month.days.t  <- unique(as.numeric(format(link.waze.bell$DATE, "%d"))) # TN crash date/time
+    month.days = unique(c(month.days.w, month.days.t))
+    
+    lastday = max(month.days[!is.na(month.days)])
+    
+    Month.hour <- seq(from = as.POSIXct(paste0(j,"-01 0:00"), tz = 'Pacific/Auckland'), 
+                      to = as.POSIXct(paste0(j,"-", lastday, " 24:00"), tz = 'Pacific/Auckland'),
+                      by = "hour")
+    
+    # Make a segment time all table
+    SegIDTime <- expand.grid(Month.hour, SegIDall)
+    names(SegIDTime) <- c("SegDayHour", "Seg_ID")
+    
+    # Assign Waze points to the table
+    
+    # Assign Bellevue points to the table
+    
+    cat("Completed", j, "\n") # end the loop
+}
 
 
 # start segment loop ----
@@ -138,11 +162,6 @@ names(GridIDTime) <- c("GridDayHour", "GRID_ID")
     fn = paste0("WazeHexTimeList_", j,"_", g, "TN.RData")
     
     save(list="Waze.hex.time", file = file.path(temp.outputdir, fn))
-    
-    # Copy to S3
-    system(paste("aws s3 cp",
-                 file.path(temp.outputdir, fn),
-                 file.path(teambucket, "TN", fn)))
     
     cat("Completed", j, "\n")
     } # End SpaceTimeGrid loop ----

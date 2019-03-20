@@ -139,10 +139,10 @@ nacounts <- colSums(is.na(crashtb)) # Milepost, Dista.From.ref.point, COUNTY.RD.
 
 # 3. Crash Points that has been filtered and matched with a filtered segment ----
 # load Shapefiles\CrashReports_Snapped50ft_MatchName.shp (WKID: 6597)
-crash_snapped <- readOGR(dsn = file.path(data.loc, "Shapefiles"), layer = "CrashReports_Snapped50ft_MatchName")
+crash_snapped <- readOGR(dsn = file.path(data.loc, "Shapefiles", "Archive"), layer = "CrashReports_Snapped50ft_MatchName")
 crash_snapped <- spTransform(crash_snapped, CRS(proj)) # 2085 rows * 29 columns
 # Shapefiles\CrashReports_Snapped50ft_MatchName_withIntersections.shp
-crash_snapped <- readOGR(dsn = file.path(data.loc, "Shapefiles"), layer = "CrashReports_Snapped50ft_MatchName_withIntersections") # 2085 rows * 30 columns
+crash_snapped <- readOGR(dsn = file.path(data.loc, "Shapefiles", "Archive"), layer = "CrashReports_Snapped50ft_MatchName_withIntersections") # 2085 rows * 30 columns
 crash_snapped <- spTransform(crash_snapped, CRS(proj))
 
 plot(crash_snapped, col = "red")
