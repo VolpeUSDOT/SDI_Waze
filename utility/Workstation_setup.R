@@ -100,9 +100,7 @@ for(i in census.ls){
 
 # EDT ----
 
-edt.ls = c("EDTsubset_april2017_to_present.zip",
-              "Maryland_april2017_to_present.csv",
-           'CTMDUTVA_20170401_20180731.txt')
+edt.ls = c('CTMDUTVA_FullYear_2018.zip')
 
 for(i in edt.ls){
   if(length(grep(i, dir(file.path('~', 'workingdata', 'EDT'))))==0){
@@ -498,7 +496,13 @@ if(MOVEFROMUPLOAD){
   system(paste("aws s3 ls", 
                file.path(teambucket, system('whoami', intern = T), "uploaded_files/")
   ))
-
+  
+  system(paste("aws s3 mv", 
+               file.path(teambucket, system('whoami', intern = T), "uploaded_files", "CTMDUTVA_FullYear_2018.zip"),
+               file.path(teambucket, "EDT", "CTMDUTVA_FullYear_2018.zip"))
+  )
+  
+  
   system(paste("aws s3 mv", 
                file.path(teambucket, system('whoami', intern = T), "uploaded_files", "CTMDUTVA_2018_Weather.zip"),
                file.path(teambucket, "Weather", "CTMDUTVA_2018_Weather.zip"))

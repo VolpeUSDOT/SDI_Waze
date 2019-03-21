@@ -24,7 +24,7 @@ teambucket <- "s3://prod-sdc-sdi-911061262852-us-east-1-bucket"
 
 user <- paste0( "/home/", system("whoami", intern = TRUE)) #the user directory to use
 
-localdir <- paste0(user, "/workingdata/") # full path for readOGR
+localdir <- file.path(user, "workingdata") # full path for readOGR
 
 wazedir <- "~/tempout" # has State_Year-mo.RData files. Grab from S3 if necessary
 edtdir <- file.path(localdir, "EDT") # Unzip and rename with shortnames if necessary
@@ -35,17 +35,17 @@ setwd(localdir) #try mkdir ~/workingdata in terminal if this returns an error
 source(file.path(codeloc, 'utility/wazefunctions.R'))
 
 # Set parameters: states, yearmonths, time zone and projection
-states = c("CT", "UT", "VA", "MD")
+states = c(#"CT", 
+            "UT", "VA", "MD")
 
 yearmonths = c(
-  paste(2017, formatC(4:12, width = 2, flag = "0"), sep="-"),
-  paste(2018, formatC(1:8, width = 2, flag = "0"), sep="-")
+  paste(2018, formatC(1:12, width = 2, flag = "0"), sep="-")
 )
 
 # Time zone picker:
 tzs <- data.frame(states, 
                   tz = c(
-                     "US/Eastern",
+            #         "US/Eastern",
                     "US/Mountain",
                     "US/Eastern",
                     "US/Eastern"
@@ -57,17 +57,18 @@ proj <- showP4(showWKT("+init=epsg:102008"))
 
 # Start loop over states ---
 
-for(i in states) {  #i= "MD"
+for(i in states) {  # i= "CT"
   
   # Start loop over months ----
+  wazedir = file.path(localdir, i, 'Waze')
   wazemonthfiles <- dir(wazedir)[grep(i, dir(wazedir))]
   wazemonthfiles <- wazemonthfiles[grep("RData$", wazemonthfiles)]
   # omit _Raw_
   omit <- grep('_Raw_', wazemonthfiles)
-  wazemonthfiles = wazemonthfiles[-omit]
+  if(length(omit) > 0) { wazemonthfiles = wazemonthfiles[-omit] }
   
   # get EDT data for this state
-  e_i <- read.csv(file.path(edtdir, "CTMDUTVA_20170401_20180731.txt"),
+  e_i <- read.csv(file.path(edtdir, "CTMDUTVA_FullYear_2018.txt"),
                   sep = "\t",
                   na.strings = c("NA", "NULL")) 
   
