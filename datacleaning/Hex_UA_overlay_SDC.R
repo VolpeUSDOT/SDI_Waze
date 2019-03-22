@@ -17,8 +17,12 @@ library(foreach)
 library(doParallel)
 
 output.loc <- "~/tempout"
-user <- paste0( "/home/", system("whoami", intern = TRUE)) #the user directory to use
-localdir <- paste0(user, "/workingdata/") # full path for readOGR
+user <- if(length(grep("@securedatacommons.com", getwd())) > 0) {
+  paste0( "/home/", system("whoami", intern = TRUE), "@securedatacommons.com")
+} else {
+  paste0( "/home/", system("whoami", intern = TRUE))
+} # find the user directory to use
+localdir <- file.path(user, "workingdata") # full path for readOGR
 edtdir <- normalizePath(file.path(localdir, "EDT"))
 wazedir <- "~/tempout" # has State_Year-mo.RData files. Grab from S3 if necessary
 
@@ -82,9 +86,17 @@ for(i in states){ # i = "UT"
   FIPS_i = formatC(state.fips[state.fips$abb == i, "fips"][1], width = 2, flag = "0")
   co_i <- co[co$STATEFP == FIPS_i,]
   
+  
+  # Limit grid to only cells which touch a county in this state
+  hex_o <- gIntersects(hex, co_i, byid = T)
+  instate <- apply(hex_o, 2, function(x) any(x))
+  hex <- hex[instate,]
+  
+  
   # Files -- 
-  e_i <- read.csv(file.path(edtdir, dir(edtdir)[grep(paste0("^", i, "_"), dir(edtdir))]),
-                    na.strings = c("NA", "NULL"))
+  e_i <- read.csv(file.path(edtdir, "CTMDUTVA_FullYear_2018.txt"),
+                  sep = "\t",
+                  na.strings = c("NA", "NULL")) 
   
   # Prep EDT data for this state
   e_i <- e_i[!is.na(e_i$GPSLat) & !is.na(e_i$GPSLong),]
