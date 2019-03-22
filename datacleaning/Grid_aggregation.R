@@ -63,6 +63,9 @@ for(state in states){ # state = "CT"
   state.tlfiles <- tlfiles[grep(state, tlfiles)]
   done.months <- unlist(lapply(strsplit(state.tlfiles, "_"), function(x) x[[2]])) 
   
+  # Manually set done.months to just the 2017 months, re-do all 2018 the same way
+  done.months <- done.months[grep('2017', done.months)]
+  
   todo.months = sort(avail.months[!avail.months %in% done.months])
   
   use.tz <- tzs$tz[tzs$states == state]
@@ -74,7 +77,7 @@ for(state in states){ # state = "CT"
   writeLines(c(""), paste0(state, "_log.txt"))    
   
   foreach(j = todo.months, .packages = c("dplyr", "lubridate", "utils")) %dopar% {
-    
+    # j = '2018-02'  
     sink(paste0(state, "_log.txt"), append=TRUE)
     
     cat(paste(Sys.time()), j, "\n")                                                           
@@ -110,7 +113,7 @@ for(state in states){ # state = "CT"
                day = format(GridDayHour, "%j"), hour = format(GridDayHour, "%H"), weekday = format(GridDayHour, "%u")) %>%
       summarize(
         nWazeRowsInMatch = n(), #includes duplicates that match more than one EDT report (don't use in model)
-        uniqWazeEvents= n_distinct(uuid.waze),
+        uniqueWazeEvents= n_distinct(uuid.waze),
         nMatchEDT_buffer = n_distinct(CrashCaseID[match=="M"]),
       
         nMatchEDT_buffer_Acc = n_distinct(CrashCaseID[match=="M" & alert_type=="ACCIDENT"]),
@@ -174,7 +177,12 @@ for(state in states){ # state = "CT"
         nMagVar30to60 = n_distinct(uuid.waze[magvar>= 60 & magvar<120]),
         nMagVar90to180 = n_distinct(uuid.waze[magvar>= 120 & magvar<180]),
         nMagVar180to240 = n_distinct(uuid.waze[magvar>= 180 & magvar<240]),
-        nMagVar240to360 = n_distinct(uuid.waze[magvar>= 240 & magvar<360])) 
+        nMagVar240to360 = n_distinct(uuid.waze[magvar>= 240 & magvar<360]),
+        
+        UA_Cluster = 1*any(Waze_UA_Type == 'C' & !is.na(Waze_UA_Type)),
+        UA_Urban = 1*any(Waze_UA_Type == 'U' & !is.na(Waze_UA_Type)),
+        UA_Rural = 1*any(is.na(Waze_UA_Type))
+        ) # end Waze aggregation 
   
     EndTime <- Sys.time()-StartTime
     EndTime
@@ -252,10 +260,10 @@ for(state in states){ # state = "CT"
     wazeTime.edt.hex_NW_N_NE_SW_S_SE <- left_join(wazeTime.edt.hex_NW_N_NE_SW_S, nWazeJam, by = c("GRID_ID_SE"="GRID_ID","day"="day", "hour"="hour"))%>%
       rename(nWazeJam_SE=nWazeJam_neighbor)
     
-    #test process - look at value for highest count in nWazeAcc_NW column (10)
-    t=filter(wazeTime.edt.hex_NW_N_NE_SW_S_SE, GRID_ID=="EG-53" & day=="141" & hour=="15")
-    t #10 - this matches, test more
-    
+    # test process - look at value for highest count in nWazeAcc_NW column (10)
+    # t=filter(wazeTime.edt.hex_NW_N_NE_SW_S_SE, GRID_ID=="EG-53" & day=="141" & hour=="15")
+    # t #10 - this matches, test more
+     
     wazeTime.edt.hexAll <- wazeTime.edt.hex_NW_N_NE_SW_S_SE %>%
       mutate_all(funs(replace(., is.na(.), 0)))
     #Replace NA with zero (for the grid counts here, 0 means there were no reported Waze events or EDT crashes in the neighbor grid cell at that hour)
@@ -320,17 +328,13 @@ if(CHECKPLOT){
   pdf(file.path("Figures", "Checking_Grid_agg_Multistate.pdf"), width = 11, height = 8)
   for(state in states){ # state = 'UT'
 
-  months = c("2017-04", "2017-09") # just a few for example
+  months = c("2018-02", "2018-11") # just a few for example
 
   state.co <- co[co$STATEFP == FIPS[FIPS$abb==state,"fips"],]
     
   # Read in hexagon shapefile. This is a rectangular surface of 1 sq mi area hexagons, 
-  if(state == "MD"){
-    hex = readOGR(file.path(localdir, "Hex", "MD_hexagons_shapefiles"), layer = "MD_hexagons_1mi_newExtent_neighbors")
-  } else {
-    hex = readOGR(file.path(localdir, "Hex"), layer = paste0(state, "_hexagons_1mi_neighbors"))
-  }
-    
+    hex = readOGR(file.path(localdir, "Hex", state), layer = paste0(state, "_hexagons_1mi_neighbors"))
+  
   hex2 <- spTransform(hex, proj4string(state.co))
   
   for(j in months){

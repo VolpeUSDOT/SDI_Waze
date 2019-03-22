@@ -55,7 +55,8 @@ for(state in states){ # state = "CT"
   tlfiles <- dir(temp.outputdir)[grep("WazeHexTimeList_", dir(temp.outputdir))]
   state.tlfiles <- tlfiles[grep(state, tlfiles)]
   done.months <- unlist(lapply(strsplit(state.tlfiles, "_"), function(x) x[[2]])) 
-
+  # Manually set done.months to just the 2017 months, re-do all 2018 the same way
+  done.months <- done.months[grep('2017', done.months)]
   todo.months = avail.months[!avail.months %in% done.months] #sort(avail.months)[c(1:9)]
 
   use.tz <- tzs$tz[tzs$states == state]
@@ -67,7 +68,7 @@ for(state in states){ # state = "CT"
   
   writeLines(c(""), "log.txt")    
   
-  foreach(j = todo.months, .packages = c("dplyr", "lubridate", "utils")) %dopar% { # j="2017-04"
+  foreach(j = todo.months, .packages = c("dplyr", "lubridate", "utils")) %dopar% { # j="2018-02"
 
     sink("log.txt", append=TRUE)
     
@@ -83,7 +84,8 @@ for(state in states){ # state = "CT"
     
     ##############
     # Make data frame of all Grid IDs by day of year and time of day in each month of data (subset to all grid IDs with Waze OR EDT data)
-    GridIDall <- c(unique(as.character(link.waze.edt$GRID_ID)), unique(as.character(link.waze.edt$GRID_ID.edt)))
+    GridIDall <- unique(c(as.character(link.waze.edt$GRID_ID), 
+                          as.character(link.waze.edt$GRID_ID.edt)))
     
     # Eliminate any rows which are not for this month -- may happen if an event began the last minute of the last day of previous month.
     
@@ -93,7 +95,9 @@ for(state in states){ # state = "CT"
     
     link.waze.edt <- link.waze.edt[year.month == j,]
     
-    month.days <- unique(as.numeric(format(link.waze.edt$last.pull.time, "%d")))
+    month.days.w <- unique(as.numeric(format(link.waze.edt$last.pull.time, "%d")))
+    month.days.e <- unique(as.numeric(format(link.waze.edt$CrashDate_Local, "%d")))
+    month.days <- unique(month.days.w, month.days.e)
     
     lastday = max(month.days[!is.na(month.days)])
     
@@ -127,6 +131,9 @@ for(state in states){ # state = "CT"
     EndTime <- Sys.time() - StartTime
     cat(round(EndTime, 2), attr(EndTime, "units"), "\n")
     
+    # Small number of rows can be EDT only with no GRID ID. Fill with GRID_ID.edt if present
+    Waze.hex.time.all$GRID_ID.edt <- as.character(Waze.hex.time.all$GRID_ID.edt)
+    Waze.hex.time.all$GRID_ID[is.na(Waze.hex.time.all$GRID_ID)] = Waze.hex.time.all$GRID_ID.edt[is.na(Waze.hex.time.all$GRID_ID)]
     Waze.hex.time <- filter(Waze.hex.time.all, !is.na(GRID_ID))
     
     #Save list of Grid cells and time windows with EDT or Waze data  

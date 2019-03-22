@@ -24,7 +24,6 @@ user <- if(length(grep("@securedatacommons.com", getwd())) > 0) {
 } # find the user directory to use
 localdir <- file.path(user, "workingdata") # full path for readOGR
 edtdir <- normalizePath(file.path(localdir, "EDT"))
-wazedir <- "~/tempout" # has State_Year-mo.RData files. Grab from S3 if necessary
 
 teambucket <- "s3://prod-sdc-sdi-911061262852-us-east-1-bucket"
 
@@ -123,6 +122,8 @@ for(i in states){ # i = "UT"
   }
   
   # Names of files for state i, in a directory with all clipped, buffered, unique uuid events by month.
+  wazedir = file.path(localdir, i, 'Waze')
+  
   wazemonthfiles <- dir(wazedir)[grep(i, dir(wazedir))]
   wazemonthfiles <- wazemonthfiles[grep("RData$", wazemonthfiles)]
   wazemonths <- sort(unique(substr(wazemonthfiles, 4, 10)))
