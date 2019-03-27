@@ -9,10 +9,11 @@ library(sp)
 library(rgdal) # for readOGR(),writeOGR () needed for reading/writing in ArcM shapefiles
 library(rgeos) # gintersection
 library(ggmap)
-library(spatstat) # for ppp density estimation. devtools::install_github('spatstat/spatstat')
 library(tidyverse)
 
-codeloc <- "~/GitHub/SDI_Waze"
+codeloc <- ifelse(grep('Flynn', normalizePath('~/')),
+                  "~/git/SDI_Waze", "~/GitHub/SDI_Waze")
+
 source(file.path(codeloc, 'utility/get_packages.R'))
 
 ## Working on shared drive
@@ -31,31 +32,40 @@ roadnettb_snapped <- spTransform(roadnettb_snapped, CRS(proj))
 waze_snapped <- readOGR(dsn = file.path(data.loc, "Shapefiles"), layer = "Waze_Snapped50ft_MatchName") # 114614*15, new: 70226*17
 waze_snapped <- spTransform(waze_snapped, CRS(proj))
 
+# Load unsnapped Waze data as well. time variable was reduced to just date in the shapefile, so we will join with the original data to get precise time
+waze_unsnapped <- read_csv(file.path(data.loc, 'Export', 'WA_Bellevue_Prep_Export.csv'))
+
 # Load Crash data
 crash_snapped <- readOGR(dsn = file.path(data.loc, "Shapefiles"), layer = "Crashes_Snapped50ft_MatchName") # 2085*29, new: 1369*51 
 crash_snapped <- spTransform(crash_snapped, CRS(proj))
 
-# Load FARS data
-FARS_snapped <- readOGR(dsn = file.path(data.loc, "Shapefiles"), layer = "FARS_Snapped50ft_MatchName") # new: 13*19
-FARS_snapped <- spTransform(FARS_snapped, CRS(proj))
+# Load unsnapped crash data for confirmation on date
+
+
+# Load FARS data -- Not needed, these do not vary by hour so will just use the values in the roadnettb_snapped layer
+# FARS_snapped <- readOGR(dsn = file.path(data.loc, "Shapefiles"), layer = "FARS_Snapped50ft_MatchName") # new: 13*19
+# FARS_snapped <- spTransform(FARS_snapped, CRS(proj))
 
 # Load weather data
 load(file.path(data.loc, "Weather","Prepared_Bellevue_Wx_2018.RData"))
-# read.csv(Preapared_Bellevue_Wx_2018.csv
 
 # <><><><><><><><><><><><><><><><><><><><>
-# ----
-# TO DO:
-#   1. Need the timestamp of the Waze events, Dan exported the updated Waze events, will need Michelle to pre-process that.
+# In Process ----
+# Getting the timestamp of the Waze events from the original Waze data export
+waze_snapped@data <- left_join(waze_snapped@data %>% select(-time),
+                               waze_unsnapped %>% select(SDC_uuid, time),
+                               by = 'SDC_uuid') 
+
+# Create time stamp for the crash data as well
 
 # For now, using the objectID as the unique ID of a segment, renames it as segment ID
 SegIDall <- roadnettb_snapped$RDSEG_ID
 
 # All year, month, and hour
 # Calendar year 2018
-# Convert Waze time with time stamp
-waze_snapped$time <- as.Date(waze_snapped$time, format='%Y/%M/%d')
-crash_snapped$DATE <- as.Date(crash_snapped$DATE, format = '%Y/%M/%d')
+# Create date field for Waze from time 
+waze_snapped$date <- format(waze_snapped$time, format='%Y-%m-%d')
+crash_snapped$DATE <- as.Date(as.character(crash_snapped$DATE))
 
 # Rename OBJECTIDs
 colnames(waze_snapped@data)[colnames(waze_snapped@data)=="OBJECTID"] <- "OBJECTID_waze"
@@ -68,28 +78,34 @@ colnames(waze_snapped@data)[colnames(waze_snapped@data)=="MinOfDay"] <- "MinOfDa
 colnames(crash_snapped@data)[colnames(crash_snapped@data)=="MinOfDay"] <- "MinOfDay_crash"
 
 # Outerjoining all three datasets.
-link.waze.bell <-  waze_snapped@data %>% full_join(crash_snapped@data, by = "NEAR_FID")
+link.waze.bell <-  waze_snapped@data %>% full_join(crash_snapped@data, by = "RDSEG_ID")
 
 # list of all months
 todo.months = format(seq(from = as.Date("2018-01-01"), to = as.Date("2018-12-31"), by = "month"), "%Y-%m")
 
+# Start parallel process
+cl <- makeCluster(parallel::detectCores()) 
+registerDoParallel(cl)
+
+
 foreach(j = todo.months, .packages = c("dplyr", "lubridate", "utils")) %dopar% {
-    # Format month, day
+  # j = todo.months[1]  
+  # Format month, day
     year.month.w <- format(link.waze.bell$time, "%Y-%m")
     year.month.t <- format(link.waze.bell$DATE, "%Y-%m")
     year.month <- year.month.w
     year.month[is.na(year.month)] <- year.month.t[is.na(year.month)]
     
-    link.waze.bell <- link.waze.bell[year.month == j,]
+    link.waze.bell.j <- link.waze.bell[year.month == j,]
     
-    month.days.w  <- unique(as.numeric(format(link.waze.bell$time, "%d"))) # Waze event date/time
-    month.days.t  <- unique(as.numeric(format(link.waze.bell$DATE, "%d"))) # TN crash date/time
-    month.days = unique(c(month.days.w, month.days.t))
+    month.days.w  <- unique(as.numeric(format(link.waze.bell.j$time, "%d"))) # Waze event date/time
+    month.days.t  <- unique(as.numeric(format(link.waze.bell.j$DATE, "%d"))) # Bellevue crash date/time
+    month.days = sort(unique(c(month.days.w[!is.na(month.days.w)], month.days.t[!is.na(month.days.t)])))
     
     lastday = max(month.days[!is.na(month.days)])
     
-    Month.hour <- seq(from = as.POSIXct(paste0(j,"-01 0:00"), tz = 'Pacific'), 
-                      to = as.POSIXct(paste0(j,"-", lastday, " 24:00"), tz = 'Pacific'),
+    Month.hour <- seq(from = as.POSIXct(paste0(j,"-01 0:00"), tz = 'America/Los_Angeles'), 
+                      to = as.POSIXct(paste0(j,"-", lastday, " 24:00"), tz = 'America/Los_Angeles'),
                       by = "hour")
     
     # Make a segment time all table
@@ -103,9 +119,18 @@ foreach(j = todo.months, .packages = c("dplyr", "lubridate", "utils")) %dopar% {
     cat("Completed", j, "\n") # end the loop
 }
 
+stopCluster(cl); gc()
 
-# start segment loop ----
-    ##############
+
+
+# <<>><<>><<>><<>><<>><<>><<>><<>><<>><<>><<>><<>>
+# OLD TN CODE FOR REFERENCE ----
+# Delete when Bellevue code completed
+# <<>><<>><<>><<>><<>><<>><<>><<>><<>><<>><<>><<>>
+OLDCODE = F
+
+if(OLDCODE){
+
     # Make data frame of all Grid IDs by day of year and time of day in each month of data (subset to all grid IDs with Waze OR EDT data)
     GridIDall <- unique(c(as.character(link.waze.tn$GRID_ID), # Grid ID for a Waze event
                           as.character(link.waze.tn$GRID_ID.TN)) # Grid ID for a TN crash
@@ -172,8 +197,4 @@ foreach(j = todo.months, .packages = c("dplyr", "lubridate", "utils")) %dopar% {
     save(list="Waze.hex.time", file = file.path(temp.outputdir, fn))
     
     cat("Completed", j, "\n")
-    } # End SpaceTimeGrid loop ----
-  
-  stopCluster(cl); gc()
-  
-} # end grid loop
+}

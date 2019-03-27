@@ -71,14 +71,13 @@ plot(zoning, add = T, col = "grey")
 
 # 1. RoadNetwork (street layer) data, highway excluded ----
 # Michelle regenerated a shapefile of Bellevue Roadnetwork by excluding the highway/freeway/interstate: RoadNetwork_Jurisdiction.shp
-# Jessie convert it to an txt file: RoadNetwork_Jurisdiction.csv
-roadnettb <- read.csv(file = file.path(data.loc, "Shapefiles/RoadNetwork_Jurisdiction.csv"))
+roadnettb <- readOGR(dsn = file.path(data.loc, "Shapefiles"), layer = "RoadNetwork_Jurisdiction")
+roadnettb <- roadnettb@data
 dim(roadnettb) # 6647   29
 names(roadnettb)
 
 # Rename the columns based on the full names
-names(roadnettb) <- c("FID",
-                      "OBJECTID",
+names(roadnettb) <- c("OBJECTID",
                       "StreetSegmentID",
                       "LifeCycleStatus",
                       "OfficialStreetName",
@@ -105,18 +104,28 @@ names(roadnettb) <- c("FID",
                       "AnomalyType",
                       "StreetNameAnno",
                       "StreetBlockNumber",
-                      #"SHAPE", # do not exist in csv
-                      "Shape_STLength"
+                      "Shape_STLength",
+                      'RDSEG_ID'
 )
 
 # ArterialClaffication, FunctionClassDescription
-count_AC <- roadnettb %>% group_by(ArterialClassification) %>% summarize(n = n()
-                                                             , length_ft = mean(Shape_STLength))
+count_AC <- roadnettb %>% 
+  filter(!is.na(ArterialClassification)) %>%
+  group_by(ArterialClassification) %>% 
+  summarize(n = n(),
+            length_ft = mean(Shape_STLength, na.rm=T))
 
-count_FC <- roadnettb %>% group_by(FunctionClassDescription) %>% summarize(n = n()
-                                                                       , length_ft = mean(Shape_STLength))
+count_FC <- roadnettb %>% 
+  filter(!is.na(FunctionClassDescription)) %>%
+  group_by(FunctionClassDescription) %>%
+  summarize(n = n(),
+            length_ft = mean(Shape_STLength))
 
-count_FC_AC <- roadnettb %>% group_by(ArterialClassification, FunctionClassDescription) %>% summarize(n = n(), length_ft = mean(Shape_STLength))
+count_FC_AC <- roadnettb %>%
+  filter(!is.na(FunctionClassDescription) & !is.na(ArterialClassification)) %>%
+  group_by(ArterialClassification, FunctionClassDescription) %>% 
+  summarize(n = n(),
+            length_ft = mean(Shape_STLength))
 
 # Speedlimit
 table(roadnettb$SpeedLimit)
