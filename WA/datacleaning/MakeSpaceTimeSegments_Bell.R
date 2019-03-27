@@ -24,15 +24,15 @@ data.loc <- file.path(wazeshareddir, "Data/Bellevue")
 proj <- showP4(showWKT("+init=epsg:6597"))
 
 # Load the network data
-roadnettb_snapped <- readOGR(dsn = file.path(data.loc, "Shapefiles", "Archive"), layer = "RoadNetwork_Jurisdiction_withIntersections_FullCrash") # 6647 * 14
+roadnettb_snapped <- readOGR(dsn = file.path(data.loc, "Shapefiles"), layer = "RoadNetwork_Jurisdiction_withData") # 6647 * 14, new: cannot open layer 
 roadnettb_snapped <- spTransform(roadnettb_snapped, CRS(proj))
 
 # Load Waze data
-waze_snapped <- readOGR(dsn = file.path(data.loc, "Shapefiles", "Archive"), layer = "WazeReports_Snapped50ft_MatchName")
+waze_snapped <- readOGR(dsn = file.path(data.loc, "Shapefiles"), layer = "Waze_Snapped50ft_MatchName") # 114614*15, new: 70226*17
 waze_snapped <- spTransform(waze_snapped, CRS(proj))
 
 # Load Crash data
-crash_snapped <- readOGR(dsn = file.path(data.loc, "Shapefiles", "Archive"), layer = "CrashReports_Snapped50ft_MatchName")
+crash_snapped <- readOGR(dsn = file.path(data.loc, "Shapefiles"), layer = "FARS_Snapped50ft_MatchName") # 2085*29, new: 13*19
 crash_snapped <- spTransform(crash_snapped, CRS(proj))
 
 # <><><><><><><><><><><><><><><><><><><><>
