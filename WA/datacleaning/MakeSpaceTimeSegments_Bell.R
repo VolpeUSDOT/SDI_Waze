@@ -24,16 +24,24 @@ data.loc <- file.path(wazeshareddir, "Data/Bellevue")
 proj <- showP4(showWKT("+init=epsg:6597"))
 
 # Load the network data
-roadnettb_snapped <- readOGR(dsn = file.path(data.loc, "Shapefiles"), layer = "RoadNetwork_Jurisdiction_withData") # 6647 * 14, new: cannot open layer 
+roadnettb_snapped <- readOGR(dsn = file.path(data.loc, "Shapefiles"), layer = "RoadNetwork_Jurisdiction_withData") # 6647 * 14, new: 6647*38
 roadnettb_snapped <- spTransform(roadnettb_snapped, CRS(proj))
 
-# Load Waze data
+# Load Waze data (old data based on 20 months, and the new data is based on 12 months)
 waze_snapped <- readOGR(dsn = file.path(data.loc, "Shapefiles"), layer = "Waze_Snapped50ft_MatchName") # 114614*15, new: 70226*17
 waze_snapped <- spTransform(waze_snapped, CRS(proj))
 
 # Load Crash data
-crash_snapped <- readOGR(dsn = file.path(data.loc, "Shapefiles"), layer = "FARS_Snapped50ft_MatchName") # 2085*29, new: 13*19
+crash_snapped <- readOGR(dsn = file.path(data.loc, "Shapefiles"), layer = "Crashes_Snapped50ft_MatchName") # 2085*29, new: 1369*51 
 crash_snapped <- spTransform(crash_snapped, CRS(proj))
+
+# Load FARS data
+FARS_snapped <- readOGR(dsn = file.path(data.loc, "Shapefiles"), layer = "FARS_Snapped50ft_MatchName") # new: 13*19
+FARS_snapped <- spTransform(FARS_snapped, CRS(proj))
+
+# Load weather data
+load(file.path(data.loc, "Weather","Prepared_Bellevue_Wx_2018.RData"))
+# read.csv(Preapared_Bellevue_Wx_2018.csv
 
 # <><><><><><><><><><><><><><><><><><><><>
 # ----
@@ -41,7 +49,7 @@ crash_snapped <- spTransform(crash_snapped, CRS(proj))
 #   1. Need the timestamp of the Waze events, Dan exported the updated Waze events, will need Michelle to pre-process that.
 
 # For now, using the objectID as the unique ID of a segment, renames it as segment ID
-SegIDall <- roadnettb_snapped$OBJECTID
+SegIDall <- roadnettb_snapped$RDSEG_ID
 
 # All year, month, and hour
 # Calendar year 2018
@@ -80,8 +88,8 @@ foreach(j = todo.months, .packages = c("dplyr", "lubridate", "utils")) %dopar% {
     
     lastday = max(month.days[!is.na(month.days)])
     
-    Month.hour <- seq(from = as.POSIXct(paste0(j,"-01 0:00"), tz = 'Pacific/Auckland'), 
-                      to = as.POSIXct(paste0(j,"-", lastday, " 24:00"), tz = 'Pacific/Auckland'),
+    Month.hour <- seq(from = as.POSIXct(paste0(j,"-01 0:00"), tz = 'Pacific'), 
+                      to = as.POSIXct(paste0(j,"-", lastday, " 24:00"), tz = 'Pacific'),
                       by = "hour")
     
     # Make a segment time all table

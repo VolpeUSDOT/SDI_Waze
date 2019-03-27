@@ -48,7 +48,7 @@ tzs <- data.frame(states,
                   stringsAsFactors = F)
 
 # Project to NAD_1983_2011_StatePlane_Washington_North_FIPS_4601_Ft_US, (Well-Known)WKID: 6597
-# USGS ID: 102039
+# USGS ID: 102039 # this is for the hexogan.
 proj <- showP4(showWKT("+init=epsg:6597"))
 # proj.USGS <- "+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs +ellps=GRS80 +towgs84=0,0,0" 
 # Hexogon grids need a flat space, and USGS is more commonly used for that purpose. We want to keep the Bellevue network in WKID 6597 as Bellevue is already using it.
@@ -155,7 +155,7 @@ dim(wazetb) # 637629*9
 
 # 5. Shapefiles of waze points that link the segments ----
 # Shapefiles\WazeReports_Snapped50ft_MatchName.shp
-waze_snapped <- readOGR(dsn = file.path(data.loc, "Shapefiles"), layer = "WazeReports_Snapped50ft_MatchName")
+waze_snapped <- readOGR(dsn = file.path(data.loc, "Shapefiles", "Archive"), layer = "WazeReports_Snapped50ft_MatchName")
 waze_snapped <- spTransform(waze_snapped, CRS(proj))
 #  114614 rows * 15 columns (18% of Waze were snapped to the segments)
 names(waze_snapped@data) # where does the added columns come from? segment layer?
@@ -175,9 +175,15 @@ length(unique(waze_snapped@data$NEAR_FID)) # 1,846, 28% of all segments
 plot(waze_snapped, col = "blue")
 plot(crash_snapped, col = "red", add=T)
 
-# 6. Road network with additional calculated columns
+# 3/27 update, new data Michelle prepared for calendar year 2018
+waze_snapped <- readOGR(dsn = file.path(data.loc, "Shapefiles"), layer = "Waze_Snapped50ft_MatchName") # 114614*15, new: 70226*17
+waze_snapped <- spTransform(waze_snapped, CRS(proj))
+names(waze_snapped@data)
+
+
+# 6. Road network with additional calculated columns----
 # Shapefiles\RoadNetwork_Jurisdiction_withIntersections_FullCrash.shp
-roadnettb_snapped <- readOGR(dsn = file.path(data.loc, "Shapefiles"), layer = "RoadNetwork_Jurisdiction_withIntersections_FullCrash") # 6647 * 14
+roadnettb_snapped <- readOGR(dsn = file.path(data.loc, "Shapefiles", "Archive"), layer = "RoadNetwork_Jurisdiction_withIntersections_FullCrash") # 6647 * 14
 roadnettb_snapped <- spTransform(roadnettb_snapped, CRS(proj))
 names(roadnettb_snapped@data)
 # [1] "OBJECTID"   "StreetSegm" "OfficialSt" "OneWay"     "SpeedLimit" "ArterialCl" "FunctionCl" "Length_FT" 
@@ -196,10 +202,21 @@ names(roadnettb_snapped@data)
 length(unique(roadnettb_snapped$OBJECTID)) # 6647
 
 plot(roadnettb_snapped)
-     
+
+# 3/27 update, new data Michelle prepared for calendar year 2018
+roadnettb_snapped <- readOGR(dsn = file.path(data.loc, "Shapefiles"), layer = "RoadNetwork_Jurisdiction_withData") # 6647 * 14, new: 6647*38
+roadnettb_snapped <- spTransform(roadnettb_snapped, CRS(proj))
+names(roadnettb_snapped@data) # OBJECTID carried over from the raw data. RDSEG_ID is the unique ID we created.
+# [1] "OBJECTID"   "StreetSegm" "LifeCycleS" "OfficialSt" "FromAddres" "FromAddr_1" "ToAddressL" "ToAddressR" "LeftJurisd"
+# [10] "RightJuris" "LeftZip"    "RightZip"   "OneWay"     "SpeedLimit" "ArterialCl" "FunctionCl" "ArterialSw" "EmergencyE"
+# [19] "EmergencyR" "SnowRespon" "TruckRoute" "IsAddressa" "IsPrivate"  "IsAccessRo" "AnomalyTyp" "StreetName" "StreetBloc"
+# [28] "Shape_STLe" "RDSEG_ID"   "nWaze_All"  "nWazeAcc"   "End1_IntID" "End2_IntID" "nCrashes"   "Crash_End1" "Crash_End2"
+# [37] "nBikes"     "nFARS_1217"
+length(unique(roadnettb_snapped@data$RDSEG_ID)) #6647
+
 # 7. Shapefiles of intersections, linked with segment ID (important) ----
 #	Shapefiles\Intersections_withSegmentIDs.shp  
-seg_int_link <- readOGR(dsn = file.path(data.loc, "Shapefiles"), layer = "Intersections_withSegmentIDs") #
+seg_int_link <- readOGR(dsn = file.path(data.loc, "Shapefiles", "Archive"), layer = "Intersections_withSegmentIDs") #
 seg_int_link <- spTransform(seg_int_link, CRS(proj))
 names(seg_int_link@data)
 # [1] "Int_ID"     "StreetSeg1" "StreetSeg2" "StreetSeg3" "StreetSeg4" "StreetSeg5" "StreetSeg6" # ordered by the segment ID from smallest to largest.
@@ -207,7 +224,7 @@ plot(seg_int_link)
 
 # 8. Emergency response geo-coordinate data from NORCOM ----
 # Shapefiles\Tableau_WazeReports_CrashReports_NORCOM_Merged.shp
-norcom <- readOGR(dsn = file.path(data.loc, "Shapefiles"), layer = "Tableau_WazeReports_CrashReports_NORCOM_Merged") # 8795 rows * 8 columns
+norcom <- readOGR(dsn = file.path(data.loc, "Shapefiles", "Archive"), layer = "Tableau_WazeReports_CrashReports_NORCOM_Merged") # 8795 rows * 8 columns
 norcom <- spTransform(norcom, CRS(proj))
 names(norcom@data)
 # [1] "OBJECTID"   "DATE"       "NEAR_FID"   "OfficialSt" "StreetSegm" "HourOfDay"  "MinOfDay"   "Dataset" 
@@ -216,6 +233,7 @@ plot(norcom)
 
 # The Norcom data is not complete, we are waiting to get a better data (csv format), and do a snap.
 
-# 9 Bike/Ped Conflict data (Raw) ----
-# Michelle may need to snap it using some columns, such as location description.
-
+# 9 Bike/Ped Conflict data ----
+# Michelle is going to put the data in shapefiles folder.
+Bike_snapped <- readOGR(dsn = file.path(data.loc, "Shapefiles"), layer = "") # 
+crash_snapped <- spTransform(Bike_snapped, CRS(proj))
