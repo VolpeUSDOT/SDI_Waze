@@ -8,6 +8,12 @@
 # 7. Shapefiles of intersections, linked with segment ID (important)
 # 8. Emergency response geo-coordinate data from NORCOM
 # 9. Bike/Ped Location data
+# 10. Weather data
+###############################################################################################
+# There are two versions of the shapefiles,:
+# the first series was based on data collected till Nov 2018, these has been put in Shapefiles\Archive folder.
+# the second was based on calendar year 2018 per Bellevue's request.
+###############################################################################################
 
 # Setup ----
 # If you don't have these packages: install.packages(c("maps", "sp", "rgdal", "rgeos", "tidyverse")) 
@@ -42,7 +48,7 @@ data.loc <- file.path(wazeshareddir, "Data/Bellevue")
 source(file.path(codeloc, 'utility/wazefunctions.R'))
 
 # Time zone picker:
-states = c("MD")
+states = c("WA")
 tzs <- data.frame(states, 
                   tz = c("US/Eastern"),
                   stringsAsFactors = F)
@@ -145,9 +151,16 @@ dim(crashtb) # 4417  254, a total of 4417 crashes.
 crashtb <- crashtb[,1:45]
 str(crashtb)
 nacounts <- colSums(is.na(crashtb)) # Milepost, Dista.From.ref.point, COUNTY.RD.ONLY..INTERSECTING.CO.RD.MILEPOST, ARM have some NAs, all other columns are clean.
+# format of time
+range(as.Date(crashtb$DATE, format = "%m/%d/%Y")) # "2017-04-01" "2018-11-16"
+# crashtb$DATE <- as.Date(crashtb$DATE, format = "%m/%d/%Y")
+crashtb$datetime <- as.POSIXct(paste(crashtb$DATE, crashtb$X24.HR.TIME), tz = 'America/Los_Angeles', format = "%m/%d/%Y %H:%M")
+# there two timezone came out: one is PDT (Pacific Daylight Time) and PST (Pacific Standard Time)
+# unique identifier
+sum(duplicated(crashtb$REPORT.NUMBER)) # 0
 
-# 3. Crash Points that has been filtered and matched with a filtered segment ----
-# load Shapefiles\CrashReports_Snapped50ft_MatchName.shp (WKID: 6597)
+# 3. Crash Points that has been filtered and snapped to a filtered segment ----
+# load Shapefiles\Archive\CrashReports_Snapped50ft_MatchName.shp (WKID: 6597)
 crash_snapped <- readOGR(dsn = file.path(data.loc, "Shapefiles", "Archive"), layer = "CrashReports_Snapped50ft_MatchName")
 crash_snapped <- spTransform(crash_snapped, CRS(proj)) # 2085 rows * 29 columns
 # Shapefiles\CrashReports_Snapped50ft_MatchName_withIntersections.shp
@@ -156,14 +169,37 @@ crash_snapped <- spTransform(crash_snapped, CRS(proj))
 
 plot(crash_snapped, col = "red")
 
+# 3/27 update, new data Michelle prepared for calendar year 2018
+crash_snapped <- readOGR(dsn = file.path(data.loc, "Shapefiles"), layer = "Crashes_Snapped50ft_MatchName") # 2085*29, new: 1369*51 
+crash_snapped <- spTransform(crash_snapped, CRS(proj))
+names(crash_snapped) # some columns names are truncated, we can retrieve them from the raw data.
+# [1] "JURISDICTI" "COUNTY"     "CITY"       "REPORT_NUM" "INDEXED_PR" "PRIMARY_TR" "BLOCK_NUMB" "MILEPOST"   "A_B"       
+# [10] "INTERSECTI" "DIST_FROM_" "MI_or_FT"   "COMP_DIR_F" "REFERENCE_" "DATE"       "YEAR"       "QTR__"      "MONTH"     
+# [19] "F24_HR_TIM" "FULL_TIME"  "MOST_SEVER" "MOST_SEV_1" "TOTAL_CRAS" "FATAL_CRAS" "SERIOUS_IN" "EVIDENT_IN" "POSSIBLE_I"
+# [28] "PDO___NO_I" "TOTAL_FATA" "TOTAL_SERI" "TOTAL_EVID" "TOTAL_POSS" "TOTAL_VEHI" "TOTAL_PEDE" "TOTAL_BICY" "WORKZONE"  
+# [37] "FIRST_COLL" "SECOND_COL" "JUNCTION_R" "WEATHER"    "ROAD_SURFA" "LIGHTING_C" "MISC_TRAFF" "COUNTY_RD_" "ARM"       
+# [46] "RDSEG_ID"   "StreetSegm" "OfficialSt" "HourOfDay"  "MinOfDay"   "INT_ID" 
+
+# Unique ID
+sum(duplicated(crash_snapped@data$REPORT_NUM)) # 0
+sum(duplicated(crash_snapped@data$RDSEG_ID)) # 786, many crashes to one segment relationship
+sum(duplicated(crash_snapped@data$INT_ID)) # 1102
+
 # 4. Waze event points ----
 wazetb <- read.csv(file = file.path(data.loc, "Export","WA_Bellevue_Prep_Export.csv"))
 names(wazetb) # "lat", "lon", "alert_type", "time", "roadclass", "sub_type", "city", "street", "magvar"
 dim(wazetb) # 637629*9
+names(wazetb)
+# [1] "lat"        "lon"        "alert_type" "time"       "roadclass"  "SDC_uuid"   "sub_type"   "city"       "street"    
+# [10] "magvar" 
 # the time column is in "2017-04-04 16:30:29" format
 
+# the new Waze data for calendar year 2018
+wazetb <- read_csv(file.path(data.loc, 'Export', 'WA_Bellevue_Prep_Export.csv')) # same name.
+wazetb$time <- as.POSIXct(wazetb$time, tz = "America/Los_Angeles")
+
 # 5. Shapefiles of waze points that link the segments ----
-# Shapefiles\WazeReports_Snapped50ft_MatchName.shp
+# Shapefiles\Archive\WazeReports_Snapped50ft_MatchName.shp
 waze_snapped <- readOGR(dsn = file.path(data.loc, "Shapefiles", "Archive"), layer = "WazeReports_Snapped50ft_MatchName")
 waze_snapped <- spTransform(waze_snapped, CRS(proj))
 #  114614 rows * 15 columns (18% of Waze were snapped to the segments)
@@ -177,7 +213,7 @@ table(waze_snapped@data$alert_type)
 # ACCIDENT           JAM   ROAD_CLOSED WEATHERHAZARD 
 # 1908         84826          2637         25243
 
-# how many unique segment are Waze events link?
+# how many unique segments are Waze events link?
 length(unique(waze_snapped@data$NEAR_FID)) # 1,846, 28% of all segments
 
 # overlay crash and waze events
@@ -188,10 +224,22 @@ plot(crash_snapped, col = "red", add=T)
 waze_snapped <- readOGR(dsn = file.path(data.loc, "Shapefiles"), layer = "Waze_Snapped50ft_MatchName") # 114614*15, new: 70226*17
 waze_snapped <- spTransform(waze_snapped, CRS(proj))
 names(waze_snapped@data)
+# [1] "lat"        "lon"        "alert_type" "time"       "roadclass"  "SDC_uuid"   "sub_type"   "city"       "street"    
+# [10] "magvar"     "NEAR_X"     "NEAR_Y"     "RDSEG_ID"   "StreetSegm" "OfficialSt" "HourOfDay"  "MinOfDay"  
+# RDSEG_ID is now the unique ID of the streetlayer data.
+# SDC_uuid is the unique id of each Waze event.
+# "magvar"     "NEAR_X"     "NEAR_Y" should be intermediate columns created by Michelle.
+# HourOfDay is in 24 hour format
 
+table(waze_snapped@data$roadclass) # ~10% of Waze events are missing roadclass.
+# 1    17     2    20     6     7    NA 
+# 1282     6 10410    54 31425 20468  6581
+
+# Date time format
+range(as.Date(waze_snapped@data$time, format = "%Y/%m/%d")) # "2017-12-31" "2018-12-31"
 
 # 6. Road network with additional calculated columns----
-# Shapefiles\RoadNetwork_Jurisdiction_withIntersections_FullCrash.shp
+# Shapefiles\Archive\RoadNetwork_Jurisdiction_withIntersections_FullCrash.shp
 roadnettb_snapped <- readOGR(dsn = file.path(data.loc, "Shapefiles", "Archive"), layer = "RoadNetwork_Jurisdiction_withIntersections_FullCrash") # 6647 * 14
 roadnettb_snapped <- spTransform(roadnettb_snapped, CRS(proj))
 names(roadnettb_snapped@data)
@@ -222,9 +270,11 @@ names(roadnettb_snapped@data) # OBJECTID carried over from the raw data. RDSEG_I
 # [28] "Shape_STLe" "RDSEG_ID"   "nWaze_All"  "nWazeAcc"   "End1_IntID" "End2_IntID" "nCrashes"   "Crash_End1" "Crash_End2"
 # [37] "nBikes"     "nFARS_1217"
 length(unique(roadnettb_snapped@data$RDSEG_ID)) #6647
+is.unsorted(roadnettb_snapped@data$RDSEG_ID) # TRUE, the IDs are not sorted.
+range(as.numeric(roadnettb_snapped@data$RDSEG_ID)) # from 1 to 6647, great!
 
 # 7. Shapefiles of intersections, linked with segment ID (important) ----
-#	Shapefiles\Intersections_withSegmentIDs.shp  
+#	Shapefiles\Archive\Intersections_withSegmentIDs.shp  
 seg_int_link <- readOGR(dsn = file.path(data.loc, "Shapefiles", "Archive"), layer = "Intersections_withSegmentIDs") #
 seg_int_link <- spTransform(seg_int_link, CRS(proj))
 names(seg_int_link@data)
@@ -232,7 +282,7 @@ names(seg_int_link@data)
 plot(seg_int_link)
 
 # 8. Emergency response geo-coordinate data from NORCOM ----
-# Shapefiles\Tableau_WazeReports_CrashReports_NORCOM_Merged.shp
+# Shapefiles\Archive\Tableau_WazeReports_CrashReports_NORCOM_Merged.shp
 norcom <- readOGR(dsn = file.path(data.loc, "Shapefiles", "Archive"), layer = "Tableau_WazeReports_CrashReports_NORCOM_Merged") # 8795 rows * 8 columns
 norcom <- spTransform(norcom, CRS(proj))
 names(norcom@data)
@@ -243,6 +293,34 @@ plot(norcom)
 # The Norcom data is not complete, we are waiting to get a better data (csv format), and do a snap.
 
 # 9 Bike/Ped Conflict data ----
-# Michelle is going to put the data in shapefiles folder.
-Bike_snapped <- readOGR(dsn = file.path(data.loc, "Shapefiles"), layer = "") # 
-crash_snapped <- spTransform(Bike_snapped, CRS(proj))
+# Shapefiles\Wikimap_Snapped50ft.shp 
+# only distance snap was applied to this data, will be needed in the aggregation code
+Bike_snapped <- readOGR(dsn = file.path(data.loc, "Shapefiles"), layer = "Wikimap_Snapped50ft") # 1402*14
+Bike_snapped <- spTransform(Bike_snapped, CRS(proj))
+names(Bike_snapped)
+# [1] "id"         "user_id"    "layer_id"   "created"    "sub_id"     "like_disli" "survey"     "kml_ID"     "kml_name"  
+# [10] "kml_descri" "kml_icon"   "RDSEG_ID"   "OfficialSt" "StreetSegm"
+sum(duplicated(Bike_snapped@data$id)) # id is an unique ID
+sum(duplicated(Bike_snapped@data$user_id)) # 768 duplicates, might be joined from another data, what are users?
+sum(duplicated(Bike_snapped@data$layer_id)) # 1397 duplicates, might be joined from another data, what layers?
+sum(duplicated(Bike_snapped@data$kml_ID)) # unique, looks like this comes from the kml file, was classified to different types
+table(Bike_snapped@data$kml_name) # we can use this information to create counts of each type of events for each segment as variables.
+# Bicycle Accommodation Issues  Unsafe Behavior by Bicyclists     Unsafe Behavior by Drivers Unsafe Behavior by Pedestrians 
+# 477                             14                            418                             50 
+# Walking Accommodation Issues 
+# 443 
+
+sum(duplicated(Bike_snapped@data$RDSEG_ID)) # 719 replicates, meaning that this is a many to one relationship.
+# "OfficialSt" "StreetSegm" should come from the network data.
+
+# created date range
+range(as.Date(Bike_snapped@data$created)) #"2015-08-26" "2015-11-01", the data was created in 2015, would it be appropriate for modeling 2018 crash data?
+
+# 10. weather data -- Only need to assign to a date
+load(file.path(data.loc, "Weather","Prepared_Bellevue_Wx_2018.RData"))
+dim(wx.grd.day) #3,766,800*7
+names(wx.grd.day)
+# [1] "day"  "ID"   "PRCP" "TMIN" "TMAX" "SNOW" "mo"
+range(wx.grd.day$day) #"2018-01-01" "2018-12-31"
+range(wx.grd.day$mo) # month
+summary(wx.grd.day)

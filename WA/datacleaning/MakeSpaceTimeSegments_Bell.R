@@ -28,37 +28,48 @@ proj <- showP4(showWKT("+init=epsg:6597"))
 roadnettb_snapped <- readOGR(dsn = file.path(data.loc, "Shapefiles"), layer = "RoadNetwork_Jurisdiction_withData") # 6647 * 14, new: 6647*38
 roadnettb_snapped <- spTransform(roadnettb_snapped, CRS(proj))
 
-# Load Waze data (old data based on 20 months, and the new data is based on 12 months)
+# Load Waze data (old data based on 20 months, and the new data is based on 12 months) ----
 waze_snapped <- readOGR(dsn = file.path(data.loc, "Shapefiles"), layer = "Waze_Snapped50ft_MatchName") # 114614*15, new: 70226*17
 waze_snapped <- spTransform(waze_snapped, CRS(proj))
 
 # Load unsnapped Waze data as well. time variable was reduced to just date in the shapefile, so we will join with the original data to get precise time
-waze_unsnapped <- read_csv(file.path(data.loc, 'Export', 'WA_Bellevue_Prep_Export.csv'))
-
-# Load Crash data
-crash_snapped <- readOGR(dsn = file.path(data.loc, "Shapefiles"), layer = "Crashes_Snapped50ft_MatchName") # 2085*29, new: 1369*51 
-crash_snapped <- spTransform(crash_snapped, CRS(proj))
-
-# Load unsnapped crash data for confirmation on date
-
-
-# Load FARS data -- Not needed, these do not vary by hour so will just use the values in the roadnettb_snapped layer
-# FARS_snapped <- readOGR(dsn = file.path(data.loc, "Shapefiles"), layer = "FARS_Snapped50ft_MatchName") # new: 13*19
-# FARS_snapped <- spTransform(FARS_snapped, CRS(proj))
-
-# Load weather data
-load(file.path(data.loc, "Weather","Prepared_Bellevue_Wx_2018.RData"))
-
-# <><><><><><><><><><><><><><><><><><><><>
-# In Process ----
+wazetb <- read_csv(file.path(data.loc, 'Export', 'WA_Bellevue_Prep_Export.csv'))
+# format timestamp
+wazetb$time <- as.POSIXct(wazetb$time, tz = "America/Los_Angeles")
 # Getting the timestamp of the Waze events from the original Waze data export
 waze_snapped@data <- left_join(waze_snapped@data %>% select(-time),
                                waze_unsnapped %>% select(SDC_uuid, time),
                                by = 'SDC_uuid') 
+# Load Crash data ----
+crash_snapped <- readOGR(dsn = file.path(data.loc, "Shapefiles"), layer = "Crashes_Snapped50ft_MatchName") # 2085*29, new: 1369*51 
+crash_snapped <- spTransform(crash_snapped, CRS(proj))
 
-# Create time stamp for the crash data as well
+# Load unsnapped crash data for confirmation on date
+# Raw Crash points - potential to add additional variables to the final model----
+crashtb <- read.csv(file = file.path(data.loc, "Crash","20181127_All_roads_Bellevue.csv"))
+names(crashtb) # Looks like this is a full crash database
+dim(crashtb) # 4417  254, a total of 4417 crashes.
 
-# For now, using the objectID as the unique ID of a segment, renames it as segment ID
+# format timestamp
+crashtb$time <- as.POSIXct(paste(crashtb$DATE, crashtb$X24.HR.TIME), tz = 'America/Los_Angeles', format = "%m/%d/%Y %H:%M")
+# join the crash snapped data with additional column time
+crash_snapped@data <- left_join(crash_snapped@data,
+                                crashtb %>% select(REPORT.NUMBER, time),
+                                by = c("REPORT_NUM" = "REPORT.NUMBER"))
+
+# Load FARS data -- Not needed, these do not vary by hour so will just use the values in the roadnettb_snapped layer
+# Jessie: this will be moved to the aggregation code.
+# FARS_snapped <- readOGR(dsn = file.path(data.loc, "Shapefiles"), layer = "FARS_Snapped50ft_MatchName") # new: 13*19
+# FARS_snapped <- spTransform(FARS_snapped, CRS(proj))
+
+# Load weather data -- Only need to assign to a Date
+load(file.path(data.loc, "Weather","Prepared_Bellevue_Wx_2018.RData")) # the file name wx.grd.day
+# format day
+wx.grd.day$day <- as.Date(wx.grd.day$day)
+
+# <><><><><><><><><><><><><><><><><><><><>
+# In Process ----
+# Segment unique ID: RDSEG_ID
 SegIDall <- roadnettb_snapped$RDSEG_ID
 
 # All year, month, and hour
@@ -104,7 +115,7 @@ foreach(j = todo.months, .packages = c("dplyr", "lubridate", "utils")) %dopar% {
     
     lastday = max(month.days[!is.na(month.days)])
     
-    Month.hour <- seq(from = as.POSIXct(paste0(j,"-01 0:00"), tz = 'America/Los_Angeles'), 
+    Month.hour <- seq(from = as.POSIXct(paste0(j,"-01 0:00"), tz = 'America/Los_Angeles'), # A list of timezone areas for reference: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
                       to = as.POSIXct(paste0(j,"-", lastday, " 24:00"), tz = 'America/Los_Angeles'),
                       by = "hour")
     
