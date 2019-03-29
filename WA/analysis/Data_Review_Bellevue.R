@@ -9,6 +9,7 @@
 # 8. Emergency response geo-coordinate data from NORCOM
 # 9. Bike/Ped Location data
 # 10. Weather data
+# 11. FARS data
 ###############################################################################################
 # There are two versions of the shapefiles,:
 # the first series was based on data collected till Nov 2018, these has been put in Shapefiles\Archive folder.
@@ -324,3 +325,9 @@ names(wx.grd.day)
 range(wx.grd.day$day) #"2018-01-01" "2018-12-31"
 range(wx.grd.day$mo) # month
 summary(wx.grd.day)
+
+# 11. FARS data
+# Load FARS data -- Not needed in makespacetime code, these do not vary by hour so will just use the values in the roadnettb_snapped layer
+Jessie: this will be moved to the aggregation code.
+FARS_snapped <- readOGR(dsn = file.path(data.loc, "Shapefiles"), layer = "FARS_Snapped50ft_MatchName") # new: 13*19
+FARS_snapped <- spTransform(FARS_snapped, CRS(proj))

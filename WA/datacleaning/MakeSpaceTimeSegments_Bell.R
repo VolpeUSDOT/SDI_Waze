@@ -40,27 +40,26 @@ wazetb$time <- as.POSIXct(wazetb$time, tz = "America/Los_Angeles")
 waze_snapped@data <- left_join(waze_snapped@data %>% select(-time),
                                waze_unsnapped %>% select(SDC_uuid, time),
                                by = 'SDC_uuid') 
+stopifnot(sum(is.na(waze_snapped@data$time)) == 0) # check if there is any NA.
+
 # Load Crash data ----
 crash_snapped <- readOGR(dsn = file.path(data.loc, "Shapefiles"), layer = "Crashes_Snapped50ft_MatchName") # 2085*29, new: 1369*51 
 crash_snapped <- spTransform(crash_snapped, CRS(proj))
 
 # Load unsnapped crash data for confirmation on date
-# Raw Crash points - potential to add additional variables to the final model----
-crashtb <- read.csv(file = file.path(data.loc, "Crash","20181127_All_roads_Bellevue.csv"))
+# Raw Crash points - potential to add additional variables to the final model
+# crashtb <- read.csv(file = file.path(data.loc, "Crash","20181127_All_roads_Bellevue.csv")) # this is the old crash data
+crashtb <- read.csv(file = file.path(data.loc, "Crash","20190314_All_roads_Bellevue.csv")) # this is the old crash data
 names(crashtb) # Looks like this is a full crash database
-dim(crashtb) # 4417  254, a total of 4417 crashes.
+dim(crashtb) # 2825  254, a total of 4417 crashes.
 
 # format timestamp
 crashtb$time <- as.POSIXct(paste(crashtb$DATE, crashtb$X24.HR.TIME), tz = 'America/Los_Angeles', format = "%m/%d/%Y %H:%M")
 # join the crash snapped data with additional column time
-crash_snapped@data <- left_join(crash_snapped@data,
+crash_snapped@data <- left_join(crash_snapped@data %>% select(-time),
                                 crashtb %>% select(REPORT.NUMBER, time),
                                 by = c("REPORT_NUM" = "REPORT.NUMBER"))
-
-# Load FARS data -- Not needed, these do not vary by hour so will just use the values in the roadnettb_snapped layer
-# Jessie: this will be moved to the aggregation code.
-# FARS_snapped <- readOGR(dsn = file.path(data.loc, "Shapefiles"), layer = "FARS_Snapped50ft_MatchName") # new: 13*19
-# FARS_snapped <- spTransform(FARS_snapped, CRS(proj))
+stopifnot(sum(is.na(crash_snapped@data$time)) == 0) # check if there is any NA.
 
 # Load weather data -- Only need to assign to a Date
 load(file.path(data.loc, "Weather","Prepared_Bellevue_Wx_2018.RData")) # the file name wx.grd.day
@@ -74,43 +73,30 @@ SegIDall <- roadnettb_snapped$RDSEG_ID
 
 # All year, month, and hour
 # Calendar year 2018
-# Create date field for Waze from time 
-waze_snapped$date <- format(waze_snapped$time, format='%Y-%m-%d')
-crash_snapped$DATE <- as.Date(as.character(crash_snapped$DATE))
-
-# Rename OBJECTIDs
-colnames(waze_snapped@data)[colnames(waze_snapped@data)=="OBJECTID"] <- "OBJECTID_waze"
-colnames(crash_snapped@data)[colnames(crash_snapped@data)=="OBJECTID"] <- "OBJECTID_crash"
- 
-colnames(waze_snapped@data)[colnames(waze_snapped@data)=="HourOfDay"] <- "HourOfDay_waze"
-colnames(crash_snapped@data)[colnames(crash_snapped@data)=="HourOfDay"] <- "HourOfDay_crash"
-
-colnames(waze_snapped@data)[colnames(waze_snapped@data)=="MinOfDay"] <- "MinOfDay_waze"
-colnames(crash_snapped@data)[colnames(crash_snapped@data)=="MinOfDay"] <- "MinOfDay_crash"
-
-# Outerjoining all three datasets.
-link.waze.bell <-  waze_snapped@data %>% full_join(crash_snapped@data, by = "RDSEG_ID")
+# # Create date field for Waze from time 
+# waze_snapped$date <- format(waze_snapped$time, format='%Y-%m-%d')
+# crash_snapped$DATE <- as.Date(as.character(crash_snapped$DATE))
 
 # list of all months
 todo.months = format(seq(from = as.Date("2018-01-01"), to = as.Date("2018-12-31"), by = "month"), "%Y-%m")
+
+# Format month, day
+year.month.w <- unique(format(waze_snapped$time, "%Y-%m"))
+year.month.c <- unique(format(crash_snapped$time, "%Y-%m"))
+year.month <- year.month.w
+year.month[is.na(year.month)] <- year.month.t[is.na(year.month)]
 
 # Start parallel process
 cl <- makeCluster(parallel::detectCores()) 
 registerDoParallel(cl)
 
-
 foreach(j = todo.months, .packages = c("dplyr", "lubridate", "utils")) %dopar% {
-  # j = todo.months[1]  
-  # Format month, day
-    year.month.w <- format(link.waze.bell$time, "%Y-%m")
-    year.month.t <- format(link.waze.bell$DATE, "%Y-%m")
-    year.month <- year.month.w
-    year.month[is.na(year.month)] <- year.month.t[is.na(year.month)]
-    
+  j = todo.months[1]
+
     link.waze.bell.j <- link.waze.bell[year.month == j,]
     
-    month.days.w  <- unique(as.numeric(format(link.waze.bell.j$time, "%d"))) # Waze event date/time
-    month.days.t  <- unique(as.numeric(format(link.waze.bell.j$DATE, "%d"))) # Bellevue crash date/time
+    month.days.w  <- unique(as.numeric(format(waze_snapped$time, "%d"))) # Waze event date/time
+    month.days.c  <- unique(as.numeric(format(crash_snapped$DATE, "%d"))) # Bellevue crash date/time
     month.days = sort(unique(c(month.days.w[!is.na(month.days.w)], month.days.t[!is.na(month.days.t)])))
     
     lastday = max(month.days[!is.na(month.days)])
