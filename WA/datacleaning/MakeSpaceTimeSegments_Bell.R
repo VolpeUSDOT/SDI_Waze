@@ -4,11 +4,8 @@
 # <><><><><><><><><><><><><><><><><><><><>
 # Setup ----
 rm(list= ls())
-library(maps) # for mapping base layers
 library(sp)
 library(rgdal) # for readOGR(),writeOGR () needed for reading/writing in ArcM shapefiles
-library(rgeos) # gintersection
-library(ggmap)
 library(tidyverse)
 library(doParallel)
 
@@ -159,4 +156,4 @@ foreach(j = todo.months, .packages = c("dplyr", "lubridate", "utils")) %dopar% {
 }
 
 stopCluster(cl); gc()
-sink() # Close the log file 
+
