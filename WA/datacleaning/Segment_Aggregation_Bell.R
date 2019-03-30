@@ -1,8 +1,10 @@
-
-# Grid agg scrip start
 # Aggregation of Waze and Bellevue crash data by segment and hour
+# After completeion, append weathers, FARS, and (when ready) LEHD to segments
 
-rm(list= ls())
+# Notes: input shows suprisingly few Waze events on road segments. For instance, only 9 total Waze events on road segments on 2018-01-01. Load j = "2018-01", see table(format(Waze.seg.time$SegDayHour, '%d')). Can be true, Waze_snapped only 70,226 total for 2018. End result of segment aggregation and binding all months together ~ 60,000 rows. Checked against Waze_Snapped50ft_MatchName, these numbers are correct. Should also check against exported data from SDC.
+# Bellevue crash events: when aggregated to segment and hour, have 1362 segment/hours with 1 crash, 3 segment/hours with 2 crashes. This seems reasonable: total was 2800 crash records, but majority are on interstates or SR 520.
+
+rm(list=ls())
 library(sp)
 library(rgdal) # for readOGR(),writeOGR () needed for reading/writing in ArcM shapefiles
 library(tidyverse)
@@ -28,7 +30,7 @@ avail.months = substr(unlist(
   lapply(strsplit(segfiles, "_"), function(x) x[2])), 1, 7)
 
 # Look for already completed months and skip those
-done_files <- dir(output.loc)[grep("WazeSegTime_", dir(output.loc))]
+done_files <- dir(output.loc)[grep("WazeSegTimeAll_", dir(output.loc))]
 done.months <- substr(unlist(lapply(strsplit(done_files, "_"), function(x) x[2])), 1, 7)
 todo.months = sort(avail.months)[!avail.months %in% done.months]
 
@@ -40,7 +42,7 @@ registerDoParallel(cl)
 writeLines(c(""), paste0("SegAgg_log.txt"))    
 
 foreach(j = todo.months, .packages = c("dplyr", "lubridate", "utils")) %dopar% {
-  # j = "2018-08"  
+  # j = "2018-01"  
   sink(paste0("SegAgg_log.txt"), append=TRUE)
   
   cat(paste(Sys.time()), j, "\n")                                                  
@@ -56,9 +58,8 @@ foreach(j = todo.months, .packages = c("dplyr", "lubridate", "utils")) %dopar% {
   
   StartTime <- Sys.time()
   waze.seg <- Waze.seg.time %>%
-    mutate(Date = as.POSIXct(Date)) %>%
     group_by(RDSEG_ID,
-             year = format(Date, "%Y"), day = format(Date, "%j"), hour = formatC(Hour, width = 2, flag = '0'), weekday = format(Date, "%u")) %>%
+             year = format(time, "%Y"), day = format(time, "%j"), hour = format(time, "%H"), weekday = format(time, "%u")) %>%
     summarize(
       uniqueWazeEvents= n_distinct(SDC_uuid), # number of unique Waze events.
       
@@ -96,19 +97,15 @@ foreach(j = todo.months, .packages = c("dplyr", "lubridate", "utils")) %dopar% {
       nWazeWeatherFog = n_distinct(SDC_uuid[sub_type=="HAZARD_WEATHER_FOG"]),
       nWazeHazardIceRoad = n_distinct(SDC_uuid[sub_type=="HAZARD_ON_ROAD_ICE"]),
       
-      nWazeRT3 = n_distinct(SDC_uuid[road_type=="3"]),
-      nWazeRT4 = n_distinct(SDC_uuid[road_type=="4"]),
-      nWazeRT6 = n_distinct(SDC_uuid[road_type=="6"]),
-      nWazeRT7 = n_distinct(SDC_uuid[road_type=="7"]),
-      nWazeRT2 = n_distinct(SDC_uuid[road_type=="2"]),
-      nWazeRT0 = n_distinct(SDC_uuid[road_type=="0"]),
-      nWazeRT1 = n_distinct(SDC_uuid[road_type=="1"]),
-      nWazeRT20 = n_distinct(SDC_uuid[road_type=="20"]),
-      nWazeRT17 = n_distinct(SDC_uuid[road_type=="17"]),
-      
-      medLastRepRate = median(last.reportRating), # median is going to be affected if Waze.seg.time table has duplicates 
-      medLastConf = median(last.confidence),
-      medLastReliab = median(last.reliability),
+      nWazeRT3 = n_distinct(SDC_uuid[roadclass=="3"]),
+      nWazeRT4 = n_distinct(SDC_uuid[roadclass=="4"]),
+      nWazeRT6 = n_distinct(SDC_uuid[roadclass=="6"]),
+      nWazeRT7 = n_distinct(SDC_uuid[roadclass=="7"]),
+      nWazeRT2 = n_distinct(SDC_uuid[roadclass=="2"]),
+      nWazeRT0 = n_distinct(SDC_uuid[roadclass=="0"]),
+      nWazeRT1 = n_distinct(SDC_uuid[roadclass=="1"]),
+      nWazeRT20 = n_distinct(SDC_uuid[roadclass=="20"]),
+      nWazeRT17 = n_distinct(SDC_uuid[roadclass=="17"]),
       
       medMagVar = median(magvar),
       nMagVar330to30 = n_distinct(SDC_uuid[magvar>= 330 & magvar<30]),
@@ -118,68 +115,38 @@ foreach(j = todo.months, .packages = c("dplyr", "lubridate", "utils")) %dopar% {
       nMagVar240to360 = n_distinct(SDC_uuid[magvar>= 240 & magvar<360])) 
   
   
-  #Compute grid counts for TN data -- update all of these to the TN data variables
+  #Compute grid counts for Bellevue crash data
   # Add accident severity counts by grid cell 
-  # names(crash.df)
-  tn.seg <- 
-    crash.df %>%
-    group_by(RDSEG_ID.TN, year = format(date, "%Y"), day = format(date, "%j"), hour = format(date, "%H")) %>%
+  # names(Crash.seg.time)
+  crash.seg <- 
+    Crash.seg.time %>%
+    group_by(RDSEG_ID, year = format(time, "%Y"), day = format(time, "%j"), hour = format(time, "%H")) %>%
     summarize(
-      uniqueTNreports= n_distinct(MstrRecNbrTxt),
+      uniqueCrashreports= n_distinct(REPORT_NUM),
       
-      nTNInjuryFatal = n_distinct(MstrRecNbrTxt[NbrFatalitiesNmb > 0]),
-      nTNInjury = n_distinct(MstrRecNbrTxt[NbrInjuredNmb > 0]),
-      nTNAlcoholInd = n_distinct(MstrRecNbrTxt[AlcoholInd == "Y"]),
-      nTNIntersectionInd = n_distinct(MstrRecNbrTxt[IntersectionInd == "Y"])
+      nCrashInjuryFatal = n_distinct(REPORT_NUM[FATAL_CRAS == 1]),
+      nCrashInjury = n_distinct(REPORT_NUM[SERIOUS_IN == 1 | EVIDENT_IN == 1 | POSSIBLE_I == 1]),
+      nCrashPDO = n_distinct(REPORT_NUM[PDO___NO_I == 1 ]),
+      nCrashWorkzone = n_distinct(REPORT_NUM[!is.na(WORKZONE)])
     ) 
   
-  #Merge TN crash counts to waze counts by hexagons
+  #Merge  crash counts to waze counts by segment ID 
   names(waze.seg)
-  names(tn.seg)
-  colnames(tn.seg)[1] <- "RDSEG_ID"
+  names(crash.seg)
   
-  wazeTime.tn.seg <- full_join(waze.seg, tn.seg, by = c("RDSEG_ID", "year", "day", "hour")) %>%
+  wazeTime.crash.seg <- full_join(waze.seg, crash.seg, by = c("RDSEG_ID", "year", "day", "hour")) %>%
     mutate_all(funs(replace(., is.na(.), 0)))
-  # Replace NA with zero (for the grid counts here, 0 means there were no reported Waze events or TN crashes in the grid cell at that hour)
-  
-  #Add columns containing data for neighboring grid cells 
-  names(wazeTime.tn.seg)
-  
-  #Accident counts for neighboring cells
-  nWazeAcc <- wazeTime.tn.seg %>%
-    ungroup()%>%
-    select(RDSEG_ID, day, hour, nWazeAccident)%>%
-    rename(nWazeAcc_neighbor = nWazeAccident)
-  
-  #Jam counts for neighboring cells
-  nWazeJam <- wazeTime.tn.seg %>%
-    ungroup()%>%
-    select(RDSEG_ID, day, hour, nWazeJam)%>%
-    rename(nWazeJam_neighbor = nWazeJam)
-  
-
-  # test process - look at value for highest count in nWazeAcc_NW column (10)
-  # t=filter(wazeTime.tn.seg_NW_N_NE_SW_S_SE, RDSEG_ID=="EG-53" & day=="141" & hour=="15")
-  # t #10 - this matches, test more
-  
-  wazeTime.tn.segAll <- wazeTime.tn.seg_NW_N_NE_SW_S_SE %>%
-    mutate_all(funs(replace(., is.na(.), 0)))
-  # Replace NA with zero (for the grid counts here, 0 means there were no reported Waze events or EDT crashes in the neighbor grid cell at that hour)
+  # Replace NA with zero (for the grid counts here, 0 means there were no reported Waze events or Bellevue crashes in the segment at that hour)
   
   # Update time variable 
-  hextimeChar <- paste(paste(wazeTime.tn.segAll$year, wazeTime.tn.segAll$day, sep = "-"), wazeTime.tn.segAll$hour, sep=" ")
-  wazeTime.tn.segAll$hextime <- hextimeChar #strptime(hextimeChar, "%Y:%j:%H", tz = use.tz)
+  segtimeChar <- paste(paste(wazeTime.crash.seg$year, wazeTime.crash.seg$day, sep = "-"), wazeTime.crash.seg$hour, sep=" ")
+  wazeTime.crash.seg$segtime <- segtimeChar # strptime(segtimeChar, "%Y-%j %H", tz = 'America/Los_Angeles')
   
-  class(wazeTime.tn.segAll) <- "data.frame" # POSIX date/time not supported for grouped tbl
+  class(wazeTime.crash.seg) <- "data.frame" # POSIX date/time not supported for grouped tbl
   
-  fn = paste("WazeTimeEdtHexAll_", j,"_", g, ".RData", sep="")
+  fn = paste("WazeSegTimeAll_", j, ".RData", sep="")
   
-  save(list="wazeTime.tn.segAll", file = file.path(temp.outputdir, fn))
-  
-  # Copy to S3
-  system(paste("aws s3 cp",
-               file.path(temp.outputdir, fn),
-               file.path(teambucket, state, fn)))
+  save(list="wazeTime.crash.seg", file = file.path(output.loc, fn))
   
   EndTime <- Sys.time()-StartTime
   cat(j, 'completed', round(EndTime, 2), attr(EndTime, 'units'), '\n')
@@ -189,9 +156,55 @@ foreach(j = todo.months, .packages = c("dplyr", "lubridate", "utils")) %dopar% {
 
 stopCluster(cl)
 
-} # end grid loop
+# Stack and add additional variables ----
 
+# First, loop over all months and bind together
+w.all <- vector()
+
+for(j in todo.months){
+  fn = paste("WazeSegTimeAll_", j, ".RData", sep="")
+  load(file.path(output.loc, fn))
+  w.all <- rbind(w.all, wazeTime.crash.seg)
+}
+
+dim(w.all)
+
+# Weather ----
 # Load weather data -- Only need to assign to a Date
 load(file.path(data.loc, "Weather","Prepared_Bellevue_Wx_2018.RData")) # the file name wx.grd.day
-# format day
-wx.grd.day$day <- as.Date(wx.grd.day$day)
+# Fill NA with 0s
+wx.grd.day[is.na(wx.grd.day)] = 0 
+
+# Format date and time to match the variables in w.all
+wx.grd.day = wx.grd.day %>%
+  mutate(year = format(day, '%Y'),
+         day = format(day, '%j'))
+
+# Left join to w.all
+w.all <- left_join(w.all, wx.grd.day, by = c('RDSEG_ID'='ID', 'year', 'day'))
+
+# FARS ----
+FARS_snapped <- readOGR(dsn = file.path(data.loc, "Shapefiles"), layer = "FARS_Snapped50ft_MatchName") 
+# 13 x 19 
+
+# Join only segment; tablulate to get counts across segments 
+FARS_segment = FARS_snapped@data %>%
+  group_by(RDSEG_ID) %>%
+  summarize(nFARS = n())
+
+w.all <- left_join(w.all, FARS_segment, by = 'RDSEG_ID')
+
+# Fill 0s
+w.all[is.na(w.all)] = 0 
+
+# LEHD ----
+# TODO: when ready
+
+# Save joined output ---
+todo.months
+
+fn = paste("Bellevue_Waze_Segments_", 
+           avail.months[1], '_to_', avail.months[length(avail.months)], 
+           ".RData", sep="")
+
+save(list="w.all", file = file.path(output.loc, fn))
