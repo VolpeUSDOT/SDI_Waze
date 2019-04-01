@@ -1,5 +1,5 @@
 # Aggregation of Waze and Bellevue crash data by segment and hour
-# After completeion, append weathers, FARS, and (when ready) LEHD to segments
+# After completion, append weathers, FARS, and (when ready) LEHD to segments
 
 # Notes: input shows suprisingly few Waze events on road segments. For instance, only 9 total Waze events on road segments on 2018-01-01. Load j = "2018-01", see table(format(Waze.seg.time$SegDayHour, '%d')). Can be true, Waze_snapped only 70,226 total for 2018. End result of segment aggregation and binding all months together ~ 60,000 rows. Checked against Waze_Snapped50ft_MatchName, these numbers are correct. Should also check against exported data from SDC.
 # Bellevue crash events: when aggregated to segment and hour, have 1362 segment/hours with 1 crash, 3 segment/hours with 2 crashes. This seems reasonable: total was 2800 crash records, but majority are on interstates or SR 520.
@@ -56,7 +56,7 @@ foreach(j = todo.months, .packages = c("dplyr", "lubridate", "utils")) %dopar% {
   StartTime <- Sys.time()
   waze.seg <- Waze.seg.time %>%
     group_by(RDSEG_ID,
-             year = format(time, "%Y"), day = format(time, "%j"), hour = format(time, "%H"), weekday = format(time, "%u")) %>%
+             year = format(time, "%Y"), day = format(time, "%j"), hour = format(time, "%H"), weekday = format(time, "%u")) %>% # format(time, "%j") get the day of the year, not the day of the month.
     summarize(
       uniqueWazeEvents= n_distinct(SDC_uuid), # number of unique Waze events.
       
@@ -136,7 +136,7 @@ foreach(j = todo.months, .packages = c("dplyr", "lubridate", "utils")) %dopar% {
   # Replace NA with zero (for the grid counts here, 0 means there were no reported Waze events or Bellevue crashes in the segment at that hour)
   
   # Update time variable 
-  segtimeChar <- paste(paste(wazeTime.crash.seg$year, wazeTime.crash.seg$day, sep = "-"), wazeTime.crash.seg$hour, sep=" ")
+  segtimeChar <- paste(paste(wazeTime.crash.seg$year, wazeTime.crash.seg$day, sep = "-"), wazeTime.crash.seg$hour, sep=" ") # day is the day of the year
   wazeTime.crash.seg$segtime <- segtimeChar # strptime(segtimeChar, "%Y-%j %H", tz = 'America/Los_Angeles')
   
   class(wazeTime.crash.seg) <- "data.frame" # POSIX date/time not supported for grouped tbl
@@ -158,13 +158,13 @@ stopCluster(cl)
 # First, loop over all months and bind together
 w.all <- vector()
 
-for(j in todo.months){
+for(j in done.months){ # we need the done.months instead of todo.months
   fn = paste("WazeSegTimeAll_", j, ".RData", sep="")
   load(file.path(output.loc, fn))
   w.all <- rbind(w.all, wazeTime.crash.seg)
 }
 
-dim(w.all)
+dim(w.all) # 61237*48
 
 # Weather ----
 # Load weather data -- Only need to assign to a Date
@@ -190,12 +190,24 @@ FARS_segment = FARS_snapped@data %>%
   summarize(nFARS = n())
 
 w.all <- left_join(w.all, FARS_segment, by = 'RDSEG_ID')
-
 # Fill 0s
 w.all[is.na(w.all)] = 0 
 
+# Joined the BellevueSegment data (e.g., ) ----
+# Load the network data, for the definitive RDSEG_ID to join to
+roadnettb_snapped <- readOGR(dsn = file.path(data.loc, "Shapefiles"), layer = "RoadNetwork_Jurisdiction_withData") # 6647 * 14, new: 6647*38
+names(roadnettb_snapped)
+
+w.all <- left_join(w.all, roadnettb_snapped@data, by = 'RDSEG_ID')
+# don't think we need to fill NAs with zeros.
+names(w.all)
+# Compare nFARS and nFARS_1217
+w.all[, c("nFARS", "nFARS_1217")] 
+sum(as.numeric(w.all$nFARS) - as.numeric(w.all$nFARS_1217)) # -61237, The two columns are not equal.
+
 # LEHD ----
 # TODO: when ready
+
 
 # Save joined output ---
 

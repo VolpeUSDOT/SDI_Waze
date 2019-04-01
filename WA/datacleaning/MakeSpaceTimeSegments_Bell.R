@@ -1,4 +1,5 @@
 # Precursor to Segment_Aggregation_Bell.R
+# Jessie validated this code on 4/1/2019
 
 
 # <><><><><><><><><><><><><><><><><><><><>
@@ -100,7 +101,7 @@ foreach(j = todo.months, .packages = c("dplyr", "lubridate", "utils")) %dopar% {
    # A list of timezone areas for reference: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
   Month.hour <- seq(from = as.POSIXct(paste0(j,"-01 0:00"), tz = 'America/Los_Angeles'), 
                     to = as.POSIXct(paste0(j,"-", lastday, " 24:00"), tz = 'America/Los_Angeles'),
-                    by = "hour")
+                    by = "hour") # create a sequential list of timestamps including date and time (for every hour).
   
   # Make a segment time all table
   SegIDTime <- expand.grid(Month.hour, SegIDall)
@@ -117,7 +118,7 @@ foreach(j = todo.months, .packages = c("dplyr", "lubridate", "utils")) %dopar% {
   counter = 1
   while(i+3600 <= t.max){
     ti.SegIDTime = filter(SegIDTime, SegDayHour == i)
-    # Match Waze events by time time. Use last pull time if available
+    # Match Waze events by time time. Use last pull time if available (in this dataset, last pull time is not avialable)
     if('last.pull.time' %in% names(waze.j)){
       ti.link.waze = waze.j@data %>% filter(time >= i & time <= i+3600 | last.pull.time >= i & last.pull.time <=i+3600) 
     } else {
@@ -135,7 +136,7 @@ foreach(j = todo.months, .packages = c("dplyr", "lubridate", "utils")) %dopar% {
     
     i=i+3600
     counter = counter + 1
-    if(counter %% 3600*24 == 0) cat(paste(i, "\n"))
+    if(counter %% 3600*24 == 0) cat(paste(i, "\n")) # If counter == 0, will output the time with issues. Not sure if it is necessary here
   } # end loop
   
   # Remove any duplicates and NA segment IDs. Should be none.
