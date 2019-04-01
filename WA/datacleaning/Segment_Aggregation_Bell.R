@@ -50,11 +50,8 @@ foreach(j = todo.months, .packages = c("dplyr", "lubridate", "utils")) %dopar% {
 
   # Aggregate: new data frame will have one row per segment, per hour, per day.
   # Response variable column: count of unique crash events in this segment, within this time window. 
-  # Predictor variable columns: median values for the numeric characteristics: report rating, confidence..
   # Counts for the number of Waze events of each alert_type and sub_type, inside this segment at this time.
   # TODO: include neighboring segments?
-  
-  # !!!!!!!!!!!!!!!!!!!!!!! Dan stopped here 2019-03-29 ----
   
   StartTime <- Sys.time()
   waze.seg <- Waze.seg.time %>%
@@ -201,7 +198,6 @@ w.all[is.na(w.all)] = 0
 # TODO: when ready
 
 # Save joined output ---
-todo.months
 
 fn = paste("Bellevue_Waze_Segments_", 
            avail.months[1], '_to_', avail.months[length(avail.months)], 
