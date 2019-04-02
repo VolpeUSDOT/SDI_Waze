@@ -10,6 +10,8 @@
 # Setup ---- 
 rm(list=ls()) # Start fresh
 library(tidyverse)
+library(ggplot2)
+require(GGally)
 
 codeloc <- ifelse(grepl('Flynn', normalizePath('~/')), # grep() does not produce a logical outcome (T/F), it gives the positive where there is a match, or no outcome if there is no match. grepl() is what we need here.
                   "~/git/SDI_Waze", "~/GitHub/SDI_Waze") # Jessie's codeloc is ~/GitHub/SDI_Waze
@@ -55,7 +57,14 @@ waze_dir_travel = grep("MagVar", names(w.all), value = T)[-2] # nMagVar30to60 is
 
 weather_var = c('PRCP', 'TMIN', 'TMAX', 'SNOW')
 
-seg_var = c("Shape_STLe", "SpeedLimit", "ArterialCl", "FunctionCl") # "ArterialCl" has no missing values. There are 6 rows with missing values in "FunctionCl", therefore if we use in the model, we will lose these rows.
+other_var = c("nBikes", "nFARS")
+
+seg_var = c("Shape_STLe", "SpeedLimit", "ArterialCl"
+            , "FunctionCl"
+            ) # "ArterialCl" has no missing values. There are 6 rows with missing values in "FunctionCl", therefore if we use in the model, we will lose these rows.
+
+# Create a list to store the indicators
+indicator.var.list <- list("seg_var" = seg_var, "other_var" = other_var, "weather_var" = weather_var, "alert_types" = alert_types, "alert_subtypes" = alert_subtypes, "waze_rd_type" = waze_rd_type, "waze_dir_travel" = waze_dir_travel)
 
 # A list of Response variables
 response.var.list <- c(
@@ -69,10 +78,35 @@ response.var.list <- c(
 
 # Correlation ----
 library(corrplot)
-correlations <- cor(w.all[, c(response.var.list, waze_rd_type)])
-corrplot(correlations, method="circle")
+correlations <- cor(w.all[, c(response.var.list, "Shape_STLe")])
+corrplot(correlations, method="circle", type = "upper", tl.col = "black"
+         # , tl.srt = 45
+         # , main = "Correlation Plots"
+)
 
-# check missing values, interesting. Checked all interested predictors listed above, they are good!
+# ggpairs to look at both scatter, boxplot, and density plots, as well as correlation, tried to save as pdf, too slow to open.
+# alternative: use boxplots for categorical variables
+
+for (i in 1:length(indicator.var.list)) {
+  
+  n <- length(c(response.var.list, indicator.var.list[[i]]))
+  
+  png(file = paste0(data.loc,'/Model_visualizations/ggpairs_', names(indicator.var.list)[i],".png"),  
+      width = celing(n/2)*2, # or use 12 for all of them 
+      height = celing(n/2)*2,
+      units = 'in', 
+      res = 300)
+  g <- ggpairs(w.all[, c(response.var.list, indicator.var.list[[i]])])
+  print(g)
+  
+  dev.off()
+  
+}
+
+
+
+# check missing values ----
+# Checked all interested predictors listed above, they are good!
 library(Amelia)
 library(mlbench)
 missmap(w.all[, alert_types], col = c("blue", "red"), legend = FALSE)
@@ -80,9 +114,12 @@ missmap(w.all[, alert_types], col = c("blue", "red"), legend = FALSE)
 
 # TODO: Design sets of models to test ----
 # Start simple
-# 01 Base: All Waze features from event type (but not the counts of all Waze events together)
-# 02 Add FARS only
-# 03 Add Weather only
+# 01 Base: Road network (seg_var)
+# 02: Add FARS only ("nFARS")
+# 03: Add Weather only (weather_var)
+# 04: Add Waze features from event type (but not the counts of all Waze events together) alert_types, alert_subtypes
+# 05: Add all other Waze features (waze_rd_type, waze_dir_travel)
+
 
 starttime = Sys.time()
 
@@ -90,19 +127,19 @@ starttime = Sys.time()
 # month (mo) and hour are categorical variables. 
 
 includes = c(
-          # alert_types,     # counts of waze events by alert types
-          # alert_subtypes,  # counts of waze events by sub-alert types
-          # "nFARS",         # FARS variables
-          # "nBikes",        # bike conflict counts
-          # waze_rd_type,    # road types from Waze
-          # waze_dir_travel, # direction of travel
-          # weather_var,
-          seg_var
+              # waze_rd_type,    # road types from Waze
+              # waze_dir_travel, # direction of travel
+              # alert_types,     # counts of waze events by alert types
+              # alert_subtypes,  # counts of waze events by sub-alert types
+              # weather_var,
+              # "nFARS",         # FARS variables 
+              # "nBikes",        # bike conflict counts
+              seg_var
           )
 
 modelno = "01"
 
-response.var <- response.var.list[, c("biCrash")]
+response.var <- response.var.list[2]
 
 # Simple 
 
