@@ -11,8 +11,8 @@
 rm(list=ls()) # Start fresh
 library(tidyverse)
 
-codeloc <- ifelse(grep('Flynn', normalizePath('~/')),
-                  "~/git/SDI_Waze", "~/GitHub/SDI_Waze")
+codeloc <- ifelse(grepl('Flynn', normalizePath('~/')), # grep() does not produce a logical outcome (T/F), it gives the positive where there is a match, or no outcome if there is no match. grepl() is what we need here.
+                  "~/git/SDI_Waze", "~/GitHub/SDI_Waze") # Jessie's codeloc is ~/GitHub/SDI_Waze
 
 source(file.path(codeloc, 'utility/get_packages.R'))
 
@@ -36,13 +36,23 @@ if(length(grep(Waze_Prepared_Data, dir(output.loc))) == 0){
 
 # <><><><><><><><><><><><><><><><><><><><><><><><>
 # Start from prepared data
+
 # Omit as predictors in this vector:
 alwaysomit = c(grep("RDSEG_ID", names(w.all), value = T), "year", "day", "segtime", "weekday", 
-               grep("Crash", names(w.all), value = T))
+               grep("Crash", names(w.all), value = T),
+               "OBJECTID")
 
 alert_types = c("nWazeAccident", "nWazeJam", "nWazeRoadClosed", "nWazeWeatherOrHazard")
 
 alert_subtypes = c("nHazardOnRoad", "nHazardOnShoulder" ,"nHazardWeather", "nWazeAccidentMajor", "nWazeAccidentMinor", "nWazeHazardCarStoppedRoad", "nWazeHazardCarStoppedShoulder", "nWazeHazardConstruction", "nWazeHazardObjectOnRoad", "nWazeHazardPotholeOnRoad", "nWazeHazardRoadKillOnRoad", "nWazeJamModerate", "nWazeJamHeavy" ,"nWazeJamStandStill",  "nWazeWeatherFlood", "nWazeWeatherFog", "nWazeHazardIceRoad")
+
+waze_rd_type = grep("WazeRT", names(w.all), value = T) # counts of events happened at that segment at each hour
+
+waze_dir_travel = grep("MagVar", names(w.all), value = T)
+
+weather_var = c('PRCP', 'TMIN', 'TMAX', 'SNOW')
+
+seg_var = c("Shape_STLe", "SpeedLimit", "ArterialCl", "FunctionCl")
 
 response.var = "uniqueCrashreports"
 
@@ -57,20 +67,22 @@ starttime = Sys.time()
 # Make a list of variables to omit from the predictors. To add variables, comment out the corresponding line.
 # month (mo) and hour are categorical variables. 
 
-omits = c(alwaysomit,
-#         alert_types,
-          alert_subtypes,
-          "nFARS",                                  # FARS variables, 
-          c('PRCP', 'TMIN', 'TMAX', 'SNOW'),        # wx variables
-          grep("WazeRT", names(w.all), value = T),  # road types from Waze
-          grep("MagVar", names(w.all), value = T)   # direction of travel
+includes = c(
+          # alert_types,  # counts of waze events by alert types
+          # alert_subtypes,  # counts of waze events by sub-alert types
+          # "nFARS",                                  # FARS variables
+          # "nBikes",               # bike conflict counts
+          # waze_rd_type,  # road types from Waze
+          # waze_dir_travel,   # direction of travel
+          # weather_var,
+          seg_var
           )
 
 modelno = "01"
 
 # Simple 
 
-( predvars = names(w.all)[!names(w.all) %in% omits] )
+( predvars = names(w.all)[names(w.all) %in% includes] )
 
 ( use.formula = as.formula(paste(response.var, "~", 
                                  paste(predvars, collapse = "+"))) )
@@ -81,11 +93,13 @@ assign(paste0('m', modelno),
 
 # Summarize
 
-
 summary(get(paste0('m', modelno)))
 
 
 summary.aov(get(paste0('m', modelno)))
+
+# TODO, convert the n of crash to binary and do logistic regression
+# once we aggregate to a 4 hour window or a day, the counts might change, then we will need a zero-inflated NB model.
 
 # TODO: extract model diagnostics, save in a list..
 

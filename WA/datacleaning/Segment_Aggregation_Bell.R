@@ -104,7 +104,7 @@ foreach(j = todo.months, .packages = c("dplyr", "lubridate", "utils")) %dopar% {
       nWazeRT20 = n_distinct(SDC_uuid[roadclass=="20"]),
       nWazeRT17 = n_distinct(SDC_uuid[roadclass=="17"]),
       
-      medMagVar = median(magvar),
+      medMagVar = median(magvar), # Median direction of travel for that road segment for that hour.
       nMagVar330to30 = n_distinct(SDC_uuid[magvar>= 330 & magvar<30]),
       nMagVar30to60 = n_distinct(SDC_uuid[magvar>= 60 & magvar<120]),
       nMagVar90to180 = n_distinct(SDC_uuid[magvar>= 120 & magvar<180]),
@@ -124,7 +124,7 @@ foreach(j = todo.months, .packages = c("dplyr", "lubridate", "utils")) %dopar% {
       nCrashInjuryFatal = n_distinct(REPORT_NUM[FATAL_CRAS == 1]),
       nCrashInjury = n_distinct(REPORT_NUM[SERIOUS_IN == 1 | EVIDENT_IN == 1 | POSSIBLE_I == 1]),
       nCrashPDO = n_distinct(REPORT_NUM[PDO___NO_I == 1 ]),
-      nCrashWorkzone = n_distinct(REPORT_NUM[!is.na(WORKZONE)])
+      nCrashWorkzone = n_distinct(REPORT_NUM[!is.na(WORKZONE)]) # Number of crashes happened in a workzone
     ) 
   
   #Merge  crash counts to waze counts by segment ID 
@@ -204,6 +204,22 @@ names(w.all)
 # Compare nFARS and nFARS_1217
 w.all[, c("nFARS", "nFARS_1217")] 
 sum(as.numeric(w.all$nFARS) - as.numeric(w.all$nFARS_1217)) # -61237, The two columns are not equal.
+w.all[as.numeric(w.all$nFARS) != as.numeric(as.character(w.all$nFARS_1217)), c("nFARS", "nFARS_1217")] # Great. Two columns match. Need to convert a factor to character then to numeric.
+# > class(w.all$nFARS)
+# [1] "numeric"
+# > class(w.all$nFARS_1217)
+# [1] "factor"
+
+# TODo: data check between uniqueCrashreports and nCrashes
+w.all[as.numeric(w.all$uniqueCrashreports) != as.numeric(as.character(w.all$nCrashes)), c("uniqueCrashreports", "nCrashes")]
+# nCrashes is the total # of crashes of a segment at all hours
+# uniqueCrashreports is the # of crash of a segment at each hour.
+
+# Convert nBikes to numeric
+# > class(w.all$nBikes)
+# [1] "factor"
+w.all$nBikes <- as.numeric(as.character(w.all$nBikes))
+
 
 # LEHD ----
 # TODO: when ready
