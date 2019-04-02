@@ -205,21 +205,19 @@ names(w.all)
 w.all[, c("nFARS", "nFARS_1217")] 
 sum(as.numeric(w.all$nFARS) - as.numeric(w.all$nFARS_1217)) # -61237, The two columns are not equal.
 w.all[as.numeric(w.all$nFARS) != as.numeric(as.character(w.all$nFARS_1217)), c("nFARS", "nFARS_1217")] # Great. Two columns match. Need to convert a factor to character then to numeric.
-# > class(w.all$nFARS)
-# [1] "numeric"
-# > class(w.all$nFARS_1217)
-# [1] "factor"
 
-# TODo: data check between uniqueCrashreports and nCrashes
+# data check between uniqueCrashreports and nCrashes
 w.all[as.numeric(w.all$uniqueCrashreports) != as.numeric(as.character(w.all$nCrashes)), c("uniqueCrashreports", "nCrashes")]
 # nCrashes is the total # of crashes of a segment at all hours
 # uniqueCrashreports is the # of crash of a segment at each hour.
 
-# Convert nBikes to numeric
-# > class(w.all$nBikes)
-# [1] "factor"
-w.all$nBikes <- as.numeric(as.character(w.all$nBikes))
+# We found many variables are not in its correct data type, so Convert a few variables from factor to numeric, due to GIS auto-converting numeric columns to factors
+sapply(roadnettb_snapped@data,class) # all but "Shape_STLe" are factor type
+numeric_var <- c("SpeedLimit", "nWaze_All", "nWazeAcc", "nCrashes", "Crash_End1", "Crash_End2", "nBikes", "nFARS_1217")
+w.all[, numeric_var] <- lapply(w.all[, numeric_var], function(x) as.numeric(as.character(x)))
 
+# Create binary crash indicator:
+w.all$biCrash <- ifelse(w.all$uniqueCrashreports > 0, 1, 0)
 
 # LEHD ----
 # TODO: when ready
