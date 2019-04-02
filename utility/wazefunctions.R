@@ -330,10 +330,17 @@ append.hex <- function(hexname, data.to.add, state, na.action = c("omit", "keep"
   dd <- get(data.to.add)
   
   if(length(grep("FARS", data.to.add)) > 0){
+    if(state == 'MD'){
+      dd <- dd %>% 
+        group_by(GRID_ID) %>%
+        summarise(CRASH_SUM = sum(COUNT_case),
+                  FATALS_SUM = sum(SUM_numfat))
+    } else {
     dd <- dd %>% 
       group_by(GRID_ID) %>%
       summarise(CRASH_SUM = sum(CRASH_SUM),
                 FATALS_SUM = sum(FATALS_SUM))
+    }
   }
   
   # Expand VMT from month / day of week / hour to day of year / hour of day, for each grid cell
@@ -415,7 +422,10 @@ append.hex <- function(hexname, data.to.add, state, na.action = c("omit", "keep"
   }
 
   if(length(grep("bg_rac_", data.to.add)) > 0){
-    
+    if(state == 'MD'){
+      use_names <- read.csv('use_RAC_names.csv')
+      names(dd)[2:ncol(dd)] <- as.character(use_names[,1])
+    }
     #dd <- dd@data 
     dd <- dd[c("GRID_ID", 
                "SUM_C000",                                                            # Total jobs
@@ -429,8 +439,11 @@ append.hex <- function(hexname, data.to.add, state, na.action = c("omit", "keep"
   }
   
   if(length(grep("bg_wac_", data.to.add)) > 0){
+    if(state == 'MD'){
+      use_names <- read.csv('use_WAC_names.csv')
+      names(dd)[2:ncol(dd)] <- as.character(use_names[,1])
+    }
     
-    #dd <- dd 
     dd <- dd[c("GRID_ID", 
                "SUM_C000",                                                            # Total jobs
                #               "SUM_CA01", "SUM_CA02", "SUM_CA03",                                    # By age category
