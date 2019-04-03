@@ -38,7 +38,7 @@ if(length(grep(Waze_Prepared_Data, dir(output.loc))) == 0){
 
 
 # <><><><><><><><><><><><><><><><><><><><><><><><>
-# Variables analysis Start from prepared data for 1 hour window
+# Variables analysis Start from prepared data for 1 hour window ----
 table(w.all$uniqueCrashreports) # only 3 segment have more than 1 crash, logistic regression is more appropriate for this data.
 # 0     1     2 
 # 59870  1364     3 
@@ -58,7 +58,7 @@ waze_dir_travel = grep("MagVar", names(w.all), value = T)[-2] # nMagVar30to60 is
 
 weather_var = c('PRCP', 'TMIN', 'TMAX', 'SNOW')
 
-other_var = c("nBikes", "nFARS", "hour")
+other_var = c("nBikes", "nFARS")
 
 seg_var = c("Shape_STLe", "SpeedLimit", "ArterialCl"
             , "FunctionCl"
@@ -159,19 +159,18 @@ starttime = Sys.time()
 # month (mo) and hour are categorical variables. 
 
 includes = c(
-              # waze_rd_type,    # road types from Waze
-              # waze_dir_travel, # direction of travel
-              # alert_types,     # counts of waze events by alert types
-              # alert_subtypes,  # counts of waze events by sub-alert types
-              # weather_var,     # Weather variables
-              # "nFARS",         # FARS variables 
-              # "nBikes",        # bike conflict counts
-              # "hour",          # hour
+              waze_rd_type,    # road types from Waze
+              waze_dir_travel, # direction of travel
+              alert_types,     # counts of waze events by alert types
+              alert_subtypes,  # counts of waze events by sub-alert types
+              weather_var,     # Weather variables
+              "nFARS",         # FARS variables
+              "nBikes",        # bike/ped conflict counts at segment level (no hour)
+              "hour",          # hour
               seg_var
-              
           )
 
-modelno = "01"
+modelno = "08"
 
 response.var <- response.var.list[2] # binary data
 
@@ -191,12 +190,57 @@ assign(paste0('m', modelno),
 
 summary(get(paste0('m', modelno)))
 
+# summary.aov(get(paste0('m', modelno)))
 
-summary.aov(get(paste0('m', modelno)))
+# 4/3/2019 Todos : 1. scale the numeric columns, and re-run logistic regressions. 2. Lasso; 3. logistic regression - present the coefficients using OR; 4. logistic regression with mixed effects; 5. double check the hour column; 6. aggregate data into multi-hour window; 7. Do a model with just the one hour of data. 8. incoporate day of week, month, hour of day as the temporal indicators; 9. XGBoost
+# x <- w.all %>% group_by(hour) %>% summarize(sumCrash = sum(uniqueCrashreports))
+# use as reference: https://medium.com/geoai/using-machine-learning-to-predict-car-accident-risk-4d92c91a7d57
+# https://gduer.github.io/Collision-Prediction-in-Louisville-KY/#5_model_selection
 
 # once we aggregate to a 4 hour window or a day, the counts might change, then we will need a zero-inflated NB model.
 
 # TODO: extract model diagnostics, save in a list..
+
+# create a summary table with diagnostics for all the linear model ----
+# Get the list of linear models
+ClassFilter <- function(x) inherits(get(x), 'lm' ) & !inherits(get(x), 'glm') # excluding other potential classes that contains "lm" as the keywords.
+row.name <- Filter( ClassFilter, ls() )
+model_list <- lapply( row.name, function(x) get(x) )
+
+out.name <- file.path(output.loc, "Bell_linear_model_summary_list.Rdata")
+# out.name <- file.path(data.loc, 'Segments', "Bell_linear_model_summary_list.Rdata")
+
+if(file.exists(out.name)){
+  load(out.name)} else {
+    source("~/GitHub/SDI_Waze/WA/utility/Model_Summary().R")
+    linear_model_summary_list <- linear_model_summary(model_list, out.name)
+  }
+# save(list = c("linear_model_summary_list"), file = file.path(data.loc, 'Segments', "Bell_linear_model_summary_list.Rdata"))
+
+M <- linear_model_summary_list$M
+model_summary  <- linear_model_summary_list$model_summary
+model_compare <- linear_model_summary_list$model_compare
+
+
+# create a summary table with diagnostics for all the logistic model ----
+# Get the list of logistic models
+ClassFilter <- function(x) inherits(get(x), 'glm')
+row.name <- Filter( ClassFilter, ls() )
+model_list <- lapply( row.name, function(x) get(x) )
+
+out.name <- file.path(data.loc, 'Segments', "Bell_logistic_model_summary_list.Rdata")
+
+if(file.exists(out.name)){
+  load(out.name)} else {
+    source("~/GitHub/SDI_Waze/WA/utility/Model_Summary().R")
+    logistic_model_summary_list <- logistic_model_summary(model_list, out.name)
+  }
+# save(list = c("logistic_model_summary_list"), file = file.path(data.loc, 'Segments', "Bell_logistic_model_summary_list.Rdata"))
+
+M <- logistic_model_summary_list$M
+model_summary  <- logistic_model_summary_list$model_summary
+model_compare <- logistic_model_summary_list$model_compare
+
 
 timediff <- Sys.time() - starttime
 cat(round(timediff, 2), attr(timediff, "units"), "elapsed to model", modelno)

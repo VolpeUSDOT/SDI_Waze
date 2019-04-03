@@ -10,7 +10,7 @@ library(rgdal) # for readOGR(),writeOGR () needed for reading/writing in ArcM sh
 library(tidyverse)
 library(doParallel)
 
-codeloc <- ifelse(grep('Flynn', normalizePath('~/')),
+codeloc <- ifelse(grepl('Flynn', normalizePath('~/')),
                   "~/git/SDI_Waze", "~/GitHub/SDI_Waze")
 
 source(file.path(codeloc, 'utility/get_packages.R'))
