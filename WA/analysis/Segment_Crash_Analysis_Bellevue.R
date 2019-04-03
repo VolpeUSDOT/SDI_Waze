@@ -12,6 +12,7 @@ rm(list=ls()) # Start fresh
 library(tidyverse)
 library(ggplot2)
 require(GGally)
+library(dplyr)
 
 codeloc <- ifelse(grepl('Flynn', normalizePath('~/')), # grep() does not produce a logical outcome (T/F), it gives the positive where there is a match, or no outcome if there is no match. grepl() is what we need here.
                   "~/git/SDI_Waze", "~/GitHub/SDI_Waze") # Jessie's codeloc is ~/GitHub/SDI_Waze
@@ -37,7 +38,7 @@ if(length(grep(Waze_Prepared_Data, dir(output.loc))) == 0){
 
 
 # <><><><><><><><><><><><><><><><><><><><><><><><>
-# Start from prepared data for 1 hour window
+# Variables analysis Start from prepared data for 1 hour window
 table(w.all$uniqueCrashreports) # only 3 segment have more than 1 crash, logistic regression is more appropriate for this data.
 # 0     1     2 
 # 59870  1364     3 
@@ -57,7 +58,7 @@ waze_dir_travel = grep("MagVar", names(w.all), value = T)[-2] # nMagVar30to60 is
 
 weather_var = c('PRCP', 'TMIN', 'TMAX', 'SNOW')
 
-other_var = c("nBikes", "nFARS")
+other_var = c("nBikes", "nFARS", "hour")
 
 seg_var = c("Shape_STLe", "SpeedLimit", "ArterialCl"
             , "FunctionCl"
@@ -76,7 +77,7 @@ response.var.list <- c(
 # ncrash.4hr = NA # if we use 4 hour window, have not created this variable yet
 
 
-# Correlation ----
+# Correlation & ggpairs ----
 library(corrplot)
 correlations <- cor(w.all[, c(response.var.list, "Shape_STLe")])
 corrplot(correlations, method="circle", type = "upper", tl.col = "black"
@@ -91,28 +92,59 @@ for (i in 1:length(indicator.var.list)) {
   
   n <- length(c(response.var.list, indicator.var.list[[i]]))
   
-  png(file = paste0(data.loc,'/Model_visualizations/ggpairs_', names(indicator.var.list)[i],".png"),  
-      width = celing(n/2)*2, # or use 12 for all of them 
-      height = celing(n/2)*2,
-      units = 'in', 
-      res = 300)
-  g <- ggpairs(w.all[, c(response.var.list, indicator.var.list[[i]])])
-  print(g)
+  f <- paste0(data.loc,'/Model_visualizations/ggpairs_', names(indicator.var.list)[i],".png")
   
-  dev.off()
-  
+  # if the file exists, then don't regenerate as it takes a few minutes for each plots
+  if (!file.exists(f)) {
+      png(file = f,  
+          width = ceiling(n/2)*2, # or use 12 for all of them 
+          height = ceiling(n/2)*2,
+          units = 'in', 
+          res = 300)
+      g <- ggpairs(w.all[, c(response.var.list, indicator.var.list[[i]])])
+      
+      print(g)
+      
+      dev.off()
+  }
 }
 
-
-
-# check missing values ----
+# check missing values and all zero columns ----
 # Checked all interested predictors listed above, they are good!
 library(Amelia)
 library(mlbench)
-missmap(w.all[, alert_types], col = c("blue", "red"), legend = FALSE)
+# missmap(w.all[, alert_types], col = c("blue", "red"), legend = FALSE)
+
+for (i in 1:length(indicator.var.list)) {
+  
+  n <- length(c(response.var.list, indicator.var.list[[i]]))
+  
+  f <- paste0(data.loc,'/Model_visualizations/missmap_', names(indicator.var.list)[i],".png")
+  
+  # if the file exists, then don't regenerate as it takes a few minutes for each plots
+  if (!file.exists(f)) {
+    png(file = f,  
+        width = ceiling(n/2)*2, # or use 12 for all of them 
+        height = ceiling(n/2)*2,
+        units = 'in', 
+        res = 300)
+    missmap(w.all[, indicator.var.list[[i]]], col = c("blue", "red"), legend = FALSE)
+    
+    dev.off()
+  }
+}
+
+# if any other columns are all zeros
+all_var <- vector()
+for (i in 1:length(indicator.var.list)){
+  all_var <- c(all_var, indicator.var.list[[i]])
+}
+
+lapply(w.all[, all_var], function(x) all(x == 0)) # all variables are clean now. None of them are all-zero column.
 
 
-# TODO: Design sets of models to test ----
+# <><><><><><><><><><><><><><><><><><><><><><><><>
+# Start Modelings ----
 # Start simple
 # 01 Base: Road network (seg_var)
 # 02: Add FARS only ("nFARS")
@@ -131,15 +163,17 @@ includes = c(
               # waze_dir_travel, # direction of travel
               # alert_types,     # counts of waze events by alert types
               # alert_subtypes,  # counts of waze events by sub-alert types
-              # weather_var,
+              # weather_var,     # Weather variables
               # "nFARS",         # FARS variables 
               # "nBikes",        # bike conflict counts
+              # "hour",          # hour
               seg_var
+              
           )
 
 modelno = "01"
 
-response.var <- response.var.list[2]
+response.var <- response.var.list[2] # binary data
 
 # Simple 
 
@@ -160,7 +194,6 @@ summary(get(paste0('m', modelno)))
 
 summary.aov(get(paste0('m', modelno)))
 
-# TODO, convert the n of crash to binary and do logistic regression
 # once we aggregate to a 4 hour window or a day, the counts might change, then we will need a zero-inflated NB model.
 
 # TODO: extract model diagnostics, save in a list..
