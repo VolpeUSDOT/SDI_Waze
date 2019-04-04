@@ -9,15 +9,19 @@
 
 # Setup ---- 
 rm(list=ls()) # Start fresh
-library(tidyverse)
-library(ggplot2)
-require(GGally)
-library(dplyr)
 
 codeloc <- ifelse(grepl('Flynn', normalizePath('~/')), # grep() does not produce a logical outcome (T/F), it gives the positive where there is a match, or no outcome if there is no match. grepl() is what we need here.
                   "~/git/SDI_Waze", "~/GitHub/SDI_Waze") # Jessie's codeloc is ~/GitHub/SDI_Waze
 
 source(file.path(codeloc, 'utility/get_packages.R'))
+
+library(tidyverse)
+library(ggplot2)
+library(GGally)
+library(dplyr)
+library(corrplot)
+library(Amelia)
+library(mlbench)
 
 ## Working on shared drive
 wazeshareddir <- "//vntscex.local/DFS/Projects/PROJ-OS62A1/SDI Waze Phase 2"
@@ -78,9 +82,10 @@ response.var.list <- c(
 
 
 # Correlation & ggpairs ----
-library(corrplot)
 correlations <- cor(w.all[, c(response.var.list, "Shape_STLe")])
-corrplot(correlations, method="circle", type = "upper", tl.col = "black"
+corrplot(correlations, method="circle", type = "upper", 
+         diag = F,
+         tl.col = "black"
          # , tl.srt = 45
          # , main = "Correlation Plots"
 )
@@ -111,8 +116,6 @@ for (i in 1:length(indicator.var.list)) {
 
 # check missing values and all zero columns ----
 # Checked all interested predictors listed above, they are good!
-library(Amelia)
-library(mlbench)
 # missmap(w.all[, alert_types], col = c("blue", "red"), legend = FALSE)
 
 for (i in 1:length(indicator.var.list)) {
@@ -172,7 +175,7 @@ includes = c(
 
 modelno = "08"
 
-response.var <- response.var.list[2] # binary data
+response.var <- response.var.list[2] # binary data, biCrash
 
 # Simple 
 
@@ -212,7 +215,7 @@ out.name <- file.path(output.loc, "Bell_linear_model_summary_list.Rdata")
 
 if(file.exists(out.name)){
   load(out.name)} else {
-    source("~/GitHub/SDI_Waze/WA/utility/Model_Summary().R")
+    source(codeloc, "utility/Model_Summary().R")
     linear_model_summary_list <- linear_model_summary(model_list, out.name)
   }
 # save(list = c("linear_model_summary_list"), file = file.path(data.loc, 'Segments', "Bell_linear_model_summary_list.Rdata"))
@@ -232,7 +235,7 @@ out.name <- file.path(data.loc, 'Segments', "Bell_logistic_model_summary_list.Rd
 
 if(file.exists(out.name)){
   load(out.name)} else {
-    source("~/GitHub/SDI_Waze/WA/utility/Model_Summary().R")
+    source(file.path(codeloc, "/WA/utility/Model_Summary().R"))
     logistic_model_summary_list <- logistic_model_summary(model_list, out.name)
   }
 # save(list = c("logistic_model_summary_list"), file = file.path(data.loc, 'Segments', "Bell_logistic_model_summary_list.Rdata"))

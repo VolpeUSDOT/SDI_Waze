@@ -2,18 +2,22 @@
 # If this fails, see "Package Installation Notes.Rmd" for details on tidyverse installation
 
 loadpacks <- c(
+            "Amelia",
             "aws.s3", # AWS convenience functions s3save and s3load
+            "corrplot",
             "doParallel",
             "DT",
             "foreach", # for parallel implementation
             "geonames",
             "getPass",
+            "GGally",
             "kableExtra",
             "lubridate",
             "maps",
             "maptools",
             "mapproj",  # for coord_map(", 
             "maptree", # for better graphing of decision trees
+            "mlbench",
             "pander",
             "party",
             "partykit",
