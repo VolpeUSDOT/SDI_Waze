@@ -22,6 +22,7 @@ library(dplyr)
 library(corrplot)
 library(Amelia)
 library(mlbench)
+library(rgdal)
 
 ## Working on shared drive
 wazeshareddir <- "//vntscex.local/DFS/Projects/PROJ-OS62A1/SDI Waze Phase 2"
@@ -66,7 +67,7 @@ other_var = c("nBikes", "nFARS")
 time_var = c("hour", "mo", "weekday", "day") # time variable can be used as indicator or to aggregate the temporal resolution.
 
 seg_var = c("Shape_STLe", "SpeedLimit", "ArterialCl"
-            , "FunctionCl"
+            # , "FunctionCl"
             ) # "ArterialCl" has no missing values. There are 6 rows with missing values in "FunctionCl", therefore if we use in the model, we will lose these rows.
 
 # Create a list to store the indicators
@@ -312,4 +313,19 @@ model_compare <- logistic_model_summary_list$model_compare
 
 timediff <- Sys.time() - starttime
 cat(round(timediff, 2), attr(timediff, "units"), "elapsed to model", modelno)
+
+# Model output visuals ----
+# m08 logistic regression using all variables
+w.all$m08_fit <- predict(m08, type = "response")
+
+out.put <- w.all[, c("RDSEG_ID", "segtime", "m08_fit", "uniqueCrashreports")]
+out.put <- out.put %>% group_by(RDSEG_ID) %>% summarize(m08_fit = sum(m08_fit),
+                                                        uniqueCrashreports = sum(uniqueCrashreports))
+
+roadnettb_snapped <- readOGR(dsn = file.path(data.loc, "Shapefiles"), layer = "RoadNetwork_Jurisdiction_withData") # 6647 * 14, new: 6647*38
+names(roadnettb_snapped)
+
+roadnettb_snapped@data <- roadnettb_snapped@data %>% left_join(out.put, by = c("RDSEG_ID")) # adding model output to the spatial data frame
+
+plot(roadnettb_snapped)
 
