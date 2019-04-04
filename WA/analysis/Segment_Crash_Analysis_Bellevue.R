@@ -22,7 +22,13 @@ library(dplyr)
 library(corrplot)
 library(Amelia)
 library(mlbench)
-library(rgdal)
+# mapping related packages
+library(maps) # for mapping base layers
+library(sp)
+library(rgdal) # for readOGR(),writeOGR () needed for reading/writing in ArcM shapefiles
+library(rgeos) # gintersection
+library(ggmap)
+library(spatstat)
 
 ## Working on shared drive
 wazeshareddir <- "//vntscex.local/DFS/Projects/PROJ-OS62A1/SDI Waze Phase 2"
@@ -42,7 +48,7 @@ if(length(grep(Waze_Prepared_Data, dir(output.loc))) == 0){
 
 
 # <><><><><><><><><><><><><><><><><><><><><><><><>
-# Variables analysis Start from prepared data for 1 hour window ----
+# Variables organization: Start from prepared data for 1 hour window ----
 table(w.all$uniqueCrashreports) # only 3 segment have more than 1 crash, logistic regression is more appropriate for this data.
 # 0     1     2 
 # 59870  1364     3 
@@ -193,6 +199,7 @@ par(mfrow=c(3, 2))
 # by day hour
 plot(w.sub_seg$uniqueCrashreports, type = 'l', main = "By day hour", xlab = "time_hr", ylab = "Number of Crashes")
 
+
 # by day
 
 # by hour
@@ -208,8 +215,8 @@ plot(w.sub_seg_hr$uniqueCrashreports, type = 'l', main = "By hour", xlab = "Hour
 # by month
 
 
-
 dev.off()
+
 
 
 # <><><><><><><><><><><><><><><><><><><><><><><><>
@@ -261,6 +268,38 @@ summary(get(paste0('m', modelno)))
 
 # summary.aov(get(paste0('m', modelno)))
 
+# Model output visuals ----
+# m08 logistic regression using all variables
+w.all$m08_fit <- predict(m08, type = "response")
+
+out.put <- w.all[, c("RDSEG_ID", "segtime", "m08_fit", "uniqueCrashreports")]
+out.put <- out.put %>% group_by(RDSEG_ID) %>% summarize(m08_fit = sum(m08_fit),
+                                                        uniqueCrashreports = sum(uniqueCrashreports))
+
+roadnettb_snapped <- readOGR(dsn = file.path(data.loc, "Shapefiles"), layer = "RoadNetwork_Jurisdiction_withData") # 6647 * 14, new: 6647*38
+names(roadnettb_snapped)
+
+roadnettb_snapped@data <- roadnettb_snapped@data %>% left_join(out.put, by = c("RDSEG_ID")) # adding model output to the spatial data frame
+
+plot(roadnettb_snapped, col = roadnettb_snapped@data$m08_fit)
+
+# ggmaps----
+# Get a map for plotting, need to define zoom_box.ll first using the same projection.
+state = "WA"
+if(length(grep(paste0(state, "_Bellevue_Basemaps"), dir(file.path(output.loc)))) == 0){
+  map_terrain_14 <- get_stamenmap(bbox = as.vector(bbox(zoom_box.ll)), maptype = 'terrain', zoom = 14)
+  map_toner_hybrid_14 <- get_stamenmap(bbox = as.vector(bbox(zoom_box.ll)), maptype = 'toner-hybrid', zoom = 14)
+  map_toner_14 <- get_stamenmap(bbox = as.vector(bbox(zoom_box.ll)), maptype = 'toner', zoom = 14)
+  save(list = c("map_terrain_14", "map_toner_hybrid_14", "map_toner_14"),
+       file = file.path(output.loc, "WA", paste0(state, "_Bellevue_Basemaps.RData")))
+} else { load(file.path(output.loc, "WA", paste0(state, "_Bellevue_Basemaps.RData"))) }
+
+
+map <- qmap('Bellevue', zoom = 12, maptype = 'hybrid')
+
+ggmap(roadnettb_snapped) + geom_path(aes(x,y, color = m08_fit), size=2)
+  
+
 # 4/3/2019 Todos : 1. scale the numeric columns, and re-run logistic regressions. 2. Lasso; 3. logistic regression - present the coefficients using OR; 4. logistic regression with mixed effects; 5. double check the hour column; 6. aggregate data into multi-hour window; 7. Do a model with just the one hour of data. 8. incoporate day of week, month, hour of day as the temporal indicators; 9. XGBoost
 # x <- w.all %>% group_by(hour) %>% summarize(sumCrash = sum(uniqueCrashreports))
 # use as reference: https://medium.com/geoai/using-machine-learning-to-predict-car-accident-risk-4d92c91a7d57
@@ -269,7 +308,6 @@ summary(get(paste0('m', modelno)))
 # once we aggregate to a 4 hour window or a day, the counts might change, then we will need a zero-inflated NB model.
 
 # TODO: extract model diagnostics, save in a list..
-
 # create a summary table with diagnostics for all the linear model ----
 # Get the list of linear models
 ClassFilter <- function(x) inherits(get(x), 'lm' ) & !inherits(get(x), 'glm') # excluding other potential classes that contains "lm" as the keywords.
@@ -313,19 +351,4 @@ model_compare <- logistic_model_summary_list$model_compare
 
 timediff <- Sys.time() - starttime
 cat(round(timediff, 2), attr(timediff, "units"), "elapsed to model", modelno)
-
-# Model output visuals ----
-# m08 logistic regression using all variables
-w.all$m08_fit <- predict(m08, type = "response")
-
-out.put <- w.all[, c("RDSEG_ID", "segtime", "m08_fit", "uniqueCrashreports")]
-out.put <- out.put %>% group_by(RDSEG_ID) %>% summarize(m08_fit = sum(m08_fit),
-                                                        uniqueCrashreports = sum(uniqueCrashreports))
-
-roadnettb_snapped <- readOGR(dsn = file.path(data.loc, "Shapefiles"), layer = "RoadNetwork_Jurisdiction_withData") # 6647 * 14, new: 6647*38
-names(roadnettb_snapped)
-
-roadnettb_snapped@data <- roadnettb_snapped@data %>% left_join(out.put, by = c("RDSEG_ID")) # adding model output to the spatial data frame
-
-plot(roadnettb_snapped)
 
