@@ -22,6 +22,8 @@ library(dplyr)
 library(corrplot)
 library(Amelia)
 library(mlbench)
+library(xts)
+
 # mapping related packages
 library(maps) # for mapping base layers
 library(sp)
@@ -155,41 +157,46 @@ lapply(w.all[, all_var], function(x) all(x == 0)) # all variables are clean now.
 
 
 # Check time variables ----
-length(unique(w.all$day)) # 365
-length(unique(w.all$mo)) # 12
-length(unique(w.all$hour)) # 24
+stopifnot(length(unique(w.all$day)) == 365) # 365
+stopifnot(length(unique(w.all$mo)) == 12)   # 12
+stopifnot(length(unique(w.all$hour)) == 24) # 24
 
 day.hour <- data.frame("time_hr" = seq(from = as.POSIXct("2018-01-01 0:00", tz = 'America/Los_Angeles'), 
                   to = as.POSIXct("2018-12-31 0:00", tz = 'America/Los_Angeles'),
                   by = "hour")
                   )
 # day.hour <- as.character(day.hour)
+# Create time_hr in w.all
+w.all = w.all %>%
+  mutate(time_hr = as.POSIXct(segtime, '%Y-%j %H', tz = 'America/Los_Angeles'))
+
 w.sub <- w.all[, c("time_hr", "RDSEG_ID", "uniqueCrashreports", "uniqueWazeEvents", "nWazeAccident", "nWazeJam")]
 
-w.sub <- day.hour %>% left_join(w.sub, by = c("time_hr")) %>% mutate_if(is.numeric,coalesce,0) %>% mutate(
-  year = format(time_hr, "%Y"), day = format(time_hr, "%j"), hour = format(time_hr, "%H")
-)
+w.sub <- day.hour %>% left_join(w.sub, by = c("time_hr")) %>% 
+  mutate_if(is.numeric, coalesce, 0) %>% 
+  mutate(
+    year = format(time_hr, "%Y"),
+    day = format(time_hr, "%j"),
+    hour = format(time_hr, "%H")
+    )
 
 is.unsorted(w.sub$time_hr) # the data now is sorted by time.
 
-# Aggregate by RDSEG_ID
-w.sub_seg <- w.sub %>% group_by(time_hr, year, day, hour) %>% summarize(
-  uniqueCrashreports = sum(uniqueCrashreports),
-  uniqueWazeEvents = sum(uniqueWazeEvents),
-  nWazeAccident = sum(nWazeAccident),
-  nWazeJam =  sum(nWazeJam)
-  )
+# Aggregate by RDSEG_ID, year, day, and hour
+w.sub_seg <- w.sub %>% 
+  group_by(time_hr, year, day, hour) %>% 
+  summarize(
+    uniqueCrashreports = sum(uniqueCrashreports),
+    uniqueWazeEvents = sum(uniqueWazeEvents),
+    nWazeAccident = sum(nWazeAccident),
+    nWazeJam =  sum(nWazeJam)
+    )
 
 is.unsorted(w.sub_seg$time_hr) # still in the order
 
 # Convert to timeseries
-library(xts)
-w.sub_seg$time_hr <- as.POSIXct(paste(paste(w.sub_seg$year, w.sub_seg$day, sep = "-"), w.sub_seg$hour, sep=" "),
-                                "%Y-%j %H", 
-                                tz = 'America/Los_Angeles'
-                                )
 
-df2 <- xts(x = w.sub_seg[,-1], order.by = w.sub_seg[,1])
+df2 <- xts(x = w.sub_seg[!names(w.sub_seg) %in% 'time_hr'], order.by = w.sub_seg$time_hr)
 
 f <- paste0(data.loc,'/Model_visualizations/time_series.png')
 
@@ -276,6 +283,8 @@ out.put <- w.all[, c("RDSEG_ID", "segtime", "m08_fit", "uniqueCrashreports")]
 out.put <- out.put %>% group_by(RDSEG_ID) %>% summarize(m08_fit = sum(m08_fit),
                                                         uniqueCrashreports = sum(uniqueCrashreports))
 
+# Dan: I suggest we split out the visualization into separate scripts for simplicity, and have the analysis script end by saving a .RData of all the model outputs only.
+
 roadnettb_snapped <- readOGR(dsn = file.path(data.loc, "Shapefiles"), layer = "RoadNetwork_Jurisdiction_withData") # 6647 * 14, new: 6647*38
 names(roadnettb_snapped)
 
@@ -285,22 +294,37 @@ plot(roadnettb_snapped, col = roadnettb_snapped@data$m08_fit)
 # legend("bottomright") # To do add legend, right now no idea of the color.
 
 # ggmaps----
-# Get a map for plotting, need to define zoom_box.ll first using the same projection.
+# Get a map for plotting, need to define bounding box (bbox) defined in decimal degree lat long. This is what get_stamenmaps requires. Can also make a buffer around the road network to ensure we have a large enough area to cover the whole city. Here just using road network.
 state = "WA"
+
+model_out_road = spTransform(roadnettb_snapped, CRS =  CRS("+proj=longlat +datum=WGS84"))
+
+bbox.bell = bbox(model_out_road) # Can also use extend.range to get a larger bouding box
+
 if(length(grep(paste0(state, "_Bellevue_Basemaps"), dir(file.path(output.loc)))) == 0){
-  map_terrain_14 <- get_stamenmap(bbox = as.vector(bbox(zoom_box.ll)), maptype = 'terrain', zoom = 14)
-  map_toner_hybrid_14 <- get_stamenmap(bbox = as.vector(bbox(zoom_box.ll)), maptype = 'toner-hybrid', zoom = 14)
-  map_toner_14 <- get_stamenmap(bbox = as.vector(bbox(zoom_box.ll)), maptype = 'toner', zoom = 14)
+  map_terrain_14 <- get_stamenmap(bbox = as.vector(bbox.bell), maptype = 'terrain', zoom = 14)
+  map_toner_hybrid_14 <- get_stamenmap(bbox = as.vector(bbox.bell), maptype = 'toner-hybrid', zoom = 14)
+  map_toner_14 <- get_stamenmap(bbox = as.vector(bbox.bell), maptype = 'toner', zoom = 14)
   save(list = c("map_terrain_14", "map_toner_hybrid_14", "map_toner_14"),
-       file = file.path(output.loc, "WA", paste0(state, "_Bellevue_Basemaps.RData")))
-} else { load(file.path(output.loc, "WA", paste0(state, "_Bellevue_Basemaps.RData"))) }
+       file = file.path(output.loc, paste0(state, "_Bellevue_Basemaps.RData")))
+} else { load(file.path(output.loc, paste0(state, "_Bellevue_Basemaps.RData"))) }
 
 
-map <- qmap('Bellevue', zoom = 12, maptype = 'hybrid')
+# map <- qmap('Bellevue', zoom = 12, maptype = 'hybrid')
 
-ggmap(roadnettb_snapped) + geom_path(aes(x,y, color = m08_fit), size=2)
-  
+# To use geom_path, we need to extract the lat-long start and end for every segment.
+# this is probably not worth it, let's just export and plot in Tableau / ArcGIS
+# https://stackoverflow.com/questions/32413190/how-to-plot-spatiallinesdataframe-feature-map-over-google-maps
 
+NOTRUN = F
+
+if(NOTRUN){
+
+ggmap(map_toner_hybrid_14, extent = 'device') + 
+  geom_path(data = model_out_road,
+            aes(mapping = aes(x = long, y = lat, group = RDSEG_ID)), 
+            size=2)
+}
 # 4/3/2019 Todos : 1. scale the numeric columns, and re-run logistic regressions. 2. Lasso; 3. logistic regression - present the coefficients using OR; 4. logistic regression with mixed effects; 5. double check the hour column; 6. aggregate data into multi-hour window; 7. Do a model with just the one hour of data. 8. incoporate day of week, month, hour of day as the temporal indicators; 9. XGBoost
 # x <- w.all %>% group_by(hour) %>% summarize(sumCrash = sum(uniqueCrashreports))
 # use as reference: https://medium.com/geoai/using-machine-learning-to-predict-car-accident-risk-4d92c91a7d57
