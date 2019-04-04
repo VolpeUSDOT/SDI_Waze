@@ -35,6 +35,7 @@ done.months <- substr(unlist(lapply(strsplit(done_files, "_"), function(x) x[2])
 todo.months = sort(avail.months)[!avail.months %in% done.months]
 
 # Start aggregation by month ----
+# The files have already been created, need to update this with a if exist clause.
 
 cl <- makeCluster(parallel::detectCores()) # make a cluster of all available cores
 registerDoParallel(cl)
@@ -165,6 +166,9 @@ for(j in done.months){ # we need the done.months instead of todo.months
 }
 
 dim(w.all) # 61237*48
+
+# Convert time variable to time format, prepare for temporal analysis
+w.all$time_hr <- as.POSIXct(w.all$segtime, "%Y-%j %H", tz = 'America/Los_Angeles')
 
 # Weather ----
 # Load weather data -- Only need to assign to a Date

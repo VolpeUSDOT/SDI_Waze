@@ -31,7 +31,6 @@ output.loc <- file.path(data.loc, "Segments")
 setwd(data.loc)
 
 # Check if prepared data are available; if not, run Segment Aggregation.
-
 Waze_Prepared_Data = dir(output.loc)[grep("^Bellevue_Waze_Segments_", dir(output.loc))]
 
 if(length(grep(Waze_Prepared_Data, dir(output.loc))) == 0){
@@ -64,6 +63,8 @@ weather_var = c('PRCP', 'TMIN', 'TMAX', 'SNOW')
 
 other_var = c("nBikes", "nFARS")
 
+time_var = c("hour", "mo", "weekday", "day") # time variable can be used as indicator or to aggregate the temporal resolution.
+
 seg_var = c("Shape_STLe", "SpeedLimit", "ArterialCl"
             , "FunctionCl"
             ) # "ArterialCl" has no missing values. There are 6 rows with missing values in "FunctionCl", therefore if we use in the model, we will lose these rows.
@@ -73,9 +74,9 @@ indicator.var.list <- list("seg_var" = seg_var, "other_var" = other_var, "weathe
 
 # A list of Response variables
 response.var.list <- c(
-                  "uniqueCrashreports",
-                  "biCrash",
-                  "nCrashes"
+                  "uniqueCrashreports", # number of crashes at each segment at every hour of day
+                  "biCrash",            # presence and absence of crash at each segment at every hour of day
+                  "nCrashes"            # total crashes at each segment of entire year 2018
                   )
 # ncrash.1yr.excludeInt  # have not created yet, should be "nCrashes" - "Crash_End1" - "Crash_End2"
 # ncrash.4hr = NA # if we use 4 hour window, have not created this variable yet
@@ -90,7 +91,7 @@ corrplot(correlations, method="circle", type = "upper",
          # , main = "Correlation Plots"
 )
 
-# ggpairs to look at both scatter, boxplot, and density plots, as well as correlation, tried to save as pdf, too slow to open.
+# ggpairs to look at scatter, boxplot, and density plots, as well as correlation, tried to save as pdf, too slow to open.
 # alternative: use boxplots for categorical variables
 
 for (i in 1:length(indicator.var.list)) {
@@ -124,7 +125,7 @@ for (i in 1:length(indicator.var.list)) {
   
   f <- paste0(data.loc,'/Model_visualizations/missmap_', names(indicator.var.list)[i],".png")
   
-  # if the file exists, then don't regenerate as it takes a few minutes for each plots
+  # if the file exists, then don't regenerate as it takes a few minutes for each plot
   if (!file.exists(f)) {
     png(file = f,  
         width = ceiling(n/2)*2, # or use 12 for all of them 
@@ -144,6 +145,70 @@ for (i in 1:length(indicator.var.list)){
 }
 
 lapply(w.all[, all_var], function(x) all(x == 0)) # all variables are clean now. None of them are all-zero column.
+
+
+# Check time variables ----
+length(unique(w.all$day)) # 365
+length(unique(w.all$mo)) # 12
+length(unique(w.all$hour)) # 24
+
+day.hour <- data.frame("time_hr" = seq(from = as.POSIXct("2018-01-01 0:00", tz = 'America/Los_Angeles'), 
+                  to = as.POSIXct("2018-12-31 0:00", tz = 'America/Los_Angeles'),
+                  by = "hour")
+                  )
+# day.hour <- as.character(day.hour)
+w.sub <- w.all[, c("time_hr", "RDSEG_ID", "uniqueCrashreports", "uniqueWazeEvents", "nWazeAccident", "nWazeJam")]
+
+w.sub <- day.hour %>% left_join(w.sub, by = c("time_hr")) %>% mutate_if(is.numeric,coalesce,0) %>% mutate(
+  year = format(time_hr, "%Y"), day = format(time_hr, "%j"), hour = format(time_hr, "%H")
+)
+
+is.unsorted(w.sub$time_hr) # the data now is sorted by time.
+
+# Aggregate by RDSEG_ID
+w.sub_seg <- w.sub %>% group_by(time_hr, year, day, hour) %>% summarize(
+  uniqueCrashreports = sum(uniqueCrashreports),
+  uniqueWazeEvents = sum(uniqueWazeEvents),
+  nWazeAccident = sum(nWazeAccident),
+  nWazeJam =  sum(nWazeJam)
+  )
+
+is.unsorted(w.sub_seg$time_hr) # still in the order
+
+# Convert to timeseries
+library(xts)
+w.sub_seg$time_hr <- as.POSIXct(paste(paste(w.sub_seg$year, w.sub_seg$day, sep = "-"), w.sub_seg$hour, sep=" "),
+                                "%Y-%j %H", 
+                                tz = 'America/Los_Angeles'
+                                )
+
+df2 <- xts(x = w.sub_seg[,-1], order.by = w.sub_seg[,1])
+
+f <- paste0(data.loc,'/Model_visualizations/time_series.png')
+
+png(f, width = 6, height = 8, units = 'in', res = 300)
+par(mfrow=c(3, 2))
+
+# by day hour
+plot(w.sub_seg$uniqueCrashreports, type = 'l', main = "By day hour", xlab = "time_hr", ylab = "Number of Crashes")
+
+# by day
+
+# by hour
+w.sub_seg_hr <- w.sub_seg %>% group_by(time_hr, year, day, hour) %>% summarize(
+  uniqueCrashreports = sum(uniqueCrashreports),
+  uniqueWazeEvents = sum(uniqueWazeEvents),
+  nWazeAccident = sum(nWazeAccident),
+  nWazeJam =  sum(nWazeJam)
+)
+plot(w.sub_seg_hr$uniqueCrashreports, type = 'l', main = "By hour", xlab = "Hour", ylab = "Number of Crashes")
+
+
+# by month
+
+
+
+dev.off()
 
 
 # <><><><><><><><><><><><><><><><><><><><><><><><>
