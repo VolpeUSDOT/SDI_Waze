@@ -282,6 +282,7 @@ names(roadnettb_snapped)
 roadnettb_snapped@data <- roadnettb_snapped@data %>% left_join(out.put, by = c("RDSEG_ID")) # adding model output to the spatial data frame
 
 plot(roadnettb_snapped, col = roadnettb_snapped@data$m08_fit)
+# legend("bottomright") # To do add legend, right now no idea of the color.
 
 # ggmaps----
 # Get a map for plotting, need to define zoom_box.ll first using the same projection.
