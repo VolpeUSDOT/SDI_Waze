@@ -24,18 +24,12 @@ library(Amelia)
 library(mlbench)
 library(xts)
 
-# mapping related packages
-library(maps) # for mapping base layers
-library(sp)
-library(rgdal) # for readOGR(),writeOGR () needed for reading/writing in ArcM shapefiles
-library(rgeos) # gintersection
-library(ggmap)
-library(spatstat)
 
 ## Working on shared drive
 wazeshareddir <- "//vntscex.local/DFS/Projects/PROJ-OS62A1/SDI Waze Phase 2"
 data.loc <- file.path(wazeshareddir, "Data/Bellevue")
 output.loc <- file.path(data.loc, "Segments")
+visual.loc <- file.path(data.loc, "Model_visualizations")
 
 setwd(data.loc)
 
@@ -91,13 +85,13 @@ response.var.list <- c(
 # ncrash.4hr = NA # if we use 4 hour window, have not created this variable yet
 
 # Correlation & ggpairs ----
-correlations <- cor(w.all[, c(response.var.list, "Shape_STLe")])
-corrplot(correlations, method="circle", type = "upper", 
-         diag = F,
-         tl.col = "black"
-         # , tl.srt = 45
-         # , main = "Correlation Plots"
-)
+# correlations <- cor(w.all[, c(response.var.list, "Shape_STLe")])
+# corrplot(correlations, method="circle", type = "upper", 
+#          diag = F,
+#          tl.col = "black"
+#          # , tl.srt = 45
+#          # , main = "Correlation Plots"
+# )
 
 # ggpairs to look at scatter, boxplot, and density plots, as well as correlation, tried to save as pdf, too slow to open.
 # alternative: use boxplots for categorical variables
@@ -106,7 +100,7 @@ for (i in 1:length(indicator.var.list)) {
   
   n <- length(c(response.var.list, indicator.var.list[[i]]))
   
-  f <- paste0(data.loc,'/Model_visualizations/ggpairs_', names(indicator.var.list)[i],".png")
+  f <- paste0(visual_loc, '/ggpairs_', names(indicator.var.list)[i],".png")
   
   # if the file exists, then don't regenerate as it takes a few minutes for each plots
   if (!file.exists(f)) {
@@ -131,7 +125,7 @@ for (i in 1:length(indicator.var.list)) {
   
   n <- length(c(response.var.list, indicator.var.list[[i]]))
   
-  f <- paste0(data.loc,'/Model_visualizations/missmap_', names(indicator.var.list)[i],".png")
+  f <- paste0(visual_loc, '/missmap_', names(indicator.var.list)[i],".png")
   
   # if the file exists, then don't regenerate as it takes a few minutes for each plot
   if (!file.exists(f)) {
@@ -197,7 +191,7 @@ is.unsorted(w.sub_seg$time_hr) # still in the order
 
 df2 <- xts(x = w.sub_seg[!names(w.sub_seg) %in% 'time_hr'], order.by = w.sub_seg$time_hr)
 
-f <- paste0(data.loc,'/Model_visualizations/time_series.png')
+f <- paste0(visual_loc, '/time_series.png')
 
 png(f, width = 6, height = 8, units = 'in', res = 300)
 par(mfrow=c(3, 2))
@@ -237,22 +231,22 @@ dev.off()
 
 starttime = Sys.time()
 
-# Make a list of variables to omit from the predictors. To add variables, comment out the corresponding line.
+# Make a list of variables to include from the predictors. To add variables, comment out the corresponding line.
 # month (mo) and hour are categorical variables. 
 
 includes = c(
-              waze_rd_type,    # road types from Waze
-              waze_dir_travel, # direction of travel
-              alert_types,     # counts of waze events by alert types
-              alert_subtypes,  # counts of waze events by sub-alert types
-              weather_var,     # Weather variables
-              "nFARS",         # FARS variables
-              "nBikes",        # bike/ped conflict counts at segment level (no hour)
-              "hour",          # hour
+              # waze_rd_type,    # road types from Waze
+              # waze_dir_travel, # direction of travel
+              # alert_types,     # counts of waze events by alert types
+              # alert_subtypes,  # counts of waze events by sub-alert types
+              # weather_var,     # Weather variables
+              # "nFARS",         # FARS variables
+              # "nBikes",        # bike/ped conflict counts at segment level (no hour)
+              # "hour",          # hour
               seg_var
           )
 
-modelno = "08"
+modelno = "00"
 
 response.var <- response.var.list[2] # binary data, biCrash
 
@@ -269,63 +263,23 @@ assign(paste0('m', modelno),
        )
 
 # Summarize
-
 summary(get(paste0('m', modelno)))
 
-# summary.aov(get(paste0('m', modelno)))
+# extract logistic model objects, save in a list
+model_type = "logistic_models"
+out.name <- file.path(data.loc, 'Segments', paste0("Bell_",model_type,".Rdata"))
 
-# Model output visuals ----
-# m08 logistic regression using all variables
-w.all$m08_fit <- predict(m08, type = "response")
-
-out.put <- w.all[, c("RDSEG_ID", "segtime", "m08_fit", "uniqueCrashreports")]
-out.put <- out.put %>% group_by(RDSEG_ID) %>% summarize(m08_fit = sum(m08_fit),
-                                                        uniqueCrashreports = sum(uniqueCrashreports))
-
-# Dan: I suggest we split out the visualization into separate scripts for simplicity, and have the analysis script end by saving a .RData of all the model outputs only.
-# Jessie: good idea, this is just a temporary space for an quick examination of the visuals. if we think R could make some good visuals, we'll use a separate code to store these.
-
-roadnettb_snapped <- readOGR(dsn = file.path(data.loc, "Shapefiles"), layer = "RoadNetwork_Jurisdiction_withData") # 6647 * 14, new: 6647*38
-names(roadnettb_snapped)
-
-roadnettb_snapped@data <- roadnettb_snapped@data %>% left_join(out.put, by = c("RDSEG_ID")) # adding model output to the spatial data frame
-
-plot(roadnettb_snapped, col = roadnettb_snapped@data$m08_fit)
-# legend("bottomright") # To do add legend, right now no idea of the color.
-
-# ggmaps----
-# Get a map for plotting, need to define bounding box (bbox) defined in decimal degree lat long. This is what get_stamenmaps requires. Can also make a buffer around the road network to ensure we have a large enough area to cover the whole city. Here just using road network.
-state = "WA"
-
-model_out_road = spTransform(roadnettb_snapped, CRS =  CRS("+proj=longlat +datum=WGS84"))
-
-bbox.bell = bbox(model_out_road) # Can also use extend.range to get a larger bouding box
-
-if(length(grep(paste0(state, "_Bellevue_Basemaps"), dir(file.path(output.loc)))) == 0){
-  map_terrain_14 <- get_stamenmap(bbox = as.vector(bbox.bell), maptype = 'terrain', zoom = 14)
-  map_toner_hybrid_14 <- get_stamenmap(bbox = as.vector(bbox.bell), maptype = 'toner-hybrid', zoom = 14)
-  map_toner_14 <- get_stamenmap(bbox = as.vector(bbox.bell), maptype = 'toner', zoom = 14)
-  save(list = c("map_terrain_14", "map_toner_hybrid_14", "map_toner_14"),
-       file = file.path(output.loc, paste0(state, "_Bellevue_Basemaps.RData")))
-} else { load(file.path(output.loc, paste0(state, "_Bellevue_Basemaps.RData"))) }
+if(file.exists(out.name)){
+  load(out.name)} else {
+    
+    ClassFilter <- function(x) inherits(get(x), 'glm')
+    row.name <- Filter(ClassFilter, ls() )
+    logistic_models <- lapply(row.name, function(x) get(x))
+    save(list = c("logistic_models"), file = out.name)
+    
+  }
 
 
-# map <- qmap('Bellevue', zoom = 12, maptype = 'hybrid')
-
-# To use geom_path, we need to extract the lat-long start and end for every segment.
-# this is probably not worth it, let's just export and plot in Tableau / ArcGIS
-# Jessie: make sense. I'll export the layer for mapping in ArcGIS.
-# https://stackoverflow.com/questions/32413190/how-to-plot-spatiallinesdataframe-feature-map-over-google-maps
-
-NOTRUN = F
-
-if(NOTRUN){
-
-ggmap(map_toner_hybrid_14, extent = 'device') + 
-  geom_path(data = model_out_road,
-            aes(mapping = aes(x = long, y = lat, group = RDSEG_ID)), 
-            size=2)
-}
 # 4/3/2019 Todos : 1. scale the numeric columns, and re-run logistic regressions. 2. Lasso; 3. logistic regression - present the coefficients using OR; 4. logistic regression with mixed effects; 5. double check the hour column; 6. aggregate data into multi-hour window; 7. Do a model with just the one hour of data. 8. incoporate day of week, month, hour of day as the temporal indicators; 9. XGBoost
 # x <- w.all %>% group_by(hour) %>% summarize(sumCrash = sum(uniqueCrashreports))
 # use as reference: https://medium.com/geoai/using-machine-learning-to-predict-car-accident-risk-4d92c91a7d57
@@ -333,7 +287,7 @@ ggmap(map_toner_hybrid_14, extent = 'device') +
 
 # once we aggregate to a 4 hour window or a day, the counts might change, then we will need a zero-inflated NB model.
 
-# TODO: extract model diagnostics, save in a list..
+
 # create a summary table with diagnostics for all the linear model ----
 # Get the list of linear models
 ClassFilter <- function(x) inherits(get(x), 'lm' ) & !inherits(get(x), 'glm') # excluding other potential classes that contains "lm" as the keywords.
@@ -341,7 +295,6 @@ row.name <- Filter( ClassFilter, ls() )
 model_list <- lapply( row.name, function(x) get(x) )
 
 out.name <- file.path(output.loc, "Bell_linear_model_summary_list.Rdata")
-# out.name <- file.path(data.loc, 'Segments', "Bell_linear_model_summary_list.Rdata")
 
 if(file.exists(out.name)){
   load(out.name)} else {
