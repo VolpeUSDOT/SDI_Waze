@@ -37,7 +37,7 @@ if(length(grep(Waze_Prepared_Data, dir(seg.loc))) == 0){
 # Model fit value extraction ----
 # load models
 model_type = "logistic_models"
-out.name <- file.path(data.loc, 'Segments', paste0("Bell_",model_type,".Rdata"))
+out.name <- file.path(data.loc, 'Model_output', paste0("Bell_",model_type,".Rdata"))
 stopifnot(file.exists(out.name))
 
 if(file.exists(out.name)){load(out.name)}
