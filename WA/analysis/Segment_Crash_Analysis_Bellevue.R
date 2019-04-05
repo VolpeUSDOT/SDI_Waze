@@ -90,7 +90,6 @@ response.var.list <- c(
 # ncrash.1yr.excludeInt  # have not created yet, should be "nCrashes" - "Crash_End1" - "Crash_End2"
 # ncrash.4hr = NA # if we use 4 hour window, have not created this variable yet
 
-
 # Correlation & ggpairs ----
 correlations <- cor(w.all[, c(response.var.list, "Shape_STLe")])
 corrplot(correlations, method="circle", type = "upper", 
@@ -284,6 +283,7 @@ out.put <- out.put %>% group_by(RDSEG_ID) %>% summarize(m08_fit = sum(m08_fit),
                                                         uniqueCrashreports = sum(uniqueCrashreports))
 
 # Dan: I suggest we split out the visualization into separate scripts for simplicity, and have the analysis script end by saving a .RData of all the model outputs only.
+# Jessie: good idea, this is just a temporary space for an quick examination of the visuals. if we think R could make some good visuals, we'll use a separate code to store these.
 
 roadnettb_snapped <- readOGR(dsn = file.path(data.loc, "Shapefiles"), layer = "RoadNetwork_Jurisdiction_withData") # 6647 * 14, new: 6647*38
 names(roadnettb_snapped)
@@ -314,6 +314,7 @@ if(length(grep(paste0(state, "_Bellevue_Basemaps"), dir(file.path(output.loc))))
 
 # To use geom_path, we need to extract the lat-long start and end for every segment.
 # this is probably not worth it, let's just export and plot in Tableau / ArcGIS
+# Jessie: make sense. I'll export the layer for mapping in ArcGIS.
 # https://stackoverflow.com/questions/32413190/how-to-plot-spatiallinesdataframe-feature-map-over-google-maps
 
 NOTRUN = F
