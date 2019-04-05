@@ -28,18 +28,19 @@ library(xts)
 ## Working on shared drive
 wazeshareddir <- "//vntscex.local/DFS/Projects/PROJ-OS62A1/SDI Waze Phase 2"
 data.loc <- file.path(wazeshareddir, "Data/Bellevue")
-output.loc <- file.path(data.loc, "Segments")
+seg.loc <- file.path(data.loc, "Segments")
+output.loc <- file.path(data.loc, "Model_output")
 visual.loc <- file.path(data.loc, "Model_visualizations")
 
 setwd(data.loc)
 
 # Check if prepared data are available; if not, run Segment Aggregation.
-Waze_Prepared_Data = dir(output.loc)[grep("^Bellevue_Waze_Segments_", dir(output.loc))]
+Waze_Prepared_Data = dir(seg.loc)[grep("^Bellevue_Waze_Segments_", dir(seg.loc))]
 
-if(length(grep(Waze_Prepared_Data, dir(output.loc))) == 0){
-  stop(paste("No Bellevue segment data available in", output.loc, "\n Run Segment_Aggregation_Bell.R or check network connection"))
+if(length(grep(Waze_Prepared_Data, dir(seg.loc))) == 0){
+  stop(paste("No Bellevue segment data available in", seg.loc, "\n Run Segment_Aggregation_Bell.R or check network connection"))
 }  else {
-  load(file.path(output.loc, Waze_Prepared_Data))
+  load(file.path(seg.loc, Waze_Prepared_Data))
 }
 
 

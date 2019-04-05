@@ -19,10 +19,20 @@ library(spatstat)
 ## Working on shared drive
 wazeshareddir <- "//vntscex.local/DFS/Projects/PROJ-OS62A1/SDI Waze Phase 2"
 data.loc <- file.path(wazeshareddir, "Data/Bellevue")
-output.loc <- file.path(data.loc, "Segments")
+seg.loc <- file.path(data.loc, "Segments")
+output.loc <- file.path(data.loc, "Model_output")
 visual.loc <- file.path(data.loc, "Model_visualizations")
 
 setwd(data.loc)
+
+# Check if prepared data are available; if not, run Segment Aggregation.
+Waze_Prepared_Data = dir(seg.loc)[grep("^Bellevue_Waze_Segments_", dir(seg.loc))]
+
+if(length(grep(Waze_Prepared_Data, dir(seg.loc))) == 0){
+  stop(paste("No Bellevue segment data available in", seg.loc, "\n Run Segment_Aggregation_Bell.R or check network connection"))
+}  else {
+  load(file.path(seg.loc, Waze_Prepared_Data))
+}
 
 # Model fit value extraction ----
 # load models
@@ -33,24 +43,59 @@ stopifnot(file.exists(out.name))
 if(file.exists(out.name)){load(out.name)}
 
 # m08 logistic regression using all variables
-m08 <- logistic_models[[9]]
+models = c("00", "01", "02", "03", "04", "05", "06", "07", "08")
+w.all[, paste0('m', models, "fit")] <- NA
 
-w.all$m08_fit <- predict(m08, type = "response")
+for (i in 1:9){
+  
+  m <- assign(paste0('m', models[i]), logistic_models[[i]])
+  w.all[, paste0('m', models[i], "fit")] <- predict(m, type = "response")
+  
+}
 
-out.put <- w.all[, c("RDSEG_ID", "segtime", "m08_fit", "uniqueCrashreports")]
-out.put <- out.put %>% group_by(RDSEG_ID) %>% summarize(m08_fit = sum(m08_fit),
-                                                        uniqueCrashreports = sum(uniqueCrashreports))
+var_include <- c("RDSEG_ID", "hour", "uniqueCrashreports", paste0('m', models, "fit"))
+
+out.put <- w.all[, var_include] %>% 
+       group_by(RDSEG_ID, hour) %>% 
+  summarize(
+    m00fit = sum(m00fit),
+    m01fit = sum(m01fit),
+    m02fit = sum(m02fit),
+    m03fit = sum(m03fit),
+    m04fit = sum(m04fit),
+    m05fit = sum(m05fit),
+    m05fit = sum(m05fit),
+    m05fit = sum(m05fit),
+    m08fit = sum(m08fit),
+    ncrash = sum(uniqueCrashreports)
+    )
+
+out.put.wide <- reshape(as.data.frame(out.put), direction = "wide", idvar = "RDSEG_ID", timevar = "hour") 
+out.put.wide[is.na(out.put.wide)]=0
+
+# save the table with all logistic model output fit values.
+write.csv(out.put.wide, file.path(output.loc, "logistic_models_estimates.csv"), row.names = F)
+
+# load network shapefile
+roadnettb_snapped <- readOGR(dsn = file.path(data.loc, "Shapefiles"), layer = "RoadNetwork_Jurisdiction_withData") # 6647 * 14, new: 6647*38
+names(roadnettb_snapped)
+
+# append the model fit stats to the shapefile
+roadnettb_snapped@data <- roadnettb_snapped@data %>% left_join(out.put.wide, by = c("RDSEG_ID")) # adding model output to the spatial data frame
+
+# save the new shapefile
+writeOGR(obj=roadnettb_snapped, dsn = output.loc, layer="Bellevue_roadnet_snapped_logistic_models_fit_stats", driver="ESRI Shapefile") # this is in geographical projection
+
+
+# quick plot
+plot(roadnettb_snapped, col = roadnettb_snapped@data$m08fit.08)
+# legend("bottomright") # To do add legend, right now no idea of the color.
+
+
 
 # Dan: I suggest we split out the visualization into separate scripts for simplicity, and have the analysis script end by saving a .RData of all the model outputs only.
 # Jessie: good idea, this is just a temporary space for an quick examination of the visuals. if we think R could make some good visuals, we'll use a separate code to store these.
 
-roadnettb_snapped <- readOGR(dsn = file.path(data.loc, "Shapefiles"), layer = "RoadNetwork_Jurisdiction_withData") # 6647 * 14, new: 6647*38
-names(roadnettb_snapped)
-
-roadnettb_snapped@data <- roadnettb_snapped@data %>% left_join(out.put, by = c("RDSEG_ID")) # adding model output to the spatial data frame
-
-plot(roadnettb_snapped, col = roadnettb_snapped@data$m08_fit)
-# legend("bottomright") # To do add legend, right now no idea of the color.
 
 # ggmaps----
 # Get a map for plotting, need to define bounding box (bbox) defined in decimal degree lat long. This is what get_stamenmaps requires. Can also make a buffer around the road network to ensure we have a large enough area to cover the whole city. Here just using road network.
