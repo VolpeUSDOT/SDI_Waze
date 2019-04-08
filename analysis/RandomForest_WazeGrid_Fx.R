@@ -151,7 +151,7 @@ do.rf <- function(train.dat, omits, response.var = "MatchEDT_buffer_Acc", model.
 
   out.df <- data.frame(test.dat.use[, c("GRID_ID", "Year", "day", "hour", response.var)], rf.pred, rf.prob)
   out.df$day <- as.numeric(out.df$day)
-  names(out.df)[4:7] <- c("Obs", "Pred", "Prob.Noncrash", "Prob.Crash")
+  names(out.df)[5:8] <- c("Obs", "Pred", "Prob.Noncrash", "Prob.Crash")
   out.df = data.frame(out.df,
                       TN = out.df$Obs == 0 &  out.df$Pred == "NoCrash",
                       FP = out.df$Obs == 0 &  out.df$Pred == "Crash",
@@ -170,7 +170,7 @@ do.rf <- function(train.dat, omits, response.var = "MatchEDT_buffer_Acc", model.
 
     out.df <- data.frame(test.dat.use[, c("GRID_ID", "Year", "day", "hour", response.var)], rf.pred, rf.prob)
     out.df$day <- as.numeric(out.df$day)
-    names(out.df)[4:6] <- c("Obs", "Pred", "Prob.Crash")
+    names(out.df)[5:7] <- c("Obs", "Pred", "Prob.Crash")
     out.df = data.frame(out.df,
                         TN = out.df$Obs == 0 &  out.df$Pred == "NoCrash",
                         FP = out.df$Obs == 0 &  out.df$Pred == "Crash",

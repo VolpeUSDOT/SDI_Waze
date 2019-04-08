@@ -5,20 +5,23 @@
 
 # Setup ---- 
 rm(list=ls()) # Start fresh
+
+codeloc <- "~/SDI_Waze" 
+source(file.path(codeloc, 'utility/get_packages.R')) # installs necessary packages
+
 library(randomForest)
 library(foreach) # for parallel implementation
 library(doParallel) # includes iterators and parallel
 library(tidyverse)
 library(rgdal)
 
-codeloc <- "~/SDI_Waze" 
-source(file.path(codeloc, 'utility/get_packages.R')) # installs necessary packages
 
 # Set grid size:
 HEXSIZE = 1 #c("1", "4", "05")[1] # Change the value in the bracket to use 1, 4, or 0.5 sq mi hexagon grids
 
 # <><><><><>
-states = c('CT', 'MD', 'UT', 'VA') #'CT'  #'UT' # Sets the state. UT, VA, MD are all options.
+#states = c('CT', 'MD', 'UT', 'VA') #'CT'  #'UT' # Sets the state. UT, VA, MD are all options.
+states = 'VA'
 # <><><><><>
 
 # Manually setting months to run here; could also scan S3 for months available for this state
@@ -140,7 +143,7 @@ for(state in states){
   
   avail.cores = parallel::detectCores()
   
-  if(avail.cores > 8) avail.cores = 12 # Limit usage below max if on r4.4xlarge instance
+  if(avail.cores > 8) avail.cores = 10 # 12 # Limit usage below max if on r4.4xlarge instance
   
   # Use this to set number of decision trees to use, and key RF parameters. mtry is especially important, should consider tuning this with caret package
   # For now use same parameters for all models for comparision; tune parameters after models are selected
