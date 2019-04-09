@@ -1,5 +1,5 @@
 
-##### PURPOSE:  Get special events time and spacial distribution in TN ########
+##### PURPOSE:  Get special events time and spatial distribution in TN ########
 ###############################################################################
 
 

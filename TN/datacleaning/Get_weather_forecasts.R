@@ -11,6 +11,7 @@ library(httr) # for GET
 library(tidyverse)
 library(xml2) # for xml parsing in tidy way
 library(XML) # for xmlToList
+library(jsonlite)
 
 user <- file.path( "/home", system("whoami", intern = TRUE)) # the user directory 
 localdir <- file.path(user, "workingdata", "TN") # full path for readOGR
@@ -31,11 +32,53 @@ xmlnames <- wu[grep(".xml$", wu)]
 outnames <- xmlnames[nchar(xmlnames) < 15]
 innames <- xmlnames[nchar(xmlnames) > 15]
 
-for(i in 1:length(innames)){
-  cat('Fetching', outnames[i], "\n")
-  assign(outnames[i], GET(innames[i]))
+# Using DarkSky now
+DARKSKY = T
+if(DARKSKY) {
   
+  ds_key = scan(file.path(localdir, 'DarkSky_Key.txt'), what = 'character')
+  ds_ll_query = ll = vector()
+  
+  for(i in innames){
+    # extract just the lat long
+    i_ll = strsplit(i, '/') 
+    i_ll = i_ll[[1]][[length(i_ll[[1]])]]
+    i_ll = sub('.xml', '', i_ll)  
+    ds_ll_query = c(ds_ll_query,
+                    paste('https://api.darksky.net/forecast', ds_key,  i_ll, sep = '/'))
+    ll = c(ll, i_ll)
+  }
+  innames = ds_ll_query
+  
+  # Parse JSON
+  
+  dat <- vector()
+  
+  # Loop over the json queries from this forecast and put into a data frame
+  for(i in 1:length(innames)){
+    
+    ll_i = strsplit(ll[i], ",")[[1]]
+    
+    dat_i = fromJSON(innames[i])$hourly$data
+    
+    dat_i = data.frame(lat = ll_i[1], lon = ll_i[2], dat_i)
+    dat = rbind(dat, dat_i)
+    
+  }
+
+  # Get correct time zone from shapefile...
+  dat$time <- as.POSIXct(dat$time, origin = '1970-01-01', tz = 'America/Chicago')
+  dat$lat = as.numeric(dat$lat)
+  dat$lon = as.numeric(dat$lon)
+
+  save(list='dat',
+       file = file.path(localdir, "Weather", paste0("TN_Forecasts_", Sys.Date(), ".RData")))
+  
+    
 }
+
+
+
 
 # Save forecasts ----
 
@@ -54,56 +97,62 @@ system(paste("aws s3 cp",
        ))
 }
 
-# Parse XML ----
 
-# Parse to data frame, apply to spatial grid, overlay on crash data for use in models
-# Useful to look at elements of the XML file
-# dat <- xmlParse(get(xmls[1]))
-# dat
-# xmlToList(dat) 
 
-# Within simpleforecast, pick out forecastdays, then each forecastday
-# date: yday, hour
-# high: fahrenheit
-# low: fahrenheit
-# conditions
-# qpf_allday: in
-# snow_allday: in
-# maxwind: mph
-# avewind: mph
 
-dat <- vector()
 
-# Loop over the xml files from this forecast and put into a data frame
-for(i in 1:length(xmls)){
-  check <- xmlToList(xmlParse(get(xmls[i])))[1]
-  check <- grep("backend failure", check)
-  if(length(check) > 0) { cat("XML query", xmls[i], "failed, skipping \n")
-    
-    } else { 
-    
-      d1 <- read_xml(get(xmls[i]))
-    
-      ll <- unlist(strsplit(innames[i], "/")); ll <- ll[length(ll)]
-      ll <- unlist(strsplit(ll, ","))
+if(!DARKSKY){
+  # WUNDERGROUND ONLY 
+  # Parse XML ----
+  
+  # Parse to data frame, apply to spatial grid, overlay on crash data for use in models
+  # Useful to look at elements of the XML file
+  # dat <- xmlParse(get(xmls[1]))
+  # dat
+  # xmlToList(dat) 
+  
+  # Within simpleforecast, pick out forecastdays, then each forecastday
+  # date: yday, hour
+  # high: fahrenheit
+  # low: fahrenheit
+  # conditions
+  # qpf_allday: in
+  # snow_allday: in
+  # maxwind: mph
+  # avewind: mph
+  
+  dat <- vector()
+  
+  # Loop over the xml files from this forecast and put into a data frame
+  for(i in 1:length(xmls)){
+    check <- xmlToList(xmlParse(get(xmls[i])))[1]
+    check <- grep("backend failure", check)
+    if(length(check) > 0) { cat("XML query", xmls[i], "failed, skipping \n")
       
-      lat <- as.numeric(ll[1])
-      lon <- as.numeric(sub("\\.xml", "", ll[2])) 
-      yr <- d1 %>% xml_find_all("//date/year") %>% xml_text()
-      ydays <- d1 %>% xml_find_all("//date/yday") %>% xml_text()
-      th <- d1 %>% xml_find_all("//high/fahrenheit") %>% xml_double()
-      tl <- d1 %>% xml_find_all("//low/fahrenheit") %>% xml_double()
-      cond <- d1 %>% xml_find_all("//conditions") %>% xml_text()
-      qpf <- d1 %>% xml_find_all("//qpf_allday/in") %>% xml_double() # accumulated precip
-      snow <- d1 %>% xml_find_all("//snow_allday/in") %>% xml_double()
-      maxwind <- d1 %>% xml_find_all("//maxwind/mph") %>% xml_double()
-      avewind <- d1 %>% xml_find_all("//avewind/mph") %>% xml_double()
+      } else { 
       
-      dat <- rbind(dat, data.frame(lat, lon, yr, ydays, th, tl, cond, qpf, snow, maxwind, avewind))
-    }
-}
+        d1 <- read_xml(get(xmls[i]))
+      
+        ll <- unlist(strsplit(innames[i], "/")); ll <- ll[length(ll)]
+        ll <- unlist(strsplit(ll, ","))
+        
+        lat <- as.numeric(ll[1])
+        lon <- as.numeric(sub("\\.xml", "", ll[2])) 
+        yr <- d1 %>% xml_find_all("//date/year") %>% xml_text()
+        ydays <- d1 %>% xml_find_all("//date/yday") %>% xml_text()
+        th <- d1 %>% xml_find_all("//high/fahrenheit") %>% xml_double()
+        tl <- d1 %>% xml_find_all("//low/fahrenheit") %>% xml_double()
+        cond <- d1 %>% xml_find_all("//conditions") %>% xml_text()
+        qpf <- d1 %>% xml_find_all("//qpf_allday/in") %>% xml_double() # accumulated precip
+        snow <- d1 %>% xml_find_all("//snow_allday/in") %>% xml_double()
+        maxwind <- d1 %>% xml_find_all("//maxwind/mph") %>% xml_double()
+        avewind <- d1 %>% xml_find_all("//avewind/mph") %>% xml_double()
+        
+        dat <- rbind(dat, data.frame(lat, lon, yr, ydays, th, tl, cond, qpf, snow, maxwind, avewind))
+      }
+  }
 
 # Next steps: interpolate to state level using kriging or other methods, see 
 # http://rspatial.org/analsis/rst/4-interpolation.html
-
+} # end Weather Underground
 

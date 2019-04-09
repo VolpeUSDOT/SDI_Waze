@@ -333,7 +333,7 @@ for(i in wx.ls){
 
 # Tennessee data ----
 
-tn.ls = c('TN.zip', 'Weather/TN_Weather_GHCN.zip', 
+tn.ls = c('TN.zip', 'Weather/TN_Weather_GHCN.zip', 'DarkSky_Key.txt',
           'Shapefiles/TN_Roadway_Shapefiles.zip', 'SpecialEvents/TN_SpecialEvent_2018.RData', 
           'Shapefiles/timezones.shapefile.zip', "SpecialEvents/TN_SpecialEvent_2017.RData",
           'Crash/TITAN_Crash_181108.zip', 'Crash/TN_Crash_Simple_2008-2018.RData')
@@ -496,6 +496,11 @@ if(MOVEFROMUPLOAD){
   system(paste("aws s3 ls", 
                file.path(teambucket, system('whoami', intern = T), "uploaded_files/")
   ))
+  
+  system(paste("aws s3 mv", 
+               file.path(teambucket, system('whoami', intern = T), "uploaded_files", "DarkSky_Key.txt"),
+               file.path(teambucket, "TN", "DarkSky_Key.txt"))
+  )
   
   system(paste("aws s3 mv", 
                file.path(teambucket, system('whoami', intern = T), "uploaded_files", "CTMDUTVA_FullYear_2018.zip"),
