@@ -23,6 +23,7 @@ library(corrplot)
 library(Amelia)
 library(mlbench)
 library(xts)
+library(lubridate)
 
 
 ## Working on shared drive
@@ -155,28 +156,32 @@ stopifnot(length(unique(w.all$day)) == 365) # 365
 stopifnot(length(unique(w.all$mo)) == 12)   # 12
 stopifnot(length(unique(w.all$hour)) == 24) # 24
 
+# create a data frame with only one variable, including all hours in 2018
 day.hour <- data.frame("time_hr" = seq(from = as.POSIXct("2018-01-01 0:00", tz = 'America/Los_Angeles'), 
                   to = as.POSIXct("2018-12-31 0:00", tz = 'America/Los_Angeles'),
                   by = "hour")
                   )
 # day.hour <- as.character(day.hour)
+
 # Create time_hr in w.all
 w.all = w.all %>%
   mutate(time_hr = as.POSIXct(segtime, '%Y-%j %H', tz = 'America/Los_Angeles'))
 
+# select a few variables as example
 w.sub <- w.all[, c("time_hr", "RDSEG_ID", "uniqueCrashreports", "uniqueWazeEvents", "nWazeAccident", "nWazeJam")]
 
+# join day.hour with w.sub on time_hr, NA fields converted to zeros.
 w.sub <- day.hour %>% left_join(w.sub, by = c("time_hr")) %>% 
   mutate_if(is.numeric, coalesce, 0) %>% 
   mutate(
     year = format(time_hr, "%Y"),
     day = format(time_hr, "%j"),
-    hour = format(time_hr, "%H")
-    )
+    hour = format(time_hr, "%H"))
 
-is.unsorted(w.sub$time_hr) # the data now is sorted by time.
+# check if the data is sorted by time, to prepare creation of a time series
+stopifnot(!is.unsorted(w.sub$time_hr)) # the data now is sorted by time.
 
-# Aggregate by RDSEG_ID, year, day, and hour
+# Aggregate by time_hr, year, day, and hour
 w.sub_seg <- w.sub %>% 
   group_by(time_hr, year, day, hour) %>% 
   summarize(
@@ -185,40 +190,58 @@ w.sub_seg <- w.sub %>%
     nWazeAccident = sum(nWazeAccident),
     nWazeJam =  sum(nWazeJam)
     )
+w.sub_seg <- as.data.frame(w.sub_seg)
+w.sub_seg <- w.sub_seg %>% mutate(time_hr = as.POSIXct(time_hr, '%Y-%j %H', tz = 'America/Los_Angeles'),
+                                  date = as.Date(time_hr, format = '%Y-%j %H'),
+                                  month = as.Date(cut(date, breaks = "month")),
+                                  week = as.Date(cut(date, breaks = "week")))
 
-is.unsorted(w.sub_seg$time_hr) # still in the order
+# check if the data is sorted by time
+stopifnot(!is.unsorted(w.sub_seg$time_hr)) # still in the order
 
-# Convert to timeseries
+## ggplot of time series
+f <- paste0(visual.loc, '/time_series.png')
 
-df2 <- xts(x = w.sub_seg[!names(w.sub_seg) %in% 'time_hr'], order.by = w.sub_seg$time_hr)
+# use minimal format
+theme_set(theme_minimal())
 
-f <- paste0(visual_loc, '/time_series.png')
-
-png(f, width = 6, height = 8, units = 'in', res = 300)
-par(mfrow=c(3, 2))
+png(f, width = 12, height = 12, units = 'in', res = 300)
 
 # by day hour
-plot(w.sub_seg$uniqueCrashreports, type = 'l', main = "By day hour", xlab = "time_hr", ylab = "Number of Crashes")
-
+p1 <- ggplot(data = w.sub_seg, aes(x = time_hr, y = uniqueCrashreports)) +
+  geom_line(color = "darkorchid4", size = 1) + geom_point() +
+  ylab("Number of Crashes")
 
 # by day
-
-# by hour
-w.sub_seg_hr <- w.sub_seg %>% group_by(time_hr, year, day, hour) %>% summarize(
-  uniqueCrashreports = sum(uniqueCrashreports),
-  uniqueWazeEvents = sum(uniqueWazeEvents),
-  nWazeAccident = sum(nWazeAccident),
-  nWazeJam =  sum(nWazeJam)
-)
-plot(w.sub_seg_hr$uniqueCrashreports, type = 'l', main = "By hour", xlab = "Hour", ylab = "Number of Crashes")
-
+p2 <- ggplot(data = ts_group_by(w.sub_seg, date), aes(x = date, y = sum)) +
+  geom_line(color = "darkorchid4", size = 1) + geom_point() +
+  ylab("Number of Crashes")
 
 # by month
+p3 <- ggplot(data = ts_group_by(w.sub_seg, month), aes(x = month, y = sum)) +
+  geom_line(color = "darkorchid4", size = 1) + geom_point() +
+  ylab("Number of Crashes") +
+  scale_x_date(date_breaks = "1 month", date_labels = "%b")
 
+# by week
+p4 <- ggplot(data = ts_group_by(w.sub_seg, week), aes(x = week, y = sum)) +
+  geom_line(color = "darkorchid4", size = 1) + geom_point() +
+  ylab("Number of Crashes") +
+  scale_x_date(date_breaks = "1 week", date_labels = "%W")
+
+# by hour
+p5 <- ggplot(data = ts_group_by(w.sub_seg,  hour), aes(x = hour, y = sum)) +
+  geom_path(color = "darkorchid4", size = 1, group = 1) + geom_point() +
+  ylab("Number of Crashes")
+
+# by month hour
+p6 <- ggplot(data = ts_group_by(w.sub_seg, month, hour), aes(x = paste0(month(month),"-",hour), y = sum)) +
+  geom_path(color = "darkorchid4", size = 1, group = 1) + geom_point() +
+  ylab("Number of Crashes")
+
+multiplot(p1, p2, p3, p4, p5, p6, col = 1)
 
 dev.off()
-
-
 
 # <><><><><><><><><><><><><><><><><><><><><><><><>
 # Start Modelings ----
