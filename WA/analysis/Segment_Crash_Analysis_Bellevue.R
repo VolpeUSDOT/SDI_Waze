@@ -194,7 +194,12 @@ w.sub_seg <- as.data.frame(w.sub_seg)
 w.sub_seg <- w.sub_seg %>% mutate(time_hr = as.POSIXct(time_hr, '%Y-%j %H', tz = 'America/Los_Angeles'),
                                   date = as.Date(time_hr, format = '%Y-%j %H'),
                                   month = as.Date(cut(date, breaks = "month")),
-                                  week = as.Date(cut(date, breaks = "week")))
+                                  # week = as.Date(cut(date, breaks = "week")),
+                                  weekday = as.factor(weekdays(date))
+)
+
+# # Convert to timeseries
+# df2 <- xts(x = w.sub_seg[!names(w.sub_seg) %in% 'time_hr'], order.by = w.sub_seg$time_hr)
 
 # check if the data is sorted by time
 stopifnot(!is.unsorted(w.sub_seg$time_hr)) # still in the order
@@ -213,29 +218,33 @@ p1 <- ggplot(data = w.sub_seg, aes(x = time_hr, y = uniqueCrashreports)) +
   ylab("Number of Crashes")
 
 # by day
-p2 <- ggplot(data = ts_group_by(w.sub_seg, date), aes(x = date, y = sum)) +
+p2 <- ggplot(data = ts_group_by(w.sub_seg, date), aes(x = date, y = uniqueCrashreports)) +
   geom_line(color = "darkorchid4", size = 1) + geom_point() +
   ylab("Number of Crashes")
 
 # by month
-p3 <- ggplot(data = ts_group_by(w.sub_seg, month), aes(x = month, y = sum)) +
+p3 <- ggplot(data = ts_group_by(w.sub_seg, month), aes(x = month, y = uniqueCrashreports)) +
   geom_line(color = "darkorchid4", size = 1) + geom_point() +
   ylab("Number of Crashes") +
   scale_x_date(date_breaks = "1 month", date_labels = "%b")
 
 # by week
-p4 <- ggplot(data = ts_group_by(w.sub_seg, week), aes(x = week, y = sum)) +
+# p4 <- ggplot(data = ts_group_by(w.sub_seg, week), aes(x = week, y = uniqueCrashreports)) +
+#   geom_line(color = "darkorchid4", size = 1) + geom_point() +
+#   ylab("Number of Crashes") +
+#   scale_x_date(date_breaks = "1 week", date_labels = "%W")
+# by weekday
+p4 <- ggplot(data = ts_group_by(weekday), aes(x = weekday, y = uniqueCrashreports)) +
   geom_line(color = "darkorchid4", size = 1) + geom_point() +
-  ylab("Number of Crashes") +
-  scale_x_date(date_breaks = "1 week", date_labels = "%W")
+  ylab("Number of Crashes")
 
 # by hour
-p5 <- ggplot(data = ts_group_by(w.sub_seg,  hour), aes(x = hour, y = sum)) +
+p5 <- ggplot(data = ts_group_by(w.sub_seg,  hour), aes(x = hour, y = uniqueCrashreports)) +
   geom_path(color = "darkorchid4", size = 1, group = 1) + geom_point() +
   ylab("Number of Crashes")
 
 # by month hour
-p6 <- ggplot(data = ts_group_by(w.sub_seg, month, hour), aes(x = paste0(month(month),"-",hour), y = sum)) +
+p6 <- ggplot(data = ts_group_by(w.sub_seg, month, hour), aes(x = paste0(month(month),"-",hour), y = uniqueCrashreports)) +
   geom_path(color = "darkorchid4", size = 1, group = 1) + geom_point() +
   ylab("Number of Crashes")
 
