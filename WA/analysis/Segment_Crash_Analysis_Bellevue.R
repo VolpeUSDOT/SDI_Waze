@@ -14,6 +14,8 @@ codeloc <- ifelse(grepl('Flynn', normalizePath('~/')), # grep() does not produce
                   "~/git/SDI_Waze", "~/GitHub/SDI_Waze") # Jessie's codeloc is ~/GitHub/SDI_Waze
 
 source(file.path(codeloc, 'utility/get_packages.R'))
+# load functions with group_by
+source(file.path(codeloc, 'WA/utility/visual_fun.R'))
 
 library(tidyverse)
 library(ggplot2)
@@ -198,6 +200,9 @@ w.sub_seg <- w.sub_seg %>% mutate(time_hr = as.POSIXct(time_hr, '%Y-%j %H', tz =
                                   weekday = as.factor(weekdays(date))
 )
 
+# order the levels of weekday
+w.sub_seg$weekday = factor(w.sub_seg$weekday, levels(w.sub_seg$weekday)[c(4,2,6,7,5,1,3)])
+
 # # Convert to timeseries
 # df2 <- xts(x = w.sub_seg[!names(w.sub_seg) %in% 'time_hr'], order.by = w.sub_seg$time_hr)
 
@@ -210,7 +215,7 @@ f <- paste0(visual.loc, '/time_series.png')
 # use minimal format
 theme_set(theme_minimal())
 
-png(f, width = 12, height = 12, units = 'in', res = 300)
+png(f, width = 12, height = 8, units = 'in', res = 300)
 
 # by day hour
 p1 <- ggplot(data = w.sub_seg, aes(x = time_hr, y = uniqueCrashreports)) +
@@ -234,19 +239,19 @@ p3 <- ggplot(data = ts_group_by(w.sub_seg, month), aes(x = month, y = uniqueCras
 #   ylab("Number of Crashes") +
 #   scale_x_date(date_breaks = "1 week", date_labels = "%W")
 # by weekday
-p4 <- ggplot(data = ts_group_by(weekday), aes(x = weekday, y = uniqueCrashreports)) +
-  geom_line(color = "darkorchid4", size = 1) + geom_point() +
+p4 <- ggplot(data = ts_group_by(w.sub_seg, weekday), aes(x = weekday, y = uniqueCrashreports)) +
+  geom_line(color = "darkorchid4", size = 1, group = 1) + geom_point() +
   ylab("Number of Crashes")
 
 # by hour
 p5 <- ggplot(data = ts_group_by(w.sub_seg,  hour), aes(x = hour, y = uniqueCrashreports)) +
-  geom_path(color = "darkorchid4", size = 1, group = 1) + geom_point() +
+  geom_line(color = "darkorchid4", size = 1, group = 1) + geom_point() +
   ylab("Number of Crashes")
 
 # by month hour
 p6 <- ggplot(data = ts_group_by(w.sub_seg, month, hour), aes(x = paste0(month(month),"-",hour), y = uniqueCrashreports)) +
-  geom_path(color = "darkorchid4", size = 1, group = 1) + geom_point() +
-  ylab("Number of Crashes")
+  geom_line(color = "darkorchid4", size = 1, group = 1) + geom_point() +
+  ylab("Number of Crashes") +xlab("Month-hour")
 
 multiplot(p1, p2, p3, p4, p5, p6, col = 1)
 
