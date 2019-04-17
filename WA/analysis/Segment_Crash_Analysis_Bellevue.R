@@ -88,6 +88,23 @@ response.var.list <- c(
 # ncrash.1yr.excludeInt  # have not created yet, should be "nCrashes" - "Crash_End1" - "Crash_End2"
 # ncrash.4hr = NA # if we use 4 hour window, have not created this variable yet
 
+# Aggregate the data to 4 hour window ----
+# Bellevue travel demand model used 6-9 and 3-6pm, our aggregation should include these two periods, so we can do a crash risk at these two peak period of a day.
+# Two ways to aggregate the hour window
+w.all$hour_window1 <- ifelse(w.all$hour %in% c("00", "01", "02","03","04","05"), "Early AM", 
+                            ifelse(w.all$hour %in% c("06", "07", "08","09"), "AM Peak", 
+                                   ifelse(w.all$hour %in% c("10", "11", "12","13", "14"), "Mid-day",
+                                          ifelse(w.all$hour %in% c("15", "16", "17", "18"), "PM Peak",
+                                                 ifelse(w.all$hour %in% c("19", "20", "21", "22", "23"), "Evening", NA)))))
+
+
+w.all$hour_window2 <- ifelse(w.all$hour %in% c("03","04","05", "06"), "Early AM", 
+                            ifelse(w.all$hour %in% c("07", "08", "09","10"), "AM Peak", 
+                                   ifelse(w.all$hour %in% c( "11", "12","13", "14"), "Mid-day",
+                                          ifelse(w.all$hour %in% c("15", "16", "17", "18"), "PM Peak",
+                                                 ifelse(w.all$hour %in% c("19", "20", "21", "22"), "Evening",
+                                                        ifelse(w.all$hour %in% c("23", "00", "01", "02"), "Mid-night", NA))))))
+
 # Correlation & ggpairs ----
 # correlations <- cor(w.all[, c(response.var.list, "Shape_STLe")])
 # corrplot(correlations, method="circle", type = "upper", 
@@ -215,7 +232,7 @@ f <- paste0(visual.loc, '/time_series.png')
 # use minimal format
 theme_set(theme_minimal())
 
-png(f, width = 12, height = 8, units = 'in', res = 300)
+png(f, width = 12, height = 10, units = 'in', res = 300)
 
 # by day hour
 p1 <- ggplot(data = w.sub_seg, aes(x = time_hr, y = uniqueCrashreports)) +
@@ -248,14 +265,22 @@ p5 <- ggplot(data = ts_group_by(w.sub_seg,  hour), aes(x = hour, y = uniqueCrash
   geom_line(color = "darkorchid4", size = 1, group = 1) + geom_point() +
   ylab("Number of Crashes")
 
-# by month hour
+# by weekday hour
 p6 <- ggplot(data = ts_group_by(w.sub_seg, month, hour), aes(x = paste0(month(month),"-",hour), y = uniqueCrashreports)) +
   geom_line(color = "darkorchid4", size = 1, group = 1) + geom_point() +
-  ylab("Number of Crashes") +xlab("Month-hour")
+  ylab("Number of Crashes") +xlab("weekday-hour")
 
-multiplot(p1, p2, p3, p4, p5, p6, col = 1)
+# by month hour
+p7 <- ggplot(data = ts_group_by(w.sub_seg, month, hour), aes(x = paste0(month(month),"-",hour), y = uniqueCrashreports)) +
+  geom_line(color = "darkorchid4", size = 1, group = 1) + geom_point() +
+  ylab("Number of Crashes") +xlab("month-hour")
+
+multiplot(p1, p2, p3, p4, p5, p6, p7)
 
 dev.off()
+
+
+##
 
 # <><><><><><><><><><><><><><><><><><><><><><><><>
 # Start Modelings ----
