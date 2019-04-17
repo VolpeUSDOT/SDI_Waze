@@ -89,21 +89,29 @@ response.var.list <- c(
 # ncrash.4hr = NA # if we use 4 hour window, have not created this variable yet
 
 # Aggregate the data to 4 hour window ----
-# Bellevue travel demand model used 6-9 and 3-6pm, our aggregation should include these two periods, so we can do a crash risk at these two peak period of a day.
+# Bellevue travel demand model used 6-9 and 3-6 pm, our aggregation should include these two periods, so we can do a crash risk model at these two peak periods of a day.
 # Two ways to aggregate the hour window
-w.all$hour_window1 <- ifelse(w.all$hour %in% c("00", "01", "02","03","04","05"), "Early AM", 
+w.all$grp_varhour <- ifelse(w.all$hour %in% c("00", "01", "02","03","04","05"), "Early AM", 
                             ifelse(w.all$hour %in% c("06", "07", "08","09"), "AM Peak", 
                                    ifelse(w.all$hour %in% c("10", "11", "12","13", "14"), "Mid-day",
                                           ifelse(w.all$hour %in% c("15", "16", "17", "18"), "PM Peak",
                                                  ifelse(w.all$hour %in% c("19", "20", "21", "22", "23"), "Evening", NA)))))
 
-
-w.all$hour_window2 <- ifelse(w.all$hour %in% c("03","04","05", "06"), "Early AM", 
+# four hour window
+w.all$grp_4hr <- ifelse(w.all$hour %in% c("03","04","05", "06"), "Early AM", 
                             ifelse(w.all$hour %in% c("07", "08", "09","10"), "AM Peak", 
                                    ifelse(w.all$hour %in% c( "11", "12","13", "14"), "Mid-day",
                                           ifelse(w.all$hour %in% c("15", "16", "17", "18"), "PM Peak",
                                                  ifelse(w.all$hour %in% c("19", "20", "21", "22"), "Evening",
                                                         ifelse(w.all$hour %in% c("23", "00", "01", "02"), "Mid-night", NA))))))
+
+# all crash and Waze variables need to be aggregated by hour
+aggr_var <- 
+
+# weather need to match day and segments
+  
+# all other variables need to match segments
+
 
 # Correlation & ggpairs ----
 # correlations <- cor(w.all[, c(response.var.list, "Shape_STLe")])
@@ -266,14 +274,16 @@ p5 <- ggplot(data = ts_group_by(w.sub_seg,  hour), aes(x = hour, y = uniqueCrash
   ylab("Number of Crashes")
 
 # by weekday hour
-p6 <- ggplot(data = ts_group_by(w.sub_seg, month, hour), aes(x = paste0(month(month),"-",hour), y = uniqueCrashreports)) +
+p6 <- ggplot(data = ts_group_by(w.sub_seg, weekday, hour), aes(x = paste0(as.numeric(weekday),"-",hour), y = uniqueCrashreports)) +
   geom_line(color = "darkorchid4", size = 1, group = 1) + geom_point() +
-  ylab("Number of Crashes") +xlab("weekday-hour")
+  theme(axis.text.x = element_text(size=7, vjust = 0.2, angle=90)) +
+  ylab("Number of Crashes") + xlab("weekday-hour")
 
 # by month hour
-p7 <- ggplot(data = ts_group_by(w.sub_seg, month, hour), aes(x = paste0(month(month),"-",hour), y = uniqueCrashreports)) +
+p7 <- ggplot(data = ts_group_by(w.sub_seg, month, hour), aes(x = paste0(month,hour), y = uniqueCrashreports)) +
   geom_line(color = "darkorchid4", size = 1, group = 1) + geom_point() +
-  ylab("Number of Crashes") +xlab("month-hour")
+  theme(axis.text.x = element_text(size=7, vjust = 0.2, angle=90)) +
+  ylab("Number of Crashes") + xlab("month-hour")
 
 multiplot(p1, p2, p3, p4, p5, p6, p7)
 

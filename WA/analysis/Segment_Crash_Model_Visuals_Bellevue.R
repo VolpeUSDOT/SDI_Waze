@@ -55,7 +55,7 @@ for (i in 1:9){
 
 var_include <- c("RDSEG_ID", "hour", "uniqueCrashreports", paste0('m', models, "fit"))
 
-out.put <- w.all[, var_include] %>% 
+out.put.1hr <- w.all[, var_include] %>% 
        group_by(RDSEG_ID, hour) %>% 
   summarize(
     m00fit = sum(m00fit),
@@ -70,11 +70,32 @@ out.put <- w.all[, var_include] %>%
     ncrash = sum(uniqueCrashreports)
     )
 
-out.put.wide <- reshape(as.data.frame(out.put), direction = "wide", idvar = "RDSEG_ID", timevar = "hour") 
-out.put.wide[is.na(out.put.wide)]=0
+var_include <- c("RDSEG_ID", "grp_4hr", "uniqueCrashreports", paste0('m', models, "fit"))
 
+out.put.4hr <- w.all[, var_include] %>% 
+  group_by(RDSEG_ID, grp_4hr) %>% 
+  summarize(
+    m00fit = sum(m00fit),
+    m01fit = sum(m01fit),
+    m02fit = sum(m02fit),
+    m03fit = sum(m03fit),
+    m04fit = sum(m04fit),
+    m05fit = sum(m05fit),
+    m05fit = sum(m05fit),
+    m05fit = sum(m05fit),
+    m08fit = sum(m08fit),
+    ncrash = sum(uniqueCrashreports)
+  )
+
+out.put.1hr.wide <- reshape(as.data.frame(out.put.1hr), direction = "wide", idvar = "RDSEG_ID", timevar = "hour") 
+out.put.1hr.wide[is.na(out.put.1hr.wide)]=0
+
+out.put.4hr.wide <- reshape(as.data.frame(out.put.4hr), direction = "wide", idvar = "RDSEG_ID", timevar = "hour") 
+out.put.4hr.wide[is.na(out.put.4hr.wide)]=0
+
+out.put.wide <- out.put.1hr.wide %>% 
 # save the table with all logistic model output fit values.
-write.csv(out.put.wide, file.path(output.loc, "logistic_models_estimates.csv"), row.names = F)
+write.csv(out.put.1hr.wide, file.path(output.loc, "logistic_models_estimates.csv"), row.names = F)
 
 # load network shapefile
 roadnettb_snapped <- readOGR(dsn = file.path(data.loc, "Shapefiles"), layer = "RoadNetwork_Jurisdiction_withData") # 6647 * 14, new: 6647*38
