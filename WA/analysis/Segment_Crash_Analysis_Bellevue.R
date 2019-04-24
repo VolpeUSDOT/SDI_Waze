@@ -93,27 +93,56 @@ response.var.list <- c(
 # Bellevue travel demand model used 6-9 and 3-6 pm, our aggregation should include these two periods, so we can do a crash risk model at these two peak periods of a day.
 # Two ways to aggregate the hour window
 w.all$grp_varhour <- ifelse(w.all$hour %in% c("00", "01", "02","03","04","05"), "Early AM", 
-                            ifelse(w.all$hour %in% c("06", "07", "08","09"), "AM Peak", 
-                                   ifelse(w.all$hour %in% c("10", "11", "12","13", "14"), "Mid-day",
+                            ifelse(w.all$hour %in% c("06", "07", "08", "09"), "AM Peak", 
+                                   ifelse(w.all$hour %in% c("10", "11", "12", "13", "14"), "Mid-day",
                                           ifelse(w.all$hour %in% c("15", "16", "17", "18"), "PM Peak",
                                                  ifelse(w.all$hour %in% c("19", "20", "21", "22", "23"), "Evening", NA)))))
 
 # four hour window
 w.all$grp_4hr <- ifelse(w.all$hour %in% c("03","04","05", "06"), "Early AM", 
-                            ifelse(w.all$hour %in% c("07", "08", "09","10"), "AM Peak", 
+                            ifelse(w.all$hour %in% c("07", "08", "09", "10"), "AM Peak", 
                                    ifelse(w.all$hour %in% c( "11", "12","13", "14"), "Mid-day",
                                           ifelse(w.all$hour %in% c("15", "16", "17", "18"), "PM Peak",
                                                  ifelse(w.all$hour %in% c("19", "20", "21", "22"), "Evening",
                                                         ifelse(w.all$hour %in% c("23", "00", "01", "02"), "Mid-night", NA))))))
 
-# all crash and Waze variables need to be aggregated by hour
+# all crash and Waze variables need to be aggregated by hour and segment
 # load the aggregation function
-aggr_var <- 
+source(file.path(codeloc, 'WA/utility/aggregation_fun().R'))
+w.all.4hr <- group_by_Waze_Crash(w.all, RDSEG_ID, year, day, grp_4hr)
 
 # weather need to match day and segments
-  
-# all other variables need to match segments
+wx.grd.day <- group_by_4hr_weather(w.all, RDSEG_ID, year, day)
+w.all.4hr <-left_join(w.all.4hr, wx.grd.day, by = c('RDSEG_ID', 'year', 'day'))
 
+# all other variables need to match segments
+seg_only_var <- names(w.all)[c(1, 54:91)]
+seg.only.data <- unique(w.all[, seg_only_var])
+
+w.all.4hr <- left_join(w.all.4hr, seg.only.data, by = 'RDSEG_ID')
+
+# some other variables
+w.all.4hr$HOUR <- ifelse(w.all.4hr$grp_4hr == "Early AM", 04,
+                         ifelse(w.all.4hr$grp_4hr == "AM Peak", 08,
+                                ifelse(w.all.4hr$grp_4hr == "Mid-day", 12,
+                                       ifelse(w.all.4hr$grp_4hr == "PM Peak", 16,
+                                              ifelse(w.all.4hr$grp_4hr == "Evening", 20,
+                                                     ifelse(w.all.4hr$grp_4hr == "Mid-night", 02, NA))))))
+w.all.4hr$segtime <- paste(paste(w.all.4hr$year, w.all.4hr$day, sep = "-"), w.all.4hr$grp_4hr, sep=" ")
+w.all.4hr$time_hr <- as.POSIXct(w.all.4hr$segtime, '%Y-%j %H', tz = 'America/Los_Angeles')
+w.all.4hr$biCrash <- ifelse(w.all.4hr$uniqueCrashreports > 0, 1, 0)
+
+# see the sparsity of the crash reports, does not improve a lot
+table(w.all.4hr$uniqueCrashreports)
+# 0     1     2 
+# 50239  1358     6 
+
+# Save the 4 hour data as Rdata
+fn = paste("Bellevue_Waze_Segments_2018-01_to_2018-12_4hr.RData", sep="")
+
+save(list="w.all.4hr", file = file.path(seg.loc, fn))
+
+# <><><><><><><><><><><><><><><><><><><><><><><><> Four-hour window completed
 
 # Correlation & ggpairs ----
 # correlations <- cor(w.all[, c(response.var.list, "Shape_STLe")])

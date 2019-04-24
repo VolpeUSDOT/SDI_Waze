@@ -1,8 +1,12 @@
-# Functions to group data by four hour window
+# Functions to group data by hour window (e.g., 4 hours)
+# Waze and Bellevue crash we need to aggregate by both hour window and segment
+# Weather we need to aggregate by day and segment
+# Other variables we need to aggregate by segments
 
-group_by_4hr <- function(table, ... ) {
-  table %>% group_by_(.dots = lazyeval::lazy_dots(...)) %>% 
+group_by_Waze_Crash <- function(table, ... ) {
+  table %>% group_by(.dots = lazyeval::lazy_dots(...)) %>% 
     summarise(
+# Waze columns
       uniqueWazeEvents = sum(uniqueWazeEvents), # number of unique Waze events.
 
       nWazeAccident = sum(nWazeAccident),
@@ -45,7 +49,26 @@ group_by_4hr <- function(table, ... ) {
       nMagVar30to60 = sum(nMagVar30to60),
       nMagVar90to180 = sum(nMagVar90to180),
       nMagVar180to240 = sum(nMagVar180to240),
-      nMagVar240to360 = sum(nMagVar240to360)
+      nMagVar240to360 = sum(nMagVar240to360),
   
+# Crash columns
+      uniqueCrashreports = sum(uniqueCrashreports),
+      
+      nCrashInjuryFatal = sum(nCrashInjuryFatal),
+      nCrashInjury = sum(nCrashInjury),
+      nCrashPDO = sum(nCrashPDO),
+      nCrashWorkzone = sum(nCrashWorkzone)
+    )
+}
+
+# Weather, only by day and segments
+group_by_weather <- function(table, ... ) {
+  table %>% group_by_(.dots = lazyeval::lazy_dots(...)) %>% 
+    summarise(
+      PRCP = mean(PRCP),
+      TMIN = mean(TMIN),                        
+      TMAX = mean(TMAX),
+      SNOW = mean(SNOW),
+      mo = unique(mo)
     )
 }
