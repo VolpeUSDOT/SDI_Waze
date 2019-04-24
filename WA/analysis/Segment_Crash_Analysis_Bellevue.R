@@ -88,7 +88,8 @@ response.var.list <- c(
 # ncrash.1yr.excludeInt  # have not created yet, should be "nCrashes" - "Crash_End1" - "Crash_End2"
 # ncrash.4hr = NA # if we use 4 hour window, have not created this variable yet
 
-# Aggregate the data to 4 hour window ----
+# <><><><><><><><><><><><><><><><><><><><><><><><>
+# Variables organization: Start from prepared data for 4 hour window ----
 # Bellevue travel demand model used 6-9 and 3-6 pm, our aggregation should include these two periods, so we can do a crash risk model at these two peak periods of a day.
 # Two ways to aggregate the hour window
 w.all$grp_varhour <- ifelse(w.all$hour %in% c("00", "01", "02","03","04","05"), "Early AM", 
@@ -106,6 +107,7 @@ w.all$grp_4hr <- ifelse(w.all$hour %in% c("03","04","05", "06"), "Early AM",
                                                         ifelse(w.all$hour %in% c("23", "00", "01", "02"), "Mid-night", NA))))))
 
 # all crash and Waze variables need to be aggregated by hour
+# load the aggregation function
 aggr_var <- 
 
 # weather need to match day and segments
