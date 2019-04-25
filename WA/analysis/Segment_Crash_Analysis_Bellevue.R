@@ -38,7 +38,7 @@ visual.loc <- file.path(data.loc, "Model_visualizations")
 setwd(data.loc)
 
 # Check if prepared data are available; if not, run Segment Aggregation.
-Waze_Prepared_Data = dir(seg.loc)[grep("^Bellevue_Waze_Segments_", dir(seg.loc))]
+Waze_Prepared_Data = dir(seg.loc)[grep("^Bellevue_Waze_Segments_", dir(seg.loc))][1] #"Bellevue_Waze_Segments_2018-01_to_2018-12.RData"
 
 if(length(grep(Waze_Prepared_Data, dir(seg.loc))) == 0){
   stop(paste("No Bellevue segment data available in", seg.loc, "\n Run Segment_Aggregation_Bell.R or check network connection"))
@@ -99,40 +99,39 @@ w.all$grp_varhour <- ifelse(w.all$hour %in% c("00", "01", "02","03","04","05"), 
                                                  ifelse(w.all$hour %in% c("19", "20", "21", "22", "23"), "Evening", NA)))))
 
 # four hour window
-w.all$grp_4hr <- ifelse(w.all$hour %in% c("03","04","05", "06"), "Early AM", 
+w.all$grp_name <- ifelse(w.all$hour %in% c("03","04","05", "06"), "Early AM", 
                             ifelse(w.all$hour %in% c("07", "08", "09", "10"), "AM Peak", 
                                    ifelse(w.all$hour %in% c( "11", "12","13", "14"), "Mid-day",
                                           ifelse(w.all$hour %in% c("15", "16", "17", "18"), "PM Peak",
                                                  ifelse(w.all$hour %in% c("19", "20", "21", "22"), "Evening",
                                                         ifelse(w.all$hour %in% c("23", "00", "01", "02"), "Mid-night", NA))))))
 
+w.all <- w.all %>% mutate(time_hr = as.POSIXct(segtime, '%Y-%j %H', tz = 'America/Los_Angeles'),
+                     date = as.Date(time_hr, format = '%Y-%j %H'),
+                     month = as.Date(cut(date, breaks = "month")),
+                     wkday = as.factor(weekdays(date))
+)
+
 # all crash and Waze variables need to be aggregated by hour and segment
 # load the aggregation function
 source(file.path(codeloc, 'WA/utility/aggregation_fun().R'))
-w.all.4hr <- group_by_Waze_Crash(w.all, RDSEG_ID, year, day, grp_4hr)
 
-# weather need to match day and segments
-wx.grd.day <- group_by_4hr_weather(w.all, RDSEG_ID, year, day)
-w.all.4hr <-left_join(w.all.4hr, wx.grd.day, by = c('RDSEG_ID', 'year', 'day'))
+t_var = "day"
+w.all.4hr <- agg_fun(w.all, t_var)
+names(w.all.4hr)
+dim(w.all.4hr)
 
-# all other variables need to match segments
-seg_only_var <- names(w.all)[c(1, 54:91)]
-seg.only.data <- unique(w.all[, seg_only_var])
+t_var = "wkday"
+w.all.4hr.wd <- agg_fun(w.all, t_var)
+names(w.all.4hr.wd)
+dim(w.all.4hr.wd)
 
-w.all.4hr <- left_join(w.all.4hr, seg.only.data, by = 'RDSEG_ID')
+t_var = c("month")
+w.all.4hr.mo <- agg_fun(w.all, t_var)
+names(w.all.4hr.mo)
+dim(w.all.4hr.mo)
 
-# some other variables
-w.all.4hr$HOUR <- ifelse(w.all.4hr$grp_4hr == "Early AM", 04,
-                         ifelse(w.all.4hr$grp_4hr == "AM Peak", 08,
-                                ifelse(w.all.4hr$grp_4hr == "Mid-day", 12,
-                                       ifelse(w.all.4hr$grp_4hr == "PM Peak", 16,
-                                              ifelse(w.all.4hr$grp_4hr == "Evening", 20,
-                                                     ifelse(w.all.4hr$grp_4hr == "Mid-night", 02, NA))))))
-w.all.4hr$segtime <- paste(paste(w.all.4hr$year, w.all.4hr$day, sep = "-"), w.all.4hr$grp_4hr, sep=" ")
-w.all.4hr$time_hr <- as.POSIXct(w.all.4hr$segtime, '%Y-%j %H', tz = 'America/Los_Angeles')
-w.all.4hr$biCrash <- ifelse(w.all.4hr$uniqueCrashreports > 0, 1, 0)
-
-# see the sparsity of the crash reports, does not improve a lot
+# examine the sparsity of the crash reports, does not improve a lot
 table(w.all.4hr$uniqueCrashreports)
 # 0     1     2 
 # 50239  1358     6 
@@ -140,8 +139,7 @@ table(w.all.4hr$uniqueCrashreports)
 # Save the 4 hour data as Rdata
 fn = paste("Bellevue_Waze_Segments_2018-01_to_2018-12_4hr.RData", sep="")
 
-save(list="w.all.4hr", file = file.path(seg.loc, fn))
-
+save(list= c("w.all.4hr","w.all.4hr.wd","w.all.4hr.mo"), file = file.path(seg.loc, fn))
 # <><><><><><><><><><><><><><><><><><><><><><><><> Four-hour window completed
 
 # Correlation & ggpairs ----

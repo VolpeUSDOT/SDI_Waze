@@ -4,7 +4,7 @@
 # Other variables we need to aggregate by segments
 
 group_by_Waze_Crash <- function(table, ... ) {
-  table %>% group_by(.dots = lazyeval::lazy_dots(...)) %>% 
+  table %>% group_by(.dots = ...) %>% 
     summarise(
 # Waze columns
       uniqueWazeEvents = sum(uniqueWazeEvents), # number of unique Waze events.
@@ -62,13 +62,58 @@ group_by_Waze_Crash <- function(table, ... ) {
 }
 
 # Weather, only by day and segments
-group_by_weather <- function(table, ... ) {
-  table %>% group_by_(.dots = lazyeval::lazy_dots(...)) %>% 
+group_by_Weather <- function(table, ... ) {
+  table %>% group_by_(.dots = ...) %>% 
     summarise(
       PRCP = mean(PRCP),
       TMIN = mean(TMIN),                        
       TMAX = mean(TMAX),
-      SNOW = mean(SNOW),
-      mo = unique(mo)
+      SNOW = mean(SNOW)
     )
+}
+
+# function to aggregate when specifying the dataset, segment, and time variable
+agg_fun <- function(w.all, t_var) {
+  
+  # Waze and crash need to match hour and segments
+  grp_cols = c("RDSEG_ID", "year", t_var, "grp_name")
+  dots = lapply(grp_cols, as.symbol)
+  w.all.4hr <- group_by_Waze_Crash(w.all, .dots = dots)
+  
+  # weather need to match day and segments
+  grp_cols = c("RDSEG_ID", "year", t_var)
+  dots = lapply(grp_cols, as.symbol)
+  wx.grd.day <- group_by_Weather(w.all, .dots = dots)
+  w.all.4hr <-left_join(w.all.4hr, wx.grd.day, by = c('RDSEG_ID', 'year', t_var))
+  
+  # all other variables need to match segments
+  seg_only_var <- names(w.all)[c(1, 54:91)]
+  seg.only.data <- unique(w.all[, seg_only_var])
+  
+  w.all.4hr <- left_join(w.all.4hr, seg.only.data, by = 'RDSEG_ID')
+  class(w.all.4hr) <- "data.frame" # POSIX date/time not supported for grouped tbl
+  
+  # some other variables
+  w.all.4hr$grp_hr <- ifelse(w.all.4hr$grp_name == "Early AM", 04,
+                             ifelse(w.all.4hr$grp_name == "AM Peak", 08,
+                                    ifelse(w.all.4hr$grp_name == "Mid-day", 12,
+                                           ifelse(w.all.4hr$grp_name == "PM Peak", 16,
+                                                  ifelse(w.all.4hr$grp_name == "Evening", 20,
+                                                         ifelse(w.all.4hr$grp_name == "Mid-night", 00, NA))))))
+  
+  w.all.4hr$biCrash <- ifelse(w.all.4hr$uniqueCrashreports > 0, 1, 0)
+  
+  w.all.4hr
+  
+  stopifnot(t_var == 'day')
+  
+  w.all.4hr <- w.all.4hr %>% mutate(biCrash = ifelse(uniqueCrashreports > 0, 1, 0),
+                                    segtime = paste(paste(year, day, sep = "-"), grp_hr, sep=" "),
+                                    time_hr = as.POSIXct(segtime, '%Y-%j %H', tz = 'America/Los_Angeles'),
+                                    date = as.Date(time_hr, format = '%Y-%j %H'),
+                                    month = as.Date(cut(date, breaks = "month")),
+                                    weekday = as.factor(weekdays(date))
+  )
+  
+  w.all.4hr
 }
