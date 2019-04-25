@@ -146,12 +146,21 @@ table(w.all.4hr.wd$uniqueCrashreports)
 table(w.all.4hr.mo$uniqueCrashreports)
 # 0     1     2     3 
 # 16300  1248    52     6 
+table(w.all.4hr.mo.wd$uniqueCrashreports)
+# 0     1     2     3 
+# 35025  1339    14     1 
 
 # examine for arterials only
 with(w.all.4hr %>% filter(!ArterialCl %in% "Local"), table(uniqueCrashreports))
 with(w.all.4hr.wd %>% filter(!ArterialCl %in% "Local"), table(uniqueCrashreports))
 with(w.all.4hr.mo %>% filter(!ArterialCl %in% "Local"), table(uniqueCrashreports))
+with(w.all.4hr.mo.wd %>% filter(!ArterialCl %in% "Local"), table(uniqueCrashreports))
 
+# Are these high counts segments the same or clustered? (need to see in the map)
+unique(w.all.4hr.mo.wd$RDSEG_ID[w.all.4hr.mo.wd$uniqueCrashreports %in% c(2,3)])
+# [1] "1"    "1368" "1737" "2034" "2062" "3079" "325"  "4494" "4515" "4516" "5120" "5122" "9290" "9538" "9865"
+# in ArcGIS, use this SQL code to select these segments: "RDSEG_ID" IN (1,   1368, 1737, 2034, 2062, 3079, 325,  4494, 4515, 4516, 5120, 5122, 9290, 9538,
+#                9865)
 
 # Save the 4 hour data as Rdata
 fn = paste("Bellevue_Waze_Segments_2018-01_to_2018-12_4hr.RData", sep="")
