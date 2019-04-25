@@ -112,6 +112,10 @@ w.all <- w.all %>% mutate(time_hr = as.POSIXct(segtime, '%Y-%j %H', tz = 'Americ
                      wkday = as.factor(weekdays(date))
 )
 
+# Eliminate two incidents which occurred on 2019-01-01
+w.all <- w.all %>% 
+  filter(date >= '2018-01-01' & date <= '2018-12-31')
+
 # all crash and Waze variables need to be aggregated by hour and segment
 # load the aggregation function
 source(file.path(codeloc, 'WA/utility/aggregation_fun().R'))
@@ -146,17 +150,20 @@ table(w.all.4hr.wd$uniqueCrashreports)
 table(w.all.4hr.mo$uniqueCrashreports)
 # 0     1     2     3 
 # 16300  1248    52     6 
+table(w.all.4hr.mo.wd$uniqueCrashreports)
 
 # examine for arterials only
 with(w.all.4hr %>% filter(!ArterialCl %in% "Local"), table(uniqueCrashreports))
 with(w.all.4hr.wd %>% filter(!ArterialCl %in% "Local"), table(uniqueCrashreports))
 with(w.all.4hr.mo %>% filter(!ArterialCl %in% "Local"), table(uniqueCrashreports))
+with(w.all.4hr.mo.wd %>% filter(!ArterialCl %in% "Local"), table(uniqueCrashreports))
 
 
 # Save the 4 hour data as Rdata
-fn = paste("Bellevue_Waze_Segments_2018-01_to_2018-12_4hr.RData", sep="")
+fn = "Bellevue_Waze_Segments_2018-01_to_2018-12_4hr.RData"
 
 save(list= c("w.all.4hr","w.all.4hr.wd","w.all.4hr.mo", "w.all.4hr.mo.wd"), file = file.path(seg.loc, fn))
+
 # <><><><><><><><><><><><><><><><><><><><><><><><> Four-hour window completed
 
 # Correlation & ggpairs ----
@@ -221,8 +228,7 @@ for (i in 1:length(indicator.var.list)){
   all_var <- c(all_var, indicator.var.list[[i]])
 }
 
-lapply(w.all[, all_var], function(x) all(x == 0)) # all variables are clean now. None of them are all-zero column.
-
+any(sapply(w.all[, all_var], function(x) all(x == 0))) # all variables are clean now. None of them are all-zero column. Returns FALSE if no columns have all zeros
 
 # Check time variables ----
 stopifnot(length(unique(w.all$day)) == 365) # 365

@@ -65,10 +65,10 @@ group_by_Waze_Crash <- function(table, ... ) {
 group_by_Weather <- function(table, ... ) {
   table %>% group_by_(.dots = ...) %>% 
     summarise(
-      PRCP = mean(PRCP),
-      TMIN = mean(TMIN),                        
-      TMAX = mean(TMAX),
-      SNOW = mean(SNOW)
+      PRCP = mean(PRCP, na.rm = T), # Should not be any NA, just to be safe adding na.rm = T
+      TMIN = mean(TMIN, na.rm = T),                        
+      TMAX = mean(TMAX, na.rm = T),
+      SNOW = mean(SNOW, na.rm = T)
     )
 }
 
