@@ -103,17 +103,15 @@ agg_fun <- function(w.all, t_var) {
   
   w.all.4hr$biCrash <- ifelse(w.all.4hr$uniqueCrashreports > 0, 1, 0)
   
-  w.all.4hr
-  
-  stopifnot(t_var == 'day')
-  
-  w.all.4hr <- w.all.4hr %>% mutate(biCrash = ifelse(uniqueCrashreports > 0, 1, 0),
-                                    segtime = paste(paste(year, day, sep = "-"), grp_hr, sep=" "),
-                                    time_hr = as.POSIXct(segtime, '%Y-%j %H', tz = 'America/Los_Angeles'),
-                                    date = as.Date(time_hr, format = '%Y-%j %H'),
-                                    month = as.Date(cut(date, breaks = "month")),
-                                    weekday = as.factor(weekdays(date))
-  )
-  
+  if (t_var == 'day') {
+       w.all.4hr <- w.all.4hr %>% mutate(segtime = paste(paste(year, day, sep = "-"), grp_hr, sep=" "),
+                                          time_hr = as.POSIXct(segtime, '%Y-%j %H', tz = 'America/Los_Angeles'),
+                                          date = as.Date(time_hr, format = '%Y-%j %H'),
+                                          month = as.Date(cut(date, breaks = "month")),
+                                          weekday = as.factor(weekdays(date))
+    )
+     
+  }
+
   w.all.4hr
 }

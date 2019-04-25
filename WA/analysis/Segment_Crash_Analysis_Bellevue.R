@@ -135,6 +135,18 @@ dim(w.all.4hr.mo)
 table(w.all.4hr$uniqueCrashreports)
 # 0     1     2 
 # 50239  1358     6 
+table(w.all.4hr.wd$uniqueCrashreports)
+# 0     1     2     3     4 
+# 11609  1146    82    16     3 
+table(w.all.4hr.mo$uniqueCrashreports)
+# 0     1     2     3 
+# 16300  1248    52     6 
+
+# examine for arterials only
+with(w.all.4hr %>% filter(!ArterialCl %in% "Local"), table(uniqueCrashreports))
+with(w.all.4hr.wd %>% filter(!ArterialCl %in% "Local"), table(uniqueCrashreports))
+with(w.all.4hr.mo %>% filter(!ArterialCl %in% "Local"), table(uniqueCrashreports))
+
 
 # Save the 4 hour data as Rdata
 fn = paste("Bellevue_Waze_Segments_2018-01_to_2018-12_4hr.RData", sep="")
