@@ -131,6 +131,11 @@ w.all.4hr.mo <- agg_fun(w.all, t_var)
 names(w.all.4hr.mo)
 dim(w.all.4hr.mo)
 
+t_var = c("month", "wkday")
+w.all.4hr.mo.wd <- agg_fun(w.all, t_var)
+names(w.all.4hr.mo.wd)
+dim(w.all.4hr.mo.wd)
+
 # examine the sparsity of the crash reports, does not improve a lot
 table(w.all.4hr$uniqueCrashreports)
 # 0     1     2 
@@ -151,7 +156,7 @@ with(w.all.4hr.mo %>% filter(!ArterialCl %in% "Local"), table(uniqueCrashreports
 # Save the 4 hour data as Rdata
 fn = paste("Bellevue_Waze_Segments_2018-01_to_2018-12_4hr.RData", sep="")
 
-save(list= c("w.all.4hr","w.all.4hr.wd","w.all.4hr.mo"), file = file.path(seg.loc, fn))
+save(list= c("w.all.4hr","w.all.4hr.wd","w.all.4hr.mo", "w.all.4hr.mo.wd"), file = file.path(seg.loc, fn))
 # <><><><><><><><><><><><><><><><><><><><><><><><> Four-hour window completed
 
 # Correlation & ggpairs ----
