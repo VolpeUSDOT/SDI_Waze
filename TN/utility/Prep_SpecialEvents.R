@@ -5,14 +5,13 @@
 
 # Run from RandomForest_WazeGrid_TN.R
 # already in memory are localdir and g, which repreresents the grid type to use
+# Run after TN_Data_Format.R for initial formatting of crash and special event data
 
 # append.hex2(hexname = w, data.to.add = "TN_SpecialEvent", state = state, na.action = na.action)
 library(rgeos)
 library(rgdal)
 library(doParallel)
 library(foreach)
-
-
 
 
 # # If not running from RandomForest_Wazegrid_TN.R, set it up manually by running following code.

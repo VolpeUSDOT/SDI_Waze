@@ -3,7 +3,10 @@
 # - Time variables for today to next 10 days, for each Grid ID
 # - Special events values prepped by Grid ID 
 # - Weather forecast for by Grid ID
-# - Waze input variables for model 05 (all TN crashes, Base Waze inputs)
+# - Waze input variables for model 05 (all TN crashes, Base Waze inputs): 
+# - Join with all other predictors which are not time-varying, namely urban area, TotalHistCrash, TotalFatalCrash.
+
+# Goal should be to source one script of each type fo input to prep, then join them all into a `next_week` data table. Then run predict(rf_05, next_week) to generate predictions for each grid cell, each hour of next week.
 
 # Setup ---- 
 rm(list=ls()) # Start fresh
@@ -47,7 +50,7 @@ state = "TN"
 
 outputdir <- file.path(localdir, "Random_Forest_Output")
 
-# Load data used for fitting - -prepared also in RandomForest_wazeGrids_TN.R
+# Load data used for fitting - prepared also in RandomForest_wazeGrids_TN.R
 
 Waze_Prepared_Data = dir(localdir)[grep(paste0('^', state, '_\\d{4}-\\d{2}_to_\\d{4}-\\d{2}_', g, '.RData'), dir(localdir))]
 
@@ -56,17 +59,10 @@ load(file.path(localdir, Waze_Prepared_Data))
 # Get special events for next week ----
 
 # Start with last week of 2018; need to get 2019. This is created by Prep_SpecialEvents.R
-load(file.path(localdir, 'TN', 'SpecialEvents', paste0('Prepared_TN_SpecialEvent_', g, '.RData')))
-
-
-special_add = spev.grid.time %>% 
-  mutate(hour = format(spev.grid.time$GridDayHour, '%H')) %>%
-  group_by(GRID_ID, Year, day, hour) %>%
-  summarize(SpecialEvents_sum = n())
+load(file.path(localdir, 'SpecialEvents', paste0('Prepared_TN_SpecialEvent_', g, '.RData')))
 
 # Get weather for next week ----
 
-# Need to update from WUnderground API, no longer free -- trying Dark Sky now.
-source(file.path(codeloc, 'TN', 'datacleaning', 'Get_weather_forecasts.R')
-)
+source(file.path(codeloc, 'TN', 'datacleaning', 'Get_weather_forecasts.R'))
+
 # Generate Waze events for next week ----

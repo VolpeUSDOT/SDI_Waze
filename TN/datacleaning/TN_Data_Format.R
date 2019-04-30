@@ -11,8 +11,7 @@ library(tidyverse) # tidyverse install on SDC may require additional steps, see 
 library(lubridate)
 library(geonames) # for time zone work
 library(httr)
-library(geonames)
-library(readxl) # read excel file
+library(readxl) # read excel filed
 library(foreach)
 library(doParallel)
 
@@ -66,7 +65,7 @@ setwd(localdir)
 
 yearmonths = c(
   paste(2017, formatC(4:12, width = 2, flag = "0"), sep="-"),
-  paste(2018, formatC(1:11, width = 2, flag = "0"), sep="-"))
+  paste(2018, formatC(1:12, width = 2, flag = "0"), sep="-"))
 
 tn.ls = paste0("TN_", yearmonths, ".RData")
 
@@ -98,11 +97,12 @@ names(crash)
 dim(crash) # 829,301 rows * 80 columns. 181108 version only 773,411 rows.
 
 # Crash ID, it is unique? Yes.
-length(unique(crash$MstrRecNbrTxt)) # 829,301, looks like this is a unique crash ID
+length(unique(crash$MstrRecNbrTxt)) # this is a unique crash ID
 
 table(crash$NbrUnitsNmb) # this column could include more than the number of vehicles
-# 0      1      2      3      4      5      6      7      8      9     10     11     12     13     14     15     17     18     22     26     98 
-# 3 219063 565583  37956   5359    969    243     73     18      9      8      4      1      2      1      1      1      1      1      1      1
+# 0      1      2      3      4      5      6      7      8      9     10     11     12     13     14     15     17     18     22    # 3 219063 565583  37956   5359    969    243     73     18      9      8      4      1      2      1      1      1      1      1    
+# 26     98 
+# 1      1
 
 table(crash$CrashTypeCde) # need information from TN State Patrol for more information
 # 0      1      2      3      4      5      6     80     98 
@@ -145,7 +145,7 @@ crash1[!complete.cases(crash1),] # display rows with missing data, looks like mo
 colSums(is.na(crash1)) # Number of missing data.
 colSums(is.na(crash1))*100/nrow(crash1) # percent of missing data, ~29% missing Lat/Lon
 
-round(colSums(is.na(crash))*100/nrow(crash), 2) # Large amounts of data are missing for some columns, such as BlockNbrTxt, IntersectionInd, IntersectLocalIDTxt, IntersectRoadNameTxt. If we plan to use these columns, need to understand why the missing data are not captured in is.na(). This might be due to blanks. 
+# round(colSums(is.na(crash))*100/nrow(crash), 2) # Large amounts of data are missing for some columns, such as BlockNbrTxt, IntersectionInd, IntersectLocalIDTxt, IntersectRoadNameTxt. If we plan to use these columns, need to understand why the missing data are not captured in is.na(). This might be due to blanks. 
 
 
 # Get columns in the right format
@@ -244,11 +244,10 @@ ggplot(na.lat) +
   ggtitle("Summary of missing location by year and crash fatality for Tennessee")
 ggsave("Output/Missing_lat_TN.jpeg")
 
-
 var1 <- c("MstrRecNbrTxt", "date", "year", "LatDecimalNmb", "LongDecimalNmb") # only take ID, time, and location
 crash1 <- crash[, var1]
 
-sumstats(crash1[2:ncol(crash1)])
+# sumstats(crash1[2:ncol(crash1)])
 
 # Day of week and hour of day summaries
 # 1 = Sunday here
@@ -266,6 +265,44 @@ byhr <- crash %>%
   group_by(hour) %>%
   count()
 data.frame(byhr)
+
+# <><><><><><><><><><><><><><><><><><>
+# 2019 Special Events ----
+# Includes all events from 2010-2019
+spev <- read_excel("SpecialEvents/2019_Special_Events.xlsx")
+
+spev <- spev %>% 
+  filter(!is.na(Event_Date) & Event_Date >= '2019-01-01' & Event_Date <= '2019-12-31' &
+         !is.na(Lat) & !is.na(Lon)) %>%
+  mutate(Lat = as.numeric(Lat),
+         Lon = as.numeric(Lon))
+# The special event are from Jan 2019 - Dec 2019.
+
+# spev$StartTime <- as.POSIXct(strptime(spev$StartTime, format = "%Y-%m-%d %H:%M:%S"))
+spev$StartTime <- format(ymd_hms(spev$StartTime), "%H:%M:%S")
+spev$EndTime <- format(ymd_hms(spev$EndTime), "%H:%M:%S")
+
+# Assign time zone to each special event.
+# Get timezone of event - TN has 2 timezones (eastern and central) - use geonames package 
+spev$TimeZone <- NA
+
+# Project spev
+spev.proj <- SpatialPointsDataFrame(coords = spev[c('Lon', 'Lat')],
+                                     data = spev,
+                                     proj4string = CRS("+proj=longlat +datum=WGS84"))
+
+spev.proj <- spTransform(spev.proj, CRS(proj.USGS))
+
+# Overlay timezone on crashes
+spev_tz <- over(spev.proj, tz[,"tzid"]) # Match a tzid name to each row in spev.proj 
+
+spev.proj@data <- data.frame(spev.proj@data, tz = spev_tz)
+
+spev <- spev.proj@data %>% filter(tzid == "America/Chicago" | tzid == "America/New_York")
+
+
+## save special event data in the output
+save("spev", file = "SpecialEvents/TN_SpecialEvent_2019.RData")
 
 # <><><><><><><><><><><><><><><><><><>
 # 2018 Special Events ----
@@ -328,65 +365,16 @@ source(system.file("tests", "testing.R", package = "geonames"), echo = TRUE)
 
 spev$TimeZone <- NA
 
-## Dan's code, did not work for Jessie's run.
-# for (i in 1:nrow(spev)) {
-#   
-#   query = paste0("http://ws.geonames.org/timezoneJSON?lat=", spev$LatDecimalNmb[i], 
-#                  "&lng=", spev$LongDecimalNmb[i], 
-#                  "&radius=0&username=waze_sdi")
-#   
-#   tzres <- GET(query)
-#   if(http_error(tzres)) {
-#     tzres <- "error"
-#   } else {
-#     tzres <- content(tzres)$timezoneId
-#   }
-#   TimeZone <- c(TimeZone, tzres)
-#   
-#   if(i %% 1000 == 0) cat(". ")
-#   if(i %% 10000 == 0) cat("i ")
-#   
-# }
-# 
-# timediff <- Sys.time() -starttime
-# cat(round(timediff, 2), attr(timediff, "units"), "elapsed")
-
-## Michelle's code # There are three rows do not have Lon/Lat, so need to skip them.
+## There are three rows do not have Lon/Lat, so need to skip them.
 range <- which(!is.na(spev$Lat) & !is.na(spev$Lon))
 for (i in range) {
 
-  spev$TimeZone[i] <- as.character(GNtimezone(spev$Lat[i], spev$Lon[i], radius = 0)$timezoneId)
+  # spev$TimeZone[i] <- as.character(GNtimezone(spev$Lat[i], spev$Lon[i], radius = 0)$timezoneId)
 
 }
 
-# To convert to UTC time, did not work for J. 
-# spev$StartUTC <- paste(spev$Event_Date, spev$StartTime)
-# spev$StartUTC <- as.POSIXct(paste(spev$Event_Date, spev$StartTime),
-#                               tz = spev$TimeZone,
-#                               format = "%Y-%m-%d %H:%M:%S")
-
-## Create Date Time
-# spev$EndDateTime <- paste(spev$Event_Date, spev$EndTime)
-# spev$EndDateTime <- as.POSIXct(spev$EndDateTime, format = "%Y-%m-%d %H:%M:%S")
-
 ## save special event data in the output
 save("spev", file = "SpecialEvents/TN_SpecialEvent_2018.RData")
-
-# locate the file that saved from outside SDC
-# step 1: find the uploaded files. intern = T will get the string of the system() output
-file_name <- system(paste("aws s3 ls",  paste0(teambucket, "/jyang/uploaded_files/")), intern = T) # the file is saved under this folder. Need to copy it over to workingdata folder.
-x <- system(paste("aws s3 ls",file.path(teambucket, "TN", "SpecialEvents/")), intern = T)
-
-# steps 2: move to a common folder in teambucket (this step has been added to workstation setup for records.)
-system(paste("aws s3 mv", 
-             file.path(teambucket, system('whoami', intern = T), "uploaded_files", "TN_SpecialEvent_2008.RData"),
-             file.path(teambucket, "TN", "SpecialEvents", "TN_SpecialEvent_2018.RData"))
-)
-
-# step 3: Transfer the file to workingdata folder.
-system(paste("aws s3 cp",
-             file.path(teambucket, "TN", "SpecialEvents", "TN_SpecialEvent_2018.RData"),
-             file.path('~', 'workingdata', 'TN', 'SpecialEvents',"TN_SpecialEvent_2018.RData"))) # Cool, did the trick
 
 # <><><><><><><><><><><><><><><><><><>
 # 2017 Special Event ----
