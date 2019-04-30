@@ -18,6 +18,8 @@ localdir <- file.path(user, "workingdata", "TN") # full path for readOGR
 
 setwd(localdir)
 
+proj.USGS <- "+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs +ellps=GRS80 +towgs84=0,0,0"
+
 # Get weather data ----
 
 # Provided by TN: WeatherUnderground_171228.txt. This is a small script to be run in a Windows enviroment, to get XML-format files for 11 locations in TN. Here we'll read in the file as is, just to extract the API addresses
@@ -66,35 +68,54 @@ if(DARKSKY) {
     
   }
 
-  # Get correct time zone from shapefile...
-  dat$time <- as.POSIXct(dat$time, origin = '1970-01-01', tz = 'America/Chicago')
-  dat$lat = as.numeric(dat$lat)
-  dat$lon = as.numeric(dat$lon)
+  # Get correct time zone from shapefile
+ # dat$time <- as.POSIXct(dat$time, origin = '1970-01-01', tz = 'America/Chicago')
+  dat$lat = as.numeric(as.character(dat$lat))
+  dat$lon = as.numeric(as.character(dat$lon))
+  
+  # Project weather to Albers equal area, ESRI 102008
+  proj <- showP4(showWKT("+init=epsg:102008"))
+  
+  dat.proj <- SpatialPointsDataFrame(coords = dat[c('lon', 'lat')],
+                                    data = dat,
+                                    proj4string = CRS("+proj=longlat +datum=WGS84"))
+  
+  dat.proj <- spTransform(dat.proj, CRS(proj.USGS))
+  
+  # Overlay timezone 
+  # Read tz file
+  tz <- readOGR(file.path(localdir, 'dist'), layer = 'combined-shapefile')
+  
+  
+  tz <- spTransform(tz, CRS(proj.USGS))
+  
+  wx_tz <- over(dat.proj, tz[,"tzid"]) # Match a tzid name to each row in dat.proj weather data 
+  
+  dat.proj@data <- data.frame(dat.proj@data, tzid = as.character(wx_tz$tzid))
+  
+  # Loop over every row and apply the correct time zone to the weather forecast times
+  local_time = vector()
+  for(k in 1:nrow(dat.proj)) {
+    local_time = c(local_time, format(as.POSIXct(dat.proj$time[k]/1000, origin = "1970-01-01", 
+                                     tz = as.character(dat.proj$tzid[k])),
+                          "%Y-%m-%d %H:%M:%S", usetz = T))
+    
+  } # end loop over rows for local_time
+  
 
-  save(list='dat',
+  save(list=c('dat', 'dat.proj'),
        file = file.path(localdir, "Weather", paste0("TN_Forecasts_", Sys.Date(), ".RData")))
   
-    
-}
-
-
-
-
-# Save forecasts ----
-
-xmls <- ls()[grep('\\.xml$', ls())]
-
-save(list=xmls,
-     file = file.path(localdir, "Weather", paste0("TN_Forecasts_", Sys.Date(), ".RData")))
-
-forecasts <- dir(file.path(localdir, "Weather"))[grep("^TN_Forecasts_", dir(file.path(localdir, "Weather")))]
-
-# Copy to S3
-for(f in forecasts){
-system(paste("aws s3 cp",
-             file.path(localdir, "Weather", f),
-             file.path(teambucket, "TN", "Weather", f)
-       ))
+  forecasts <- dir(file.path(localdir, "Weather"))[grep("^TN_Forecasts_", dir(file.path(localdir, "Weather")))]
+  
+  # Copy to S3
+  for(f in forecasts){
+    system(paste("aws s3 cp",
+                 file.path(localdir, "Weather", f),
+                 file.path(teambucket, "TN", "Weather", f)
+    ))
+  }
+  
 }
 
 
@@ -152,6 +173,25 @@ if(!DARKSKY){
       }
   }
 
+  
+  
+  
+  # Save forecasts ----
+  
+  save(list='dat',
+       file = file.path(localdir, "Weather", paste0("TN_Forecasts_", Sys.Date(), ".RData")))
+  
+  forecasts <- dir(file.path(localdir, "Weather"))[grep("^TN_Forecasts_", dir(file.path(localdir, "Weather")))]
+  
+  # Copy to S3
+  for(f in forecasts){
+    system(paste("aws s3 cp",
+                 file.path(localdir, "Weather", f),
+                 file.path(teambucket, "TN", "Weather", f)
+    ))
+  }
+  
+  
 # Next steps: interpolate to state level using kriging or other methods, see 
 # http://rspatial.org/analsis/rst/4-interpolation.html
 } # end Weather Underground
