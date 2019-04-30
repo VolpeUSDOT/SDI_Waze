@@ -46,50 +46,8 @@ if(length(grep(Waze_Prepared_Data, dir(seg.loc))) == 0){
   load(file.path(seg.loc, Waze_Prepared_Data))
 }
 
-
 # <><><><><><><><><><><><><><><><><><><><><><><><>
-# Variables organization: Start from prepared data for 1 hour window ----
-table(w.all$uniqueCrashreports) # only 3 segment have more than 1 crash, logistic regression is more appropriate for this data.
-# 0     1     2 
-# 59870  1364     3 
-
-# Omit or include predictors in this vector:
-alwaysomit = c(grep("RDSEG_ID", names(w.all), value = T), "year", "day", "segtime", "weekday", 
-               grep("Crash", names(w.all), value = T),
-               "OBJECTID")
-
-alert_types = c("nWazeAccident", "nWazeJam", "nWazeRoadClosed", "nWazeWeatherOrHazard")
-
-alert_subtypes = c("nHazardOnRoad", "nHazardOnShoulder" ,"nHazardWeather", "nWazeAccidentMajor", "nWazeAccidentMinor", "nWazeHazardCarStoppedRoad", "nWazeHazardCarStoppedShoulder", "nWazeHazardConstruction", "nWazeHazardObjectOnRoad", "nWazeHazardPotholeOnRoad", "nWazeHazardRoadKillOnRoad", "nWazeJamModerate", "nWazeJamHeavy" ,"nWazeJamStandStill",  "nWazeWeatherFlood", "nWazeWeatherFog", "nWazeHazardIceRoad")
-
-waze_rd_type = grep("WazeRT", names(w.all), value = T)[-c(1,2,6)] # counts of events happened at that segment at each hour. All zero for road type 0, 3, 4, thus removing them
-
-waze_dir_travel = grep("MagVar", names(w.all), value = T)[-2] # nMagVar30to60 is all zero, removing it from the variable list
-
-weather_var = c('PRCP', 'TMIN', 'TMAX', 'SNOW')
-
-other_var = c("nBikes", "nFARS")
-
-time_var = c("hour", "mo", "weekday", "day") # time variable can be used as indicator or to aggregate the temporal resolution.
-
-seg_var = c("Shape_STLe", "SpeedLimit", "ArterialCl"
-            # , "FunctionCl"
-            ) # "ArterialCl" has no missing values. There are 6 rows with missing values in "FunctionCl", therefore if we use in the model, we will lose these rows.
-
-# Create a list to store the indicators
-indicator.var.list <- list("seg_var" = seg_var, "other_var" = other_var, "weather_var" = weather_var, "alert_types" = alert_types, "alert_subtypes" = alert_subtypes, "waze_rd_type" = waze_rd_type, "waze_dir_travel" = waze_dir_travel)
-
-# A list of Response variables
-response.var.list <- c(
-                  "uniqueCrashreports", # number of crashes at each segment at every hour of day
-                  "biCrash",            # presence and absence of crash at each segment at every hour of day
-                  "nCrashes"            # total crashes at each segment of entire year 2018
-                  )
-# ncrash.1yr.excludeInt  # have not created yet, should be "nCrashes" - "Crash_End1" - "Crash_End2"
-# ncrash.4hr = NA # if we use 4 hour window, have not created this variable yet
-
-# <><><><><><><><><><><><><><><><><><><><><><><><>
-# Variables organization: Start from prepared data for 4 hour window ----
+# Variables organization: Prepare data for 4 hour window ----
 # Bellevue travel demand model used 6-9 and 3-6 pm, our aggregation should include these two periods, so we can do a crash risk model at these two peak periods of a day.
 # Two ways to aggregate the hour window
 w.all$grp_varhour <- ifelse(w.all$hour %in% c("00", "01", "02","03","04","05"), "Early AM", 
@@ -100,16 +58,16 @@ w.all$grp_varhour <- ifelse(w.all$hour %in% c("00", "01", "02","03","04","05"), 
 
 # four hour window
 w.all$grp_name <- ifelse(w.all$hour %in% c("03","04","05", "06"), "Early AM", 
-                            ifelse(w.all$hour %in% c("07", "08", "09", "10"), "AM Peak", 
-                                   ifelse(w.all$hour %in% c( "11", "12","13", "14"), "Mid-day",
-                                          ifelse(w.all$hour %in% c("15", "16", "17", "18"), "PM Peak",
-                                                 ifelse(w.all$hour %in% c("19", "20", "21", "22"), "Evening",
-                                                        ifelse(w.all$hour %in% c("23", "00", "01", "02"), "Mid-night", NA))))))
+                         ifelse(w.all$hour %in% c("07", "08", "09", "10"), "AM Peak", 
+                                ifelse(w.all$hour %in% c( "11", "12","13", "14"), "Mid-day",
+                                       ifelse(w.all$hour %in% c("15", "16", "17", "18"), "PM Peak",
+                                              ifelse(w.all$hour %in% c("19", "20", "21", "22"), "Evening",
+                                                     ifelse(w.all$hour %in% c("23", "00", "01", "02"), "Mid-night", NA))))))
 
 w.all <- w.all %>% mutate(time_hr = as.POSIXct(segtime, '%Y-%j %H', tz = 'America/Los_Angeles'),
-                     date = as.Date(time_hr, format = '%Y-%j %H'),
-                     month = as.Date(cut(date, breaks = "month")),
-                     wkday = as.factor(weekdays(date))
+                          date = as.Date(time_hr, format = '%Y-%j %H'),
+                          month = as.Date(cut(date, breaks = "month")),
+                          wkday = as.factor(weekdays(date))
 )
 
 # Eliminate two incidents which occurred on 2019-01-01
@@ -169,9 +127,53 @@ unique(w.all.4hr.mo.wd$RDSEG_ID[w.all.4hr.mo.wd$uniqueCrashreports %in% c(2,3)])
 # Save the 4 hour data as Rdata
 fn = "Bellevue_Waze_Segments_2018-01_to_2018-12_4hr.RData"
 
-save(list= c("w.all.4hr","w.all.4hr.wd","w.all.4hr.mo", "w.all.4hr.mo.wd"), file = file.path(seg.loc, fn))
+save(list= c("w.all", "w.all.4hr", "w.all.4hr.wd", "w.all.4hr.mo", "w.all.4hr.mo.wd"), file = file.path(seg.loc, fn))
 
 # <><><><><><><><><><><><><><><><><><><><><><><><> Four-hour window completed
+
+
+# <><><><><><><><><><><><><><><><><><><><><><><><> Start linear and logistic regression from prepared data for 1 hour window
+# 1-hr model Variables organization:----
+table(w.all$uniqueCrashreports) # only 3 segment have more than 1 crash, logistic regression is more appropriate for this data.
+# 0     1     2 
+# 59870  1364     3 
+
+# Omit or include predictors in this vector:
+alwaysomit = c(grep("RDSEG_ID", names(w.all), value = T), "year", "day", "segtime", "weekday", 
+               grep("Crash", names(w.all), value = T),
+               "OBJECTID")
+
+alert_types = c("nWazeAccident", "nWazeJam", "nWazeRoadClosed", "nWazeWeatherOrHazard")
+
+alert_subtypes = c("nHazardOnRoad", "nHazardOnShoulder" ,"nHazardWeather", "nWazeAccidentMajor", "nWazeAccidentMinor", "nWazeHazardCarStoppedRoad", "nWazeHazardCarStoppedShoulder", "nWazeHazardConstruction", "nWazeHazardObjectOnRoad", "nWazeHazardPotholeOnRoad", "nWazeHazardRoadKillOnRoad", "nWazeJamModerate", "nWazeJamHeavy" ,"nWazeJamStandStill",  "nWazeWeatherFlood", "nWazeWeatherFog", "nWazeHazardIceRoad")
+
+waze_rd_type = grep("WazeRT", names(w.all), value = T)[-c(1,2,6)] # counts of events happened at that segment at each hour. All zero for road type 0, 3, 4, thus removing them
+
+waze_dir_travel = grep("MagVar", names(w.all), value = T)[-2] # nMagVar30to60 is all zero, removing it from the variable list
+
+weather_var = c('PRCP', 'TMIN', 'TMAX', 'SNOW')
+
+other_var = c("nBikes", "nFARS")
+
+time_var = c("hour", "mo", "weekday", "day") # time variable can be used as indicator or to aggregate the temporal resolution.
+
+seg_var = c("Shape_STLe", "SpeedLimit", "ArterialCl"
+            # , "FunctionCl"
+            ) # "ArterialCl" has no missing values. There are 6 rows with missing values in "FunctionCl", therefore if we use in the model, we will lose these rows.
+
+# Create a list to store the indicators
+indicator.var.list <- list("seg_var" = seg_var, "other_var" = other_var, "weather_var" = weather_var, "alert_types" = alert_types, "alert_subtypes" = alert_subtypes, "waze_rd_type" = waze_rd_type, "waze_dir_travel" = waze_dir_travel)
+
+# A list of Response variables
+response.var.list <- c(
+                  "uniqueCrashreports", # number of crashes at each segment at every hour of day
+                  "biCrash",            # presence and absence of crash at each segment at every hour of day
+                  "nCrashes"            # total crashes at each segment of entire year 2018
+                  )
+# ncrash.1yr.excludeInt  # have not created yet, should be "nCrashes" - "Crash_End1" - "Crash_End2"
+# ncrash.4hr = NA # if we use 4 hour window, have not created this variable yet
+
+
 
 # Correlation & ggpairs ----
 # correlations <- cor(w.all[, c(response.var.list, "Shape_STLe")])
@@ -237,7 +239,7 @@ for (i in 1:length(indicator.var.list)){
 
 any(sapply(w.all[, all_var], function(x) all(x == 0))) # all variables are clean now. None of them are all-zero column. Returns FALSE if no columns have all zeros
 
-# Check time variables ----
+# Check time variables & Time Series visuals ----
 stopifnot(length(unique(w.all$day)) == 365) # 365
 stopifnot(length(unique(w.all$mo)) == 12)   # 12
 stopifnot(length(unique(w.all$hour)) == 24) # 24
@@ -256,7 +258,7 @@ w.all = w.all %>%
 # select a few variables as example
 w.sub <- w.all[, c("time_hr", "RDSEG_ID", "uniqueCrashreports", "uniqueWazeEvents", "nWazeAccident", "nWazeJam")]
 
-# join day.hour with w.sub on time_hr, NA fields converted to zeros.
+# join day.hour with w.sub on time_hr, NA fields were converted to zeros.
 w.sub <- day.hour %>% left_join(w.sub, by = c("time_hr")) %>% 
   mutate_if(is.numeric, coalesce, 0) %>% 
   mutate(
@@ -348,8 +350,6 @@ multiplot(p1, p2, p3, p4, p5, p6, p7)
 
 dev.off()
 
-
-##
 
 # <><><><><><><><><><><><><><><><><><><><><><><><>
 # Start Modelings ----
