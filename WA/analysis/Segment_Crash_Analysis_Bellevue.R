@@ -191,7 +191,7 @@ for (i in 1:length(indicator.var.list)) {
   
   n <- length(c(response.var.list, indicator.var.list[[i]]))
   
-  f <- paste0(visual_loc, '/ggpairs_', names(indicator.var.list)[i],".png")
+  f <- paste0(visual.loc, '/ggpairs_', names(indicator.var.list)[i],".png")
   
   # if the file exists, then don't regenerate as it takes a few minutes for each plots
   if (!file.exists(f)) {
@@ -216,7 +216,7 @@ for (i in 1:length(indicator.var.list)) {
   
   n <- length(c(response.var.list, indicator.var.list[[i]]))
   
-  f <- paste0(visual_loc, '/missmap_', names(indicator.var.list)[i],".png")
+  f <- paste0(visual.loc, '/missmap_', names(indicator.var.list)[i],".png")
   
   # if the file exists, then don't regenerate as it takes a few minutes for each plot
   if (!file.exists(f)) {

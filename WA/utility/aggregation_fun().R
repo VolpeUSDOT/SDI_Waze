@@ -94,12 +94,12 @@ agg_fun <- function(w.all, t_var) {
   class(w.all.4hr) <- "data.frame" # POSIX date/time not supported for grouped tbl
   
   # some other variables
-  w.all.4hr$grp_hr <- ifelse(w.all.4hr$grp_name == "Early AM", 04,
-                             ifelse(w.all.4hr$grp_name == "AM Peak", 08,
-                                    ifelse(w.all.4hr$grp_name == "Mid-day", 12,
-                                           ifelse(w.all.4hr$grp_name == "PM Peak", 16,
-                                                  ifelse(w.all.4hr$grp_name == "Evening", 20,
-                                                         ifelse(w.all.4hr$grp_name == "Mid-night", 00, NA))))))
+  w.all.4hr$grp_hr <- ifelse(w.all.4hr$grp_name == "Early AM", "04",
+                             ifelse(w.all.4hr$grp_name == "AM Peak", "08",
+                                    ifelse(w.all.4hr$grp_name == "Mid-day", "12",
+                                           ifelse(w.all.4hr$grp_name == "PM Peak", "16",
+                                                  ifelse(w.all.4hr$grp_name == "Evening", "20",
+                                                         ifelse(w.all.4hr$grp_name == "Mid-night", "00", NA))))))
   
   w.all.4hr$biCrash <- ifelse(w.all.4hr$uniqueCrashreports > 0, 1, 0)
   
