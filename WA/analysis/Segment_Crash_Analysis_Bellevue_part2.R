@@ -25,6 +25,9 @@ library(Amelia)
 library(mlbench)
 library(xts)
 library(lubridate)
+library(pscl) # zero-inflated Poisson
+library(MASS) # NB model
+library(randomForest) # random forest
 
 
 ## Working on shared drive
@@ -68,6 +71,7 @@ time_var = c("grp_hr", "wkday") # time variable can be used as indicator or to a
 seg_var = c("Shape_STLe", "SpeedLimit", "ArterialCl"
             # , "FunctionCl"
             ) # "ArterialCl" is complete. There are 6 rows with missing values in "FunctionCl", therefore if we use in the model, we will lose these rows.
+table(w.all.4hr.wd$ArterialCl)
 
 # Create a list to store the indicators
 indicator.var.list <- list("seg_var" = seg_var, "other_var" = other_var, "time_var" = time_var, "weather_var" = weather_var, "alert_types" = alert_types, "alert_subtypes" = alert_subtypes, "waze_rd_type" = waze_rd_type, "waze_dir_travel" = waze_dir_travel)
@@ -80,7 +84,9 @@ response.var.list <- c(
                   )
 
 # Any last-minute data organization: order the levels of weekday
-w.all.4hr.wd$wkday = factor(w.all.4hr.wd$wkday, levels(w.all.4hr.wd$wkday)[c(4,2,6,7,5,1,3)])
+# w.all.4hr.wd$wkday = factor(w.all.4hr.wd$wkday, levels(w.all.4hr.wd$wkday)[c(4,2,6,7,5,1,3)])
+w.all.4hr.wd$wkday.s = w.all.4hr.wd$wkday
+levels(w.all.4hr.wd$wkday.s) <- c("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat")
 
 # Correlation & ggpairs ----
 correlations <- cor(w.all.4hr.wd[, c(response.var.list, "Shape_STLe")])
@@ -114,4 +120,123 @@ for (i in 1:length(indicator.var.list)) {
   }
 }
 
-# 
+# check missing values and all zero columns ----
+# if any other columns are all zeros
+all_var <- response.var.list
+for (i in 1:length(indicator.var.list)){
+  all_var <- c(all_var, indicator.var.list[[i]])
+}
+
+any(sapply(w.all.4hr.wd[, all_var], function(x) all(x == 0))) # Returns FALSE if no columns have all zeros
+# all variables of w.all.4hr.wd are clean now. None of them are all-zero column. 
+
+# Check time variables & Time Series visuals ----
+stopifnot(length(unique(w.all.4hr.wd$wkday)) == 7)
+stopifnot(length(unique(w.all.4hr.wd$grp_hr)) == 6)
+
+## ggplot of time series
+f <- paste0(visual.loc, '/Bellevue_crashes_time_series_4hr_wd.png')
+
+# use minimal format
+theme_set(theme_minimal())
+
+png(f, width = 6, height = 10, units = 'in', res = 300)
+
+# by both
+p1 <- ggplot(data = ts_group_by(w.all.4hr.wd, wkday.s, grp_hr), aes(x = grp_hr, y = uniqueCrashreports)) +
+  geom_line(color = "darkorchid4", size = 1, group = 1) + geom_point() + facet_wrap("wkday.s") +
+  ylab("Number of Crashes")
+
+p2 <- ggplot(data = ts_group_by(w.all.4hr.wd, wkday.s, grp_hr), aes(x = wkday.s, y = uniqueCrashreports)) +
+  geom_line(color = "darkorchid4", size = 1, group = 1) + geom_point() + facet_wrap("grp_hr") +
+  ylab("Number of Crashes")
+
+# by wkday
+p3 <- ggplot(data = ts_group_by(w.all.4hr.wd, wkday.s), aes(x = wkday.s, y = uniqueCrashreports)) +
+  geom_line(color = "darkorchid4", size = 1, group = 1) + geom_point() +
+  ylab("Number of Crashes") +
+  theme(axis.text.x = element_text(size=7, vjust = 0.2, angle=90))
+
+# by 4-hour window
+p4 <- ggplot(data = ts_group_by(w.all.4hr.wd, grp_hr), aes(x = grp_hr, y = uniqueCrashreports)) +
+  geom_line(color = "darkorchid4", size = 1, group = 1) + geom_point() +
+  ylab("Number of Crashes") 
+
+multiplot(p1, p2, p3, p4)
+
+dev.off()
+
+
+# Mean and variance ----
+hist(w.all.4hr.wd$uniqueCrashreports)
+mean(w.all.4hr.wd$uniqueCrashreports) # 0.106
+var(w.all.4hr.wd$uniqueCrashreports) # 0.1179727
+# The data is not overdispersed. Maybe a Poisson model is also appropriate.
+ggplot(w.all.4hr.wd, aes(uniqueCrashreports)) + geom_histogram() + scale_x_log10()
+
+# <><><><><><><><><><><><><><><><><><><><><><><><>
+# Start Modelings ----
+# Start simple
+# 10: seg_var + TimeOfDay + DayofWeek + Month
+# 11: 10 + nFARS
+# 12: 10 + nFARS + nBikes
+# 13: {Best of 10 - 12} + weather_var
+# 14: {Best of 10 - 13} + alert_types
+# 15: 14 + waze_dir_travel + waze_rd_type
+
+starttime = Sys.time()
+
+# Make a list of variables to include from the predictors. To add variables, comment out the corresponding line.
+# month (mo) and hour are categorical variables. 
+
+includes = c(
+  # waze_dir_travel, waze_rd_type, # direction of travel + road types from Waze
+  # alert_types,     # counts of waze events by alert types
+  # weather_var,     # Weather variables
+  # "nBikes",        # bike/ped conflict counts at segment level (no hour)
+  # "nFARS",         # FARS variables
+  seg_var, "wkday", "grp_hr"
+)
+
+modelno = "10.rf"
+
+response.var <- response.var.list[1]
+
+Art.Only <- F # False to use all road class, True to Arterial only roads
+if(Art.Only) {data = w.all.4hr.wd %>% filter(ArterialCl != "Local")} else {data = w.all.4hr.wd} 
+
+# Simple 
+
+( predvars = names(w.all.4hr.wd)[names(w.all.4hr.wd) %in% includes] )
+
+( use.formula = as.formula(paste(response.var, "~", 
+                                 paste(predvars, collapse = "+"))) )
+
+assign(paste0('m', modelno),
+       # glm(use.formula, data = data, family=poisson) # regular Poisson Model
+       # zeroinfl(use.formula, data = data) # zero-inflated Possion
+       # glm.nb(use.formula, data = data) # regular NB
+       # zeroinfl(use.formula, data = data, dist = "negbin", EM = F) # zero-inflated NB, EM algorithm looks for optimal starting values, which is slower.
+       randomForest(use.formula, data = data) # RF model
+)
+
+# Summarize
+summary(get(paste0('m', modelno)))
+
+fitted <- fitted(get(paste0('m', modelno)))
+pres <- residuals(get(paste0('m', modelno)), type="pearson")
+assign(paste0('diag.plot.', modelno), plot((fitted)^(1/2), abs(pres)))
+
+AIC(m10.0poi, m10.poi, m10.nb, m10.0nb) # we ran a base model 10, and here is the comparison of AIC.
+# df      AIC
+# m10.0poi 36 8832.233
+# m10.poi  18 8882.401
+# m10.nb   19 8850.987
+# m10.0nb  37 8831.231
+
+# plot(get(paste0('m', modelno)), which=3)
+
+# Random Forest and XGBoost 
+# https://xgboost.readthedocs.io/en/latest/R-package/xgboostPresentation.html
+
+

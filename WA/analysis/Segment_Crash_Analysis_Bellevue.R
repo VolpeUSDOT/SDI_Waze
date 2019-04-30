@@ -296,7 +296,7 @@ w.sub_seg$weekday = factor(w.sub_seg$weekday, levels(w.sub_seg$weekday)[c(4,2,6,
 stopifnot(!is.unsorted(w.sub_seg$time_hr)) # still in the order
 
 ## ggplot of time series
-f <- paste0(visual.loc, '/time_series.png')
+f <- paste0(visual.loc, '/Bellevue_crashes_time_series.png')
 
 # use minimal format
 theme_set(theme_minimal())

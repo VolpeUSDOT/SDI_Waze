@@ -1,7 +1,7 @@
 # this function is a group_by function for visualization
 
 ts_group_by <- function(table, ... ) {
-  table %>% group_by_(.dots = lazyeval::lazy_dots(...)) %>% 
+  table %>% group_by(.dots = lazyeval::lazy_dots(...)) %>% 
     summarise(uniqueCrashreports = sum(uniqueCrashreports))
 }
   
