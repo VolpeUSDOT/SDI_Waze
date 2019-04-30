@@ -1,4 +1,9 @@
 # Using best random forest models of crash estimation for TN, predict the number of crashes for the next week by grid ID and time.
+# Inputs:
+# - Time variables for today to next 10 days, for each Grid ID
+# - Special events values prepped by Grid ID 
+# - Weather forecast for by Grid ID
+# - Waze input variables for model 05 (all TN crashes, Base Waze inputs)
 
 # Setup ---- 
 rm(list=ls()) # Start fresh
