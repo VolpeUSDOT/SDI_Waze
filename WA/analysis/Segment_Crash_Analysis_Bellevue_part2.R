@@ -44,6 +44,13 @@ setwd(data.loc)
 fn = "Bellevue_Waze_Segments_2018-01_to_2018-12_4hr.RData"
 load(file.path(seg.loc, fn))
 
+# Eliminate two incidents which occurred on 2019-01-01 in the w.all dataset
+w.all <- w.all %>% 
+  filter(date >= '2018-01-01' & date <= '2018-12-31')
+
+w.all.4hr <- w.all.4hr %>% 
+  filter(date >= '2018-01-01' & date <= '2018-12-31')
+
 # <><><><><><><><><><><><><><><><><><><><><><><><> Start from prepared data for 4 hour window
 # 4-hr model variables organization:  ----
 table(w.all.4hr.wd$uniqueCrashreports) # ~10% of the data has non-zero counts, 0.8% of the data has counts larger than 1
@@ -89,6 +96,7 @@ response.var.list <- c(
 w.all.4hr.wd$wkday.s = w.all.4hr.wd$wkday
 levels(w.all.4hr.wd$wkday.s) <- c("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat")
 
+
 # Correlation & ggpairs ----
 correlations <- cor(w.all.4hr.wd[, c(response.var.list, "Shape_STLe")])
 corrplot(correlations, method="circle", type = "upper",
@@ -130,6 +138,9 @@ for (i in 1:length(indicator.var.list)){
 
 any(sapply(w.all.4hr.wd[, all_var], function(x) all(x == 0))) # Returns False if no columns have all zeros
 # all variables of w.all.4hr.wd are clean now. None of them are all-zero column. 
+
+# checking missing fields
+sum(is.na(w.all.4hr.wd[, all_var]))
 
 # Check time variables & Time Series visuals ----
 stopifnot(length(unique(w.all.4hr.wd$wkday)) == 7)

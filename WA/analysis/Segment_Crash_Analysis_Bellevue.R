@@ -65,14 +65,12 @@ w.all$grp_name <- ifelse(w.all$hour %in% c("03","04","05", "06"), "Early AM",
                                                      ifelse(w.all$hour %in% c("23", "00", "01", "02"), "Mid-night", NA))))))
 
 w.all <- w.all %>% mutate(time_hr = as.POSIXct(segtime, '%Y-%j %H', tz = 'America/Los_Angeles'),
-                          date = as.Date(time_hr, format = '%Y-%j %H'),
-                          month = as.Date(cut(date, breaks = "month")),
+                          date = as.Date(time_hr, format = '%Y-%j %H', tz = 'America/Los_Angeles'), # need to set them the same timezone, otherwise, some 2018-12-31 records become 2019-01-01 records.
+                          month = as.Date(cut(date, breaks = "month"), tz = 'America/Los_Angeles'),
                           wkday = as.factor(weekdays(date))
 )
 
-# Eliminate two incidents which occurred on 2019-01-01
-w.all <- w.all %>% 
-  filter(date >= '2018-01-01' & date <= '2018-12-31')
+stopifnot(with(w.all, date >= '2018-01-01' & date <= '2018-12-31')) # make sure that all dates are within calendar year 2018.
 
 # all crash and Waze variables need to be aggregated by hour and segment
 # load the aggregation function
