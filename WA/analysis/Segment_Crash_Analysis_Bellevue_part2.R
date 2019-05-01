@@ -180,8 +180,8 @@ ggplot(w.all.4hr.wd, aes(uniqueCrashreports)) + geom_histogram() + scale_x_log10
 # 10: seg_var + TimeOfDay + DayofWeek + Month
 # 11: 10 + nFARS
 # 12: 10 + nFARS + nBikes
-# 13: {Best of 10 - 12} + weather_var
-# 14: {Best of 10 - 13} + alert_types
+# 13: {Best of 10 - 12} = 12 + weather_var
+# 14: {Best of 10 - 13} = 12 + alert_types
 # 15: 14 + waze_dir_travel + waze_rd_type
 
 starttime = Sys.time()
@@ -190,17 +190,17 @@ starttime = Sys.time()
 # month (mo) and hour are categorical variables. 
 
 includes = c(
-  # waze_dir_travel, waze_rd_type, # direction of travel + road types from Waze
-  # alert_types,     # counts of waze events by alert types
+  waze_dir_travel, waze_rd_type, # direction of travel + road types from Waze
+  alert_types,     # counts of waze events by alert types
   # weather_var,     # Weather variables
-  # "nBikes",        # bike/ped conflict counts at segment level (no hour)
-  # "nFARS",         # FARS variables
+  "nBikes",        # bike/ped conflict counts at segment level (no hour)
+  "nFARS",         # FARS variables
   seg_var, "wkday", "grp_hr"
 )
 
-modelno = "10.rf"
+modelno = "15.poi"
 
-response.var <- response.var.list[1]
+response.var <- response.var.list[1] # use crash counts
 
 Art.Only <- F # False to use all road class, True to Arterial only roads
 if(Art.Only) {data = w.all.4hr.wd %>% filter(ArterialCl != "Local")} else {data = w.all.4hr.wd} 
@@ -213,11 +213,10 @@ if(Art.Only) {data = w.all.4hr.wd %>% filter(ArterialCl != "Local")} else {data 
                                  paste(predvars, collapse = "+"))) )
 
 assign(paste0('m', modelno),
-       # glm(use.formula, data = data, family=poisson) # regular Poisson Model
+       glm(use.formula, data = data, family=poisson) # regular Poisson Model
        # zeroinfl(use.formula, data = data) # zero-inflated Possion
        # glm.nb(use.formula, data = data) # regular NB
        # zeroinfl(use.formula, data = data, dist = "negbin", EM = F) # zero-inflated NB, EM algorithm looks for optimal starting values, which is slower.
-       randomForest(use.formula, data = data) # RF model
 )
 
 # Summarize
@@ -228,7 +227,7 @@ pres <- residuals(get(paste0('m', modelno)), type="pearson")
 assign(paste0('diag.plot.', modelno), plot((fitted)^(1/2), abs(pres)))
 
 AIC(m10.0poi, m10.poi, m10.nb, m10.0nb) # we ran a base model 10, and here is the comparison of AIC.
-# df      AIC
+# model    df      AIC
 # m10.0poi 36 8832.233
 # m10.poi  18 8882.401
 # m10.nb   19 8850.987
@@ -236,7 +235,17 @@ AIC(m10.0poi, m10.poi, m10.nb, m10.0nb) # we ran a base model 10, and here is th
 
 # plot(get(paste0('m', modelno)), which=3)
 
-# Random Forest and XGBoost 
+AIC(m10.poi, m11.poi, m12.poi, m13.poi, m14.poi, m15.poi) # model 12 seems to be slightly better, adding weather does not improve, so will exclude weather out of the model. Model 15 is the best, adding Waze data helps a lot.
+# model   df      AIC
+# m10.poi 18 8882.401
+# m11.poi 19 8884.033
+# m12.poi 20 8879.510
+# m13.poi 24 8879.688
+# m14.poi 24 8615.698
+# m15.poi 35 7632.854
+
+# Random Forest and XGBoost ----
 # https://xgboost.readthedocs.io/en/latest/R-package/xgboostPresentation.html
 
+randomForest(use.formula, data = data) # RF model
 
