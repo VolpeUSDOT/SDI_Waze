@@ -28,6 +28,7 @@ library(lubridate)
 library(pscl) # zero-inflated Poisson
 library(MASS) # NB model
 library(randomForest) # random forest
+library(car) # to get vif()
 
 
 ## Working on shared drive
@@ -127,7 +128,7 @@ for (i in 1:length(indicator.var.list)){
   all_var <- c(all_var, indicator.var.list[[i]])
 }
 
-any(sapply(w.all.4hr.wd[, all_var], function(x) all(x == 0))) # Returns FALSE if no columns have all zeros
+any(sapply(w.all.4hr.wd[, all_var], function(x) all(x == 0))) # Returns False if no columns have all zeros
 # all variables of w.all.4hr.wd are clean now. None of them are all-zero column. 
 
 # Check time variables & Time Series visuals ----
@@ -192,17 +193,17 @@ starttime = Sys.time()
 includes = c(
   waze_dir_travel, waze_rd_type, # direction of travel + road types from Waze
   alert_types,     # counts of waze events by alert types
-  # weather_var,     # Weather variables
+  weather_var,     # Weather variables
   "nBikes",        # bike/ped conflict counts at segment level (no hour)
   "nFARS",         # FARS variables
   seg_var, "wkday", "grp_hr"
 )
 
-modelno = "15.poi"
+modelno = "15.poi.art"
 
 response.var <- response.var.list[1] # use crash counts
 
-Art.Only <- F # False to use all road class, True to Arterial only roads
+Art.Only <- T # False to use all road class, True to Arterial only roads
 if(Art.Only) {data = w.all.4hr.wd %>% filter(ArterialCl != "Local")} else {data = w.all.4hr.wd} 
 
 # Simple 
@@ -235,7 +236,7 @@ AIC(m10.0poi, m10.poi, m10.nb, m10.0nb) # we ran a base model 10, and here is th
 
 # plot(get(paste0('m', modelno)), which=3)
 
-AIC(m10.poi, m11.poi, m12.poi, m13.poi, m14.poi, m15.poi) # model 12 seems to be slightly better, adding weather does not improve, so will exclude weather out of the model. Model 15 is the best, adding Waze data helps a lot.
+AIC(m10.poi, m11.poi, m12.poi, m13.poi, m14.poi, m15.poi) # all roads, model 12 seems to be slightly better, adding weather does not improve, so will exclude weather out of the model. Model 15 is the best, adding Waze data helps a lot.
 # model   df      AIC
 # m10.poi 18 8882.401
 # m11.poi 19 8884.033
@@ -244,8 +245,64 @@ AIC(m10.poi, m11.poi, m12.poi, m13.poi, m14.poi, m15.poi) # model 12 seems to be
 # m14.poi 24 8615.698
 # m15.poi 35 7632.854
 
+AIC(m10.poi.art, m11.poi.art, m12.poi.art, m13.poi.art, m14.poi.art, m15.poi.art) # Arterial only model. model 12 is better. Adding weather improves slightly, so it is included.
+# model       df      AIC
+# m10.poi.art 17 8244.503
+# m11.poi.art 18 8246.157
+# m12.poi.art 19 8241.697
+# m13.poi.art 23 8240.909
+# m14.poi.art 27 7982.763
+# m15.poi.art 36 7195.533
+
+# extract logistic model objects, save in a list
+model_type = "Poisson_models"
+out.name <- file.path(data.loc, 'Model_output', paste0("Bell_",model_type,".Rdata"))
+
+if(file.exists(out.name)){
+  load(out.name)} else {
+    
+    ClassFilter <- function(x) inherits(get(x), 'glm')
+    row.name <- Filter(ClassFilter, ls() )
+    Poisson_models <- lapply(row.name, function(x) get(x))
+    save(list = c("Poisson_models", "row.name"), file = out.name)
+    
+  }
+
+# row.name <- c("m10.poi", "m10.poi.art", "m11.poi", "m11.poi.art", "m12.poi", "m12.poi.art", "m13.poi", "m13.poi.art", "m14.poi", "m14.poi.art", "m15.poi", "m15.poi.art")
+
+for (i in 1:length(row.name)) {
+  
+  assign(row.name[i], Poisson_models[[i]])
+         
+}
+
+# create a summary table with diagnostics for all the Poisson model ----
+# Get the list of glm models
+ClassFilter <- function(x) inherits(get(x), 'glm' ) # excluding other potential classes that contains "lm" as the keywords.
+row.name <- Filter( ClassFilter, ls() )
+model_list <- lapply( row.name, function(x) get(x) )
+
+out.name <- file.path(output.loc, "Bell_Poi_model_summary_list.Rdata")
+
+if(file.exists(out.name)){
+  load(out.name)} else {
+    source(file.path(codeloc, "/WA/utility/Model_Summary().R"))
+    Poisson_model_summary_list <- Poisson_model_summary(model_list, out.name)
+  }
+
+M <- Poisson_model_summary_list$M
+model_summary  <- Poisson_model_summary_list$model_summary
+model_compare <- Poisson_model_summary_list$model_compare
+
+
 # Random Forest and XGBoost ----
 # https://xgboost.readthedocs.io/en/latest/R-package/xgboostPresentation.html
 
 randomForest(use.formula, data = data) # RF model
 
+# TODO: create a scatter plot of observed vs fitted - Dan will send example.
+# scatter plot of Waze data vs fitted
+# add # of observation of the model data into summary table, add data type ()
+# delete the three obs from 2019.
+# try using weekday and weekend as one variable
+# try lasso or ridge regression.

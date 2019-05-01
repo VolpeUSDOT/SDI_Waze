@@ -399,7 +399,7 @@ summary(get(paste0('m', modelno)))
 
 # extract logistic model objects, save in a list
 model_type = "logistic_models"
-out.name <- file.path(data.loc, 'Segments', paste0("Bell_",model_type,".Rdata"))
+out.name <- file.path(data.loc, 'Model_output', paste0("Bell_",model_type,".Rdata"))
 
 if(file.exists(out.name)){
   load(out.name)} else {
@@ -430,7 +430,7 @@ out.name <- file.path(output.loc, "Bell_linear_model_summary_list.Rdata")
 
 if(file.exists(out.name)){
   load(out.name)} else {
-    source(codeloc, "utility/Model_Summary().R")
+    source(file.path(codeloc, "/WA/utility/Model_Summary().R"))
     linear_model_summary_list <- linear_model_summary(model_list, out.name)
   }
 # save(list = c("linear_model_summary_list"), file = file.path(data.loc, 'Segments', "Bell_linear_model_summary_list.Rdata"))
