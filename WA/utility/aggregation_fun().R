@@ -106,8 +106,8 @@ agg_fun <- function(w.all, t_var) {
   if (t_var == 'day') {
        w.all.4hr <- w.all.4hr %>% mutate(segtime = paste(paste(year, day, sep = "-"), grp_hr, sep=" "),
                                           time_hr = as.POSIXct(segtime, '%Y-%j %H', tz = 'America/Los_Angeles'),
-                                          date = as.Date(time_hr, format = '%Y-%j %H'),
-                                          month = as.Date(cut(date, breaks = "month")),
+                                          date = as.Date(time_hr, format = '%Y-%j %H', tz = 'America/Los_Angeles'),
+                                          month = as.Date(cut(date, breaks = "month"), tz = 'America/Los_Angeles'),
                                           weekday = as.factor(weekdays(date))
     )
      

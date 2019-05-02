@@ -44,13 +44,6 @@ setwd(data.loc)
 fn = "Bellevue_Waze_Segments_2018-01_to_2018-12_4hr.RData"
 load(file.path(seg.loc, fn))
 
-# Eliminate two incidents which occurred on 2019-01-01 in the w.all dataset
-w.all <- w.all %>% 
-  filter(date >= '2018-01-01' & date <= '2018-12-31')
-
-w.all.4hr <- w.all.4hr %>% 
-  filter(date >= '2018-01-01' & date <= '2018-12-31')
-
 # <><><><><><><><><><><><><><><><><><><><><><><><> Start from prepared data for 4 hour window
 # 4-hr model variables organization:  ----
 table(w.all.4hr.wd$uniqueCrashreports) # ~10% of the data has non-zero counts, 0.8% of the data has counts larger than 1
