@@ -40,11 +40,11 @@ todo.months = sort(avail.months)[!avail.months %in% done.months]
 cl <- makeCluster(parallel::detectCores()) # make a cluster of all available cores
 registerDoParallel(cl)
 
-writeLines(c(""), paste0("SegAgg_log.txt"))    
+# writeLines(c(""), paste0("SegAgg_log.txt"))    
 
 foreach(j = todo.months, .packages = c("dplyr", "lubridate", "utils")) %dopar% {
   # j = "2018-01"  
-  sink(paste0("SegAgg_log.txt"), append=TRUE)
+  # sink(paste0("SegAgg_log.txt"), append=TRUE)
   
   cat(paste(Sys.time()), j, "\n")                                                  
   load(file.path(output.loc, paste0("WazeSegTimeList_", j, ".RData"))) # includes both Waze (link.seg.waze) and crash data (link.seg.crash) 
@@ -123,6 +123,8 @@ foreach(j = todo.months, .packages = c("dplyr", "lubridate", "utils")) %dopar% {
       uniqueCrashreports= n_distinct(REPORT_NUM),
       
       nCrashInjuryFatal = n_distinct(REPORT_NUM[FATAL_CRAS == 1]),
+      nCrashSeriousInjury = n_distinct(REPORT_NUM[SERIOUS_IN == 1]),
+      nCrashKSI = n_distinct(REPORT_NUM[SERIOUS_IN == 1 | FATAL_CRAS == 1]),
       nCrashInjury = n_distinct(REPORT_NUM[SERIOUS_IN == 1 | EVIDENT_IN == 1 | POSSIBLE_I == 1]),
       nCrashPDO = n_distinct(REPORT_NUM[PDO___NO_I == 1 ]),
       nCrashWorkzone = n_distinct(REPORT_NUM[!is.na(WORKZONE)]) # Number of crashes happened in a workzone
@@ -132,8 +134,9 @@ foreach(j = todo.months, .packages = c("dplyr", "lubridate", "utils")) %dopar% {
   names(waze.seg)
   names(crash.seg)
   
-  wazeTime.crash.seg <- full_join(waze.seg, crash.seg, by = c("RDSEG_ID", "year", "day", "hour")) %>%
-    mutate_all(funs(replace(., is.na(.), 0)))
+  wazeTime.crash.seg <- full_join(waze.seg, crash.seg, by = c("RDSEG_ID", "year", "day", "hour")) 
+  wazeTime.crash.seg[is.na(wazeTime.crash.seg)] <- 0
+  # %>% mutate_all(list(replace(., is.na(.), 0))) # keep having error running this code, probably because the packages have been updated.
   # Replace NA with zero (for the grid counts here, 0 means there were no reported Waze events or Bellevue crashes in the segment at that hour)
   
   # Update time variable 
@@ -159,13 +162,13 @@ stopCluster(cl)
 # First, loop over all months and bind together
 w.all <- vector()
 
-for(j in done.months){ # we need the done.months instead of todo.months
+for(j in avail.months){ # we need the done.months instead of todo.months
   fn = paste("WazeSegTimeAll_", j, ".RData", sep="")
   load(file.path(output.loc, fn))
   w.all <- rbind(w.all, wazeTime.crash.seg)
 }
 
-dim(w.all) # 61237*48
+dim(w.all) # 61237*50, added two more variables
 
 # Convert time variable to time format, prepare for temporal analysis
 w.all$time_hr <- as.POSIXct(w.all$segtime, "%Y-%j %H", tz = 'America/Los_Angeles')

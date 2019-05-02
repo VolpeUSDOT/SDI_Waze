@@ -150,27 +150,58 @@ png(f, width = 6, height = 10, units = 'in', res = 300)
 # by both
 p1 <- ggplot(data = ts_group_by(w.all.4hr.wd, wkday.s, grp_hr), aes(x = grp_hr, y = uniqueCrashreports)) +
   geom_line(color = "darkorchid4", size = 1, group = 1) + geom_point() + facet_wrap("wkday.s") +
-  ylab("Number of Crashes")
+  ylab("Crashes")
 
 p2 <- ggplot(data = ts_group_by(w.all.4hr.wd, wkday.s, grp_hr), aes(x = wkday.s, y = uniqueCrashreports)) +
   geom_line(color = "darkorchid4", size = 1, group = 1) + geom_point() + facet_wrap("grp_hr") +
-  ylab("Number of Crashes")
+  ylab("Crashes")
 
 # by wkday
 p3 <- ggplot(data = ts_group_by(w.all.4hr.wd, wkday.s), aes(x = wkday.s, y = uniqueCrashreports)) +
   geom_line(color = "darkorchid4", size = 1, group = 1) + geom_point() +
-  ylab("Number of Crashes") +
+  ylab("Crashes") +
   theme(axis.text.x = element_text(size=7, vjust = 0.2, angle=90))
 
 # by 4-hour window
 p4 <- ggplot(data = ts_group_by(w.all.4hr.wd, grp_hr), aes(x = grp_hr, y = uniqueCrashreports)) +
   geom_line(color = "darkorchid4", size = 1, group = 1) + geom_point() +
-  ylab("Number of Crashes") 
+  ylab("Crashes") 
 
 multiplot(p1, p2, p3, p4)
 
 dev.off()
 
+
+f <- paste0(visual.loc, '/Bellevue_KSIcrashes_time_series_4hr_wd.png')
+
+# use minimal format
+theme_set(theme_minimal())
+
+png(f, width = 6, height = 10, units = 'in', res = 300)
+
+# by both
+p1 <- ggplot(data = ts_group_by(w.all.4hr.wd, wkday.s, grp_hr), aes(x = grp_hr, y = nCrashKSI)) +
+  geom_line(color = "darkorchid4", size = 1, group = 1) + geom_point() + facet_wrap("wkday.s") +
+  ylab("KSI Crashes")
+
+p2 <- ggplot(data = ts_group_by(w.all.4hr.wd, wkday.s, grp_hr), aes(x = wkday.s, y = nCrashKSI)) +
+  geom_line(color = "darkorchid4", size = 1, group = 1) + geom_point() + facet_wrap("grp_hr") +
+  ylab("KSI Crashes")
+
+# by wkday
+p3 <- ggplot(data = ts_group_by(w.all.4hr.wd, wkday.s), aes(x = wkday.s, y = nCrashKSI)) +
+  geom_line(color = "darkorchid4", size = 1, group = 1) + geom_point() +
+  ylab("KSI Crashes") +
+  theme(axis.text.x = element_text(size=7, vjust = 0.2, angle=90))
+
+# by 4-hour window
+p4 <- ggplot(data = ts_group_by(w.all.4hr.wd, grp_hr), aes(x = grp_hr, y = nCrashKSI)) +
+  geom_line(color = "darkorchid4", size = 1, group = 1) + geom_point() +
+  ylab("KSI Crashes") 
+
+multiplot(p1, p2, p3, p4)
+
+dev.off()
 
 # Mean and variance ----
 hist(w.all.4hr.wd$uniqueCrashreports)

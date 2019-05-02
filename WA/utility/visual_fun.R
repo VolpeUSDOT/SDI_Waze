@@ -2,7 +2,11 @@
 
 ts_group_by <- function(table, ... ) {
   table %>% group_by(.dots = lazyeval::lazy_dots(...)) %>% 
-    summarise(uniqueCrashreports = sum(uniqueCrashreports))
+    summarise(uniqueCrashreports = sum(uniqueCrashreports),
+              nCrashKSI = sum(nCrashKSI),
+              uniqueWazeEvents = sum(uniqueWazeEvents),
+              nWazeAccident = sum(nWazeAccident),
+              nWazeJam =  sum(nWazeJam))
 }
   
   

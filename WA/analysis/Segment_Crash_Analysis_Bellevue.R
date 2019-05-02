@@ -254,7 +254,7 @@ w.all = w.all %>%
   mutate(time_hr = as.POSIXct(segtime, '%Y-%j %H', tz = 'America/Los_Angeles'))
 
 # select a few variables as example
-w.sub <- w.all[, c("time_hr", "RDSEG_ID", "uniqueCrashreports", "uniqueWazeEvents", "nWazeAccident", "nWazeJam")]
+w.sub <- w.all[, c("time_hr", "RDSEG_ID", "uniqueCrashreports", "nCrashKSI", "uniqueWazeEvents", "nWazeAccident", "nWazeJam")]
 
 # join day.hour with w.sub on time_hr, NA fields were converted to zeros.
 w.sub <- day.hour %>% left_join(w.sub, by = c("time_hr")) %>% 
@@ -272,6 +272,7 @@ w.sub_seg <- w.sub %>%
   group_by(time_hr, year, day, hour) %>% 
   summarize(
     uniqueCrashreports = sum(uniqueCrashreports),
+    nCrashKSI = sum(nCrashKSI),
     uniqueWazeEvents = sum(uniqueWazeEvents),
     nWazeAccident = sum(nWazeAccident),
     nWazeJam =  sum(nWazeJam)
@@ -294,7 +295,7 @@ w.sub_seg$weekday = factor(w.sub_seg$weekday, levels(w.sub_seg$weekday)[c(4,2,6,
 stopifnot(!is.unsorted(w.sub_seg$time_hr)) # still in the order
 
 ## ggplot of time series
-f <- paste0(visual.loc, '/Bellevue_crashes_time_series.png')
+f <- paste0(visual.loc, '/Bellevue_waze_time_series.png')
 
 # use minimal format
 theme_set(theme_minimal())
@@ -302,47 +303,97 @@ theme_set(theme_minimal())
 png(f, width = 12, height = 10, units = 'in', res = 300)
 
 # by day hour
-p1 <- ggplot(data = w.sub_seg, aes(x = time_hr, y = uniqueCrashreports)) +
+p1 <- ggplot(data = w.sub_seg, aes(x = time_hr, y = uniqueWazeEvents)) +
   geom_line(color = "darkorchid4", size = 1) + geom_point() +
-  ylab("Number of Crashes")
+  ylab("Waze")
 
 # by day
-p2 <- ggplot(data = ts_group_by(w.sub_seg, date), aes(x = date, y = uniqueCrashreports)) +
+p2 <- ggplot(data = ts_group_by(w.sub_seg, date), aes(x = date, y = uniqueWazeEvents)) +
   geom_line(color = "darkorchid4", size = 1) + geom_point() +
-  ylab("Number of Crashes")
+  ylab("Waze")
 
 # by month
-p3 <- ggplot(data = ts_group_by(w.sub_seg, month), aes(x = month, y = uniqueCrashreports)) +
+p3 <- ggplot(data = ts_group_by(w.sub_seg, month), aes(x = month, y = uniqueWazeEvents)) +
   geom_line(color = "darkorchid4", size = 1) + geom_point() +
-  ylab("Number of Crashes") +
+  ylab("Waze") +
+  scale_x_date(date_breaks = "1 month", date_labels = "%b")
+
+# by weekday
+p4 <- ggplot(data = ts_group_by(w.sub_seg, weekday), aes(x = weekday, y = uniqueWazeEvents)) +
+  geom_line(color = "darkorchid4", size = 1, group = 1) + geom_point() +
+  ylab("Waze")
+
+# by hour
+p5 <- ggplot(data = ts_group_by(w.sub_seg,  hour), aes(x = hour, y = uniqueWazeEvents)) +
+  geom_line(color = "darkorchid4", size = 1, group = 1) + geom_point() +
+  ylab("Waze")
+
+# by weekday hour
+p6 <- ggplot(data = ts_group_by(w.sub_seg, weekday, hour), aes(x = paste0(as.numeric(weekday),"-",hour), y = uniqueWazeEvents)) +
+  geom_line(color = "darkorchid4", size = 1, group = 1) + geom_point() +
+  theme(axis.text.x = element_text(size=7, vjust = 0.2, angle=90)) +
+  ylab("Waze") + xlab("weekday-hour")
+
+# by month hour
+p7 <- ggplot(data = ts_group_by(w.sub_seg, month, hour), aes(x = paste0(month,hour), y = uniqueWazeEvents)) +
+  geom_line(color = "darkorchid4", size = 1, group = 1) + geom_point() +
+  theme(axis.text.x = element_text(size=7, vjust = 0.2, angle=90)) +
+  ylab("Waze") + xlab("month-hour")
+
+multiplot(p1, p2, p3, p4, p5, p6, p7)
+
+dev.off()
+
+
+f <- paste0(visual.loc, '/Bellevue_crashes_time_series_KSI.png')
+
+# use minimal format
+theme_set(theme_minimal())
+
+png(f, width = 12, height = 10, units = 'in', res = 300)
+
+# by day hour
+p1 <- ggplot(data = w.sub_seg, aes(x = time_hr, y = nCrashKSI)) +
+  geom_line(color = "darkorchid4", size = 1) + geom_point() +
+  ylab("KSI Crashes")
+
+# by day
+p2 <- ggplot(data = ts_group_by(w.sub_seg, date), aes(x = date, y = nCrashKSI)) +
+  geom_line(color = "darkorchid4", size = 1) + geom_point() +
+  ylab("KSI Crashes")
+
+# by month
+p3 <- ggplot(data = ts_group_by(w.sub_seg, month), aes(x = month, y = nCrashKSI)) +
+  geom_line(color = "darkorchid4", size = 1) + geom_point() +
+  ylab("KSI Crashes") +
   scale_x_date(date_breaks = "1 month", date_labels = "%b")
 
 # by week
-# p4 <- ggplot(data = ts_group_by(w.sub_seg, week), aes(x = week, y = uniqueCrashreports)) +
+# p4 <- ggplot(data = ts_group_by(w.sub_seg, week), aes(x = week, y = nCrashKSI)) +
 #   geom_line(color = "darkorchid4", size = 1) + geom_point() +
-#   ylab("Number of Crashes") +
+#   ylab("Crashes") +
 #   scale_x_date(date_breaks = "1 week", date_labels = "%W")
 # by weekday
-p4 <- ggplot(data = ts_group_by(w.sub_seg, weekday), aes(x = weekday, y = uniqueCrashreports)) +
+p4 <- ggplot(data = ts_group_by(w.sub_seg, weekday), aes(x = weekday, y = nCrashKSI)) +
   geom_line(color = "darkorchid4", size = 1, group = 1) + geom_point() +
-  ylab("Number of Crashes")
+  ylab("KSI Crashes")
 
 # by hour
-p5 <- ggplot(data = ts_group_by(w.sub_seg,  hour), aes(x = hour, y = uniqueCrashreports)) +
+p5 <- ggplot(data = ts_group_by(w.sub_seg,  hour), aes(x = hour, y = nCrashKSI)) +
   geom_line(color = "darkorchid4", size = 1, group = 1) + geom_point() +
-  ylab("Number of Crashes")
+  ylab("KSI Crashes")
 
 # by weekday hour
-p6 <- ggplot(data = ts_group_by(w.sub_seg, weekday, hour), aes(x = paste0(as.numeric(weekday),"-",hour), y = uniqueCrashreports)) +
+p6 <- ggplot(data = ts_group_by(w.sub_seg, weekday, hour), aes(x = paste0(as.numeric(weekday),"-",hour), y = nCrashKSI)) +
   geom_line(color = "darkorchid4", size = 1, group = 1) + geom_point() +
   theme(axis.text.x = element_text(size=7, vjust = 0.2, angle=90)) +
-  ylab("Number of Crashes") + xlab("weekday-hour")
+  ylab("KSI Crashes") + xlab("weekday-hour")
 
 # by month hour
-p7 <- ggplot(data = ts_group_by(w.sub_seg, month, hour), aes(x = paste0(month,hour), y = uniqueCrashreports)) +
+p7 <- ggplot(data = ts_group_by(w.sub_seg, month, hour), aes(x = paste0(month,hour), y = nCrashKSI)) +
   geom_line(color = "darkorchid4", size = 1, group = 1) + geom_point() +
   theme(axis.text.x = element_text(size=7, vjust = 0.2, angle=90)) +
-  ylab("Number of Crashes") + xlab("month-hour")
+  ylab("KSI Crashes") + xlab("month-hour")
 
 multiplot(p1, p2, p3, p4, p5, p6, p7)
 

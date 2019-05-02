@@ -55,6 +55,8 @@ group_by_Waze_Crash <- function(table, ... ) {
       uniqueCrashreports = sum(uniqueCrashreports),
       
       nCrashInjuryFatal = sum(nCrashInjuryFatal),
+      nCrashSeriousInjury = sum(nCrashSeriousInjury),
+      nCrashKSI = sum(nCrashKSI),
       nCrashInjury = sum(nCrashInjury),
       nCrashPDO = sum(nCrashPDO),
       nCrashWorkzone = sum(nCrashWorkzone)
@@ -63,7 +65,7 @@ group_by_Waze_Crash <- function(table, ... ) {
 
 # Weather, only by day and segments
 group_by_Weather <- function(table, ... ) {
-  table %>% group_by_(.dots = ...) %>% 
+  table %>% group_by(.dots = ...) %>% 
     summarise(
       PRCP = mean(PRCP, na.rm = T), # Should not be any NA, just to be safe adding na.rm = T
       TMIN = mean(TMIN, na.rm = T),                        
@@ -87,7 +89,7 @@ agg_fun <- function(w.all, t_var) {
   w.all.4hr <-left_join(w.all.4hr, wx.grd.day, by = c('RDSEG_ID', 'year', t_var))
   
   # all other variables need to match segments
-  seg_only_var <- names(w.all)[c(1, 54:91)]
+  seg_only_var <- names(w.all)[c(1, 57:94)]
   seg.only.data <- unique(w.all[, seg_only_var])
   
   w.all.4hr <- left_join(w.all.4hr, seg.only.data, by = 'RDSEG_ID')
