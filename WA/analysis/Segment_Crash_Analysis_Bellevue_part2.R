@@ -140,7 +140,7 @@ stopifnot(length(unique(w.all.4hr.wd$wkday)) == 7)
 stopifnot(length(unique(w.all.4hr.wd$grp_hr)) == 6)
 
 ## ggplot of time series
-f <- paste0(visual.loc, '/Bellevue_crashes_time_series_4hr_wd.png')
+f <- paste0(visual.loc, '/Bellevue_WazeAccidents_time_series_4hr_wd.png')
 
 # use minimal format
 theme_set(theme_minimal())
@@ -148,24 +148,24 @@ theme_set(theme_minimal())
 png(f, width = 6, height = 10, units = 'in', res = 300)
 
 # by both
-p1 <- ggplot(data = ts_group_by(w.all.4hr.wd, wkday.s, grp_hr), aes(x = grp_hr, y = uniqueCrashreports)) +
+p1 <- ggplot(data = ts_group_by(w.all.4hr.wd, wkday.s, grp_hr), aes(x = grp_hr, y = nWazeAccident)) +
   geom_line(color = "darkorchid4", size = 1, group = 1) + geom_point() + facet_wrap("wkday.s") +
-  ylab("Crashes")
+  ylab("Waze Acc.")
 
-p2 <- ggplot(data = ts_group_by(w.all.4hr.wd, wkday.s, grp_hr), aes(x = wkday.s, y = uniqueCrashreports)) +
+p2 <- ggplot(data = ts_group_by(w.all.4hr.wd, wkday.s, grp_hr), aes(x = wkday.s, y = nWazeAccident)) +
   geom_line(color = "darkorchid4", size = 1, group = 1) + geom_point() + facet_wrap("grp_hr") +
-  ylab("Crashes")
+  ylab("Waze Acc.")
 
 # by wkday
-p3 <- ggplot(data = ts_group_by(w.all.4hr.wd, wkday.s), aes(x = wkday.s, y = uniqueCrashreports)) +
+p3 <- ggplot(data = ts_group_by(w.all.4hr.wd, wkday.s), aes(x = wkday.s, y = nWazeAccident)) +
   geom_line(color = "darkorchid4", size = 1, group = 1) + geom_point() +
-  ylab("Crashes") +
+  ylab("Waze Acc.") +
   theme(axis.text.x = element_text(size=7, vjust = 0.2, angle=90))
 
 # by 4-hour window
-p4 <- ggplot(data = ts_group_by(w.all.4hr.wd, grp_hr), aes(x = grp_hr, y = uniqueCrashreports)) +
+p4 <- ggplot(data = ts_group_by(w.all.4hr.wd, grp_hr), aes(x = grp_hr, y = nWazeAccident)) +
   geom_line(color = "darkorchid4", size = 1, group = 1) + geom_point() +
-  ylab("Crashes") 
+  ylab("Waze Acc.") 
 
 multiplot(p1, p2, p3, p4)
 
