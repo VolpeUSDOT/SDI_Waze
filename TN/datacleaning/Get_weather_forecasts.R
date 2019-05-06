@@ -92,7 +92,7 @@ if(DARKSKY) {
   
   wx_tz <- over(wx_dat.proj, tz[,"tzid"]) # Match a tzid name to each row in wx_dat.proj weather wx_data 
   
-  wx_dat.proj@wx_data <- data.frame(wx_dat.proj@data, tzid = as.character(wx_tz$tzid))
+  wx_dat.proj@data <- data.frame(wx_dat.proj@data, tzid = as.character(wx_tz$tzid))
   
   # Loop over every row and apply the correct time zone to the weather forecast times
   local_time = vector()

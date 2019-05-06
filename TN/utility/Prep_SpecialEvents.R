@@ -97,8 +97,8 @@ if(!file.exists(file.path(localdir, "SpecialEvents", prepname))) { # if doen't e
   # Expand grid by hour
   # If there is no start / end time, apply from 0 to 24
   
-  # Make framework to join into. Max in 2018 now
-  dd <- dd %>% filter(Event_Date <= '2018-12-31')
+  # Make framework to join into. Max in 2019 now
+  dd <- dd %>% filter(Event_Date <= '2019-12-31')
   
   all.hour <- seq(from = as.POSIXct(paste(min(dd$Event_Date), "0:00"), tz = "America/Chicago"), 
                     to = as.POSIXct(paste(max(dd$Event_Date), "0:00"), tz = "America/Chicago"),
@@ -203,7 +203,7 @@ if(!file.exists(file.path(localdir, "SpecialEvents", prepname))) { # if doen't e
                file.path(localdir, "SpecialEvents", paste0(prepname, ".RData")),
                file.path(teambucket, state, "SpecialEvents", paste0(prepname, ".RData"))))
   
-  rm(dd, grid_dd_pip, grid_shp, spev2017, spev2018, cl,
+  rm(dd, grid_dd_pip, grid_shp, spev2017, spev2018, spev2019, cl,
      dh, g.i, gdh, gdh.dd, GridIDTime, spev, xx,
      all.hour, b, buffdist, buffdist.mi, e.hr, end.date.hr,
      end.hr, grid_id, grid_ids, hours, hr.seq, i, s.hr, start.date.hr, start.hr,

@@ -47,8 +47,12 @@ state = "TN"
 # <><><><><>
 
 # Load a fitted model from local machine -- run RandomForest_WazeGrids_TN.R to generate models
+# Loads rf.out, the model object, which we will feed new data to predict on.
+# New data will need the same structure as the data used in the model fitting.
 
 outputdir <- file.path(localdir, "Random_Forest_Output")
+
+load(file.path(outputdir, paste0('TN_Model_05_', g, '_RandomForest_Output.RData')))
 
 # Load data used for fitting - prepared also in RandomForest_wazeGrids_TN.R
 
@@ -56,13 +60,80 @@ Waze_Prepared_Data = dir(localdir)[grep(paste0('^', state, '_\\d{4}-\\d{2}_to_\\
 
 load(file.path(localdir, Waze_Prepared_Data))
 
+# Create week ----
+# Create GRID_ID by time variables for the next week, to join everything else into 
+today <- Sys.Date()
+
+
+day_seq <- seq(today, today+7, by = 1)
+hour_seq <- 0:23
+
+day_x_hour <- expand.grid(Day = day_seq, Hour = hour_seq)
+
+day_hour_seq <- as.POSIXct(paste(day_x_hour$Day, day_x_hour$Hour), 
+                           format = '%Y-%m-%d %H', tz = 'America/Chicago')
+
+day_hour_seq <- format(day_hour_seq, '%Y-%j %H')
+
+grid_seq <- sort(unique(w.allmonths$GRID_ID))
+
+grid_x_day <- expand.grid(GRID_ID = grid_seq,
+                          hextime = day_hour_seq)
+
+grid_x_day <- grid_x_day %>%
+  mutate(hextime = as.POSIXct(hextime, format = '%Y-%j %H'),
+         Year = format(hextime, '%Y'),
+         mo = format(hextime, '%m'),
+         day = format(hextime, '%j'),
+         hour = as.numeric(format(hextime, '%H')),
+         DayOfWeek = format(hextime, '%u'), # Monday = 1
+         date = format(hextime, '%Y-%m-%d'))
+
+# dim(grid_x_day) # 215,040 rows, 7 columns for 01dd fishnet
+na.action = "fill0" # This is an argument in append.hex, below. Other options are 'omit' or 'keep'.
+
 # Get special events for next week ----
 
 # Start with last week of 2018; need to get 2019. This is created by Prep_SpecialEvents.R
 load(file.path(localdir, 'SpecialEvents', paste0('Prepared_TN_SpecialEvent_', g, '.RData')))
 
+# Join with append.hex
+next_week <- append.hex(hexname = 'grid_x_day',
+                        data.to.add = "TN_SpecialEvent", state = state, na.action = na.action)
+
 # Get weather for next week ----
 
-source(file.path(codeloc, 'TN', 'datacleaning', 'Get_weather_forecasts.R'))
+source(file.path(codeloc, 'TN', 'utility', 'Prep_ForecastWeather.R'))
+
+wx.grd.day$day <- as.Date(wx.grd.day$day)
+
+next_week <- append.hex(hexname = 'next_week',
+                        data.to.add = "wx.grd.day", state = state, na.action = na.action)
 
 # Generate Waze events for next week ----
+
+source(file.path(codeloc, 'TN', 'utility', 'Prep_ExpectedWaze.R'))
+
+next_week <- left_join(next_week, w.expected,
+                        by = c('GRID_ID', 'mo', 'DayOfWeek', 'hour'))
+  
+  
+# Add in static variables: Historical crashes, historical FARS, and urban/rural. Grab these from w.allmonths by GRID_ID
+
+next_week2 <- left_join(next_week, w.allmonths %>% 
+                          dplyr::select(GRID_ID, 
+                                 UA_Cluster, UA_Urban, UA_Rural,
+                                 TotalHistCrashsum, TotalFatalCrashsum),
+                        by = 'GRID_ID')
+
+  
+  
+  
+  
+  
+  
+
+
+
+
+# 

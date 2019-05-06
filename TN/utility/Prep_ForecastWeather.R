@@ -2,9 +2,10 @@
 # Need to create an interpolated grid based on forecasted weather.
 
 # Run from PredictWeek_TN.R, following Get_weather_forecasts.R, which provides dat 
-# already in memory are localdir and g, which repreresents the grid type to use
-# 
-# Next step after this script is to run append.hex function to add 
+# already in memory: localdir, teambucket, codeloc, state, and g, which repreresents the grid type to use
+
+# Also already in memory is `next_week`, a data frame of the grid ID and date/time for the next week
+ 
 censusdir <- paste0(user, "/workingdata/census") # full path for readOGR, for buffered state shapefile created in first step of data pipeline, ReduceWaze_SDC.R
 
 temp.outputdir <- "~/tempout" # to hold daily output files as they are generated, and then sent to team bucket
@@ -15,64 +16,28 @@ library(gstat) # For kriging
 library(raster) # masks several functions from dplyr, use caution
 library(doParallel)
 library(foreach)
-  
-  cat("Preparing Forecasts to ", max  , "for", g, "\n")
-  
-  # Read in GHCN data
-  wx.files <- dir(file.path(localdir, "Weather", "GHCN"))
-  wx <- vector()
-  
-  # Most stations don't have most of the wx variables. Simplify to core variables, per GHCN documentation:
-  core_vars = c("STATION", "NAME", "DATE", 
-                "PRCP", "SNOW", "SNWD", "TMAX", "TMIN")
-  # longer set of possible variables
-  # vars = c("STATION", "NAME", "DATE", "AWND", "DAPR", "MDPR", "PGTM", "PRCP", "SNOW", "SNWD", "TAVG", "TMAX", "TMIN", "TOBS", "WSFG", "WT01", "WT02", "WT03", "WT04", "WT05", "WT06", "WT08", "WT10", "WT11")
 
-  for(k in wx.files){ # k = wx.files[1]
-    if(length(grep('stations', k))==0){
-      wxx <- read.csv(file.path(localdir, "Weather", "GHCN", k))
-      wx <- rbind(wx, wxx[core_vars])
-      rm(wxx)
-    }
+prepname =  paste0("TN_Forecasts_Gridded_", Sys.Date(), ".RData")
+
+if(!file.exists(file.path(localdir, 'Weather', prepname))) {
+
+  cat("Preparing Forecasts to", max(next_week$date) , "for", g, "\n")
+  
+  # Get weather forecast for the next week
+  # First check to see if forecast has been run already from today (to not over-user API call)
+  if(file.exists(file.path(localdir, 'Weather', paste0("TN_Forecasts_", Sys.Date(), ".RData")))) {
+    load(file.path(localdir, 'Weather', paste0("TN_Forecasts_", Sys.Date(), ".RData")))
+  } else {
+    source(file.path(codeloc, 'TN', 'datacleaning', 'Get_weather_forecasts.R'))
   }
-
-  station_file <- file.path(localdir, "Weather", "GHCN", wx.files[grep('stations', wx.files)])
-  stations <- read_fwf(station_file,
-                       col_positions = fwf_empty(station_file))
-  names(stations) = c("STATION", "lat", "lon", "masl", "NAME", "x1", "x2", "x3")
   
-  wx$DATE <- as.Date(as.character(wx$DATE))
-  
-  wx <- wx[order(wx$DATE, wx$STATION),]
-  
-  # Make sure values are reasonable
-  # range(wx$PRCP, na.rm=T)
-  # wx %>%
-  #   filter(TMAX < 10) # Looks possible
-  # wx %>%
-  #   filter(TMIN < -10) # Replace -99 with NA
-   
-  wx$TMIN[wx$TMIN == -99] = NA
-  wx$TMAX[wx$TMAX == -99] = NA
-
-  # To match with forecast, want the following by day
-  # date: yday, hour
-  # high: fahrenheit
-  # low: fahrenheit
-  # precip
-  # snow_allday: in
-
-  wx <- left_join(wx, stations[1:5], by = "STATION")
   
   # Interpolate over state ----
   # http://rspatial.org/analsis/rst/4-interpolation.html
   # First, make this a spatial points data frame
   # Project crashes
-  wx.proj <- SpatialPointsDataFrame(wx[c("lon", "lat")], 
-                                       wx,
-                                       proj4string = CRS("+proj=longlat +datum=WGS84"))
-  
-  wx.proj <- spTransform(wx.proj, CRS(proj.USGS))
+
+  wx.proj <- spTransform(wx_dat.proj, CRS(proj.USGS))
   
   # Read in grid
   grid_shp <- rgdal::readOGR(file.path(localdir, "Shapefiles"), layer = g)
@@ -87,18 +52,20 @@ library(foreach)
   
   grid_shp <- grid_shp[as.vector(grid_intersects),]
   
-  wx <- wx %>%
-    mutate(mo = format(DATE, "%m"))
+  wx <- wx_dat %>%
+    mutate(local_time = as.POSIXct(local_time, '%Y-%m-%d %H:%M:%s'),
+           mo = format(local_time, "%m"),
+           date = format(local_time, '%Y-%m-%d'))
   
-  # Plot average Jan and June max temp by station to check
-  source(file.path(codeloc, 'TN', 'datacleaning', 'Plot_weather_points.R'))
-  
-  # Options: nearest neighbor interpolation, inverse distance weighted, ordinary kriging...
-  # Will make one raster for each variable of interest, per day, and then apply to grid/hour.
-  # Here use kriging from gstat. Models are all based on spatial variance of the target variabel
+  wx.proj@data <- wx.proj@data %>%
+    mutate(local_time = as.POSIXct(local_time, '%Y-%m-%d %H:%M:%s'),
+           mo = format(local_time, "%m"),
+           date = format(local_time, '%Y-%m-%d'))
   
   # Kriging. Intercept only = ordinary kriging.
-  cl <- makeCluster(parallel::detectCores())
+  # Parallize by day -- only need up to 7 cores
+  use.cores = ifelse(parallel::detectCores() > 7, 7, parallel::detectCores()) 
+  cl <- makeCluster(use.cores)
   registerDoParallel(cl)
   
   # Create an empty raster grid for the state; we will interpolate over this grid, then assign values from the raster to each grid cell. Increase n for smaller raster cells (more time-intensive)
@@ -111,21 +78,19 @@ library(foreach)
   
   StartTime <- Sys.time()
   
-  writeLines(c(""), paste0("Prep_Weather_", g, "_log.txt"))    
+  writeLines(c(""), paste("Prep_Weather_to", max(next_week$date), g, "log.txt", sep="_"))    
   
   # Start parallel loop ----
   # limit to dates in the set of months we are using, see do.months specified in the RandomForest_WazeGrids file.
-  all_wx_days = unique(wx$DATE)
-  all_wx_ym = format(all_wx_days, "%Y-%m")
-  use_wx_days = all_wx_days[all_wx_ym %in% do.months]
+  all_wx_days = unique(wx$date)
   
-  wx.grd.day <- foreach(day = use_wx_days, 
+  wx.grd.day <- foreach(day = all_wx_days, 
                       .packages = c('raster','gstat','dplyr','rgdal'), 
                       .combine = rbind) %dopar% {
     # day = unique(wx$DATE)[1]
                         
     cat(paste(Sys.time()), as.character(day), "\n", 
-        file = paste0("Prep_Weather_", g, "_log.txt"), append = T) 
+        file = paste("Prep_Weather_to", max(next_week$date), g, "log.txt", sep="_"), append = T) 
         
     # Scan team bucket for completed daily weather prep ----
     fn = paste("Prep_Weather_Daily_", day,"_", g, ".RData", sep="")
@@ -143,44 +108,40 @@ library(foreach)
       load(file.path(temp.outputdir, fn))
     } else {
     
-    wx.day = wx.proj[wx.proj$DATE == day,]
+    wx.day = wx.proj[wx.proj$date == day,]
                         
-    f.p <- as.formula(PRCP ~ 1)
+    f.p <- as.formula(precipIntensityMax  ~ 1)
     
-    vg_prcp <- gstat::variogram(PRCP ~ 1, locations = wx.day[!is.na(wx.day$PRCP),])
+    vg_prcp <- gstat::variogram(precipIntensityMax  ~ 1, locations = wx.day[!is.na(wx.day$precipIntensityMax ),])
     dat.fit <- fit.variogram(vg_prcp, fit.ranges = F, fit.sills = F,
                              vgm(model = "Sph"))
     # plot(vg_prcp, dat.fit) # Plot the semi variogram. 
-    dat.krg.prcp <- krige(f.p, wx.day[!is.na(wx.day$PRCP),], grd, dat.fit)
+    dat.krg.prcp <- krige(f.p, wx.day[!is.na(wx.day$precipIntensityMax),], grd, dat.fit)
     
     # Rasterize
     prcp_r <- raster::raster(dat.krg.prcp)
     prcp_r <- mask(prcp_r, grid_shp)
-    # plot(prcp_r,  
-    #      main = "Map of precipitation on 2017-04-01")
-     
-    # Plot the 95% confidence intervals
-    # prcp_ci <- sqrt(raster(dat.krg.prcp, layer = 'var1.var')) * 1.96
-    # prcp_ci <- mask(prcp_ci, grid_shp)
-    # plot(prcp_ci, main = "95% CI map of precipitation on 2017-04-01",
-    #      sub = "Smaller values = greater confidence")
     
     # Now do tmin, tmax, and snow
-    f.tmin <- as.formula(TMIN ~ 1)
-    vg_tmin <- variogram(TMIN ~ 1, wx.day[!is.na(wx.day$TMIN),])
+    f.tmin <- as.formula(temperatureMin ~ 1)
+    vg_tmin <- variogram(temperatureMin ~ 1, wx.day[!is.na(wx.day$temperatureMin),])
     dat.fit <- fit.variogram(vg_tmin, fit.ranges = F, fit.sills = F,
                              vgm(model = "Sph"))
-    dat.krg.tmin <- krige(f.tmin, wx.day[!is.na(wx.day$TMIN),], grd, dat.fit)
+    dat.krg.tmin <- krige(f.tmin, wx.day[!is.na(wx.day$temperatureMin),], grd, dat.fit)
     tmin_r <- raster::raster(dat.krg.tmin)
     tmin_r <- mask(tmin_r, grid_shp)
     
-    f.tmax <- as.formula(TMAX ~ 1)
-    vg_tmax <- variogram(TMAX ~ 1, wx.day[!is.na(wx.day$TMAX),])
+    f.tmax <- as.formula(temperatureMax ~ 1)
+    vg_tmax <- variogram(temperatureMax ~ 1, wx.day[!is.na(wx.day$temperatureMax),])
     dat.fit <- fit.variogram(vg_tmax, fit.ranges = F, fit.sills = F,
                              vgm(model = "Sph"))
-    dat.krg.tmax <- krige(f.tmax, wx.day[!is.na(wx.day$TMAX),], grd, dat.fit)
+    dat.krg.tmax <- krige(f.tmax, wx.day[!is.na(wx.day$temperatureMax),], grd, dat.fit)
     tmax_r <- raster::raster(dat.krg.tmax)
     tmax_r <- mask(tmax_r, grid_shp)
+    
+    # SNOW: model fitted with historical data had a variable called SNOW. Forecast does not, but does have precipType, so create SNOW from this.
+    wx.day@data <- wx.day@data %>%
+      mutate(SNOW = ifelse(precipType == 'snow', precipIntensity, 0))
     
     f.snow <- as.formula(SNOW ~ 1)
     vg_snow <- variogram(SNOW ~ 1, wx.day[!is.na(wx.day$SNOW),])
@@ -191,14 +152,7 @@ library(foreach)
     snow_r <- mask(snow_r, grid_shp)
     
     # Apply to grid cells in year-day ----
-    
-    # Trying to speed up with rasterize. Doesn't help, because converts to the grid cell dimensions of the raster object, we need to preserve the polygon geometry
-    # extracttimestart <- Sys.time()
-    # clip1 <- crop(prcp_r, extent(grid_shp))
-    # grid_rst <- rasterize(grid_shp, clip1, mask = T) # still slow, but faster than extract
-    # prcp_extr_r <- getValues(grid_rst) # instant
-    # cat(Sys.time()-extracttimestart)
-    # extracttimestart <- Sys.time()
+
     # Need to extract values from the raster layers to the polygons
     prcp_extr <- raster::extract(x = prcp_r,   # Raster object
                                  y = grid_shp, # SpatialPolygons
@@ -255,21 +209,18 @@ library(foreach)
     daily_result
   } # end parallel loop
    
-  # Plot gridded versions of same point maps to check
-  source(file.path(codeloc, 'TN', 'datacleaning', 'Plot_weather_gridded.R'))
-  
   EndTime <- Sys.time() - StartTime
   cat(round(EndTime, 2), attr(EndTime, "units"), "\n")
    
   save(list = c("wx.grd.day"), 
-       file = file.path(localdir, "Weather", paste0(prepname, ".RData")))
+       file = file.path(localdir, "Weather", prepname))
 
   # Copy to S3
   system(paste("aws s3 cp",
-               file.path(localdir, "Weather", paste0(prepname, ".RData")),
-               file.path(teambucket, state, "Weather", paste0(prepname, ".RData"))))
+               file.path(localdir, "Weather", prepname),
+               file.path(teambucket, state, "Weather", prepname)))
 
   } else {
-  load(file.path(localdir, "Weather", paste0(prepname, ".RData")))
+  load(file.path(localdir, "Weather", prepname))
 }
 
