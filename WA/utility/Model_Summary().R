@@ -14,10 +14,10 @@ Poisson_model_summary <- function(model_list, out.name){
     mvec <- cbind(mvec, sum(vec[1:i]) + 1) # lower index
   }
   
-  M = data.frame(matrix(NA,N,7))
+  M = data.frame(matrix(NA,N,8))
   vec1 <- vec[2:(length(model_list)+1)]
   
-  colnames(M) <- c("Model","Formula","Data","AIC", "Variable", "Exp_coef", "vif")
+  colnames(M) <- c("Model","Formula","Data", "N_Obs","AIC", "Variable", "Exp_coef", "vif")
   
   for(i in 1:length(model_list)){
     lm <- model_list[[i]]
@@ -27,14 +27,15 @@ Poisson_model_summary <- function(model_list, out.name){
     M[m:n,1] = row.name[i]
     M[m:n,2] = paste(format(formula(lm)), collapse = "") # paste(eval(lm$call[[2]]), collapse = "T") # formula
     M[m:n,3] = ifelse(length(lm$call[[3]]) > 1, paste(format(lm$call[[3]]), collapse = ""), paste(lm$call[[4]])) # data
-    M[m:n,4] = round(summary(lm)$aic,2) # get AIC
+    M[m:n,4] = length(fitted(lm)) # N of obs
+    M[m:n,5] = round(summary(lm)$aic,2) # get AIC
     for (k in 1:ni){
-      M[m+k-1, 5] = rownames(summary(lm)$coef)[k] # names of variables
+      M[m+k-1, 6] = rownames(summary(lm)$coef)[k] # names of variables
       p_value = ifelse(summary(lm)$coef[k,4] < 0.05, "*","") # p-value, whether the summary will show * for significance at 95%
-      M[m+k-1, 6] = paste0(round(exp(summary(lm)$coef[k,1]),2), p_value) # convert coefficients to odds ratio
+      M[m+k-1, 7] = paste0(round(exp(summary(lm)$coef[k,1]),2), p_value) # convert coefficients to odds ratio
     }
     for (j in 2:ni){
-      M[m+j-1, 7] = ifelse(nrow(summary(lm)$coef)<=2, NA, paste0(round(vif(lm)[j-1],4)))
+      M[m+j-1, 8] = ifelse(nrow(summary(lm)$coef)<=2, NA, paste0(round(vif(lm)[j-1],4)))
     }
   }
   

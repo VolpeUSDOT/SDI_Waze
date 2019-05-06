@@ -67,7 +67,7 @@ weather_var = c('PRCP', 'TMIN', 'TMAX', 'SNOW')
 
 other_var = c("nBikes", "nFARS")
 
-time_var = c("grp_hr", "wkday") # time variable can be used as indicator or to aggregate the temporal resolution.
+time_var = c("grp_hr", "wkday", "wkend") # time variable can be used as indicator or to aggregate the temporal resolution.
 
 seg_var = c("Shape_STLe", "SpeedLimit", "ArterialCl"
             # , "FunctionCl"
@@ -89,6 +89,7 @@ response.var.list <- c(
 w.all.4hr.wd$wkday.s = w.all.4hr.wd$wkday
 levels(w.all.4hr.wd$wkday.s) <- c("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat")
 
+w.all.4hr.wd$wkend = ifelse(w.all.4hr.wd$wkday.s %in% c("Sun","Sat"), "Weekend", "Weekday")
 
 # Correlation & ggpairs ----
 correlations <- cor(w.all.4hr.wd[, c(response.var.list, "Shape_STLe")])
@@ -231,10 +232,10 @@ includes = c(
   weather_var,     # Weather variables
   "nBikes",        # bike/ped conflict counts at segment level (no hour)
   "nFARS",         # FARS variables
-  seg_var, "wkday", "grp_hr"
+  seg_var, "wkend", "grp_hr"
 )
 
-modelno = "15.poi.art"
+modelno = "15.poi.art.wkend"
 
 response.var <- response.var.list[1] # use crash counts
 
@@ -289,6 +290,11 @@ AIC(m10.poi.art, m11.poi.art, m12.poi.art, m13.poi.art, m14.poi.art, m15.poi.art
 # m14.poi.art 27 7982.763
 # m15.poi.art 36 7195.533
 
+AIC(m15.poi.art, m15.poi.art.wkend) # compare two models with weekday or weekend as variables.
+# model             df      AIC
+# m15.poi.art       36 7137.534
+# m15.poi.art.wkend 31 7130.908
+
 # extract logistic model objects, save in a list
 model_type = "Poisson_models"
 out.name <- file.path(data.loc, 'Model_output', paste0("Bell_",model_type,".Rdata"))
@@ -329,15 +335,45 @@ M <- Poisson_model_summary_list$M
 model_summary  <- Poisson_model_summary_list$model_summary
 model_compare <- Poisson_model_summary_list$model_compare
 
+write.csv(model_summary, file.path(output.loc, "Posson_model_summary.csv"), row.names = F)
+
+continous_var <- c(waze_dir_travel, waze_rd_type, # direction of travel + road types from Waze
+                   alert_types,     # counts of waze events by alert types
+                   weather_var,     # Weather variables
+                   "nBikes",        # bike/ped conflict counts at segment level (no hour)
+                   "nFARS",         # FARS variables
+                   "Shape_STLe", "SpeedLimit")
+corr <- cor(w.all.4hr.wd[, c(continous_var, "uniqueCrashreports")])
+write.csv(corr, file.path(output.loc, "Correlation.csv"))
+vif(m15.poi.art) # there are aliased coefficients in the model
+
+# Lasso or Ridge Regression
+install.packages("glmnet", repos = "http://cran.us.r-project.org")
+library(glmnetUtils)
+library(glmnet)
+x <- as.matrix(w.all.4hr.wd[, includes])
+y <- w.all.4hr.wd[, response.var]
+fit = glmnet(x, y, family = "poisson")
+fit = glmnet(use.formula, data = data, family = "poisson")
+plot(fit)
 
 # Random Forest and XGBoost ----
 # https://xgboost.readthedocs.io/en/latest/R-package/xgboostPresentation.html
 
 randomForest(use.formula, data = data) # RF model
 
-# TODO: create a scatter plot of observed vs fitted - Dan will send example.
-# scatter plot of Waze data vs fitted
+# TODO: 
+# create a scatter plot of observed vs fitted - Dan will send example.
+# Dan will send a generalized code so we can write a function to such scatter plot.
+
 # add # of observation of the model data into summary table, add data type ()
-# delete the three obs from 2019.
+# Jessie checked that the # of obs for all Poisson model (all roads 12,855 obs, arterial only 11,865) This further confirms that the model data completeness is good. 
+
+# DONE: delete the three obs from 2019.
+
 # try using weekday and weekend as one variable
+# Created this new variable, replace the week variable.
+
 # try lasso or ridge regression.
+# Jessie tried lasso or ridge regression using glmnet package, could not get it to work.
+
