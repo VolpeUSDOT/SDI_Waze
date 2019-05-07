@@ -42,7 +42,7 @@ source(file.path(codeloc, "analysis/RandomForest_WazeGrid_Fx.R"))
 setwd(localdir)
 
 # <><><><><>
-g = grids[2] # start with square grids, now running hex also. Change between 1 and 2.
+g = grids[1] # start with square grids, now running hex also. Change between 1 and 2.
 state = "TN"
 # <><><><><>
 
@@ -153,7 +153,7 @@ predict_next_week <- predict(rf.out, next_week_pred, type = "response",
 prob_next_week <- predict(rf.out, next_week_pred, type = "prob",
                              cutoff = c(1-cutoff, cutoff)) 
 
-names(prob_next_week) = c('Prob_NoCrash', 'Prob_Crash')
+colnames(prob_next_week) = c('Prob_NoCrash', 'Prob_Crash')
 
 next_week_out <- data.frame(next_week, Crash_pred = predict_next_week, prob_next_week)
 
@@ -173,7 +173,12 @@ system(paste(
 ))
 
 
+# Visualize predictions -----
+# use the following objects to make visualizations
+# next_week_out
 
-
-
-# 
+next_week_out <- read.csv(paste0('TN_Model_05_Predictions', g, '2019-05-06', '.csv'))
+VIZ = T
+if(VIZ){
+  source(codeloc, 'TN', 'analysis', 'Visualize_Next_Week.R')
+}
