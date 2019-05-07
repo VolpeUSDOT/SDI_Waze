@@ -42,7 +42,7 @@ source(file.path(codeloc, "analysis/RandomForest_WazeGrid_Fx.R"))
 setwd(localdir)
 
 # <><><><><>
-g = grids[1] # start with square grids, now running hex also. Change between 1 and 2.
+g = grids[2] # start with square grids, now running hex also. Change between 1 and 2.
 state = "TN"
 # <><><><><>
 
@@ -120,18 +120,58 @@ next_week <- left_join(next_week, w.expected,
   
 # Add in static variables: Historical crashes, historical FARS, and urban/rural. Grab these from w.allmonths by GRID_ID
 
-next_week2 <- left_join(next_week, w.allmonths %>% 
-                          dplyr::select(GRID_ID, 
-                                 UA_Cluster, UA_Urban, UA_Rural,
-                                 TotalHistCrashsum, TotalFatalCrashsum),
+w.staticvars <- w.allmonths %>% 
+  filter(!duplicated(GRID_ID)) %>%
+  dplyr::select(GRID_ID, 
+                UA_Cluster, UA_Urban, UA_Rural,
+                TotalHistCrashsum, TotalFatalCrashsum)
+
+next_week <- left_join(next_week, w.staticvars,
                         by = 'GRID_ID')
 
-  
-  
-  
-  
-  
-  
+
+# Make predictions ----
+
+# Use rf.out from Model 5 for this grid size
+# Make sure we have factor variables, with same levels as in the fitted data.
+# Model 05
+fitvars <- read.csv('Fitvars_05_TN_01dd_fishnet.csv')
+
+# Fill NA with 0
+next_week[is.na(next_week)] = 0
+
+next_week$DayOfWeek <- as.factor(next_week$DayOfWeek)
+levels(next_week$DayOfWeek) = c(levels(next_week$DayOfWeek), '0')
+next_week_pred <- next_week[,names(next_week) %in% fitvars$fitvars]
+
+# see Precision-recall tradeoff plots from re-fit local
+cutoff = 0.05
+
+predict_next_week <- predict(rf.out, next_week_pred, type = "response",
+                             cutoff = c(1-cutoff, cutoff)) 
+
+prob_next_week <- predict(rf.out, next_week_pred, type = "prob",
+                             cutoff = c(1-cutoff, cutoff)) 
+
+names(prob_next_week) = c('Prob_NoCrash', 'Prob_Crash')
+
+next_week_out <- data.frame(next_week, Crash_pred = predict_next_week, prob_next_week)
+
+write.csv(next_week_out, file = paste0('TN_Model_05_Predictions', g, Sys.Date(), '.csv'), row.names = F)
+
+zipname = paste0('TN_RandomForest_Predictions_', g, "_", Sys.Date(), '.zip')
+
+system(paste('zip', file.path('~/workingdata', zipname),
+             'Fitvars_05_TN_01dd_fishnet.csv',
+             paste0('TN_Model_05_Predictions', g, Sys.Date(), '.csv')
+             ))
+
+system(paste(
+  'aws s3 cp',
+  file.path('~/workingdata', zipname),
+  file.path(teambucket, 'export_requests', zipname)
+))
+
 
 
 

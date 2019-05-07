@@ -324,6 +324,22 @@ omits = c(alwaysomit,
           grep("nWazeJam_", names(w.allmonths), value = T) # neighboring jams
 )
 
+fitvars = names(w.allmonths)[is.na(match(names(w.allmonths), omits))]
+class_fit = n_lev_fit = levs_fit = vector()
+
+for(f in fitvars){
+  class_fit = c(class_fit, class(w.allmonths[,f]))
+  n_lev_fit = c(n_lev_fit, ifelse(is.factor(w.allmonths[,f]),
+                                  length(levels((w.allmonths[,f]))),
+                                  NA))
+  levs_fit = c(levs_fit, ifelse(is.factor(w.allmonths[,f]),
+                                  paste(levels((w.allmonths[,f])), collapse = ", "),
+                                  NA))
+}
+
+
+fitvar_df <- data.frame(fitvars, class_fit, n_lev_fit, levs_fit)
+write.csv(fitvar_df, file = paste0('Fitvars_', modelno, ".csv"))
 
 if(!REASSESS){
   keyoutputs[[modelno]] = do.rf(train.dat = w.allmonths, 

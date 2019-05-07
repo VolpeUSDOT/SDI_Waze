@@ -17,7 +17,7 @@
 
 waze_date_range <- paste(range(w.allmonths$date), collapse = "_to_")
 
-prepname =  paste0("TN_Waze_Expected_", waze_date_range, ".RData")
+prepname =  paste0("TN_Waze_Expected_", g, "_", waze_date_range, ".RData")
 
 if(!file.exists(file.path(localdir, 'Waze', prepname))){
 

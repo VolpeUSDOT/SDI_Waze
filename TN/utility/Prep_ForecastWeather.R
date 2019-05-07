@@ -13,15 +13,17 @@ temp.outputdir <- "~/tempout" # to hold daily output files as they are generated
 proj.USGS <- "+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs +ellps=GRS80 +towgs84=0,0,0"
 
 library(gstat) # For kriging
+library(rgeos) # for gIntersects
+library(rgdal)
 library(raster) # masks several functions from dplyr, use caution
 library(doParallel)
 library(foreach)
 
-prepname =  paste0("TN_Forecasts_Gridded_", Sys.Date(), ".RData")
+prepname =  paste0("TN_Forecasts_Gridded_", g, Sys.Date(), ".RData")
 
 if(!file.exists(file.path(localdir, 'Weather', prepname))) {
 
-  cat("Preparing Forecasts to", max(next_week$date) , "for", g, "\n")
+  cat("Preparing Forecasts to", as.character(max(next_week$date)), "for", g, "\n")
   
   # Get weather forecast for the next week
   # First check to see if forecast has been run already from today (to not over-user API call)
