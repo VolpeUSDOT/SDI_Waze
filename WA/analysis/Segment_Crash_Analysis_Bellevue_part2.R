@@ -357,10 +357,58 @@ fit = glmnet(x, y, family = "poisson")
 fit = glmnet(use.formula, data = data, family = "poisson")
 plot(fit)
 
-# Random Forest and XGBoost ----
+# Random Forest ----
 # https://xgboost.readthedocs.io/en/latest/R-package/xgboostPresentation.html
 
-randomForest(use.formula, data = data) # RF model
+# convert character to factor for random forest model
+w.all.4hr.wd = w.all.4hr.wd %>% mutate_if(is.character, as.factor)
+
+# split data to train and validation sets
+set.seed(254)
+train <- sample(nrow(w.all.4hr.wd), 0.7*nrow(w.all.4hr.wd), replace = FALSE)
+TrainSet <- w.all.4hr.wd[train,]
+ValidSet <- w.all.4hr.wd[-train,]
+# summary(TrainSet)
+# summary(ValidSet)
+
+# 12 is the best among 10-12, and 10-13
+includes = c(
+  waze_dir_travel, waze_rd_type, # direction of travel + road types from Waze
+  alert_types,     # counts of waze events by alert types
+  # weather_var,     # Weather variables
+  "nBikes",        # bike/ped conflict counts at segment level (no hour)
+  "nFARS",         # FARS variables
+  seg_var, "wkend", "grp_hr"
+)
+
+modelno = "15.rf.art.wkend"
+
+response.var <- response.var.list[1] # use crash counts
+
+Art.Only <- T # False to use all road class, True to Arterial only roads
+if(Art.Only) {data = TrainSet %>% filter(ArterialCl != "Local")} else {data = TrainSet} 
+
+# Simple 
+
+( predvars = names(w.all.4hr.wd)[names(w.all.4hr.wd) %in% includes] )
+
+( use.formula = as.formula(paste(response.var, "~", 
+                                 paste(predvars, collapse = "+"))) )
+
+assign(paste0('m', modelno),
+       randomForest(use.formula, data = TrainSet) # random forest model
+)
+# Warning
+# Warning message:
+#   In randomForest.default(m, y, ...) :
+#   The response has five or fewer unique values.  Are you sure you want to do regression?
+importance(m10.rf.art.wkend)   
+varImpPlot(m10.rf.art.wkend)
+
+
+# XGBoost ----
+
+
 
 # TODO: 
 # create a scatter plot of observed vs fitted - Dan will send example.
@@ -376,4 +424,8 @@ randomForest(use.formula, data = data) # RF model
 
 # try lasso or ridge regression.
 # Jessie tried lasso or ridge regression using glmnet package, could not get it to work.
+
+# Run XGboost
+# General highlevel performance comparison.
+
 
