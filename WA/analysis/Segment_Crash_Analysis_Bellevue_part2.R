@@ -29,7 +29,11 @@ library(pscl) # zero-inflated Poisson
 library(MASS) # NB model
 library(randomForest) # random forest
 library(car) # to get vif()
-
+library(xgboost)
+# #install from Github (Windows user will need to install Rtools first.)
+# install.packages("drat", repos="https://cran.rstudio.com")
+# drat:::addRepo("dmlc")
+# install.packages("xgboost", repos="http://dmlc.ml/drat/", type = "source")
 
 ## Working on shared drive
 wazeshareddir <- "//vntscex.local/DFS/Projects/PROJ-OS62A1/SDI Waze Phase 2"
@@ -365,28 +369,28 @@ w.all.4hr.wd = w.all.4hr.wd %>% mutate_if(is.character, as.factor)
 
 # split data to train and validation sets
 set.seed(254)
-train <- sample(nrow(w.all.4hr.wd), 0.7*nrow(w.all.4hr.wd), replace = FALSE)
-TrainSet <- w.all.4hr.wd[train,]
-ValidSet <- w.all.4hr.wd[-train,]
+train_index <- sample(nrow(w.all.4hr.wd), 0.7*nrow(w.all.4hr.wd), replace = FALSE)
+TrainSet <- w.all.4hr.wd[train_index,]
+ValidSet <- w.all.4hr.wd[-train_index,]
 # summary(TrainSet)
 # summary(ValidSet)
 
 # 12 is the best among 10-12, and 10-13
 includes = c(
-  waze_dir_travel, waze_rd_type, # direction of travel + road types from Waze
-  alert_types,     # counts of waze events by alert types
-  # weather_var,     # Weather variables
+  # waze_dir_travel, waze_rd_type, # direction of travel + road types from Waze
+  # alert_types,     # counts of waze events by alert types
+  weather_var,     # Weather variables
   "nBikes",        # bike/ped conflict counts at segment level (no hour)
   "nFARS",         # FARS variables
   seg_var, "wkend", "grp_hr"
 )
 
-modelno = "15.rf.art.wkend"
+modelno = "12.rf.art.wkend"
 
 response.var <- response.var.list[1] # use crash counts
 
-Art.Only <- T # False to use all road class, True to Arterial only roads
-if(Art.Only) {data = TrainSet %>% filter(ArterialCl != "Local")} else {data = TrainSet} 
+# Art.Only <- T # False to use all road class, True to Arterial only roads
+# if(Art.Only) {data = TrainSet %>% filter(ArterialCl != "Local")} else {data = TrainSet} 
 
 # Simple 
 
@@ -396,7 +400,7 @@ if(Art.Only) {data = TrainSet %>% filter(ArterialCl != "Local")} else {data = Tr
                                  paste(predvars, collapse = "+"))) )
 
 assign(paste0('m', modelno),
-       randomForest(use.formula, data = TrainSet) # random forest model
+       randomForest(use.formula, data = TrainSet %>% filter(ArterialCl != "Local")) # random forest model mtry (how many variables to try in each tree) and maxnodes (how deep the tree goes) are influenctial parameters to set for random forest model.
 )
 # Warning
 # Warning message:
@@ -405,12 +409,25 @@ assign(paste0('m', modelno),
 importance(m10.rf.art.wkend)   
 varImpPlot(m10.rf.art.wkend)
 
+# Compare % of var explained for these models, manual calculation
+print(m10.rf.art.wkend)
+cat("% Var explained: \n", 100 * (1-sum((m10.rf.art.wkend$y-m10.rf.art.wkend$pred   )^2) /
+                                  sum((m10.rf.art.wkend$y-mean(m10.rf.art.wkend$y))^2)
+                                  )
+    )
 
 # XGBoost ----
-
+# build a list containing two things, label and data
+train <- list("data" = data[,includes], "label" = TrainSet[,response.var])
 
 
 # TODO: 
+# next step:
+#   save model summary for random forest model
+# run XGboost models
+# save summary for XGboost models
+# a table for the best models of Poisson, RF, and XGboost.
+
 # create a scatter plot of observed vs fitted - Dan will send example.
 # Dan will send a generalized code so we can write a function to such scatter plot.
 
@@ -427,5 +444,4 @@ varImpPlot(m10.rf.art.wkend)
 
 # Run XGboost
 # General highlevel performance comparison.
-
 
