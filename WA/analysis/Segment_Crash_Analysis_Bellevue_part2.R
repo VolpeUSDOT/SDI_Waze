@@ -377,15 +377,15 @@ ValidSet <- w.all.4hr.wd[-train_index,]
 
 # 12 is the best among 10-12, and 10-13
 includes = c(
-  # waze_dir_travel, waze_rd_type, # direction of travel + road types from Waze
-  # alert_types,     # counts of waze events by alert types
-  weather_var,     # Weather variables
+  waze_dir_travel, waze_rd_type, # direction of travel + road types from Waze
+  alert_types,     # counts of waze events by alert types
+  # weather_var,     # Weather variables
   "nBikes",        # bike/ped conflict counts at segment level (no hour)
   "nFARS",         # FARS variables
   seg_var, "wkend", "grp_hr"
 )
 
-modelno = "12.rf.art.wkend"
+modelno = "15.rf.art.wkend"
 
 response.var <- response.var.list[1] # use crash counts
 
@@ -400,8 +400,8 @@ response.var <- response.var.list[1] # use crash counts
                                  paste(predvars, collapse = "+"))) )
 
 assign(paste0('m', modelno),
-       randomForest(use.formula, data = TrainSet %>% filter(ArterialCl != "Local")) # random forest model mtry (how many variables to try in each tree) and maxnodes (how deep the tree goes) are influenctial parameters to set for random forest model.
-)
+       randomForest(use.formula, data = TrainSet %>% filter(ArterialCl != "Local"))) # random forest model mtry (how many variables to try in each tree) and maxnodes (how deep the tree goes) are influenctial parameters to set for random forest model.
+
 # Warning
 # Warning message:
 #   In randomForest.default(m, y, ...) :
@@ -409,12 +409,51 @@ assign(paste0('m', modelno),
 importance(m10.rf.art.wkend)   
 varImpPlot(m10.rf.art.wkend)
 
-# Compare % of var explained for these models, manual calculation
-print(m10.rf.art.wkend)
+# Compare % of var explained for these models & manual calculation
+print(m10.rf.art.wkend) # 2.37
+print(m11.rf.art.wkend) # 3.42
+print(m12.rf.art.wkend) # 4.13
+print(m13.rf.art.wkend) # -0.26 (worse)
+print(m14.rf.art.wkend) # 32.02
+print(m15.rf.art.wkend) # 37.04
+
 cat("% Var explained: \n", 100 * (1-sum((m10.rf.art.wkend$y-m10.rf.art.wkend$pred   )^2) /
                                   sum((m10.rf.art.wkend$y-mean(m10.rf.art.wkend$y))^2)
                                   )
     )
+
+# Save RF model output
+model_type = "RF_models"
+out.name <- file.path(data.loc, 'Model_output', paste0("Bell_",model_type,".Rdata"))
+
+if(file.exists(out.name)){
+  load(out.name)} else {
+    
+    ClassFilter <- function(x) inherits(get(x), 'randomForest')
+    row.name <- Filter(ClassFilter, ls() )
+    RF_models <- lapply(row.name, function(x) get(x))
+    save(list = c("RF_models", "row.name", "TrainSet", "ValidSet", "response.var"), file = out.name)
+    
+  }
+
+# Save RF model summary
+ClassFilter <- function(x) inherits(get(x), 'randomForest' ) # excluding other potential classes that contains "lm" as the keywords.
+row.name <- Filter( ClassFilter, ls() )
+model_list <- lapply( row.name, function(x) get(x) )
+
+out.name <- file.path(output.loc, "Bell_RF_model_summary_list.Rdata")
+
+if(file.exists(out.name)){
+  load(out.name)} else {
+    source(file.path(codeloc, "/WA/utility/Model_Summary().R"))
+    RF_model_summary_list <- RF_model_summary(model_list, out.name)
+  }
+
+M <- RF_model_summary_list$M
+model_summary  <- RF_model_summary_list$model_summary
+model_compare <- RF_model_summary_list$model_compare
+
+
 
 # XGBoost ----
 # build a list containing two things, label and data
