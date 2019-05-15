@@ -216,7 +216,7 @@ var(w.all.4hr.wd$uniqueCrashreports) # 0.1179727
 ggplot(w.all.4hr.wd, aes(uniqueCrashreports)) + geom_histogram() + scale_x_log10()
 
 # <><><><><><><><><><><><><><><><><><><><><><><><>
-# Start Modelings ----
+# Start Poisson Modelings ----
 # Start simple
 # 10: seg_var + TimeOfDay + DayofWeek + Month
 # 11: 10 + nFARS
@@ -254,7 +254,7 @@ if(Art.Only) {data = w.all.4hr.wd %>% filter(ArterialCl != "Local")} else {data 
                                  paste(predvars, collapse = "+"))) )
 
 assign(paste0('m', modelno),
-       glm(use.formula, data = data, family=poisson) # regular Poisson Model
+       glm(use.formula, data = data, family = poisson) # regular Poisson Model
        # zeroinfl(use.formula, data = data) # zero-inflated Possion
        # glm.nb(use.formula, data = data) # regular NB
        # zeroinfl(use.formula, data = data, dist = "negbin", EM = F) # zero-inflated NB, EM algorithm looks for optimal starting values, which is slower.
@@ -313,7 +313,7 @@ if(file.exists(out.name)){
     
   }
 
-# row.name <- c("m10.poi", "m10.poi.art", "m11.poi", "m11.poi.art", "m12.poi", "m12.poi.art", "m13.poi", "m13.poi.art", "m14.poi", "m14.poi.art", "m15.poi", "m15.poi.art")
+row.name <- c("m10.poi", "m10.poi.art", "m11.poi", "m11.poi.art", "m12.poi", "m12.poi.art", "m13.poi", "m13.poi.art", "m14.poi", "m14.poi.art", "m15.poi", "m15.poi.art", "m15.poi.art.wkend")
 
 for (i in 1:length(row.name)) {
   
@@ -339,7 +339,7 @@ M <- Poisson_model_summary_list$M
 model_summary  <- Poisson_model_summary_list$model_summary
 model_compare <- Poisson_model_summary_list$model_compare
 
-write.csv(model_summary, file.path(output.loc, "Posson_model_summary.csv"), row.names = F)
+write.csv(model_summary, file.path(output.loc, "Poisson_model_summary.csv"), row.names = F)
 
 continous_var <- c(waze_dir_travel, waze_rd_type, # direction of travel + road types from Waze
                    alert_types,     # counts of waze events by alert types
@@ -351,7 +351,7 @@ corr <- cor(w.all.4hr.wd[, c(continous_var, "uniqueCrashreports")])
 write.csv(corr, file.path(output.loc, "Correlation.csv"))
 vif(m15.poi.art) # there are aliased coefficients in the model
 
-# Lasso or Ridge Regression
+# Lasso or Ridge Regression ----
 install.packages("glmnet", repos = "http://cran.us.r-project.org")
 library(glmnetUtils)
 library(glmnet)
@@ -372,6 +372,8 @@ set.seed(254)
 train_index <- sample(nrow(w.all.4hr.wd), 0.7*nrow(w.all.4hr.wd), replace = FALSE)
 TrainSet <- w.all.4hr.wd[train_index,]
 ValidSet <- w.all.4hr.wd[-train_index,]
+PredSet <- rbind(TrainSet, ValidSet)
+
 # summary(TrainSet)
 # summary(ValidSet)
 
@@ -390,7 +392,8 @@ modelno = "15.rf.art.wkend"
 response.var <- response.var.list[1] # use crash counts
 
 # Art.Only <- T # False to use all road class, True to Arterial only roads
-# if(Art.Only) {data = TrainSet %>% filter(ArterialCl != "Local")} else {data = TrainSet} 
+# if(Art.Only) {TrainSet = TrainSet %>% filter(ArterialCl != "Local")} else {TrainSet = TrainSet}
+# if(Art.Only) {ValidSet = ValidSet %>% filter(ArterialCl != "Local")} else {ValidSet = ValidSet}
 
 # Simple 
 
@@ -406,8 +409,10 @@ assign(paste0('m', modelno),
 # Warning message:
 #   In randomForest.default(m, y, ...) :
 #   The response has five or fewer unique values.  Are you sure you want to do regression?
-importance(m10.rf.art.wkend)   
-varImpPlot(m10.rf.art.wkend)
+importance(m15.rf.art.wkend)   
+varImpPlot(m15.rf.art.wkend)
+rf_pred <- predict(m15.rf.art.wkend, PredSet[, includes])
+range(rf_pred) # -2.701728e-16  3.258433e+00
 
 # Compare % of var explained for these models & manual calculation
 print(m10.rf.art.wkend) # 2.37
@@ -417,8 +422,9 @@ print(m13.rf.art.wkend) # -0.26 (worse)
 print(m14.rf.art.wkend) # 32.02
 print(m15.rf.art.wkend) # 37.04
 
-cat("% Var explained: \n", 100 * (1-sum((m10.rf.art.wkend$y-m10.rf.art.wkend$pred   )^2) /
-                                  sum((m10.rf.art.wkend$y-mean(m10.rf.art.wkend$y))^2)
+# the manual calculationg used "pred" within the randomForest object, it is actually OOB predicted values. Because the trees of rf model are grown almost to max depth and will overfit the training set, only cross-validation can be used assess the performance. https://stats.stackexchange.com/questions/109232/low-explained-variance-in-random-forest-r-randomforest
+cat("% Var explained: \n", 100 * (1-sum((m15.rf.art.wkend$y-m15.rf.art.wkend$pred   )^2) /
+                                  sum((m15.rf.art.wkend$y-mean(m15.rf.art.wkend$y))^2)
                                   )
     )
 
@@ -452,35 +458,76 @@ if(file.exists(out.name)){
 M <- RF_model_summary_list$M
 model_summary  <- RF_model_summary_list$model_summary
 model_compare <- RF_model_summary_list$model_compare
-
-
+write.csv(model_summary, file.path(output.loc, "RF_model_summary.csv"), row.names = F)
 
 # XGBoost ----
 # build a list containing two things, label and data
-train <- list("data" = data[,includes], "label" = TrainSet[,response.var])
+modelno = "15.xgb.art.wkend"
+
+Art.Only <- T # False to use all road class, True to Arterial only roads
+if(Art.Only) {TrainSet = TrainSet %>% filter(ArterialCl != "Local")} else {TrainSet = TrainSet}
+if(Art.Only) {ValidSet = ValidSet %>% filter(ArterialCl != "Local")} else {ValidSet = ValidSet}
+
+# need to convert character and factor columns to dummy variables.
+continous_var <- c(waze_dir_travel, waze_rd_type, # direction of travel + road types from Waze
+                   alert_types,     # counts of waze events by alert types
+                   weather_var,     # Weather variables
+                   "nBikes",        # bike/ped conflict counts at segment level (no hour)
+                   "nFARS",         # FARS variables
+                   "Shape_STLe", "SpeedLimit")
+
+TrainSet_xgb <- data.frame(TrainSet[, includes_xgb], model.matrix(~ TrainSet$ArterialCl + 0), model.matrix(~ TrainSet$wkend + 0), model.matrix(~ TrainSet$grp_hr + 0))
+ValidSet_xgb <- data.frame(ValidSet[, includes_xgb], model.matrix(~ ValidSet$ArterialCl + 0), model.matrix(~ ValidSet$wkend + 0), model.matrix(~ ValidSet$grp_hr + 0))
+
+dtrain <- list("data" = as.matrix(TrainSet_xgb), "label" = TrainSet[,response.var])
+dtest <- list("data" = as.matrix(ValidSet_xgb), "label" = ValidSet[,response.var])
+
+PredSet_xgb <- data.frame(PredSet[, includes_xgb], model.matrix(~ PredSet$ArterialCl + 0), model.matrix(~ PredSet$wkend + 0), model.matrix(~ PredSet$grp_hr + 0))
+dpred <- list("data" = as.matrix(PredSet_xgb), "label" = PredSet[,response.var])
+
+assign(paste0('m', modelno),
+       xgboost(data = dtrain$data, label = dtrain$label, max.depth = 6, eta = 1, nthread = 2, nrounds = 20, objective = "count:poisson"))
+
+# pred_test <- predict(m15.xgb.art.wkend, dtest$data)
+pred_pred <- predict(m15.xgb.art.wkend, dpred$data)
+range(pred_pred) # 0.2105482 0.4908491 improved when use a larger nrounds: 0.001423684 5.045446396
+range(PredSet[,response.var]) # 0 - 6
+
+# manually calculate test error
+err <- mean(as.numeric(pred_test > 0.5) != dtest$label)
+mean(as.numeric(pred_pred > 0.5) != dpred$label)
+
+# importance matrix
+importance_matrix <- xgb.importance(model = m15.xgb.art.wkend)
+# xgb.importance(feature_names = colnames(dtrain$data), model = m15.xgb.art.wkend)
+print(importance_matrix)
+xgb.plot.importance(importance_matrix = importance_matrix)
+
+pred_test <- predict(m15.xgb.art.wkend, dtest$data)
+cat("% Var explained: \n", 100 * (1-sum(( TrainSet[,response.var] - pred_pred )^2) /
+                                    sum(( TrainSet[,response.var] - mean(PredSet[,response.var]))^2)
+)
+)
+
+
+cat("% Var explained: \n", 100 * (1-sum(( PredSet[,response.var] - pred_pred )^2) /
+                                    sum(( PredSet[,response.var] - mean(PredSet[,response.var]))^2)
+)
+)
+
+
+# model output both training and testing errors.
+train <- xgb.DMatrix(data = dtrain$data, label = dtrain$label)
+test <- xgb.DMatrix(data = dtest$data, label = dtest$label)
+pred <- xgb.DMatrix(data = dpred$data, label = dpred$label)
+watchlist <- list(train = train, test = test)
+
+bst <- xgb.train(data = train, max.depth=2, eta=1, nthread = 2, nrounds=2, watchlist=watchlist, objective = "count:poisson")
 
 
 # TODO: 
 # next step:
-#   save model summary for random forest model
+# save model summary for random forest model -- Done
 # run XGboost models
 # save summary for XGboost models
 # a table for the best models of Poisson, RF, and XGboost.
-
-# create a scatter plot of observed vs fitted - Dan will send example.
-# Dan will send a generalized code so we can write a function to such scatter plot.
-
-# add # of observation of the model data into summary table, add data type ()
-# Jessie checked that the # of obs for all Poisson model (all roads 12,855 obs, arterial only 11,865) This further confirms that the model data completeness is good. 
-
-# DONE: delete the three obs from 2019.
-
-# try using weekday and weekend as one variable
-# Created this new variable, replace the week variable.
-
-# try lasso or ridge regression.
-# Jessie tried lasso or ridge regression using glmnet package, could not get it to work.
-
-# Run XGboost
-# General highlevel performance comparison.
-

@@ -31,7 +31,7 @@ RF_model_summary <- function(model_list, out.name, TrainSet, ValidSet, Art.Only,
     mvec <- cbind(mvec, sum(vec[1:i]) + 1) # lower index
   }
   
-  M = data.frame(matrix(NA,N,8))
+  M = data.frame(matrix(NA,N,9))
   vec1 <- vec[2:(length(model_list)+1)]
   
   colnames(M) <- c("Model","Formula", "Data", "N_obs_train","N_obs_pred" ,"PertVar_Train", "PertVar_Pred", "Variable", "Imp")
@@ -45,19 +45,19 @@ RF_model_summary <- function(model_list, out.name, TrainSet, ValidSet, Art.Only,
     M[m:n,2] = paste(format(formula(lm)), collapse = "") # paste(eval(lm$call[[2]]), collapse = "T") # formula
     M[m:n,3] = ifelse(length(lm$call[[3]]) > 1, paste(format(lm$call[[3]]), collapse = ""), paste(lm$call[[4]])) # data
     M[m:n,4] = length(lm$predicted) # N of obs trained in the model
-    M[m:n,5] = pert_var_fun(lm) # get % of Var explained for the training dataset
-    M[m:n,6] = pert_var_pred_fun(lm, FullSet) # get % of Var explained for the predicted dataset
+    M[m:n,5] = nrow(FullSet)
+    M[m:n,6] = pert_var_fun(lm) # get % of Var explained for the training dataset
+    M[m:n,7] = pert_var_pred_fun(lm, FullSet) # get % of Var explained for the predicted dataset
     for (k in 1:ni){
-      M[m+k-1, 7] = rownames(importance(lm))[k] # names of variables
-      M[m+k-1, 8] = importance(lm)[k] # importance value
+      M[m+k-1, 8] = rownames(importance(lm))[k] # names of variables
+      M[m+k-1, 9] = importance(lm)[k] # importance value
     }
 
-    RF_model_etimates
   }
   
-  model_summary <- reshape(M[, 1:7], timevar = c("Variable"), idvar = c("Model", "Formula", "Data", "N_obs_modeled", "PertVar_Train", "PertVar_Pred"), direction = "wide")
+  model_summary <- reshape(M, timevar = c("Variable"), idvar = c("Model","Formula", "Data", "N_obs_train","N_obs_pred" ,"PertVar_Train", "PertVar_Pred"), direction = "wide")
   
-  model_compare <- unique(M[, 1:4])
+  model_compare <- unique(M[, 1:6])
   
   RF_model_summary_list <- list("model_summary" = model_summary, "M" = M, "model_compare" = model_compare)
   save(list = c("RF_model_summary_list"), file = out.name)
@@ -79,10 +79,10 @@ Poisson_model_summary <- function(model_list, out.name){
     mvec <- cbind(mvec, sum(vec[1:i]) + 1) # lower index
   }
   
-  M = data.frame(matrix(NA,N,8))
+  M = data.frame(matrix(NA,N,9))
   vec1 <- vec[2:(length(model_list)+1)]
   
-  colnames(M) <- c("Model","Formula","Data", "N_Obs","AIC", "Variable", "Exp_coef", "vif")
+  colnames(M) <- c("Model","Formula","Data", "N_Obs","AIC", "PertVar_Pred", "Variable", "Exp_coef", "vif")
   
   for(i in 1:length(model_list)){
     lm <- model_list[[i]]
@@ -94,19 +94,22 @@ Poisson_model_summary <- function(model_list, out.name){
     M[m:n,3] = ifelse(length(lm$call[[3]]) > 1, paste(format(lm$call[[3]]), collapse = ""), paste(lm$call[[4]])) # data
     M[m:n,4] = length(fitted(lm)) # N of obs
     M[m:n,5] = round(summary(lm)$aic,2) # get AIC
+    M[m:n,6] = 100 * (1-sum((lm$y - lm$fitted )^2) /
+                        sum((lm$y - mean(lm$y))^2)
+    )
     for (k in 1:ni){
-      M[m+k-1, 6] = rownames(summary(lm)$coef)[k] # names of variables
+      M[m+k-1, 7] = rownames(summary(lm)$coef)[k] # names of variables
       p_value = ifelse(summary(lm)$coef[k,4] < 0.05, "*","") # p-value, whether the summary will show * for significance at 95%
-      M[m+k-1, 7] = paste0(round(exp(summary(lm)$coef[k,1]),2), p_value) # convert coefficients to odds ratio
+      M[m+k-1, 8] = paste0(round(exp(summary(lm)$coef[k,1]),2), p_value) # convert coefficients to odds ratio
     }
     for (j in 2:ni){
-      M[m+j-1, 8] = ifelse(nrow(summary(lm)$coef)<=2, NA, paste0(round(vif(lm)[j-1],4)))
+      M[m+j-1, 9] = ifelse(nrow(summary(lm)$coef)<=2, NA, paste0(round(vif(lm)[j-1],4)))
     }
   }
   
   model_summary <- reshape(M[, 1:7], timevar = c("Variable"), idvar = c("Model", "Formula", "Data", "AIC"), direction = "wide")
   
-  model_compare <- unique(M[, 1:4])
+  model_compare <- unique(M[, 1:6])
   # fun_vif <- function(x){ifelse(x > 2, T, F)}
   # 
   # model_compare <- model_summary %>% replace(is.na(.), 0) %>% mutate(sum_all = rowSums(.[grep("vif", colnames(.))], na.rm = T))
