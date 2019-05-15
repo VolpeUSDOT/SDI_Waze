@@ -410,9 +410,14 @@ assign(paste0('m', modelno),
 #   In randomForest.default(m, y, ...) :
 #   The response has five or fewer unique values.  Are you sure you want to do regression?
 importance(m15.rf.art.wkend)   
-varImpPlot(m15.rf.art.wkend)
+
 rf_pred <- predict(m15.rf.art.wkend, PredSet[, includes])
 range(rf_pred) # -2.701728e-16  3.258433e+00
+
+f <- paste0(visual.loc, '/Bellevue_importance_rf_m15.rf.art.wkend.png')
+png(file = f,  width = 6, height = 10, units = 'in', res = 300)
+varImpPlot(m15.rf.art.wkend)
+dev.off()
 
 # Compare % of var explained for these models & manual calculation
 print(m10.rf.art.wkend) # 2.37
@@ -501,19 +506,23 @@ mean(as.numeric(pred_pred > 0.5) != dpred$label)
 importance_matrix <- xgb.importance(model = m15.xgb.art.wkend)
 # xgb.importance(feature_names = colnames(dtrain$data), model = m15.xgb.art.wkend)
 print(importance_matrix)
-xgb.plot.importance(importance_matrix = importance_matrix)
 
-pred_test <- predict(m15.xgb.art.wkend, dtest$data)
-cat("% Var explained: \n", 100 * (1-sum(( TrainSet[,response.var] - pred_pred )^2) /
-                                    sum(( TrainSet[,response.var] - mean(PredSet[,response.var]))^2)
+f <- paste0(visual.loc, '/Bellevue_importance_xgb_m15.xgb.art.wkend.png')
+png(file = f,  width = 6, height = 10, units = 'in', res = 300)
+xgb.plot.importance(importance_matrix = importance_matrix)
+dev.off()
+
+pred_train <- predict(m15.xgb.art.wkend, dtrain$data)
+cat("% Var explained: \n", 100 * (1-sum(( TrainSet[,response.var] - pred_train )^2) /
+                                    sum(( TrainSet[,response.var] - mean(TrainSet[,response.var]))^2)
 )
-)
+) # 71% of Var explained
 
 
 cat("% Var explained: \n", 100 * (1-sum(( PredSet[,response.var] - pred_pred )^2) /
                                     sum(( PredSet[,response.var] - mean(PredSet[,response.var]))^2)
 )
-)
+) # 59% of Var explained
 
 
 # model output both training and testing errors.
