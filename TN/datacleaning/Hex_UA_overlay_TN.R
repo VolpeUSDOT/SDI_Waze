@@ -72,7 +72,7 @@ co <- spTransform(co, CRS(proj.USGS))
 grids = c("TN_01dd_fishnet",
           "TN_1sqmile_hexagons")
 
-for(g in grids){ # g = grids[2]
+for(g in grids){ # g = grids[1]
   
   grid = readOGR(file.path(localdir, state, "Shapefiles"), layer = g) # the grid layer
   grid <- spTransform(grid, CRS(proj.USGS))
@@ -106,9 +106,10 @@ for(g in grids){ # g = grids[2]
 
   # Names of files for this state, in a directory with all clipped, buffered, unique uuid events by month.
   wazemonthfiles <- dir(wazedir)[grep(state, dir(wazedir))]
-  wazemonthfiles <- wazemonthfiles[grep("RData$", wazemonthfiles)]
+  wazemonthfiles <- wazemonthfiles[grep("TN_\\d{4}-\\d{2}.RData$", wazemonthfiles)]
   wazemonths <- sort(unique(substr(wazemonthfiles, 4, 10)))
   
+  # !!!! TODO: allow manual set for just Waze data for all availale months of Waze, for exporting to TN
   months_shared <- sort(tn_crash_months[tn_crash_months %in% wazemonths])
   # Not months all are shared -- TN crash data through Sept 2018 
   #  summary(wazemonths %in% tn_crash_months)
