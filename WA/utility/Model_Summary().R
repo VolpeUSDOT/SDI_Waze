@@ -107,7 +107,7 @@ Poisson_model_summary <- function(model_list, out.name){
     }
   }
   
-  model_summary <- reshape(M[, 1:7], timevar = c("Variable"), idvar = c("Model", "Formula", "Data", "AIC"), direction = "wide")
+  model_summary <- reshape(M[, 1:9], timevar = c("Variable"), idvar = c("Model", "Formula", "Data", "N_Obs", "AIC","PertVar_Pred"), direction = "wide")
   
   model_compare <- unique(M[, 1:6])
   # fun_vif <- function(x){ifelse(x > 2, T, F)}

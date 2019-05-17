@@ -480,6 +480,9 @@ continous_var <- c(waze_dir_travel, waze_rd_type, # direction of travel + road t
                    "nBikes",        # bike/ped conflict counts at segment level (no hour)
                    "nFARS",         # FARS variables
                    "Shape_STLe", "SpeedLimit")
+response.var <- response.var.list[1] # use crash counts
+
+includes_xgb <- includes[-c(20:22)]
 
 TrainSet_xgb <- data.frame(TrainSet[, includes_xgb], model.matrix(~ TrainSet$ArterialCl + 0), model.matrix(~ TrainSet$wkend + 0), model.matrix(~ TrainSet$grp_hr + 0))
 ValidSet_xgb <- data.frame(ValidSet[, includes_xgb], model.matrix(~ ValidSet$ArterialCl + 0), model.matrix(~ ValidSet$wkend + 0), model.matrix(~ ValidSet$grp_hr + 0))
@@ -491,7 +494,7 @@ PredSet_xgb <- data.frame(PredSet[, includes_xgb], model.matrix(~ PredSet$Arteri
 dpred <- list("data" = as.matrix(PredSet_xgb), "label" = PredSet[,response.var])
 
 assign(paste0('m', modelno),
-       xgboost(data = dtrain$data, label = dtrain$label, max.depth = 6, eta = 1, nthread = 2, nrounds = 20, objective = "count:poisson"))
+       xgboost(data = dtrain$data, label = dtrain$label, max.depth = 6, eta = 1, nthread = 2, nrounds = 30, objective = "count:poisson"))
 
 # pred_test <- predict(m15.xgb.art.wkend, dtest$data)
 pred_pred <- predict(m15.xgb.art.wkend, dpred$data)
@@ -516,13 +519,13 @@ pred_train <- predict(m15.xgb.art.wkend, dtrain$data)
 cat("% Var explained: \n", 100 * (1-sum(( TrainSet[,response.var] - pred_train )^2) /
                                     sum(( TrainSet[,response.var] - mean(TrainSet[,response.var]))^2)
 )
-) # 71% of Var explained
+) # 71% using 20 rounds, 78% of Var explained using 30 rounds
 
 
 cat("% Var explained: \n", 100 * (1-sum(( PredSet[,response.var] - pred_pred )^2) /
                                     sum(( PredSet[,response.var] - mean(PredSet[,response.var]))^2)
 )
-) # 59% of Var explained
+) # 59% of Var explained using 20 rounds, 64% using 30 rounds.
 
 
 # model output both training and testing errors.
