@@ -180,7 +180,7 @@ for(g in grids){ # g = grids[1]
     # save the merged file to local output directory, move to S3 after
     fn = paste0("grid.overlay.waze.tn.", g, "_", mo, ".RData")
     
-    save(list=c("waze.df", "crash.df"), file = file.path(localdir, "TN", "Overlay", fn))
+    save(list=c("waze.df"), file = file.path(localdir, "TN", "Overlay", fn))
     
     system(paste("aws s3 cp",
                  file.path(localdir, "TN", "Overlay", fn),
