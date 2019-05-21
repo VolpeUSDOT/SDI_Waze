@@ -71,7 +71,7 @@ for(g in grids){ # g = grids[1]
   
   writeLines(c(""), paste(g, "log.txt", sep = "_"))    
   
-  foreach(j = todo.months, .packages = c("dplyr", "lubridate", "utils")) %dopar% { # j="2018-08" 
+  foreach(j = todo.months, .packages = c("dplyr", "lubridate", "utils")) %dopar% { # j="2018-12" 
 
     sink(paste(g, "log.txt", sep = "_"), append=TRUE) # sink() function diverts R output to a connection and stops such diversions. Starting from this point, all output in console will be saved in the log file in the working directory.
     
@@ -86,10 +86,8 @@ for(g in grids){ # g = grids[1]
     GridIDall <- unique(as.character(waze.df$GRID_ID) # Grid ID for a Waze event
                         )
     year.month.w <- format(waze.df$time, "%Y-%m")
-    year.month.t <- format(waze.df$date, "%Y-%m")
     year.month <- year.month.w
-    year.month[is.na(year.month)] <- year.month.t[is.na(year.month)]
-    
+
     waze.df <- waze.df[year.month == j,]
     
     month.days.w  <- unique(as.numeric(format(waze.df$time, "%d"))) # Waze event date/time
@@ -150,7 +148,6 @@ for(g in grids){ # g = grids[1]
     Waze.hex.time <- unique(Waze.hex.time.all) # Rows with match = "M" are duplicated, so we want to remove the duplicates.
     
     
-    Waze.hex.time$GRID_ID[is.na(Waze.hex.time$GRID_ID)] = Waze.hex.time$GRID_ID.TN[is.na(Waze.hex.time$GRID_ID)]
     Waze.hex.time <- filter(Waze.hex.time, !is.na(GRID_ID))
     
     # Save list of Grid cells and time windows with EDT or Waze data  
