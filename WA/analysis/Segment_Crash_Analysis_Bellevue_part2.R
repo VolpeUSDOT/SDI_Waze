@@ -467,8 +467,6 @@ write.csv(model_summary, file.path(output.loc, "RF_model_summary.csv"), row.name
 
 # XGBoost ----
 # build a list containing two things, label and data
-modelno = "15.xgb.art.wkend"
-
 Art.Only <- T # False to use all road class, True to Arterial only roads
 if(Art.Only) {TrainSet = TrainSet %>% filter(ArterialCl != "Local")} else {TrainSet = TrainSet}
 if(Art.Only) {ValidSet = ValidSet %>% filter(ArterialCl != "Local")} else {ValidSet = ValidSet}
@@ -493,49 +491,58 @@ dtest <- list("data" = as.matrix(ValidSet_xgb), "label" = ValidSet[,response.var
 PredSet_xgb <- data.frame(PredSet[, includes_xgb], model.matrix(~ PredSet$ArterialCl + 0), model.matrix(~ PredSet$wkend + 0), model.matrix(~ PredSet$grp_hr + 0))
 dpred <- list("data" = as.matrix(PredSet_xgb), "label" = PredSet[,response.var])
 
+modelno = "15.xgb.art.wkend.30rd"
 assign(paste0('m', modelno),
        xgboost(data = dtrain$data, label = dtrain$label, max.depth = 6, eta = 1, nthread = 2, nrounds = 30, objective = "count:poisson"))
 
-# pred_test <- predict(m15.xgb.art.wkend, dtest$data)
-pred_pred <- predict(m15.xgb.art.wkend, dpred$data)
-range(pred_pred) # 0.2105482 0.4908491 improved when use a larger nrounds: 0.001423684 5.045446396
+pred_test <- predict(m15.xgb.art.wkend.30rd, dtest$data)
+pred_pred <- predict(m15.xgb.art.wkend.30rd, dpred$data)
+range(pred_pred) # 0.00407875 4.49043274 ( 10 rounds) 0.2105482 0.4908491 (20 rounds) improved when use a larger nrounds: 15.xgb.art.wkend.20rd
 range(PredSet[,response.var]) # 0 - 6
 
-# manually calculate test error
-err <- mean(as.numeric(pred_test > 0.5) != dtest$label)
-mean(as.numeric(pred_pred > 0.5) != dpred$label)
-
 # importance matrix
-importance_matrix <- xgb.importance(model = m15.xgb.art.wkend)
+importance_matrix <- xgb.importance(model = m15.xgb.art.wkend.10rd)
 # xgb.importance(feature_names = colnames(dtrain$data), model = m15.xgb.art.wkend)
 print(importance_matrix)
 
-f <- paste0(visual.loc, '/Bellevue_importance_xgb_m15.xgb.art.wkend.png')
+f <- paste0(visual.loc, '/Bellevue_importance_xgb_',paste0('m', modelno),'.png')
 png(file = f,  width = 6, height = 10, units = 'in', res = 300)
 xgb.plot.importance(importance_matrix = importance_matrix)
 dev.off()
 
-pred_train <- predict(m15.xgb.art.wkend, dtrain$data)
+pred_train <- predict(m15.xgb.art.wkend.10rd, dtrain$data)
 cat("% Var explained: \n", 100 * (1-sum(( TrainSet[,response.var] - pred_train )^2) /
                                     sum(( TrainSet[,response.var] - mean(TrainSet[,response.var]))^2)
 )
-) # 71% using 20 rounds, 78% of Var explained using 30 rounds
+) # 62.04436% using 10 rounds, 71.33% using 20 rounds, 78% of Var explained using 30 rounds
 
 
 cat("% Var explained: \n", 100 * (1-sum(( PredSet[,response.var] - pred_pred )^2) /
                                     sum(( PredSet[,response.var] - mean(PredSet[,response.var]))^2)
 )
-) # 59% of Var explained using 20 rounds, 64% using 30 rounds.
+) # 53.76801% using 10 rounds, 60.8% of Var explained using 20 rounds, 64% using 30 rounds.
 
 
-# model output both training and testing errors.
-train <- xgb.DMatrix(data = dtrain$data, label = dtrain$label)
-test <- xgb.DMatrix(data = dtest$data, label = dtest$label)
-pred <- xgb.DMatrix(data = dpred$data, label = dpred$label)
-watchlist <- list(train = train, test = test)
+# # model output both training and testing errors.
+# train <- xgb.DMatrix(data = dtrain$data, label = dtrain$label)
+# test <- xgb.DMatrix(data = dtest$data, label = dtest$label)
+# pred <- xgb.DMatrix(data = dpred$data, label = dpred$label)
+# watchlist <- list(train = train, test = test)
+# 
+# bst <- xgb.train(data = train, max.depth=2, eta=1, nthread = 2, nrounds=2, watchlist=watchlist, objective = "count:poisson")
 
-bst <- xgb.train(data = train, max.depth=2, eta=1, nthread = 2, nrounds=2, watchlist=watchlist, objective = "count:poisson")
+# Save xgb model output
+model_type = "XGB_models"
+out.name <- file.path(data.loc, 'Model_output', paste0("Bell_",model_type,".Rdata"))
 
+if(file.exists(out.name)){
+  load(out.name)} else {
+    
+    row.name <- c("m15.xgb.art.wkend.10rd", "m15.xgb.art.wkend.20rd", "m15.xgb.art.wkend.30rd")
+    XGB_models <- lapply(row.name, function(x) get(x))
+    save(list = c("XGB_models", "row.name", "TrainSet", "ValidSet", "response.var"), file = out.name)
+    
+  }
 
 # TODO: 
 # next step:
