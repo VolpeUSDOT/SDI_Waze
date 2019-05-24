@@ -25,6 +25,14 @@ visual.loc <- file.path(data.loc, "Model_visualizations")
 
 setwd(data.loc)
 
+# Prepare XGBoost summary table for Tableau 
+model_type = "XGB_models"
+out.name <- file.path(data.loc, 'Model_output', paste0("Bell_",model_type,".Rdata"))
+load(out.name)
+PredSet <- rbind(TrainSet, ValidSet)
+
+
+
 # Check if prepared data are available; if not, run Segment Aggregation.
 Waze_Prepared_Data = dir(seg.loc)[grep("^Bellevue_Waze_Segments_", dir(seg.loc))]
 

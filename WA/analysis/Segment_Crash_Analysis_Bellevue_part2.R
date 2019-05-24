@@ -467,9 +467,16 @@ write.csv(model_summary, file.path(output.loc, "RF_model_summary.csv"), row.name
 
 # XGBoost ----
 # build a list containing two things, label and data
+set.seed(254)
+train_index <- sample(nrow(w.all.4hr.wd), 0.7*nrow(w.all.4hr.wd), replace = FALSE)
+TrainSet <- w.all.4hr.wd[train_index,]
+ValidSet <- w.all.4hr.wd[-train_index,]
+PredSet <- rbind(TrainSet, ValidSet)
+
 Art.Only <- T # False to use all road class, True to Arterial only roads
 if(Art.Only) {TrainSet = TrainSet %>% filter(ArterialCl != "Local")} else {TrainSet = TrainSet}
 if(Art.Only) {ValidSet = ValidSet %>% filter(ArterialCl != "Local")} else {ValidSet = ValidSet}
+if(Art.Only) {ValidSet = PredSet %>% filter(ArterialCl != "Local")} else {PredSet = ValidSet}
 
 # need to convert character and factor columns to dummy variables.
 continous_var <- c(waze_dir_travel, waze_rd_type, # direction of travel + road types from Waze
