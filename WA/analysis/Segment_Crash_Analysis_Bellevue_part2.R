@@ -487,6 +487,15 @@ continous_var <- c(waze_dir_travel, waze_rd_type, # direction of travel + road t
                    "Shape_STLe", "SpeedLimit")
 response.var <- response.var.list[1] # use crash counts
 
+includes = c(
+  waze_dir_travel, waze_rd_type, # direction of travel + road types from Waze
+  alert_types,     # counts of waze events by alert types
+  # weather_var,     # Weather variables
+  "nBikes",        # bike/ped conflict counts at segment level (no hour)
+  "nFARS",         # FARS variables
+  seg_var, "wkend", "grp_hr"
+)
+
 includes_xgb <- includes[-c(20:22)]
 
 TrainSet_xgb <- data.frame(TrainSet[, includes_xgb], model.matrix(~ TrainSet$ArterialCl + 0), model.matrix(~ TrainSet$wkend + 0), model.matrix(~ TrainSet$grp_hr + 0))
@@ -508,7 +517,7 @@ range(pred_pred) # 0.00407875 4.49043274 ( 10 rounds) 0.2105482 0.4908491 (20 ro
 range(PredSet[,response.var]) # 0 - 6
 
 # importance matrix
-importance_matrix <- xgb.importance(model = m15.xgb.art.wkend.10rd)
+importance_matrix <- xgb.importance(model = m15.xgb.art.wkend.30rd)
 # xgb.importance(feature_names = colnames(dtrain$data), model = m15.xgb.art.wkend)
 print(importance_matrix)
 
@@ -517,7 +526,7 @@ png(file = f,  width = 6, height = 10, units = 'in', res = 300)
 xgb.plot.importance(importance_matrix = importance_matrix)
 dev.off()
 
-pred_train <- predict(m15.xgb.art.wkend.10rd, dtrain$data)
+pred_train <- predict(m15.xgb.art.wkend.30rd, dtrain$data)
 cat("% Var explained: \n", 100 * (1-sum(( TrainSet[,response.var] - pred_train )^2) /
                                     sum(( TrainSet[,response.var] - mean(TrainSet[,response.var]))^2)
 )
@@ -547,7 +556,7 @@ if(file.exists(out.name)){
     
     row.name <- c("m15.xgb.art.wkend.10rd", "m15.xgb.art.wkend.20rd", "m15.xgb.art.wkend.30rd")
     XGB_models <- lapply(row.name, function(x) get(x))
-    save(list = c("XGB_models", "row.name", "TrainSet", "ValidSet", "response.var"), file = out.name)
+    save(list = c("XGB_models", "row.name", "TrainSet", "ValidSet", "PredSet", "response.var", "pred_pred"), file = out.name)
     
   }
 
