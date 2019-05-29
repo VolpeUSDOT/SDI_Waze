@@ -476,7 +476,7 @@ PredSet <- rbind(TrainSet, ValidSet)
 Art.Only <- T # False to use all road class, True to Arterial only roads
 if(Art.Only) {TrainSet = TrainSet %>% filter(ArterialCl != "Local")} else {TrainSet = TrainSet}
 if(Art.Only) {ValidSet = ValidSet %>% filter(ArterialCl != "Local")} else {ValidSet = ValidSet}
-if(Art.Only) {ValidSet = PredSet %>% filter(ArterialCl != "Local")} else {PredSet = ValidSet}
+if(Art.Only) {PredSet = PredSet %>% filter(ArterialCl != "Local")} else {PredSet = PredSet}
 
 # need to convert character and factor columns to dummy variables.
 continous_var <- c(waze_dir_travel, waze_rd_type, # direction of travel + road types from Waze
@@ -500,12 +500,13 @@ includes_xgb <- includes[-c(20:22)]
 
 TrainSet_xgb <- data.frame(TrainSet[, includes_xgb], model.matrix(~ TrainSet$ArterialCl + 0), model.matrix(~ TrainSet$wkend + 0), model.matrix(~ TrainSet$grp_hr + 0))
 ValidSet_xgb <- data.frame(ValidSet[, includes_xgb], model.matrix(~ ValidSet$ArterialCl + 0), model.matrix(~ ValidSet$wkend + 0), model.matrix(~ ValidSet$grp_hr + 0))
+PredSet_xgb <- data.frame(PredSet[, includes_xgb], model.matrix(~ PredSet$ArterialCl + 0), model.matrix(~ PredSet$wkend + 0), model.matrix(~ PredSet$grp_hr + 0))
+dpred <- list("data" = as.matrix(PredSet_xgb), "label" = PredSet[,response.var])
+
 
 dtrain <- list("data" = as.matrix(TrainSet_xgb), "label" = TrainSet[,response.var])
 dtest <- list("data" = as.matrix(ValidSet_xgb), "label" = ValidSet[,response.var])
 
-PredSet_xgb <- data.frame(PredSet[, includes_xgb], model.matrix(~ PredSet$ArterialCl + 0), model.matrix(~ PredSet$wkend + 0), model.matrix(~ PredSet$grp_hr + 0))
-dpred <- list("data" = as.matrix(PredSet_xgb), "label" = PredSet[,response.var])
 
 modelno = "15.xgb.art.wkend.30rd"
 assign(paste0('m', modelno),

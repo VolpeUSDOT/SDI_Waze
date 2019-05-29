@@ -33,7 +33,11 @@ load(out.name)
 # data with XGBoost model predictions
 out <- cbind(PredSet, "Xgb_Pred" = pred_pred)
 var <- c(response.var, includes, "Xgb_Pred")
-write.csv(out[, var], file.path(data.loc, 'Model_output', paste0("Bell_",model_type,"_pred.csv")), row.names = F)
+write.csv(out, file.path(data.loc, 'Model_output', paste0("Bell_",model_type,"_pred.csv")), row.names = F)
+
+# Visualizations ----
+# Histogram
+boxplot(out$Xgb_Pred ~ out$uniqueCrashreports) # observed vs predicted
 
 
 # Check if prepared data are available; if not, run Segment Aggregation.
