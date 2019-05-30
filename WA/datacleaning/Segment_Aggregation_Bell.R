@@ -46,7 +46,7 @@ registerDoParallel(cl)
 # writeLines(c(""), paste0("SegAgg_log.txt"))    
 
 foreach(j = todo.months, .packages = c("dplyr", "lubridate", "utils", "circular")) %dopar% {
-  # j = "2018-01"  
+   #j = "2018-01"  
   # sink(paste0("SegAgg_log.txt"), append=TRUE)
   
   cat(paste(Sys.time()), j, "\n")                                                  
@@ -65,7 +65,7 @@ foreach(j = todo.months, .packages = c("dplyr", "lubridate", "utils", "circular"
     group_by(RDSEG_ID,
              year = format(time, "%Y"), day = format(time, "%j"), hour = format(time, "%H"), weekday = format(time, "%u")) %>% # format(time, "%j") get the day of the year, not the day of the month.
     summarize(
-      uniqueWazeEvents= n_distinct(SDC_uuid), # number of unique Waze events.
+      uniqueWazeEvents= n_distinct(SDC_uuid), # number of unique Waze events, includes road closures.
       
       nWazeAccident = n_distinct(SDC_uuid[alert_type=="ACCIDENT"]),
       nWazeJam = n_distinct(SDC_uuid[alert_type=="JAM"]),
@@ -101,6 +101,7 @@ foreach(j = todo.months, .packages = c("dplyr", "lubridate", "utils", "circular"
       nWazeWeatherFog = n_distinct(SDC_uuid[sub_type=="HAZARD_WEATHER_FOG"]),
       nWazeHazardIceRoad = n_distinct(SDC_uuid[sub_type=="HAZARD_ON_ROAD_ICE"]),
       
+      #These include road closures in the counts - omit?
       nWazeRT3 = n_distinct(SDC_uuid[roadclass=="3"]),
       nWazeRT4 = n_distinct(SDC_uuid[roadclass=="4"]),
       nWazeRT6 = n_distinct(SDC_uuid[roadclass=="6"]),
@@ -111,22 +112,28 @@ foreach(j = todo.months, .packages = c("dplyr", "lubridate", "utils", "circular"
       nWazeRT20 = n_distinct(SDC_uuid[roadclass=="20"]),
       nWazeRT17 = n_distinct(SDC_uuid[roadclass=="17"]),
       
-      #TODO: Need to omit road closures - magvar is filled in as zero (or omit from dataset earlier)
-      medMagVar = median(magvar), # Median direction of travel for that road segment for that hour.
-      mean.sin.magvar = mean(Sin.MagVar),
-      med.sin.magvar = median(Sin.MagVar),
-      mean.cos.magvar = mean(Cos.MagVar),
-      med.cos.magvar = median(Sin.MagVar),
-      magvar.circ.median = median.circular(MagVar.circ),
-      magvar.circ.mean = mean.circular(MagVar.circ),
+      #Omit road closures - magvar is filled in as zero, but it does not reflect direction
+      magvar.circ.median = median.circular(MagVar.circ[alert_type!="ROAD_CLOSED"]),
+      magvar.circ.mean = mean.circular(MagVar.circ[alert_type!="ROAD_CLOSED"]),
       
-      #Values corrected to represent N, NE, SE, S, EW, NW directions. 
-      nMagVar330to30 = n_distinct(SDC_uuid[magvar>= 330 | magvar<30]),
-      nMagVar30to90 = n_distinct(SDC_uuid[magvar>= 30 & magvar<90]),
-      nMagVar90to150 = n_distinct(SDC_uuid[magvar>= 90 & magvar<150]),
-      nMagVar150to210 = n_distinct(SDC_uuid[magvar>= 150 & magvar<210]),
-      nMagVar210to270 = n_distinct(SDC_uuid[magvar>= 210 & magvar<270]),
-      nMagVar270to330 = n_distinct(SDC_uuid[magvar>= 270 & magvar<330])) 
+      mean.sin.magvar.Acc = mean(Sin.MagVar[alert_type=="ACCIDENT"]),
+      med.sin.magvar.Acc = median(Sin.MagVar[alert_type=="ACCIDENT"]),
+      mean.cos.magvar.Acc = mean(Cos.MagVar[alert_type=="ACCIDENT"]),
+      med.cos.magvar.Acc = median(Sin.MagVar[alert_type=="ACCIDENT"]),
+      
+      mean.sin.magvar.Jam = mean(Sin.MagVar[alert_type=="JAM"]),
+      med.sin.magvar.Jam = median(Sin.MagVar[alert_type=="JAM"]),
+      mean.cos.magvar.Jam = mean(Cos.MagVar[alert_type=="JAM"]),
+      med.cos.magvar.Jam = median(Sin.MagVar[alert_type=="JAM"]),
+      
+      #Values corrected to represent N, NE, SE, S, EW, NW directions.
+      #Omit road closures - magvar is filled in as zero, but it does not reflect direction
+      nMagVar330to30 = n_distinct(SDC_uuid[alert_type!="ROAD_CLOSED" & magvar>= 330 | magvar<30]),
+      nMagVar30to90 = n_distinct(SDC_uuid[alert_type!="ROAD_CLOSED" & magvar>= 30 & magvar<90]),
+      nMagVar90to150 = n_distinct(SDC_uuid[alert_type!="ROAD_CLOSED" & magvar>= 90 & magvar<150]),
+      nMagVar150to210 = n_distinct(SDC_uuid[alert_type!="ROAD_CLOSED" & magvar>= 150 & magvar<210]),
+      nMagVar210to270 = n_distinct(SDC_uuid[alert_type!="ROAD_CLOSED" & magvar>= 210 & magvar<270]),
+      nMagVar270to330 = n_distinct(SDC_uuid[alert_type!="ROAD_CLOSED" & magvar>= 270 & magvar<330])) 
   
   
   #Compute grid counts for Bellevue crash data
@@ -161,7 +168,7 @@ foreach(j = todo.months, .packages = c("dplyr", "lubridate", "utils", "circular"
   
   class(wazeTime.crash.seg) <- "data.frame" # POSIX date/time not supported for grouped tbl
   
-  fn = paste("WazeSegTimeAll_mv2_", j, ".RData", sep="")
+  fn = paste("WazeSegTimeAll_", j, ".RData", sep="")
   
   save(list="wazeTime.crash.seg", file = file.path(output.loc, fn))
   
@@ -182,7 +189,7 @@ stopCluster(cl)
 w.all <- vector()
 
 for(j in avail.months){ # we need the done.months instead of todo.months
-  fn = paste("WazeSegTimeAll_mv2_", j, ".RData", sep="")
+  fn = paste("WazeSegTimeAll_", j, ".RData", sep="")
   load(file.path(output.loc, fn))
   w.all <- rbind(w.all, wazeTime.crash.seg)
 }
@@ -218,7 +225,7 @@ FARS_segment = FARS_snapped@data %>%
 w.all <- left_join(w.all, FARS_segment, by = 'RDSEG_ID')
 
 # Fill 0s
-#From Erika - why do we fill zeros here? Does this affect the distribution of the numeric variables?
+#From Erika - why do we fill zeros here? Does this affect the distribution of the numeric variables? mean/median of magvar
 w.all[is.na(w.all)] = 0 
 
 # Joined the BellevueSegment data (e.g., ) ----
@@ -254,7 +261,7 @@ w.all$biCrash <- ifelse(w.all$uniqueCrashreports > 0, 1, 0)
 
 # Save joined output ---
 
-fn = paste("Bellevue_Waze_Segments_mv2", 
+fn = paste("Bellevue_Waze_Segments_", 
            avail.months[1], '_to_', avail.months[length(avail.months)], 
            ".RData", sep="")
 

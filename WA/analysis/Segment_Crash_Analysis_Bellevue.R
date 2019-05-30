@@ -13,7 +13,7 @@ rm(list=ls()) # Start fresh
 codeloc <- ifelse(grepl('Flynn', normalizePath('~/')), # grep() does not produce a logical outcome (T/F), it gives the positive where there is a match, or no outcome if there is no match. grepl() is what we need here.
                   "~/git/SDI_Waze", "~/GitHub/SDI_Waze") # Jessie's codeloc is ~/GitHub/SDI_Waze
 
-source(file.path(codeloc, 'utility/get_packages.R'))
+#source(file.path(codeloc, 'utility/get_packages.R'))
 # load functions with group_by
 source(file.path(codeloc, 'WA/utility/visual_fun.R'))
 
