@@ -49,7 +49,7 @@ registerDoParallel(cl)
 # writeLines(c(""), paste0("SegAgg_log.txt"))    
 
 foreach(j = todo.months, .packages = c("dplyr", "lubridate", "utils", "circular")) %dopar% {
-   j = "2018-01"  
+   #j = "2018-01"  
   # sink(paste0("SegAgg_log.txt"), append=TRUE)
   
   cat(paste(Sys.time()), j, "\n")                                                  

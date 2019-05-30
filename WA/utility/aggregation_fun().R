@@ -34,6 +34,7 @@ group_by_Waze_Crash <- function(table, ... ) {
       nWazeWeatherFog = sum(nWazeWeatherFog),
       nWazeHazardIceRoad = sum(nWazeHazardIceRoad),
       
+      #Road closures are omitted
       nWazeRT3 = sum(nWazeRT3),
       nWazeRT4 = sum(nWazeRT4),
       nWazeRT6 = sum(nWazeRT6),
@@ -44,28 +45,33 @@ group_by_Waze_Crash <- function(table, ... ) {
       nWazeRT20 = sum(nWazeRT20),
       nWazeRT17 = sum(nWazeRT17),
       
-      #magvar variables omit road closures - filled in as zero in the data, but does not reflect direction
-      magvar.circ.median = median.circular(magvar.circ.median),
-      magvar.circ.mean = mean.circular(magvar.circ.mean),
-      
-      #Values corrected to represent N, NE, SE, S, EW, NW directions. 
-      nMagVar330to30 = sum(nMagVar330to30),
-      nMagVar30to90 = sum(nMagVar30to90),
-      nMagVar90to150 = sum(nMagVar90to150),
-      nMagVar150to210 = sum(nMagVar150to210),
-      nMagVar210to270 = sum(nMagVar210to270),
-      nMagVar270to330 = sum(nMagVar270to330),
+      #Road closures are omitted
+      #Values represent N, NE, SE, S, EW, NW directions. 
+      nMagVar330to30N = sum(nMagVar330to30),
+      nMagVar30to90NE = sum(nMagVar30to90),
+      nMagVar90to150SE = sum(nMagVar90to150),
+      nMagVar150to210S = sum(nMagVar150to210),
+      nMagVar210to270EW = sum(nMagVar210to270),
+      nMagVar270to330NW = sum(nMagVar270to330),
   
 # Crash columns
+# Add weighted crash column based on HSM and IDOT network screening study
+# IDOT put further emphasis on the most severe crashes by applying a weighting factor of 25 times a fatal crash, 
+# 10 times a A-injury crash, and one time a B-injury crash
       uniqueCrashreports = sum(uniqueCrashreports),
       nCrashInjuryFatal = sum(nCrashInjuryFatal),
       nCrashSeriousInjury = sum(nCrashSeriousInjury),
+      nCrashEvidentInjury = sum(nCrashEvidentInjury),
+      nCrashPossibleInjury = sum(nCrashPossibleInjury),
+      nCrashEvdPossInjury = sum(nCrashEvdPossInjury),
       nCrashKSI = sum(nCrashKSI),
-      nCrashInjury = sum(nCrashInjury),
+      nCrashAllInjury = sum(nCrashAllInjury),
       nCrashPDO = sum(nCrashPDO),
-      nCrashWorkzone = sum(nCrashWorkzone)
+      nCrashWorkzone = sum(nCrashWorkzone),
+      WeightedCrashes = sum(nCrashKSI)*25 + sum(nCrashEvdPossInjury)*10 + sum(nCrashPDO) 
     )
 }
+
 
 # Weather, only by day and segments
 group_by_Weather <- function(table, ... ) {
@@ -93,7 +99,11 @@ agg_fun <- function(w.all, t_var) {
   w.all.4hr <-left_join(w.all.4hr, wx.grd.day, by = c('RDSEG_ID', 'year', t_var))
   
   # all other variables need to match segments
-  seg_only_var <- names(w.all)[c(1, 64:101)] #From Erika - check this step with extra magvar columns added
+  seg_only_var <- c("RDSEG_ID","OBJECTID", "StreetSegm", "LifeCycleS", "OfficialSt", "FromAddres", "FromAddr_1", "ToAddressL",
+                      "ToAddressR", "LeftJurisd", "RightJuris", "LeftZip", "RightZip", "OneWay", "SpeedLimit",
+                      "ArterialCl", "FunctionCl", "ArterialSw", "EmergencyE", "EmergencyR", "SnowRespon", 
+                      "TruckRoute", "IsAddressa", "IsPrivate", "IsAccessRo", "AnomalyTyp", "StreetName",
+                      "StreetBloc", "Shape_STLe")
   seg.only.data <- unique(w.all[, seg_only_var])
   
   w.all.4hr <- left_join(w.all.4hr, seg.only.data, by = 'RDSEG_ID')
