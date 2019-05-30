@@ -35,7 +35,8 @@ avail.months = substr(unlist(
 # Look for already completed months and skip those
 done_files <- dir(output.loc)[grep("WazeSegTimeAll_", dir(output.loc))]
 done.months <- substr(unlist(lapply(strsplit(done_files, "_"), function(x) x[2])), 1, 7)
-todo.months = sort(avail.months)[!avail.months %in% done.months]
+todo.months = sort(avail.months)[avail.months %in% done.months]
+#todo.months = sort(avail.months)[!avail.months %in% done.months] Use this line if you do not want to generate new files
 
 # Start aggregation by month ----
 # The files have already been created, need to update this with a if exist clause.
