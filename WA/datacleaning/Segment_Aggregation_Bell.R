@@ -46,7 +46,7 @@ registerDoParallel(cl)
 # writeLines(c(""), paste0("SegAgg_log.txt"))    
 
 foreach(j = todo.months, .packages = c("dplyr", "lubridate", "utils", "circular")) %dopar% {
-   #j = "2018-01"  
+   j = "2018-01"  
   # sink(paste0("SegAgg_log.txt"), append=TRUE)
   
   cat(paste(Sys.time()), j, "\n")                                                  
@@ -65,7 +65,7 @@ foreach(j = todo.months, .packages = c("dplyr", "lubridate", "utils", "circular"
     group_by(RDSEG_ID,
              year = format(time, "%Y"), day = format(time, "%j"), hour = format(time, "%H"), weekday = format(time, "%u")) %>% # format(time, "%j") get the day of the year, not the day of the month.
     summarize(
-      uniqueWazeEvents= n_distinct(SDC_uuid), # number of unique Waze events, includes road closures.
+      uniqueWazeEvents= n_distinct(SDC_uuid), # number of unique Waze events, includes 197 road closures.
       
       nWazeAccident = n_distinct(SDC_uuid[alert_type=="ACCIDENT"]),
       nWazeJam = n_distinct(SDC_uuid[alert_type=="JAM"]),
@@ -101,7 +101,7 @@ foreach(j = todo.months, .packages = c("dplyr", "lubridate", "utils", "circular"
       nWazeWeatherFog = n_distinct(SDC_uuid[sub_type=="HAZARD_WEATHER_FOG"]),
       nWazeHazardIceRoad = n_distinct(SDC_uuid[sub_type=="HAZARD_ON_ROAD_ICE"]),
       
-      #Omit road closures
+      #Omit road closures from counts (not reported by users)
       nWazeRT3 = n_distinct(SDC_uuid[alert_type!="ROAD_CLOSED" & roadclass=="3"]),
       nWazeRT4 = n_distinct(SDC_uuid[alert_type!="ROAD_CLOSED" & roadclass=="4"]),
       nWazeRT6 = n_distinct(SDC_uuid[alert_type!="ROAD_CLOSED" & roadclass=="6"]),
@@ -113,7 +113,7 @@ foreach(j = todo.months, .packages = c("dplyr", "lubridate", "utils", "circular"
       nWazeRT17 = n_distinct(SDC_uuid[alert_type!="ROAD_CLOSED" & roadclass=="17"]),
       
       #Values corrected to represent N, NE, SE, S, EW, NW directions.
-      #Omit road closures - magvar is filled in as zero, but it does not reflect direction
+      #Omit road closures - magvar is filled in as zero for road closures, but it does not reflect direction
       nMagVar330to30 = n_distinct(SDC_uuid[alert_type!="ROAD_CLOSED" & magvar>= 330 | magvar<30]),
       nMagVar30to90 = n_distinct(SDC_uuid[alert_type!="ROAD_CLOSED" & magvar>= 30 & magvar<90]),
       nMagVar90to150 = n_distinct(SDC_uuid[alert_type!="ROAD_CLOSED" & magvar>= 90 & magvar<150]),
