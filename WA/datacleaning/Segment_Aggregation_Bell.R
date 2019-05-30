@@ -116,16 +116,6 @@ foreach(j = todo.months, .packages = c("dplyr", "lubridate", "utils", "circular"
       magvar.circ.median = median.circular(MagVar.circ[alert_type!="ROAD_CLOSED"]),
       magvar.circ.mean = mean.circular(MagVar.circ[alert_type!="ROAD_CLOSED"]),
       
-      mean.sin.magvar.Acc = mean(Sin.MagVar[alert_type=="ACCIDENT"]),
-      med.sin.magvar.Acc = median(Sin.MagVar[alert_type=="ACCIDENT"]),
-      mean.cos.magvar.Acc = mean(Cos.MagVar[alert_type=="ACCIDENT"]),
-      med.cos.magvar.Acc = median(Sin.MagVar[alert_type=="ACCIDENT"]),
-      
-      mean.sin.magvar.Jam = mean(Sin.MagVar[alert_type=="JAM"]),
-      med.sin.magvar.Jam = median(Sin.MagVar[alert_type=="JAM"]),
-      mean.cos.magvar.Jam = mean(Cos.MagVar[alert_type=="JAM"]),
-      med.cos.magvar.Jam = median(Sin.MagVar[alert_type=="JAM"]),
-      
       #Values corrected to represent N, NE, SE, S, EW, NW directions.
       #Omit road closures - magvar is filled in as zero, but it does not reflect direction
       nMagVar330to30 = n_distinct(SDC_uuid[alert_type!="ROAD_CLOSED" & magvar>= 330 | magvar<30]),
@@ -194,7 +184,7 @@ for(j in avail.months){ # we need the done.months instead of todo.months
   w.all <- rbind(w.all, wazeTime.crash.seg)
 }
 
-dim(w.all) # 61237*57, added more variables
+dim(w.all) # 61237*60, added more variables
 
 # Convert time variable to time format, prepare for temporal analysis
 w.all$time_hr <- as.POSIXct(w.all$segtime, "%Y-%j %H", tz = 'America/Los_Angeles')
@@ -224,8 +214,10 @@ FARS_segment = FARS_snapped@data %>%
 
 w.all <- left_join(w.all, FARS_segment, by = 'RDSEG_ID')
 
+
 # Fill 0s
-#From Erika - why do we fill zeros here? Does this affect the distribution of the numeric variables? mean/median of magvar
+#This affects the distribution of the numeric variables - mean/median of magvar. 
+# Remove or do not use for models (or convert zeros to NAs before/after aggregation)
 w.all[is.na(w.all)] = 0 
 
 # Joined the BellevueSegment data (e.g., ) ----

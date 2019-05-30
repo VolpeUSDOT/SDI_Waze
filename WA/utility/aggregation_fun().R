@@ -44,11 +44,7 @@ group_by_Waze_Crash <- function(table, ... ) {
       nWazeRT20 = sum(nWazeRT20),
       nWazeRT17 = sum(nWazeRT17),
       
-      medMagVar = median(medMagVar), # Median direction of travel for that road segment for that hour.
-      mean.sin.magvar = mean(mean.sin.magvar),
-      med.sin.magvar = median(med.sin.magvar),
-      mean.cos.magvar = mean(mean.cos.magvar),
-      med.cos.magvar = median(med.cos.magvar),
+      #magvar variables omit road closures - filled in as zero in the data, but does not reflect direction
       magvar.circ.median = median.circular(magvar.circ.median),
       magvar.circ.mean = mean.circular(magvar.circ.mean),
       
@@ -62,7 +58,6 @@ group_by_Waze_Crash <- function(table, ... ) {
   
 # Crash columns
       uniqueCrashreports = sum(uniqueCrashreports),
-      
       nCrashInjuryFatal = sum(nCrashInjuryFatal),
       nCrashSeriousInjury = sum(nCrashSeriousInjury),
       nCrashKSI = sum(nCrashKSI),
