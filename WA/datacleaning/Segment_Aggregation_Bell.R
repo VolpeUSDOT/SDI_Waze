@@ -36,7 +36,9 @@ avail.months = substr(unlist(
 done_files <- dir(output.loc)[grep("WazeSegTimeAll_", dir(output.loc))]
 done.months <- substr(unlist(lapply(strsplit(done_files, "_"), function(x) x[2])), 1, 7)
 todo.months = sort(avail.months)[avail.months %in% done.months]
-#todo.months = sort(avail.months)[!avail.months %in% done.months] Use this line if you do not want to generate new files
+
+#Use this line if you do not want to generate new files
+#todo.months = sort(avail.months)[!avail.months %in% done.months] 
 
 # Start aggregation by month ----
 # The files have already been created, need to update this with a if exist clause.
@@ -134,8 +136,10 @@ foreach(j = todo.months, .packages = c("dplyr", "lubridate", "utils", "circular"
       
       nCrashInjuryFatal = n_distinct(REPORT_NUM[FATAL_CRAS == 1]),
       nCrashSeriousInjury = n_distinct(REPORT_NUM[SERIOUS_IN == 1]),
+      nCrashEvidentInjury = n_distinct(REPORT_NUM[EVIDENT_IN == 1]),
+      nCrashPOssibleInjury = n_distinct(REPORT_NUM[POSSIBLE_I == 1]),
       nCrashKSI = n_distinct(REPORT_NUM[SERIOUS_IN == 1 | FATAL_CRAS == 1]),
-      nCrashInjury = n_distinct(REPORT_NUM[SERIOUS_IN == 1 | EVIDENT_IN == 1 | POSSIBLE_I == 1]),
+      nCrashAllInjury = n_distinct(REPORT_NUM[SERIOUS_IN == 1 | EVIDENT_IN == 1 | POSSIBLE_I == 1]),
       nCrashPDO = n_distinct(REPORT_NUM[PDO___NO_I == 1 ]),
       nCrashWorkzone = n_distinct(REPORT_NUM[!is.na(WORKZONE)]) # Number of crashes happened in a workzone
     ) 
