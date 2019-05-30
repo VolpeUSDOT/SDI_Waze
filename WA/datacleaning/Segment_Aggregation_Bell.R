@@ -101,20 +101,16 @@ foreach(j = todo.months, .packages = c("dplyr", "lubridate", "utils", "circular"
       nWazeWeatherFog = n_distinct(SDC_uuid[sub_type=="HAZARD_WEATHER_FOG"]),
       nWazeHazardIceRoad = n_distinct(SDC_uuid[sub_type=="HAZARD_ON_ROAD_ICE"]),
       
-      #These include road closures in the counts - omit?
-      nWazeRT3 = n_distinct(SDC_uuid[roadclass=="3"]),
-      nWazeRT4 = n_distinct(SDC_uuid[roadclass=="4"]),
-      nWazeRT6 = n_distinct(SDC_uuid[roadclass=="6"]),
-      nWazeRT7 = n_distinct(SDC_uuid[roadclass=="7"]),
-      nWazeRT2 = n_distinct(SDC_uuid[roadclass=="2"]),
-      nWazeRT0 = n_distinct(SDC_uuid[roadclass=="0"]),
-      nWazeRT1 = n_distinct(SDC_uuid[roadclass=="1"]),
-      nWazeRT20 = n_distinct(SDC_uuid[roadclass=="20"]),
-      nWazeRT17 = n_distinct(SDC_uuid[roadclass=="17"]),
-      
-      #Omit road closures - magvar is filled in as zero, but it does not reflect direction
-      magvar.circ.median = median.circular(MagVar.circ[alert_type!="ROAD_CLOSED"]),
-      magvar.circ.mean = mean.circular(MagVar.circ[alert_type!="ROAD_CLOSED"]),
+      #Omit road closures
+      nWazeRT3 = n_distinct(SDC_uuid[alert_type!="ROAD_CLOSED" & roadclass=="3"]),
+      nWazeRT4 = n_distinct(SDC_uuid[alert_type!="ROAD_CLOSED" & roadclass=="4"]),
+      nWazeRT6 = n_distinct(SDC_uuid[alert_type!="ROAD_CLOSED" & roadclass=="6"]),
+      nWazeRT7 = n_distinct(SDC_uuid[alert_type!="ROAD_CLOSED" & roadclass=="7"]),
+      nWazeRT2 = n_distinct(SDC_uuid[alert_type!="ROAD_CLOSED" & roadclass=="2"]),
+      nWazeRT0 = n_distinct(SDC_uuid[alert_type!="ROAD_CLOSED" & roadclass=="0"]),
+      nWazeRT1 = n_distinct(SDC_uuid[alert_type!="ROAD_CLOSED" & roadclass=="1"]),
+      nWazeRT20 = n_distinct(SDC_uuid[alert_type!="ROAD_CLOSED" & roadclass=="20"]),
+      nWazeRT17 = n_distinct(SDC_uuid[alert_type!="ROAD_CLOSED" & roadclass=="17"]),
       
       #Values corrected to represent N, NE, SE, S, EW, NW directions.
       #Omit road closures - magvar is filled in as zero, but it does not reflect direction
