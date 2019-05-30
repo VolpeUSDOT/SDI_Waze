@@ -38,7 +38,7 @@ visual.loc <- file.path(data.loc, "Model_visualizations")
 setwd(data.loc)
 
 # Check if prepared data are available; if not, run Segment Aggregation.
-Waze_Prepared_Data = dir(seg.loc)[grep("^Bellevue_Waze_Segments_", dir(seg.loc))][1] #"Bellevue_Waze_Segments_2018-01_to_2018-12.RData"
+Waze_Prepared_Data = dir(seg.loc)[grep("^Bellevue_Waze_Segments_mv2", dir(seg.loc))][1] #"Bellevue_Waze_Segments_2018-01_to_2018-12.RData"
 
 if(length(grep(Waze_Prepared_Data, dir(seg.loc))) == 0){
   stop(paste("No Bellevue segment data available in", seg.loc, "\n Run Segment_Aggregation_Bell.R or check network connection"))

@@ -44,21 +44,21 @@ group_by_Waze_Crash <- function(table, ... ) {
       nWazeRT20 = sum(nWazeRT20),
       nWazeRT17 = sum(nWazeRT17),
       
-      medMagVar = median(magvar), # Median direction of travel for that road segment for that hour.
-      mean.sin.magvar = mean(Sin.MagVar),
-      med.sin.magvar = median(Sin.MagVar),
-      mean.cos.magvar = mean(Cos.MagVar),
-      med.cos.magvar = median(Sin.MagVar),
-      magvar.circ.median = median.circular(MagVar.circ),
-      magvar.circ.mean = mean.circular(MagVar.circ),
+      medMagVar = median(medMagVar), # Median direction of travel for that road segment for that hour.
+      mean.sin.magvar = mean(mean.sin.magvar),
+      med.sin.magvar = median(med.sin.magvar),
+      mean.cos.magvar = mean(mean.cos.magvar),
+      med.cos.magvar = median(med.cos.magvar),
+      magvar.circ.median = median.circular(magvar.circ.median),
+      magvar.circ.mean = mean.circular(magvar.circ.mean),
       
       #Values corrected to represent N, NE, SE, S, EW, NW directions. 
-      nMagVar330to30 = n_distinct(SDC_uuid[magvar>= 330 & magvar<30]),
-      nMagVar30to90 = n_distinct(SDC_uuid[magvar>= 30 & magvar<90]),
-      nMagVar90to150 = n_distinct(SDC_uuid[magvar>= 90 & magvar<150]),
-      nMagVar150to210 = n_distinct(SDC_uuid[magvar>= 150 & magvar<210]),
-      nMagVar210to270 = n_distinct(SDC_uuid[magvar>= 210 & magvar<270]),
-      nMagVar270to330 = n_distinct(SDC_uuid[magvar>= 270 & magvar<330]), 
+      nMagVar330to30 = sum(nMagVar330to30),
+      nMagVar30to90 = sum(nMagVar30to90),
+      nMagVar90to150 = sum(nMagVar90to150),
+      nMagVar150to210 = sum(nMagVar150to210),
+      nMagVar210to270 = sum(nMagVar210to270),
+      nMagVar270to330 = sum(nMagVar270to330),
   
 # Crash columns
       uniqueCrashreports = sum(uniqueCrashreports),
@@ -98,7 +98,7 @@ agg_fun <- function(w.all, t_var) {
   w.all.4hr <-left_join(w.all.4hr, wx.grd.day, by = c('RDSEG_ID', 'year', t_var))
   
   # all other variables need to match segments
-  seg_only_var <- names(w.all)[c(1, 57:94)]
+  seg_only_var <- names(w.all)[c(1, 64:101)] #From Erika - check this step with extra magvar columns added
   seg.only.data <- unique(w.all[, seg_only_var])
   
   w.all.4hr <- left_join(w.all.4hr, seg.only.data, by = 'RDSEG_ID')
