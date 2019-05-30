@@ -44,12 +44,21 @@ group_by_Waze_Crash <- function(table, ... ) {
       nWazeRT20 = sum(nWazeRT20),
       nWazeRT17 = sum(nWazeRT17),
       
-      medMagVar = median(medMagVar), # Median direction of travel for that road segment for that hour.
-      nMagVar330to30 = sum(nMagVar330to30),
-      nMagVar30to60 = sum(nMagVar30to60),
-      nMagVar90to180 = sum(nMagVar90to180),
-      nMagVar180to240 = sum(nMagVar180to240),
-      nMagVar240to360 = sum(nMagVar240to360),
+      medMagVar = median(magvar), # Median direction of travel for that road segment for that hour.
+      mean.sin.magvar = mean(Sin.MagVar),
+      med.sin.magvar = median(Sin.MagVar),
+      mean.cos.magvar = mean(Cos.MagVar),
+      med.cos.magvar = median(Sin.MagVar),
+      magvar.circ.median = median.circular(MagVar.circ),
+      magvar.circ.mean = mean.circular(MagVar.circ),
+      
+      #Values corrected to represent N, NE, SE, S, EW, NW directions. 
+      nMagVar330to30 = n_distinct(SDC_uuid[magvar>= 330 & magvar<30]),
+      nMagVar30to90 = n_distinct(SDC_uuid[magvar>= 30 & magvar<90]),
+      nMagVar90to150 = n_distinct(SDC_uuid[magvar>= 90 & magvar<150]),
+      nMagVar150to210 = n_distinct(SDC_uuid[magvar>= 150 & magvar<210]),
+      nMagVar210to270 = n_distinct(SDC_uuid[magvar>= 210 & magvar<270]),
+      nMagVar270to330 = n_distinct(SDC_uuid[magvar>= 270 & magvar<330]), 
   
 # Crash columns
       uniqueCrashreports = sum(uniqueCrashreports),

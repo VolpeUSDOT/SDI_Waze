@@ -4,16 +4,19 @@
 # Notes: input shows suprisingly few Waze events on road segments. For instance, only 9 total Waze events on road segments on 2018-01-01. Load j = "2018-01", see table(format(Waze.seg.time$SegDayHour, '%d')). Can be true, Waze_snapped only 70,226 total for 2018. End result of segment aggregation and binding all months together ~ 60,000 rows. Checked against Waze_Snapped50ft_MatchName, these numbers are correct. Should also check against exported data from SDC.
 # Bellevue crash events: when aggregated to segment and hour, have 1362 segment/hours with 1 crash, 3 segment/hours with 2 crashes. This seems reasonable: total was 2800 crash records, but majority are on interstates or SR 520.
 
+#install.packages("circular")
+
 rm(list=ls())
 library(sp)
 library(rgdal) # for readOGR(),writeOGR () needed for reading/writing in ArcM shapefiles
 library(tidyverse)
 library(doParallel)
+library(circular)
 
 codeloc <- ifelse(grepl('Flynn', normalizePath('~/')),
                   "~/git/SDI_Waze", "~/GitHub/SDI_Waze")
 
-source(file.path(codeloc, 'utility/get_packages.R'))
+#source(file.path(codeloc, 'utility/get_packages.R')) #run if packaghes are needed
 
 ## Working on shared drive
 wazeshareddir <- "//vntscex.local/DFS/Projects/PROJ-OS62A1/SDI Waze Phase 2"
@@ -42,7 +45,7 @@ registerDoParallel(cl)
 
 # writeLines(c(""), paste0("SegAgg_log.txt"))    
 
-foreach(j = todo.months, .packages = c("dplyr", "lubridate", "utils")) %dopar% {
+foreach(j = todo.months, .packages = c("dplyr", "lubridate", "utils", "circular")) %dopar% {
   # j = "2018-01"  
   # sink(paste0("SegAgg_log.txt"), append=TRUE)
   
@@ -55,6 +58,9 @@ foreach(j = todo.months, .packages = c("dplyr", "lubridate", "utils")) %dopar% {
   # TODO: include neighboring segments?
   
   StartTime <- Sys.time()
+  Waze.seg.time$MagVar.circ <- circular(Waze.seg.time$magvar, units = "degrees", template = "geographics")
+  Waze.seg.time$Sin.MagVar <- sin(Waze.seg.time$magvar)
+  Waze.seg.time$Cos.MagVar <- cos(Waze.seg.time$magvar)
   waze.seg <- Waze.seg.time %>%
     group_by(RDSEG_ID,
              year = format(time, "%Y"), day = format(time, "%j"), hour = format(time, "%H"), weekday = format(time, "%u")) %>% # format(time, "%j") get the day of the year, not the day of the month.
@@ -106,11 +112,20 @@ foreach(j = todo.months, .packages = c("dplyr", "lubridate", "utils")) %dopar% {
       nWazeRT17 = n_distinct(SDC_uuid[roadclass=="17"]),
       
       medMagVar = median(magvar), # Median direction of travel for that road segment for that hour.
+      mean.sin.magvar = mean(Sin.MagVar),
+      med.sin.magvar = median(Sin.MagVar),
+      mean.cos.magvar = mean(Cos.MagVar),
+      med.cos.magvar = median(Sin.MagVar),
+      magvar.circ.median = median.circular(MagVar.circ),
+      magvar.circ.mean = mean.circular(MagVar.circ),
+      
+      #Values corrected to represent N, NE, SE, S, EW, NW directions. 
       nMagVar330to30 = n_distinct(SDC_uuid[magvar>= 330 & magvar<30]),
-      nMagVar30to60 = n_distinct(SDC_uuid[magvar>= 60 & magvar<120]),
-      nMagVar90to180 = n_distinct(SDC_uuid[magvar>= 120 & magvar<180]),
-      nMagVar180to240 = n_distinct(SDC_uuid[magvar>= 180 & magvar<240]),
-      nMagVar240to360 = n_distinct(SDC_uuid[magvar>= 240 & magvar<360])) 
+      nMagVar30to90 = n_distinct(SDC_uuid[magvar>= 30 & magvar<90]),
+      nMagVar90to150 = n_distinct(SDC_uuid[magvar>= 90 & magvar<150]),
+      nMagVar150to210 = n_distinct(SDC_uuid[magvar>= 150 & magvar<210]),
+      nMagVar210to270 = n_distinct(SDC_uuid[magvar>= 210 & magvar<270]),
+      nMagVar270to330 = n_distinct(SDC_uuid[magvar>= 270 & magvar<330])) 
   
   
   #Compute grid counts for Bellevue crash data
@@ -145,7 +160,7 @@ foreach(j = todo.months, .packages = c("dplyr", "lubridate", "utils")) %dopar% {
   
   class(wazeTime.crash.seg) <- "data.frame" # POSIX date/time not supported for grouped tbl
   
-  fn = paste("WazeSegTimeAll_", j, ".RData", sep="")
+  fn = paste("WazeSegTimeAll_mv2_", j, ".RData", sep="")
   
   save(list="wazeTime.crash.seg", file = file.path(output.loc, fn))
   
@@ -157,18 +172,21 @@ foreach(j = todo.months, .packages = c("dplyr", "lubridate", "utils")) %dopar% {
 
 stopCluster(cl)
 
+#check magvar (circular variable)
+#plot.circular(Waze.seg.time$MagVar.circ)
+
 # Stack and add additional variables ----
 
 # First, loop over all months and bind together
 w.all <- vector()
 
 for(j in avail.months){ # we need the done.months instead of todo.months
-  fn = paste("WazeSegTimeAll_", j, ".RData", sep="")
+  fn = paste("WazeSegTimeAll_mv2_", j, ".RData", sep="")
   load(file.path(output.loc, fn))
   w.all <- rbind(w.all, wazeTime.crash.seg)
 }
 
-dim(w.all) # 61237*50, added two more variables
+dim(w.all) # 61237*57, added more variables
 
 # Convert time variable to time format, prepare for temporal analysis
 w.all$time_hr <- as.POSIXct(w.all$segtime, "%Y-%j %H", tz = 'America/Los_Angeles')
@@ -191,13 +209,15 @@ w.all <- left_join(w.all, wx.grd.day, by = c('RDSEG_ID'='ID', 'year', 'day'))
 FARS_snapped <- readOGR(dsn = file.path(data.loc, "Shapefiles"), layer = "FARS_Snapped50ft_MatchName") 
 # 13 x 19 
 
-# Join only segment; tablulate to get counts across segments 
+# Join only segment; tabulate to get counts across segments 
 FARS_segment = FARS_snapped@data %>%
   group_by(RDSEG_ID) %>%
   summarize(nFARS = n())
 
 w.all <- left_join(w.all, FARS_segment, by = 'RDSEG_ID')
+
 # Fill 0s
+#From Erika - why do we fill zeros here? Does this affect the distribution of the numeric variables?
 w.all[is.na(w.all)] = 0 
 
 # Joined the BellevueSegment data (e.g., ) ----
@@ -206,6 +226,7 @@ roadnettb_snapped <- readOGR(dsn = file.path(data.loc, "Shapefiles"), layer = "R
 names(roadnettb_snapped)
 
 w.all <- left_join(w.all, roadnettb_snapped@data, by = 'RDSEG_ID')
+
 # don't think we need to fill NAs with zeros.
 names(w.all)
 # Compare nFARS and nFARS_1217
@@ -232,8 +253,10 @@ w.all$biCrash <- ifelse(w.all$uniqueCrashreports > 0, 1, 0)
 
 # Save joined output ---
 
-fn = paste("Bellevue_Waze_Segments_", 
+fn = paste("Bellevue_Waze_Segments_mv2", 
            avail.months[1], '_to_', avail.months[length(avail.months)], 
            ".RData", sep="")
 
 save(list="w.all", file = file.path(output.loc, fn))
+
+

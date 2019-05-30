@@ -54,6 +54,13 @@ table(w.all.4hr.wd$uniqueCrashreports) # ~10% of the data has non-zero counts, 0
 # 0     1     2     3     4 
 # 11609  1146    81    16     3 
 
+#Other variables
+table(w.all.4hr.wd$nCrashKSI)
+table(w.all.4hr.wd$nCrashInjury)
+table(w.all.4hr.wd$nFARS_1217)
+table(w.all.4hr.wd$nFARS)
+table(w.all.4hr.wd$nCrashes)
+
 # Omit or include predictors in this vector:
 alwaysomit = c(grep("RDSEG_ID", names(w.all.4hr.wd), value = T), "year", "wkday", "grp_name", "grp_hr", "nFARS_1217",
                grep("Crash", names(w.all.4hr.wd), value = T),
@@ -126,6 +133,10 @@ for (i in 1:length(indicator.var.list)) {
     dev.off()
   }
 }
+
+# Explore medMagVar variable
+hist(w.all.4hr.wd$medMagVar)
+hist(w.all.4hr.wd$nMagVar30to60)
 
 # check missing values and all zero columns ----
 # if any other columns are all zeros
@@ -267,6 +278,7 @@ fitted <- fitted(get(paste0('m', modelno)))
 pres <- residuals(get(paste0('m', modelno)), type="pearson")
 assign(paste0('diag.plot.', modelno), plot((fitted)^(1/2), abs(pres)))
 
+##Note from Erika: These need to be run after the function below to run all models##
 AIC(m10.0poi, m10.poi, m10.nb, m10.0nb) # we ran a base model 10, and here is the comparison of AIC.
 # model    df      AIC
 # m10.0poi 36 8832.233
@@ -295,6 +307,7 @@ AIC(m10.poi.art, m11.poi.art, m12.poi.art, m13.poi.art, m14.poi.art, m15.poi.art
 # m15.poi.art 36 7195.533
 
 AIC(m15.poi.art, m15.poi.art.wkend) # compare two models with weekday or weekend as variables.
+#Note from Erika: Can't compare these directly - different number of observations
 # model             df      AIC
 # m15.poi.art       36 7137.534
 # m15.poi.art.wkend 31 7130.908
