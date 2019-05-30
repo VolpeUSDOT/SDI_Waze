@@ -16,7 +16,7 @@ library(circular)
 codeloc <- ifelse(grepl('Flynn', normalizePath('~/')),
                   "~/git/SDI_Waze", "~/GitHub/SDI_Waze")
 
-#source(file.path(codeloc, 'utility/get_packages.R')) #run if packaghes are needed
+#source(file.path(codeloc, 'utility/get_packages.R')) #run if packages are needed
 
 ## Working on shared drive
 wazeshareddir <- "//vntscex.local/DFS/Projects/PROJ-OS62A1/SDI Waze Phase 2"
@@ -111,6 +111,7 @@ foreach(j = todo.months, .packages = c("dplyr", "lubridate", "utils", "circular"
       nWazeRT20 = n_distinct(SDC_uuid[roadclass=="20"]),
       nWazeRT17 = n_distinct(SDC_uuid[roadclass=="17"]),
       
+      #TODO: Need to omit road closures - magvar is filled in as zero (or omit from dataset earlier)
       medMagVar = median(magvar), # Median direction of travel for that road segment for that hour.
       mean.sin.magvar = mean(Sin.MagVar),
       med.sin.magvar = median(Sin.MagVar),
@@ -120,7 +121,7 @@ foreach(j = todo.months, .packages = c("dplyr", "lubridate", "utils", "circular"
       magvar.circ.mean = mean.circular(MagVar.circ),
       
       #Values corrected to represent N, NE, SE, S, EW, NW directions. 
-      nMagVar330to30 = n_distinct(SDC_uuid[magvar>= 330 & magvar<30]),
+      nMagVar330to30 = n_distinct(SDC_uuid[magvar>= 330 | magvar<30]),
       nMagVar30to90 = n_distinct(SDC_uuid[magvar>= 30 & magvar<90]),
       nMagVar90to150 = n_distinct(SDC_uuid[magvar>= 90 & magvar<150]),
       nMagVar150to210 = n_distinct(SDC_uuid[magvar>= 150 & magvar<210]),
