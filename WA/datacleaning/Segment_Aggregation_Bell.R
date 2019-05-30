@@ -133,13 +133,13 @@ foreach(j = todo.months, .packages = c("dplyr", "lubridate", "utils", "circular"
     group_by(RDSEG_ID, year = format(time, "%Y"), day = format(time, "%j"), hour = format(time, "%H")) %>%
     summarize(
       uniqueCrashreports= n_distinct(REPORT_NUM),
-      
       nCrashInjuryFatal = n_distinct(REPORT_NUM[FATAL_CRAS == 1]),
       nCrashSeriousInjury = n_distinct(REPORT_NUM[SERIOUS_IN == 1]),
       nCrashEvidentInjury = n_distinct(REPORT_NUM[EVIDENT_IN == 1]),
-      nCrashPOssibleInjury = n_distinct(REPORT_NUM[POSSIBLE_I == 1]),
+      nCrashPossibleInjury = n_distinct(REPORT_NUM[POSSIBLE_I == 1]),
       nCrashKSI = n_distinct(REPORT_NUM[SERIOUS_IN == 1 | FATAL_CRAS == 1]),
       nCrashAllInjury = n_distinct(REPORT_NUM[SERIOUS_IN == 1 | EVIDENT_IN == 1 | POSSIBLE_I == 1]),
+      nCrashEvdPossInjury = n_distinct(REPORT_NUM[EVIDENT_IN == 1 | POSSIBLE_I == 1]),
       nCrashPDO = n_distinct(REPORT_NUM[PDO___NO_I == 1 ]),
       nCrashWorkzone = n_distinct(REPORT_NUM[!is.na(WORKZONE)]) # Number of crashes happened in a workzone
     ) 
