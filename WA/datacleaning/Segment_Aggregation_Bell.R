@@ -217,8 +217,7 @@ w.all <- left_join(w.all, FARS_segment, by = 'RDSEG_ID')
 
 
 # Fill 0s
-#This affects the distribution of the numeric variables - mean/median of magvar. 
-# Remove or do not use for models (or convert zeros to NAs before/after aggregation)
+#This affects the distribution of the numeric variables - mean/median of magvar. now that we removed the medMagVar, so this is fine.
 w.all[is.na(w.all)] = 0
 
 # Joined the BellevueSegment data (e.g., ) ----

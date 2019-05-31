@@ -285,15 +285,15 @@ starttime = Sys.time()
 # month (mo) and hour are categorical variables. 
 
 includes = c(
-  waze_dir_travel, waze_rd_type, # direction of travel + road types from Waze
-  alert_types,     # counts of waze events by alert types
-  weather_var,     # Weather variables
-  "nBikes",        # bike/ped conflict counts at segment level (no hour)
-  "nFARS",         # FARS variables
-  seg_var, "wkend", "grp_hr"
+  # waze_dir_travel, waze_rd_type, # direction of travel + road types from Waze
+  # alert_types,     # counts of waze events by alert types
+  # weather_var,     # Weather variables
+  # "nBikes",        # bike/ped conflict counts at segment level (no hour)
+  # "nFARS_1217",         # FARS variables
+  seg_var, "wkday", "grp_hr"
 )
 
-modelno = "15.poi.art.wkend"
+modelno = "10.poi.art"
 
 response.var <- response.var.list[1] # use crash counts
 
@@ -341,19 +341,29 @@ AIC(m10.poi, m11.poi, m12.poi, m13.poi, m14.poi, m15.poi) # all roads, model 12 
 # m15.poi 35 7632.854
 
 AIC(m10.poi.art, m11.poi.art, m12.poi.art, m13.poi.art, m14.poi.art, m15.poi.art) # Arterial only model. model 12 is better. Adding weather improves slightly, so it is included.
-# model       df      AIC
-# m10.poi.art 17 8244.503
-# m11.poi.art 18 8246.157
-# m12.poi.art 19 8241.697
-# m13.poi.art 23 8240.909
-# m14.poi.art 27 7982.763
-# m15.poi.art 36 7195.533
+#             df      AIC
+# m10.poi.art 17 8193.005
+# m11.poi.art 18 8194.777
+# m12.poi.art 19 8190.248
+# m13.poi.art 23 8189.671
+# m14.poi.art 23 7940.256
+# m15.poi.art 33 7917.516
 
 AIC(m15.poi.art, m15.poi.art.wkend) # compare two models with weekday or weekend as variables.
 #Note from Erika: Can't compare these directly - different number of observations
-# model             df      AIC
-# m15.poi.art       36 7137.534
-# m15.poi.art.wkend 31 7130.908
+# they should be able to compare, they are both arterial only model with 11,630 observations.
+#                   df      AIC
+# m15.poi.art       33 7917.516
+# m15.poi.art.wkend 28 7915.291
+
+AIC(m10.poi.art.wkend, m11.poi.art.wkend, m12.poi.art.wkend, m13.poi.art.wkend, m14.poi.art.wkend, m15.poi.art.wkend)
+#                   df      AIC
+# m10.poi.art.wkend 12 8189.240
+# m11.poi.art.wkend 13 8191.022
+# m12.poi.art.wkend 14 8186.461
+# m13.poi.art.wkend 18 8187.136
+# m14.poi.art.wkend 18 7938.109
+# m15.poi.art.wkend 28 7915.291
 
 # extract logistic model objects, save in a list
 model_type = "Poisson_models"
@@ -369,13 +379,13 @@ if(file.exists(out.name)){
     
   }
 
-row.name <- c("m10.poi", "m10.poi.art", "m11.poi", "m11.poi.art", "m12.poi", "m12.poi.art", "m13.poi", "m13.poi.art", "m14.poi", "m14.poi.art", "m15.poi", "m15.poi.art", "m15.poi.art.wkend")
+# row.name <- c("m10.poi.art", "m10.poi.art.wkend" "m11.poi.art", "m11.poi.art.wkend", "m12.poi.art", "m12.poi.art.wkend" "m13.poi.art", "m13.poi.art.wkend", "m14.poi.art", "m14.poi.art.wkend" "m15.poi.art", "m15.poi.art.wkend")
 
-for (i in 1:length(row.name)) {
-  
-  assign(row.name[i], Poisson_models[[i]])
-         
-}
+# for (i in 1:length(row.name)) {
+#   
+#   assign(row.name[i], Poisson_models[[i]])
+#          
+# }
 
 # create a summary table with diagnostics for all the Poisson model ----
 # Get the list of glm models
@@ -431,7 +441,14 @@ ValidSet <- w.all.4hr.wd[-train_index,]
 PredSet <- rbind(TrainSet, ValidSet)
 
 # summary(TrainSet)
-# summary(ValidSet)
+
+
+# 10: seg_var + TimeOfDay + DayofWeek + Month
+# 11: 10 + nFARS
+# 12: 10 + nFARS + nBikes
+# 13: {Best of 10 - 12} = 12 + weather_var
+# 14: {Best of 10 - 13} = 12 + alert_types
+# 15: 14 + waze_dir_travel + waze_rd_type
 
 # 12 is the best among 10-12, and 10-13
 includes = c(
@@ -447,9 +464,9 @@ modelno = "15.rf.art.wkend"
 
 response.var <- response.var.list[1] # use crash counts
 
-# Art.Only <- T # False to use all road class, True to Arterial only roads
-# if(Art.Only) {TrainSet = TrainSet %>% filter(ArterialCl != "Local")} else {TrainSet = TrainSet}
-# if(Art.Only) {ValidSet = ValidSet %>% filter(ArterialCl != "Local")} else {ValidSet = ValidSet}
+Art.Only <- T # False to use all road class, True to Arterial only roads
+if(Art.Only) {TrainSet = TrainSet %>% filter(ArterialCl != "Local")} else {TrainSet = TrainSet}
+if(Art.Only) {ValidSet = ValidSet %>% filter(ArterialCl != "Local")} else {ValidSet = ValidSet}
 
 # Simple 
 
@@ -478,18 +495,18 @@ varImpPlot(m15.rf.art.wkend)
 dev.off()
 
 # Compare % of var explained for these models & manual calculation
-print(m10.rf.art.wkend) # 2.37
-print(m11.rf.art.wkend) # 3.42
-print(m12.rf.art.wkend) # 4.13
-print(m13.rf.art.wkend) # -0.26 (worse)
-print(m14.rf.art.wkend) # 32.02
-print(m15.rf.art.wkend) # 37.04
+print(m10.rf.art.wkend) # 2.37, (removing medMagVar, 2.34)
+print(m11.rf.art.wkend) # 3.42, (removing medMagVar, 3.28)
+print(m12.rf.art.wkend) # 4.13, (removing medMagVar, 3.79)
+print(m13.rf.art.wkend) # -0.26 (worst), (removing medMagVar, -0.09)
+print(m14.rf.art.wkend) # 32.02, (removing medMagVar, 31.24) Model 14 seems to be better.
+print(m15.rf.art.wkend) # 37.04, (removing medMagVar, 29.5)
 
 # the manual calculationg used "pred" within the randomForest object, it is actually OOB predicted values. Because the trees of rf model are grown almost to max depth and will overfit the training set, only cross-validation can be used assess the performance. https://stats.stackexchange.com/questions/109232/low-explained-variance-in-random-forest-r-randomforest
 cat("% Var explained: \n", 100 * (1-sum((m15.rf.art.wkend$y-m15.rf.art.wkend$pred   )^2) /
                                   sum((m15.rf.art.wkend$y-mean(m15.rf.art.wkend$y))^2)
                                   )
-    )
+    ) #
 
 # Save RF model output
 model_type = "RF_models"
@@ -554,29 +571,49 @@ includes = c(
   seg_var, "wkend", "grp_hr"
 )
 
-includes_xgb <- includes[-c(21:23)] #From Erika - which variables are we trying to remove here? Columns have changed
+includes_xgb <- includes[-c("ArterialCl", "wkend", "grp_hr")] #From Erika - which variables are we trying to remove here? Columns have changed
 
-TrainSet_xgb <- data.frame(TrainSet[, includes_xgb], model.matrix(~ TrainSet$ArterialCl + 0), model.matrix(~ TrainSet$wkend + 0), model.matrix(~ TrainSet$grp_hr + 0))
-ValidSet_xgb <- data.frame(ValidSet[, includes_xgb], model.matrix(~ ValidSet$ArterialCl + 0), model.matrix(~ ValidSet$wkend + 0), model.matrix(~ ValidSet$grp_hr + 0))
-PredSet_xgb <- data.frame(PredSet[, includes_xgb], model.matrix(~ PredSet$ArterialCl + 0), model.matrix(~ PredSet$wkend + 0), model.matrix(~ PredSet$grp_hr + 0))
+ArterialCl <- TrainSet$ArterialCl
+wkend <- TrainSet$wkend
+grp_hr <- TrainSet$grp_hr
+TrainSet_xgb <- data.frame(TrainSet[, includes_xgb], model.matrix(~ ArterialCl + 0), model.matrix(~ wkend + 0), model.matrix(~ grp_hr + 0))
+
+ArterialCl <- ValidSet$ArterialCl
+wkend <- ValidSet$wkend
+grp_hr <- ValidSet$grp_hr
+ValidSet_xgb <- data.frame(ValidSet[, includes_xgb], model.matrix(~ ArterialCl + 0), model.matrix(~ wkend + 0), model.matrix(~ grp_hr + 0))
+
+ArterialCl <- PredSet$ArterialCl
+wkend <- PredSet$wkend
+grp_hr <- PredSet$grp_hr
+PredSet_xgb <- data.frame(PredSet[, includes_xgb], model.matrix(~ ArterialCl + 0), model.matrix(~ wkend + 0), model.matrix(~ grp_hr + 0))
+
 dpred <- list("data" = as.matrix(PredSet_xgb), "label" = PredSet[,response.var])
-
-
 dtrain <- list("data" = as.matrix(TrainSet_xgb), "label" = TrainSet[,response.var])
 dtest <- list("data" = as.matrix(ValidSet_xgb), "label" = ValidSet[,response.var])
 
-
-modelno = "15.xgb.art.wkend.30rd"
+modelno = "15.xgb.art.wkend.20rd"
 assign(paste0('m', modelno),
        xgboost(data = dtrain$data, label = dtrain$label, max.depth = 6, eta = 1, nthread = 2, nrounds = 30, objective = "count:poisson"))
 
-pred_test <- predict(m15.xgb.art.wkend.30rd, dtest$data)
-pred_pred <- predict(m15.xgb.art.wkend.30rd, dpred$data)
-range(pred_pred) # 0.00407875 4.49043274 ( 10 rounds) 0.2105482 0.4908491 (20 rounds) improved when use a larger nrounds: 15.xgb.art.wkend.20rd
+pred_train <- predict(m15.xgb.art.wkend.20rd, dtrain$data)
+pred_test <- predict(m15.xgb.art.wkend.20rd, dtest$data)
+pred_pred <- predict(m15.xgb.art.wkend.20rd, dpred$data)
+range(pred_pred) # 0.00407875 4.49043274 ( 10 rounds)  0.0009638735 7.5567440987 (20 rounds) 0-11 (30 rounds)
 range(PredSet[,response.var]) # 0 - 6
+# todo, double check which model prediction we used in the out file.
+# use WeightedCrashes as the response for the XGBoost model, and add the prediction to the out table.
+
+# compare the distribution of response and prediction
+f <- paste0(visual.loc, '/Bellevue_hist_obs_pred_xgb_',paste0('m', modelno),'.png')
+png(file = f,  width = 6, height = 10, units = 'in', res = 300)
+par(mfrow = c(2,1))
+hist(log(PredSet[,response.var] + 0.0001), main = "obs") # obs
+hist(log(pred_pred + 0.0001), main = "pred") # prediction
+dev.off()
 
 # importance matrix
-importance_matrix <- xgb.importance(model = m15.xgb.art.wkend.30rd)
+importance_matrix <- xgb.importance(model = m15.xgb.art.wkend.20rd)
 # xgb.importance(feature_names = colnames(dtrain$data), model = m15.xgb.art.wkend)
 print(importance_matrix)
 
@@ -585,18 +622,17 @@ png(file = f,  width = 6, height = 10, units = 'in', res = 300)
 xgb.plot.importance(importance_matrix = importance_matrix)
 dev.off()
 
-pred_train <- predict(m15.xgb.art.wkend.30rd, dtrain$data)
+# % of variance explained
 cat("% Var explained: \n", 100 * (1-sum(( TrainSet[,response.var] - pred_train )^2) /
                                     sum(( TrainSet[,response.var] - mean(TrainSet[,response.var]))^2)
 )
-) # 62.04436% using 10 rounds, 71.33% using 20 rounds, 78% of Var explained using 30 rounds
+) # 50.17904% using 10 rounds, 58% using 20 rounds, 65.28416% of Var explained using 30 rounds
 
 
 cat("% Var explained: \n", 100 * (1-sum(( PredSet[,response.var] - pred_pred )^2) /
                                     sum(( PredSet[,response.var] - mean(PredSet[,response.var]))^2)
 )
-) # 53.76801% using 10 rounds, 60.8% of Var explained using 20 rounds, 64% using 30 rounds.
-
+) # 43.23524% using 10 rounds, 44.31% of Var explained using 20 rounds, 41.85474% using 30 rounds.
 
 # # model output both training and testing errors.
 # train <- xgb.DMatrix(data = dtrain$data, label = dtrain$label)
