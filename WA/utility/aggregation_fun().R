@@ -68,7 +68,7 @@ group_by_Waze_Crash <- function(table, ... ) {
       nCrashAllInjury = sum(nCrashAllInjury),
       nCrashPDO = sum(nCrashPDO),
       nCrashWorkzone = sum(nCrashWorkzone),
-      WeightedCrashes = sum(nCrashKSI)*25 + sum(nCrashEvdPossInjury)*10 + sum(nCrashPDO) 
+      WeightedCrashes = sum(nCrashKSI)*25 + sum(nCrashEvdPossInjury)*10 + sum(nCrashPDO) #check this calculation
     )
 }
 
@@ -103,7 +103,8 @@ agg_fun <- function(w.all, t_var) {
                       "ToAddressR", "LeftJurisd", "RightJuris", "LeftZip", "RightZip", "OneWay", "SpeedLimit",
                       "ArterialCl", "FunctionCl", "ArterialSw", "EmergencyE", "EmergencyR", "SnowRespon", 
                       "TruckRoute", "IsAddressa", "IsPrivate", "IsAccessRo", "AnomalyTyp", "StreetName",
-                      "StreetBloc", "Shape_STLe")
+                      "StreetBloc", "Shape_STLe", "End1_IntID", "End2_IntID",
+                    "nCrashes", "Crash_End1", "Crash_End2", "nBikes", "nFARS_1217")
   seg.only.data <- unique(w.all[, seg_only_var])
   
   w.all.4hr <- left_join(w.all.4hr, seg.only.data, by = 'RDSEG_ID')
