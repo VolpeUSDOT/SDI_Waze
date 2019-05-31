@@ -50,17 +50,16 @@ load(file.path(seg.loc, fn))
 
 # <><><><><><><><><><><><><><><><><><><><><><><><> Start from prepared data for 4 hour window
 # 4-hr model variables organization:  ----
+nrow(w.all.4hr.wd) # total 12,608 rows
 table(w.all.4hr.wd$uniqueCrashreports) # ~10% of the data has non-zero counts, 0.8% of the data has counts larger than 1
-# 0     1     2     3     4 
-# 11609  1146    81    16     3
 
-#With new code (5/29/19)
+# With new code (5/29/19)
 #    0     1     2     3     4     6 
 #11358  1155    75    17     2     1 
 
 #Other variables
 table(w.all.4hr.wd$nCrashKSI)
-table(w.all.4hr.wd$We)
+table(w.all.4hr.wd$nCrashInjury)
 table(w.all.4hr.wd$nFARS_1217)
 table(w.all.4hr.wd$nFARS)
 table(w.all.4hr.wd$nCrashes)
@@ -68,12 +67,18 @@ table(w.all.4hr.wd$ArterialCl)
 
 
 #histograms
-hist(log(w.all.4hr.wd$nMagVar330to30N))
-hist(log(w.all.4hr.wd$nMagVar30to90NE))
-hist(log(w.all.4hr.wd$nMagVar90to150SE))
-hist(log(w.all.4hr.wd$nMagVar150to210S))
-hist(log(w.all.4hr.wd$nMagVar210to270SW))
-hist(log(w.all.4hr.wd$nMagVar270to330NW))
+png(file = paste0(visual.loc, "/histigrams_4hr_wd_MegVar.png"), width = 6, height = 8, units = 'in', res = 300)
+par(mfrow = c(2,3))
+
+hist(log(w.all.4hr.wd$nMagVar330to30N), xlab = "nMagVar330to30N", main = "")
+hist(log(w.all.4hr.wd$nMagVar30to90NE), xlab = "nMagVar30to90NE", main = "")
+hist(log(w.all.4hr.wd$nMagVar90to150SE), xlab = "nMagVar90to150SE", main = "")
+hist(log(w.all.4hr.wd$nMagVar150to210S), xlab = "nMagVar150to210S", main = "")
+hist(log(w.all.4hr.wd$nMagVar210to270SW), xlab = "nMagVar210to270SW", main = "")
+hist(log(w.all.4hr.wd$nMagVar270to330NW), xlab = "nMagVar270to330NW", main = "")
+
+dev.off()
+
 
 # Omit or include predictors in this vector:
 alwaysomit = c(grep("RDSEG_ID", names(w.all.4hr.wd), value = T), "year", "wkday", "grp_name", "grp_hr", "nFARS_1217",
@@ -113,9 +118,9 @@ response.var.list <- c(
                   "WeightedCrashes")    #total crashes weighted by severity (25 for KSI, 10 for injury, 1 for PDO)
 
 # Any last-minute data organization: order the levels of weekday
-# w.all.4hr.wd$wkday = factor(w.all.4hr.wd$wkday, levels(w.all.4hr.wd$wkday)[c(4,2,6,7,5,1,3)])
+w.all.4hr.wd$wkday = factor(w.all.4hr.wd$wkday, levels(w.all.4hr.wd$wkday)[c(4,2,6,7,5,1,3)])
 w.all.4hr.wd$wkday.s = w.all.4hr.wd$wkday
-levels(w.all.4hr.wd$wkday.s) <- c("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat")
+levels(w.all.4hr.wd$wkday.s) <- list(Sun = "Sunday", Mon = "Monday", Tue = "Tuesday", Wed = "Wednesday", Thu = "Thursday", Fri = "Friday", Sat = "Saturday")
 
 w.all.4hr.wd$wkend = ifelse(w.all.4hr.wd$wkday.s %in% c("Sun","Sat"), "Weekend", "Weekday")
 
