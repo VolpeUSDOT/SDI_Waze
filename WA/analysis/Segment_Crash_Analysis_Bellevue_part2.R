@@ -89,14 +89,16 @@ alert_types = c("nWazeAccident", "nWazeJam", "nWazeRoadClosed", "nWazeWeatherOrH
 
 alert_subtypes = c("nHazardOnRoad", "nHazardOnShoulder" ,"nHazardWeather", "nWazeAccidentMajor", "nWazeAccidentMinor", "nWazeHazardCarStoppedRoad", "nWazeHazardCarStoppedShoulder", "nWazeHazardConstruction", "nWazeHazardObjectOnRoad", "nWazeHazardPotholeOnRoad", "nWazeHazardRoadKillOnRoad", "nWazeJamModerate", "nWazeJamHeavy" ,"nWazeJamStandStill",  "nWazeWeatherFlood", "nWazeWeatherFog", "nWazeHazardIceRoad")
 
-waze_rd_type = grep("WazeRT", names(w.all), value = T)[-c(1,2,6)] # counts of events happened at that segment at each hour. 
+waze_rd_type = grep("WazeRT", names(w.all.4hr.wd), value = T)[-c(1,2,6)] # counts of events happened at that segment at each hour. 
+colSums(w.all.4hr.wd[, waze_rd_type]) #
 #All zero for road type 0, 3, 4, thus removing them
 
-waze_dir_travel = grep("MagVar", names(w.all), value = T) 
+waze_dir_travel = grep("MagVar", names(w.all.4hr.wd), value = T) 
+# colSums(w.all.4hr.wd[,waze_dir_travel]) # none of these columns are all zeros.
 
 weather_var = c('PRCP', 'TMIN', 'TMAX', 'SNOW')
 
-other_var = c("nBikes", "nFARS")
+other_var = c("nBikes", "nFARS_1217")
 
 time_var = c("grp_hr", "wkday", "wkend") # time variable can be used as indicator or to aggregate the temporal resolution.
 
@@ -106,9 +108,15 @@ seg_var = c("Shape_STLe", "SpeedLimit", "ArterialCl")
 table(w.all.4hr.wd$ArterialCl)
 
 # Create a list to store the indicators
-indicator.var.list <- list("seg_var" = seg_var, "other_var" = other_var, "time_var" = time_var, 
-                           "weather_var" = weather_var, "alert_types" = alert_types, "alert_subtypes" = alert_subtypes, 
-                           "waze_rd_type" = waze_rd_type, "waze_dir_travel" = waze_dir_travel)
+indicator.var.list <- list("seg_var" = seg_var, 
+                           "other_var" = other_var, 
+                           "time_var" = time_var, 
+                           "weather_var" = weather_var, 
+                           "alert_types" = alert_types, 
+                           "alert_subtypes" = alert_subtypes, 
+                           "waze_rd_type" = waze_rd_type, 
+                           "waze_dir_travel" = waze_dir_travel
+                           )
 
 # A list of Response variables
 response.var.list <- c(
@@ -118,11 +126,24 @@ response.var.list <- c(
                   "WeightedCrashes")    #total crashes weighted by severity (25 for KSI, 10 for injury, 1 for PDO)
 
 # Any last-minute data organization: order the levels of weekday
-w.all.4hr.wd$wkday = factor(w.all.4hr.wd$wkday, levels(w.all.4hr.wd$wkday)[c(4,2,6,7,5,1,3)])
-w.all.4hr.wd$wkday.s = w.all.4hr.wd$wkday
-levels(w.all.4hr.wd$wkday.s) <- list(Sun = "Sunday", Mon = "Monday", Tue = "Tuesday", Wed = "Wednesday", Thu = "Thursday", Fri = "Friday", Sat = "Saturday")
+# create wkend variables using the raw data.
+w.all.4hr.wd$wkend = ifelse(w.all.4hr.wd$wkday %in% c("Sunday","Saturday"), "Weekend", "Weekday")
 
-w.all.4hr.wd$wkend = ifelse(w.all.4hr.wd$wkday.s %in% c("Sun","Sat"), "Weekend", "Weekday")
+# re-order the factor level (can run only once)
+w.all.4hr.wd$wkday = factor(w.all.4hr.wd$wkday, levels(w.all.4hr.wd$wkday)[c(4,2,6,7,5,1,3)])
+# create another columns, and rename with short names
+w.all.4hr.wd$wkday.s = w.all.4hr.wd$wkday
+levels(w.all.4hr.wd$wkday.s) <- list(Sun = "Sunday", 
+                                     Mon = "Monday", 
+                                     Tue = "Tuesday", 
+                                     Wed = "Wednesday", 
+                                     Thu = "Thursday", 
+                                     Fri = "Friday", 
+                                     Sat = "Saturday"
+                                     )
+
+# check variables to make sure it is correct
+table(w.all.4hr.wd[,c("wkend", "wkday", "wkday.s")])
 
 #Remove ArterialCL levels with no observations
 w.all.4hr.wd$ArterialCl <- factor(w.all.4hr.wd$ArterialCl)
@@ -162,7 +183,7 @@ for (i in 1:length(indicator.var.list)) {
 
 # check missing values and all zero columns ----
 # if any other columns are all zeros
-all_var <- response.var.list
+all_var <- vector()
 for (i in 1:length(indicator.var.list)){
   all_var <- c(all_var, indicator.var.list[[i]])
 }

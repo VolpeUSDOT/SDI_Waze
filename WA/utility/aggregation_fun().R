@@ -104,7 +104,7 @@ agg_fun <- function(w.all, t_var) {
                       "ArterialCl", "FunctionCl", "ArterialSw", "EmergencyE", "EmergencyR", "SnowRespon", 
                       "TruckRoute", "IsAddressa", "IsPrivate", "IsAccessRo", "AnomalyTyp", "StreetName",
                       "StreetBloc", "Shape_STLe", "End1_IntID", "End2_IntID",
-                    "nCrashes", "Crash_End1", "Crash_End2", "nBikes", "nFARS_1217")
+                    "nCrashes", "Crash_End1", "Crash_End2", "nBikes", "nFARS_1217", "nFARS")
   seg.only.data <- unique(w.all[, seg_only_var])
   
   w.all.4hr <- left_join(w.all.4hr, seg.only.data, by = 'RDSEG_ID')
