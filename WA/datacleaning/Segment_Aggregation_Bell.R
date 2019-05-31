@@ -117,12 +117,12 @@ foreach(j = todo.months, .packages = c("dplyr", "lubridate", "utils", "circular"
       
       #Values corrected to represent N, NE, SE, S, EW, NW directions.
       #Omit road closures - magvar is filled in as zero for road closures, but it does not reflect direction
-      nMagVar330to30 = n_distinct(SDC_uuid[alert_type!="ROAD_CLOSED" & magvar>= 330 | magvar<30]),
-      nMagVar30to90 = n_distinct(SDC_uuid[alert_type!="ROAD_CLOSED" & magvar>= 30 & magvar<90]),
-      nMagVar90to150 = n_distinct(SDC_uuid[alert_type!="ROAD_CLOSED" & magvar>= 90 & magvar<150]),
-      nMagVar150to210 = n_distinct(SDC_uuid[alert_type!="ROAD_CLOSED" & magvar>= 150 & magvar<210]),
-      nMagVar210to270 = n_distinct(SDC_uuid[alert_type!="ROAD_CLOSED" & magvar>= 210 & magvar<270]),
-      nMagVar270to330 = n_distinct(SDC_uuid[alert_type!="ROAD_CLOSED" & magvar>= 270 & magvar<330])) 
+      nMagVar330to30N = n_distinct(SDC_uuid[alert_type!="ROAD_CLOSED" & magvar>= 330 | magvar<30]),
+      nMagVar30to90NE = n_distinct(SDC_uuid[alert_type!="ROAD_CLOSED" & magvar>= 30 & magvar<90]),
+      nMagVar90to150SE = n_distinct(SDC_uuid[alert_type!="ROAD_CLOSED" & magvar>= 90 & magvar<150]),
+      nMagVar150to210S = n_distinct(SDC_uuid[alert_type!="ROAD_CLOSED" & magvar>= 150 & magvar<210]),
+      nMagVar210to270SW = n_distinct(SDC_uuid[alert_type!="ROAD_CLOSED" & magvar>= 210 & magvar<270]),
+      nMagVar270to330NW = n_distinct(SDC_uuid[alert_type!="ROAD_CLOSED" & magvar>= 270 & magvar<330])) 
   
   
   #Compute grid counts for Bellevue crash data

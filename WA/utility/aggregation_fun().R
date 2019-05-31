@@ -47,12 +47,12 @@ group_by_Waze_Crash <- function(table, ... ) {
       
       #Road closures are omitted
       #Values represent N, NE, SE, S, EW, NW directions. 
-      nMagVar330to30N = sum(nMagVar330to30),
-      nMagVar30to90NE = sum(nMagVar30to90),
-      nMagVar90to150SE = sum(nMagVar90to150),
-      nMagVar150to210S = sum(nMagVar150to210),
-      nMagVar210to270EW = sum(nMagVar210to270),
-      nMagVar270to330NW = sum(nMagVar270to330),
+      nMagVar330to30N = sum(nMagVar330to30N),
+      nMagVar30to90NE = sum(nMagVar30to90NE),
+      nMagVar90to150SE = sum(nMagVar90to150SE),
+      nMagVar150to210S = sum(nMagVar150to210S),
+      nMagVar210to270SW = sum(nMagVar210to270SW),
+      nMagVar270to330NW = sum(nMagVar270to330NW),
   
 # Crash columns
 # Add weighted crash column based on HSM and IDOT network screening study

@@ -12,7 +12,7 @@ rm(list=ls()) # Start fresh
 codeloc <- ifelse(grepl('Flynn', normalizePath('~/')), # grep() does not produce a logical outcome (T/F), it gives the positive where there is a match, or no outcome if there is no match. grepl() is what we need here.
                   "~/git/SDI_Waze", "~/GitHub/SDI_Waze") # Jessie's codeloc is ~/GitHub/SDI_Waze
 
-source(file.path(codeloc, 'utility/get_packages.R'))
+#source(file.path(codeloc, 'utility/get_packages.R')) #run if need packages
 # load functions with group_by
 source(file.path(codeloc, 'WA/utility/visual_fun.R'))
 
@@ -52,14 +52,28 @@ load(file.path(seg.loc, fn))
 # 4-hr model variables organization:  ----
 table(w.all.4hr.wd$uniqueCrashreports) # ~10% of the data has non-zero counts, 0.8% of the data has counts larger than 1
 # 0     1     2     3     4 
-# 11609  1146    81    16     3 
+# 11609  1146    81    16     3
+
+#With new code (5/29/19)
+#    0     1     2     3     4     6 
+#11358  1155    75    17     2     1 
 
 #Other variables
 table(w.all.4hr.wd$nCrashKSI)
-table(w.all.4hr.wd$nCrashInjury)
+table(w.all.4hr.wd$We)
 table(w.all.4hr.wd$nFARS_1217)
 table(w.all.4hr.wd$nFARS)
 table(w.all.4hr.wd$nCrashes)
+table(w.all.4hr.wd$ArterialCl)
+
+
+#histograms
+hist(log(w.all.4hr.wd$nMagVar330to30N))
+hist(log(w.all.4hr.wd$nMagVar30to90NE))
+hist(log(w.all.4hr.wd$nMagVar90to150SE))
+hist(log(w.all.4hr.wd$nMagVar150to210S))
+hist(log(w.all.4hr.wd$nMagVar210to270SW))
+hist(log(w.all.4hr.wd$nMagVar270to330NW))
 
 # Omit or include predictors in this vector:
 alwaysomit = c(grep("RDSEG_ID", names(w.all.4hr.wd), value = T), "year", "wkday", "grp_name", "grp_hr", "nFARS_1217",
@@ -70,9 +84,10 @@ alert_types = c("nWazeAccident", "nWazeJam", "nWazeRoadClosed", "nWazeWeatherOrH
 
 alert_subtypes = c("nHazardOnRoad", "nHazardOnShoulder" ,"nHazardWeather", "nWazeAccidentMajor", "nWazeAccidentMinor", "nWazeHazardCarStoppedRoad", "nWazeHazardCarStoppedShoulder", "nWazeHazardConstruction", "nWazeHazardObjectOnRoad", "nWazeHazardPotholeOnRoad", "nWazeHazardRoadKillOnRoad", "nWazeJamModerate", "nWazeJamHeavy" ,"nWazeJamStandStill",  "nWazeWeatherFlood", "nWazeWeatherFog", "nWazeHazardIceRoad")
 
-waze_rd_type = grep("WazeRT", names(w.all), value = T)[-c(1,2,6)] # counts of events happened at that segment at each hour. All zero for road type 0, 3, 4, thus removing them
+waze_rd_type = grep("WazeRT", names(w.all), value = T)[-c(1,2,6)] # counts of events happened at that segment at each hour. 
+#All zero for road type 0, 3, 4, thus removing them
 
-waze_dir_travel = grep("MagVar", names(w.all), value = T)[-2] # nMagVar30to60 is all zero, removing it from the variable list
+waze_dir_travel = grep("MagVar", names(w.all), value = T) 
 
 weather_var = c('PRCP', 'TMIN', 'TMAX', 'SNOW')
 
@@ -80,20 +95,22 @@ other_var = c("nBikes", "nFARS")
 
 time_var = c("grp_hr", "wkday", "wkend") # time variable can be used as indicator or to aggregate the temporal resolution.
 
-seg_var = c("Shape_STLe", "SpeedLimit", "ArterialCl"
+seg_var = c("Shape_STLe", "SpeedLimit", "ArterialCl")
             # , "FunctionCl"
-            ) # "ArterialCl" is complete. There are 6 rows with missing values in "FunctionCl", therefore if we use in the model, we will lose these rows.
+             # "ArterialCl" is complete. There are 6 rows with missing values in "FunctionCl", therefore if we use in the model, we will lose these rows.
 table(w.all.4hr.wd$ArterialCl)
 
 # Create a list to store the indicators
-indicator.var.list <- list("seg_var" = seg_var, "other_var" = other_var, "time_var" = time_var, "weather_var" = weather_var, "alert_types" = alert_types, "alert_subtypes" = alert_subtypes, "waze_rd_type" = waze_rd_type, "waze_dir_travel" = waze_dir_travel)
+indicator.var.list <- list("seg_var" = seg_var, "other_var" = other_var, "time_var" = time_var, 
+                           "weather_var" = weather_var, "alert_types" = alert_types, "alert_subtypes" = alert_subtypes, 
+                           "waze_rd_type" = waze_rd_type, "waze_dir_travel" = waze_dir_travel)
 
 # A list of Response variables
 response.var.list <- c(
                   "uniqueCrashreports", # number of crashes at each segment at every time segment (every 4 hours at each weekday)
                   "biCrash",            # presence and absence of crash at each segment at every hour of day
-                  "nCrashes"            # total crashes at each segment of entire year 2018
-                  )
+                  "nCrashes",            # total crashes at each segment of entire year 2018
+                  "WeightedCrashes")    #total crashes weighted by severity (25 for KSI, 10 for injury, 1 for PDO)
 
 # Any last-minute data organization: order the levels of weekday
 # w.all.4hr.wd$wkday = factor(w.all.4hr.wd$wkday, levels(w.all.4hr.wd$wkday)[c(4,2,6,7,5,1,3)])
@@ -101,6 +118,10 @@ w.all.4hr.wd$wkday.s = w.all.4hr.wd$wkday
 levels(w.all.4hr.wd$wkday.s) <- c("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat")
 
 w.all.4hr.wd$wkend = ifelse(w.all.4hr.wd$wkday.s %in% c("Sun","Sat"), "Weekend", "Weekday")
+
+#Remove ArterialCL levels with no observations
+w.all.4hr.wd$ArterialCl <- factor(w.all.4hr.wd$ArterialCl)
+
 
 # Correlation & ggpairs ----
 correlations <- cor(w.all.4hr.wd[, c(response.var.list, "Shape_STLe")])
@@ -133,10 +154,6 @@ for (i in 1:length(indicator.var.list)) {
     dev.off()
   }
 }
-
-# Explore medMagVar variable
-hist(w.all.4hr.wd$medMagVar)
-hist(w.all.4hr.wd$nMagVar30to60)
 
 # check missing values and all zero columns ----
 # if any other columns are all zeros
@@ -221,8 +238,8 @@ dev.off()
 
 # Mean and variance ----
 hist(w.all.4hr.wd$uniqueCrashreports)
-mean(w.all.4hr.wd$uniqueCrashreports) # 0.106
-var(w.all.4hr.wd$uniqueCrashreports) # 0.1179727
+mean(w.all.4hr.wd$uniqueCrashreports) # 0.10866
+var(w.all.4hr.wd$uniqueCrashreports) # 0.1211338
 # The data is not overdispersed. Maybe a Poisson model is also appropriate.
 ggplot(w.all.4hr.wd, aes(uniqueCrashreports)) + geom_histogram() + scale_x_log10()
 
@@ -352,13 +369,13 @@ M <- Poisson_model_summary_list$M
 model_summary  <- Poisson_model_summary_list$model_summary
 model_compare <- Poisson_model_summary_list$model_compare
 
-write.csv(model_summary, file.path(output.loc, "Poisson_model_summary.csv"), row.names = F)
+write.csv(model_summary, file.path(output.loc, "Poisson_model_summary_update.csv"), row.names = F)
 
 continous_var <- c(waze_dir_travel, waze_rd_type, # direction of travel + road types from Waze
                    alert_types,     # counts of waze events by alert types
                    weather_var,     # Weather variables
                    "nBikes",        # bike/ped conflict counts at segment level (no hour)
-                   "nFARS",         # FARS variables
+                   "nFARS_1217",         # FARS variables
                    "Shape_STLe", "SpeedLimit")
 corr <- cor(w.all.4hr.wd[, c(continous_var, "uniqueCrashreports")])
 write.csv(corr, file.path(output.loc, "Correlation.csv"))
@@ -396,7 +413,7 @@ includes = c(
   alert_types,     # counts of waze events by alert types
   # weather_var,     # Weather variables
   "nBikes",        # bike/ped conflict counts at segment level (no hour)
-  "nFARS",         # FARS variables
+  "nFARS_1217",         # FARS variables
   seg_var, "wkend", "grp_hr"
 )
 
@@ -416,7 +433,9 @@ response.var <- response.var.list[1] # use crash counts
                                  paste(predvars, collapse = "+"))) )
 
 assign(paste0('m', modelno),
-       randomForest(use.formula, data = TrainSet %>% filter(ArterialCl != "Local"))) # random forest model mtry (how many variables to try in each tree) and maxnodes (how deep the tree goes) are influenctial parameters to set for random forest model.
+       randomForest(use.formula, data = TrainSet %>% filter(ArterialCl != "Local"))) 
+# random forest model mtry (how many variables to try in each tree) 
+# and maxnodes (how deep the tree goes) are influenctial parameters to set for random forest model.
 
 # Warning
 # Warning message:
@@ -496,7 +515,7 @@ continous_var <- c(waze_dir_travel, waze_rd_type, # direction of travel + road t
                    alert_types,     # counts of waze events by alert types
                    weather_var,     # Weather variables
                    "nBikes",        # bike/ped conflict counts at segment level (no hour)
-                   "nFARS",         # FARS variables
+                   "nFARS_1217",         # FARS variables
                    "Shape_STLe", "SpeedLimit")
 response.var <- response.var.list[1] # use crash counts
 
@@ -505,11 +524,11 @@ includes = c(
   alert_types,     # counts of waze events by alert types
   # weather_var,     # Weather variables
   "nBikes",        # bike/ped conflict counts at segment level (no hour)
-  "nFARS",         # FARS variables
+  "nFARS_1217",         # FARS variables
   seg_var, "wkend", "grp_hr"
 )
 
-includes_xgb <- includes[-c(20:22)]
+includes_xgb <- includes[-c(21:23)] #From Erika - which variables are we trying to remove here? Columns have changed
 
 TrainSet_xgb <- data.frame(TrainSet[, includes_xgb], model.matrix(~ TrainSet$ArterialCl + 0), model.matrix(~ TrainSet$wkend + 0), model.matrix(~ TrainSet$grp_hr + 0))
 ValidSet_xgb <- data.frame(ValidSet[, includes_xgb], model.matrix(~ ValidSet$ArterialCl + 0), model.matrix(~ ValidSet$wkend + 0), model.matrix(~ ValidSet$grp_hr + 0))
