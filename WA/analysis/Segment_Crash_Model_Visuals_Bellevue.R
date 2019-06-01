@@ -30,9 +30,34 @@ model_type = "XGB_models"
 out.name <- file.path(data.loc, 'Model_output', paste0("Bell_",model_type,".Rdata"))
 load(out.name)
 
+model_type = "RF_models"
+out.name <- file.path(data.loc, 'Model_output', paste0("Bell_",model_type,".Rdata"))
+load(out.name)
+
+model_type = "Poisson_models"
+out.name <- file.path(data.loc, 'Model_output', paste0("Bell_",model_type,".Rdata"))
+load(out.name)
+
+ArterialCl <- PredSet$ArterialCl
+wkend <- PredSet$wkend
+grp_hr <- PredSet$grp_hr
+PredSet_xgb <- data.frame(PredSet[, includes_xgb], model.matrix(~ ArterialCl + 0), model.matrix(~ wkend + 0), model.matrix(~ grp_hr + 0))
+
+dpred <- list("data" = as.matrix(PredSet_xgb), "label" = PredSet[,response.var])
+
+pred_pred <- predict(m15.xgb.art.wkend.20rd, dpred$data)
+pred_pred_weighted <- predict(m15.xgb.art.wkend.25rd.weighted, dpred$data)
+
+rf_Pred = predict(m15.rf.art.wkend, PredSet)
+Poi_Pred = predict.glm(m15.poi.art.wkend, PredSet, type = "response")
+range(Poi_Pred) 
+# the message is mostly due to too many predictors in the formula of glm for the data of model 15, maybe we can use model 14 instead.
+# POisson prediction Warning message:
+#   In predict.lm(object, newdata, se.fit, scale = 1, type = if (type ==  :
+#                                                                prediction from a rank-deficient fit may be misleading
+
 # data with XGBoost model predictions
-out <- cbind(PredSet, "Xgb_Pred" = pred_pred)
-var <- c(response.var, includes, "Xgb_Pred")
+out <- cbind(PredSet, "Poi_Pred" = Poi_Pred, "Rf_Pred" = rf_Pred, "Xgb_Pred" = pred_pred, "Xgb_Pred_Weighted" = pred_pred_weighted)
 write.csv(out, file.path(data.loc, 'Model_output', paste0("Bell_",model_type,"_pred.csv")), row.names = F)
 
 # Visualizations ----

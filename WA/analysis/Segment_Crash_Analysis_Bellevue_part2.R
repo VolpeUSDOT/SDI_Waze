@@ -279,21 +279,20 @@ ggplot(w.all.4hr.wd, aes(uniqueCrashreports)) + geom_histogram() + scale_x_log10
 # 14: {Best of 10 - 13} = 12 + alert_types
 # 15: 14 + waze_dir_travel + waze_rd_type
 
-starttime = Sys.time()
-
 # Make a list of variables to include from the predictors. To add variables, comment out the corresponding line.
 # month (mo) and hour are categorical variables. 
 
 includes = c(
-  # waze_dir_travel, waze_rd_type, # direction of travel + road types from Waze
-  # alert_types,     # counts of waze events by alert types
+  waze_dir_travel,
+  waze_rd_type, # direction of travel + road types from Waze
+  alert_types,     # counts of waze events by alert types
   # weather_var,     # Weather variables
-  # "nBikes",        # bike/ped conflict counts at segment level (no hour)
-  # "nFARS_1217",         # FARS variables
-  seg_var, "wkday", "grp_hr"
+  "nBikes",        # bike/ped conflict counts at segment level (no hour)
+  "nFARS_1217",         # FARS variables
+  seg_var, "wkend", "grp_hr"
 )
 
-modelno = "10.poi.art"
+modelno = "15.poi.art.wkend"
 
 response.var <- response.var.list[1] # use crash counts
 
@@ -467,6 +466,7 @@ response.var <- response.var.list[1] # use crash counts
 Art.Only <- T # False to use all road class, True to Arterial only roads
 if(Art.Only) {TrainSet = TrainSet %>% filter(ArterialCl != "Local")} else {TrainSet = TrainSet}
 if(Art.Only) {ValidSet = ValidSet %>% filter(ArterialCl != "Local")} else {ValidSet = ValidSet}
+if(Art.Only) {PredSet = PredSet %>% filter(ArterialCl != "Local")} else {PredSet = PredSet}
 
 # Simple 
 
@@ -506,7 +506,7 @@ print(m15.rf.art.wkend) # 37.04, (removing medMagVar, 29.5)
 cat("% Var explained: \n", 100 * (1-sum((m15.rf.art.wkend$y-m15.rf.art.wkend$pred   )^2) /
                                   sum((m15.rf.art.wkend$y-mean(m15.rf.art.wkend$y))^2)
                                   )
-    ) #
+    ) # 29.53954%
 
 # Save RF model output
 model_type = "RF_models"
@@ -518,7 +518,7 @@ if(file.exists(out.name)){
     ClassFilter <- function(x) inherits(get(x), 'randomForest')
     row.name <- Filter(ClassFilter, ls() )
     RF_models <- lapply(row.name, function(x) get(x))
-    save(list = c("RF_models", "row.name", "TrainSet", "ValidSet", "response.var"), file = out.name)
+    save(list = c("RF_models", "row.name", "TrainSet", "ValidSet", "PredSet", "response.var"), file = out.name)
     
   }
 
@@ -561,6 +561,7 @@ continous_var <- c(waze_dir_travel, waze_rd_type, # direction of travel + road t
                    "nFARS_1217",         # FARS variables
                    "Shape_STLe", "SpeedLimit")
 response.var <- response.var.list[1] # use crash counts
+# response.var <- response.var.list[4] # use weighted crash
 
 includes = c(
   waze_dir_travel, waze_rd_type, # direction of travel + road types from Waze
@@ -571,7 +572,7 @@ includes = c(
   seg_var, "wkend", "grp_hr"
 )
 
-includes_xgb <- includes[-c("ArterialCl", "wkend", "grp_hr")] #From Erika - which variables are we trying to remove here? Columns have changed
+includes_xgb <- includes[-which(includes %in% c("ArterialCl", "wkend", "grp_hr"))] #From Erika - which variables are we trying to remove here? Columns have changed
 
 ArterialCl <- TrainSet$ArterialCl
 wkend <- TrainSet$wkend
@@ -592,15 +593,18 @@ dpred <- list("data" = as.matrix(PredSet_xgb), "label" = PredSet[,response.var])
 dtrain <- list("data" = as.matrix(TrainSet_xgb), "label" = TrainSet[,response.var])
 dtest <- list("data" = as.matrix(ValidSet_xgb), "label" = ValidSet[,response.var])
 
+# modelno = "15.xgb.art.wkend.25rd.weighted"
 modelno = "15.xgb.art.wkend.20rd"
 assign(paste0('m', modelno),
-       xgboost(data = dtrain$data, label = dtrain$label, max.depth = 6, eta = 1, nthread = 2, nrounds = 30, objective = "count:poisson"))
+       xgboost(data = dtrain$data, label = dtrain$label, max.depth = 6, eta = 1, nthread = 2, nrounds = 20, objective = "count:poisson"))
 
 pred_train <- predict(m15.xgb.art.wkend.20rd, dtrain$data)
-pred_test <- predict(m15.xgb.art.wkend.20rd, dtest$data)
-pred_pred <- predict(m15.xgb.art.wkend.20rd, dpred$data)
-range(pred_pred) # 0.00407875 4.49043274 ( 10 rounds)  0.0009638735 7.5567440987 (20 rounds) 0-11 (30 rounds)
-range(PredSet[,response.var]) # 0 - 6
+pred_test <- predict(m15.xgb.art.wkend.10rd, dtest$data)
+pred_pred <- predict(m15.xgb.art.wkend.10rd, dpred$data)
+# pred_pred_weighted <- predict(m15.xgb.art.wkend.25rd.weighted, dpred$data)
+range(pred_pred) # 0.00407875 4.49043274 ( 10 rounds)  0.0009638735 7.5567440987 (20 rounds) 0-11 (30 rounds) 
+range(pred_pred_weighted) # .002860187 23.191209793 (20 rounds weighted crash) 0.001295544 27.112457275 (25 rounds)
+range(PredSet[,response.var]) # 0 - 6 (weighted crashes: 0-27)
 # todo, double check which model prediction we used in the out file.
 # use WeightedCrashes as the response for the XGBoost model, and add the prediction to the out table.
 
@@ -626,7 +630,7 @@ dev.off()
 cat("% Var explained: \n", 100 * (1-sum(( TrainSet[,response.var] - pred_train )^2) /
                                     sum(( TrainSet[,response.var] - mean(TrainSet[,response.var]))^2)
 )
-) # 50.17904% using 10 rounds, 58% using 20 rounds, 65.28416% of Var explained using 30 rounds
+) # 50.17904% using 10 rounds, 58.09369% using 20 rounds, 65.28416% of Var explained using 30 rounds
 
 
 cat("% Var explained: \n", 100 * (1-sum(( PredSet[,response.var] - pred_pred )^2) /
@@ -634,6 +638,10 @@ cat("% Var explained: \n", 100 * (1-sum(( PredSet[,response.var] - pred_pred )^2
 )
 ) # 43.23524% using 10 rounds, 44.31% of Var explained using 20 rounds, 41.85474% using 30 rounds.
 
+cat("% Var explained: \n", 100 * (1-sum(( PredSet[,response.var] - pred_pred_weighted )^2) /
+                                    sum(( PredSet[,response.var] - mean(PredSet[,response.var]))^2)
+)
+) #  28.70593% (20 rounds) 29.03364% (25 rounds)
 # # model output both training and testing errors.
 # train <- xgb.DMatrix(data = dtrain$data, label = dtrain$label)
 # test <- xgb.DMatrix(data = dtest$data, label = dtest$label)
@@ -649,7 +657,7 @@ out.name <- file.path(data.loc, 'Model_output', paste0("Bell_",model_type,".Rdat
 if(file.exists(out.name)){
   load(out.name)} else {
     
-    row.name <- c("m15.xgb.art.wkend.10rd", "m15.xgb.art.wkend.20rd", "m15.xgb.art.wkend.30rd")
+    row.name <- c("m15.xgb.art.wkend.10rd", "m15.xgb.art.wkend.20rd", "m15.xgb.art.wkend.30rd", "m15.xgb.art.wkend.20rd.weighted", "m15.xgb.art.wkend.25rd.weighted")
     XGB_models <- lapply(row.name, function(x) get(x))
     save(list = c("XGB_models", "row.name", "TrainSet", "ValidSet", "PredSet", "response.var", "pred_pred"), file = out.name)
     
