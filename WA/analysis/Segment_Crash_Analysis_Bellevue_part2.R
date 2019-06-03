@@ -560,8 +560,8 @@ continous_var <- c(waze_dir_travel, waze_rd_type, # direction of travel + road t
                    "nBikes",        # bike/ped conflict counts at segment level (no hour)
                    "nFARS_1217",         # FARS variables
                    "Shape_STLe", "SpeedLimit")
-response.var <- response.var.list[1] # use crash counts
-# response.var <- response.var.list[4] # use weighted crash
+# response.var <- response.var.list[1] # use crash counts
+response.var <- response.var.list[4] # use weighted crash
 
 includes = c(
   waze_dir_travel, waze_rd_type, # direction of travel + road types from Waze
@@ -593,15 +593,16 @@ dpred <- list("data" = as.matrix(PredSet_xgb), "label" = PredSet[,response.var])
 dtrain <- list("data" = as.matrix(TrainSet_xgb), "label" = TrainSet[,response.var])
 dtest <- list("data" = as.matrix(ValidSet_xgb), "label" = ValidSet[,response.var])
 
-# modelno = "15.xgb.art.wkend.25rd.weighted"
-modelno = "15.xgb.art.wkend.20rd"
+modelno = "15.xgb.art.wkend.25rd.weighted.v2"
+# modelno = "15.xgb.art.wkend.20rd"
 assign(paste0('m', modelno),
-       xgboost(data = dtrain$data, label = dtrain$label, max.depth = 6, eta = 1, nthread = 2, nrounds = 20, objective = "count:poisson"))
+       xgboost(data = dtrain$data, label = dtrain$label, max.depth = 6, eta = 1, nthread = 2, nrounds = 25, objective = "count:poisson"))
 
 pred_train <- predict(m15.xgb.art.wkend.20rd, dtrain$data)
-pred_test <- predict(m15.xgb.art.wkend.10rd, dtest$data)
-pred_pred <- predict(m15.xgb.art.wkend.10rd, dpred$data)
-# pred_pred_weighted <- predict(m15.xgb.art.wkend.25rd.weighted, dpred$data)
+pred_test <- predict(m15.xgb.art.wkend.20rd, dtest$data)
+pred_pred <- predict(m15.xgb.art.wkend.20rd, dpred$data)
+pred_train_weighted <- predict(m15.xgb.art.wkend.25rd.weighted.v2, dtrain$data)
+pred_pred_weighted <- predict(m15.xgb.art.wkend.25rd.weighted.v2, dpred$data)
 range(pred_pred) # 0.00407875 4.49043274 ( 10 rounds)  0.0009638735 7.5567440987 (20 rounds) 0-11 (30 rounds) 
 range(pred_pred_weighted) # .002860187 23.191209793 (20 rounds weighted crash) 0.001295544 27.112457275 (25 rounds)
 range(PredSet[,response.var]) # 0 - 6 (weighted crashes: 0-27)
@@ -613,11 +614,11 @@ f <- paste0(visual.loc, '/Bellevue_hist_obs_pred_xgb_',paste0('m', modelno),'.pn
 png(file = f,  width = 6, height = 10, units = 'in', res = 300)
 par(mfrow = c(2,1))
 hist(log(PredSet[,response.var] + 0.0001), main = "obs") # obs
-hist(log(pred_pred + 0.0001), main = "pred") # prediction
+hist(log(pred_pred_weighted + 0.0001), main = "pred") # prediction
 dev.off()
 
 # importance matrix
-importance_matrix <- xgb.importance(model = m15.xgb.art.wkend.20rd)
+importance_matrix <- xgb.importance(model = m15.xgb.art.wkend.25rd.weighted.v2)
 # xgb.importance(feature_names = colnames(dtrain$data), model = m15.xgb.art.wkend)
 print(importance_matrix)
 
@@ -638,10 +639,16 @@ cat("% Var explained: \n", 100 * (1-sum(( PredSet[,response.var] - pred_pred )^2
 )
 ) # 43.23524% using 10 rounds, 44.31% of Var explained using 20 rounds, 41.85474% using 30 rounds.
 
+cat("% Var explained: \n", 100 * (1-sum(( TrainSet[,response.var] - pred_train_weighted )^2) /
+                                    sum(( TrainSet[,response.var] - mean(TrainSet[,response.var]))^2)
+)
+) # 72.00288% (25 rounds, re-run 6/3)
+
 cat("% Var explained: \n", 100 * (1-sum(( PredSet[,response.var] - pred_pred_weighted )^2) /
                                     sum(( PredSet[,response.var] - mean(PredSet[,response.var]))^2)
 )
 ) #  28.70593% (20 rounds) 29.03364% (25 rounds)
+
 # # model output both training and testing errors.
 # train <- xgb.DMatrix(data = dtrain$data, label = dtrain$label)
 # test <- xgb.DMatrix(data = dtest$data, label = dtest$label)
@@ -657,9 +664,9 @@ out.name <- file.path(data.loc, 'Model_output', paste0("Bell_",model_type,".Rdat
 if(file.exists(out.name)){
   load(out.name)} else {
     
-    row.name <- c("m15.xgb.art.wkend.10rd", "m15.xgb.art.wkend.20rd", "m15.xgb.art.wkend.30rd", "m15.xgb.art.wkend.20rd.weighted", "m15.xgb.art.wkend.25rd.weighted")
+    row.name <- c("m15.xgb.art.wkend.10rd", "m15.xgb.art.wkend.20rd", "m15.xgb.art.wkend.30rd", "m15.xgb.art.wkend.20rd.weighted", "m15.xgb.art.wkend.25rd.weighted", "m15.xgb.art.wkend.25rd.weighted.v2")
     XGB_models <- lapply(row.name, function(x) get(x))
-    save(list = c("XGB_models", "row.name", "TrainSet", "ValidSet", "PredSet", "response.var", "pred_pred"), file = out.name)
+    save(list = c("XGB_models", "row.name", "TrainSet", "ValidSet", "PredSet", "response.var.list", "pred_pred", "includes_xgb"), file = out.name)
     
   }
 

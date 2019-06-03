@@ -25,28 +25,53 @@ visual.loc <- file.path(data.loc, "Model_visualizations")
 
 setwd(data.loc)
 
-# Prepare XGBoost summary table for Tableau 
+# Prepare XGBoost summary table for Tableau ---- 
 model_type = "XGB_models"
 out.name <- file.path(data.loc, 'Model_output', paste0("Bell_",model_type,".Rdata"))
 load(out.name)
+for (i in 1:length(row.name)) {
+  assign(row.name[i], XGB_models[[i]])
+}
 
 model_type = "RF_models"
 out.name <- file.path(data.loc, 'Model_output', paste0("Bell_",model_type,".Rdata"))
 load(out.name)
+for (i in 1:length(row.name)) {
+  assign(row.name[i], RF_models[[i]])
+}
 
 model_type = "Poisson_models"
 out.name <- file.path(data.loc, 'Model_output', paste0("Bell_",model_type,".Rdata"))
 load(out.name)
+for (i in 1:length(row.name)) {
+  assign(row.name[i], Poisson_models[[i]])
+}
 
 ArterialCl <- PredSet$ArterialCl
 wkend <- PredSet$wkend
 grp_hr <- PredSet$grp_hr
 PredSet_xgb <- data.frame(PredSet[, includes_xgb], model.matrix(~ ArterialCl + 0), model.matrix(~ wkend + 0), model.matrix(~ grp_hr + 0))
 
+response.var <- response.var.list[1]
 dpred <- list("data" = as.matrix(PredSet_xgb), "label" = PredSet[,response.var])
-
 pred_pred <- predict(m15.xgb.art.wkend.20rd, dpred$data)
+cat("% Var explained: \n", 100 * (1-sum(( PredSet[,response.var] - pred_pred )^2) /
+                                    sum(( PredSet[,response.var] - mean(PredSet[,response.var]))^2)
+)) # 44.31%
+
+response.var <- response.var.list[4]
+dpred <- list("data" = as.matrix(PredSet_xgb), "label" = PredSet[,response.var])
 pred_pred_weighted <- predict(m15.xgb.art.wkend.25rd.weighted, dpred$data)
+cat("% Var explained: \n", 100 * (1-sum(( PredSet[,response.var] - pred_pred_weighted )^2) /
+                                    sum(( PredSet[,response.var] - mean(PredSet[,response.var]))^2)
+)) # 28.75%
+
+response.var <- response.var.list[4]
+dpred <- list("data" = as.matrix(PredSet_xgb), "label" = PredSet[,response.var])
+pred_pred_weighted <- predict(m15.xgb.art.wkend.25rd.weighted.v2, dpred$data)
+cat("% Var explained: \n", 100 * (1-sum(( PredSet[,response.var] - pred_pred_weighted )^2) /
+                                    sum(( PredSet[,response.var] - mean(PredSet[,response.var]))^2)
+)) # 55.71285%
 
 rf_Pred = predict(m15.rf.art.wkend, PredSet)
 Poi_Pred = predict.glm(m15.poi.art.wkend, PredSet, type = "response")
