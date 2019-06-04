@@ -608,11 +608,11 @@ xgb.m <- assign(paste0('m', modelno),
        xgboost(data = dtrain$data, 
                label = dtrain$label, 
                max.depth = m.depth, #default=6 
-               min_child_weight=1, #default = 1, range 0 to inf, min sum of instance weight needed in a child
-               gamma=1, #default=0, minimum loss reduction to make further partition
+               min_child_weight=1, #default = 1, range 0 to inf, min sum of instance weight needed in a child start with 1/sqrt(eventrate)?
+               gamma=0, #default=0, minimum loss reduction to make further partition
                eta = n.eta, #default = 0.3 (0 to 1 range, smaller prevents overfitting)
                subsample=1, #default = 1, subsample ratio of the training instance
-               colsample_bytree=1, #default=1, range 0 to 1, subsample ratio of columns when constructing each tree
+               colsample_bytree=1, #default=1, range 0 to 1, subsample ratio of columns when constructing each tree (.3-.5)
                max_delta_step=0, #default 0, range 0 to inf, max delta step we allow each tree's weight estimation to be
                seed=1,
                nthread = 1, 
@@ -622,6 +622,19 @@ xgb.m <- assign(paste0('m', modelno),
 #xgb.m
 importance_matrix <- xgb.importance(feature_names = colnames(dtrain$data), model = xgb.m)
 xgb.plot.importance(importance_matrix[1:20,])
+
+# % of variance explained
+cat("% Var explained: \n", 100 * (1-sum(( TrainSet[,response.var] - pred_train )^2) /
+                                    sum(( TrainSet[,response.var] - mean(TrainSet[,response.var]))^2)
+)
+) # 63% using 50 rounds
+
+
+cat("% Var explained: \n", 100 * (1-sum(( PredSet[,response.var] - pred_pred )^2) /
+                                    sum(( PredSet[,response.var] - mean(PredSet[,response.var]))^2)
+)
+) # 49.8% using 50 rounds
+
 
 #pretty plot - how to interpret?
 xgb.plot.tree(feature_names = colnames(dtrain$data),model=xgb.m, trees = 0, show_node_id = TRUE)
