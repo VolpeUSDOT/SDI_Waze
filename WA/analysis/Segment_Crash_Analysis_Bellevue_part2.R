@@ -146,7 +146,7 @@ levels(w.all.4hr.wd$wkday.s) <- list(Sun = "Sunday",
 table(w.all.4hr.wd[,c("wkend", "wkday", "wkday.s")])
 
 #Remove ArterialCL levels with no observations
-w.all.4hr.wd$ArterialCl <- factor(w.all.4hr.wd$ArterialCl)
+w.all.4hr.wd$ArterialCl <- factor(w.all.4hr.wd$ArterialCl) #check if this mixes up output for Tableau - dashboard shows some local roads
 
 
 # Correlation & ggpairs ----
@@ -560,8 +560,6 @@ continous_var <- c(waze_dir_travel, waze_rd_type, # direction of travel + road t
                    "nBikes",        # bike/ped conflict counts at segment level (no hour)
                    "nFARS_1217",         # FARS variables
                    "Shape_STLe", "SpeedLimit")
-# response.var <- response.var.list[1] # use crash counts
-response.var <- response.var.list[4] # use weighted crash
 
 includes = c(
   waze_dir_travel, waze_rd_type, # direction of travel + road types from Waze
@@ -572,7 +570,7 @@ includes = c(
   seg_var, "wkend", "grp_hr"
 )
 
-includes_xgb <- includes[-which(includes %in% c("ArterialCl", "wkend", "grp_hr"))] #From Erika - which variables are we trying to remove here? Columns have changed
+includes_xgb <- includes[-which(includes %in% c("ArterialCl", "wkend", "grp_hr"))]
 
 ArterialCl <- TrainSet$ArterialCl
 wkend <- TrainSet$wkend
@@ -589,22 +587,32 @@ wkend <- PredSet$wkend
 grp_hr <- PredSet$grp_hr
 PredSet_xgb <- data.frame(PredSet[, includes_xgb], model.matrix(~ ArterialCl + 0), model.matrix(~ wkend + 0), model.matrix(~ grp_hr + 0))
 
+#response.var <- response.var.list[1] # use crash counts
+response.var <- response.var.list[4] # use weighted crash
+
 dpred <- list("data" = as.matrix(PredSet_xgb), "label" = PredSet[,response.var])
 dtrain <- list("data" = as.matrix(TrainSet_xgb), "label" = TrainSet[,response.var])
 dtest <- list("data" = as.matrix(ValidSet_xgb), "label" = ValidSet[,response.var])
 
-modelno = "15.xgb.art.wkend.25rd.weighted.v2"
-# modelno = "15.xgb.art.wkend.20rd"
+#modelno = "15.xgb.art.wkend.20rd"
+modelno = "15.xgb.art.wkend.25rd.weighted.v2" 
+modelno = "15.xgb.art.wkend.30rd.weighted.v2" 
+
 assign(paste0('m', modelno),
-       xgboost(data = dtrain$data, label = dtrain$label, max.depth = 6, eta = 1, nthread = 2, nrounds = 25, objective = "count:poisson"))
+       xgboost(data = dtrain$data, label = dtrain$label, max.depth = 6, eta = 1, nthread = 2, nrounds = 30, objective = "count:poisson"))
 
 pred_train <- predict(m15.xgb.art.wkend.20rd, dtrain$data)
 pred_test <- predict(m15.xgb.art.wkend.20rd, dtest$data)
 pred_pred <- predict(m15.xgb.art.wkend.20rd, dpred$data)
+
 pred_train_weighted <- predict(m15.xgb.art.wkend.25rd.weighted.v2, dtrain$data)
 pred_pred_weighted <- predict(m15.xgb.art.wkend.25rd.weighted.v2, dpred$data)
+
+pred_train_weighted <- predict(m15.xgb.art.wkend.30rd.weighted.v2, dtrain$data)
+pred_pred_weighted <- predict(m15.xgb.art.wkend.30rd.weighted.v2, dpred$data)
+
 range(pred_pred) # 0.00407875 4.49043274 ( 10 rounds)  0.0009638735 7.5567440987 (20 rounds) 0-11 (30 rounds) 
-range(pred_pred_weighted) # .002860187 23.191209793 (20 rounds weighted crash) 0.001295544 27.112457275 (25 rounds)
+range(pred_pred_weighted) # .002860187 23.191209793 (20 rounds weighted crash) 0.001555491 21.812366486 (25 rounds) .000816789 24.28149 (30 rounds)
 range(PredSet[,response.var]) # 0 - 6 (weighted crashes: 0-27)
 # todo, double check which model prediction we used in the out file.
 # use WeightedCrashes as the response for the XGBoost model, and add the prediction to the out table.
