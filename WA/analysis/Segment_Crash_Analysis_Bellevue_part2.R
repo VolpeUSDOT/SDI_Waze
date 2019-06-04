@@ -30,6 +30,7 @@ library(MASS) # NB model
 library(randomForest) # random forest
 library(car) # to get vif()
 library(xgboost)
+library(DiagrammeR)
 # #install from Github (Windows user will need to install Rtools first.)
 # install.packages("drat", repos="https://cran.rstudio.com")
 # drat:::addRepo("dmlc")
@@ -146,8 +147,7 @@ levels(w.all.4hr.wd$wkday.s) <- list(Sun = "Sunday",
 table(w.all.4hr.wd[,c("wkend", "wkday", "wkday.s")])
 
 #Remove ArterialCL levels with no observations
-w.all.4hr.wd$ArterialCl <- factor(w.all.4hr.wd$ArterialCl) #check if this mixes up output for Tableau - dashboard shows some local roads
-
+w.all.4hr.wd$ArterialCl <- factor(w.all.4hr.wd$ArterialCl) 
 
 # Correlation & ggpairs ----
 correlations <- cor(w.all.4hr.wd[, c(response.var.list, "Shape_STLe")])
@@ -266,6 +266,7 @@ dev.off()
 hist(w.all.4hr.wd$uniqueCrashreports)
 mean(w.all.4hr.wd$uniqueCrashreports) # 0.10866
 var(w.all.4hr.wd$uniqueCrashreports) # 0.1211338
+
 # The data is not overdispersed. Maybe a Poisson model is also appropriate.
 ggplot(w.all.4hr.wd, aes(uniqueCrashreports)) + geom_histogram() + scale_x_log10()
 
@@ -576,44 +577,181 @@ ArterialCl <- TrainSet$ArterialCl
 wkend <- TrainSet$wkend
 grp_hr <- TrainSet$grp_hr
 TrainSet_xgb <- data.frame(TrainSet[, includes_xgb], model.matrix(~ ArterialCl + 0), model.matrix(~ wkend + 0), model.matrix(~ grp_hr + 0))
+table(ArterialCl)
 
 ArterialCl <- ValidSet$ArterialCl
 wkend <- ValidSet$wkend
 grp_hr <- ValidSet$grp_hr
 ValidSet_xgb <- data.frame(ValidSet[, includes_xgb], model.matrix(~ ArterialCl + 0), model.matrix(~ wkend + 0), model.matrix(~ grp_hr + 0))
+table(ArterialCl)
 
 ArterialCl <- PredSet$ArterialCl
 wkend <- PredSet$wkend
 grp_hr <- PredSet$grp_hr
 PredSet_xgb <- data.frame(PredSet[, includes_xgb], model.matrix(~ ArterialCl + 0), model.matrix(~ wkend + 0), model.matrix(~ grp_hr + 0))
+table(ArterialCl)
 
-#response.var <- response.var.list[1] # use crash counts
-response.var <- response.var.list[4] # use weighted crash
-
+# XGboost unique crash counts, updated code to test parameters in xgboost function 
+response.var <- response.var.list[1] # use crash counts
 dpred <- list("data" = as.matrix(PredSet_xgb), "label" = PredSet[,response.var])
 dtrain <- list("data" = as.matrix(TrainSet_xgb), "label" = TrainSet[,response.var])
 dtest <- list("data" = as.matrix(ValidSet_xgb), "label" = ValidSet[,response.var])
 
-#modelno = "15.xgb.art.wkend.20rd"
-modelno = "15.xgb.art.wkend.25rd.weighted.v2" 
-modelno = "15.xgb.art.wkend.30rd.weighted.v2" 
+n.rds = 50
+n.eta=.3
+m.depth=6
+modelno = paste("15.xgb.art.wkend.",n.rds,"rd.",m.depth,"depth", sep='')
+modelno
 
-assign(paste0('m', modelno),
-       xgboost(data = dtrain$data, label = dtrain$label, max.depth = 6, eta = 1, nthread = 2, nrounds = 30, objective = "count:poisson"))
+set.seed(1024)
+xgb.m <- assign(paste0('m', modelno),
+       xgboost(data = dtrain$data, 
+               label = dtrain$label, 
+               max.depth = m.depth, #default=6 
+               min_child_weight=1, #default = 1, range 0 to inf, min sum of instance weight needed in a child
+               gamma=1, #default=0, minimum loss reduction to make further partition
+               eta = n.eta, #default = 0.3 (0 to 1 range, smaller prevents overfitting)
+               subsample=1, #default = 1, subsample ratio of the training instance
+               colsample_bytree=1, #default=1, range 0 to 1, subsample ratio of columns when constructing each tree
+               max_delta_step=0, #default 0, range 0 to inf, max delta step we allow each tree's weight estimation to be
+               seed=1,
+               nthread = 1, 
+               nrounds = n.rds, 
+               objective = "count:poisson"))
+
+#xgb.m
+importance_matrix <- xgb.importance(feature_names = colnames(dtrain$data), model = xgb.m)
+xgb.plot.importance(importance_matrix[1:20,])
+
+#pretty plot - how to interpret?
+xgb.plot.tree(feature_names = colnames(dtrain$data),model=xgb.m, trees = 0, show_node_id = TRUE)
+
+pred_train <- predict(xgb.m, dtrain$data)
+pred_test <- predict(xgb.m, dtest$data)
+pred_pred <- predict(xgb.m, dpred$data)
+
+range(pred_pred) # 0.0005870936 5.9243960381 (eta=.3,50 rounds)
+range(PredSet[,response.var]) # 0 - 6
+
+#cross-validation function (xgb.cv) - can use to select features
+set.seed(1024)
+xgb.cv <- assign(paste0('m.cv', modelno), 
+                xgb.cv(data = dtrain$data, 
+                       label = dtrain$label, 
+                       max.depth = m.depth, #default=6 
+                       min_child_weight=1, #default = 1, range 0 to inf, min sum of instance weight needed in a child
+                       gamma=1, #default=0, minimum loss reduction to make further partition
+                       eta = n.eta, #default = 0.3 (0 to 1 range, smaller prevents overfitting)
+                       subsample=1, #default = 1, subsample ratio of the training instance
+                       colsample_bytree=1, #default=1, range 0 to 1, subsample ratio of columns when constructing each tree
+                       max_delta_step=0, #default 0, range 0 to inf, max delta step we allow each tree's weight estimation to be
+                       seed=1,
+                       nthread = 1, 
+                       nrounds = n.rds, 
+                        nfold=5,
+                        early.stopping.rounds = 3,
+                        objective = "count:poisson"))
+
+
+#Code to test, not working
+#bestRound = which.max(as.matrix(xgb.cv)[,3]-as.matrix(xgb.cv)[,4])
+#bestRound
+
+#test <- chisq.test(dtrain$Shape_STLe, output_vector)
+#xgb.modsum <- xgb.dump(xgb.m, with_stats = T)
+#xgb.modsum[1:10]
+
+#method to set exposure - Poisson assumes a rate, need to scale by segment length (and exposure): 
+# https://stackoverflow.com/questions/35660588/xgboost-poisson-distribution-with-varying-exposure-offset
+#setinfo(xgtrain, "base_margin", log(d$exposure))
+
+
+
+# XGboost unique crash counts, original code for 20 rounds 
+response.var <- response.var.list[1] # use crash counts
+dpred <- list("data" = as.matrix(PredSet_xgb), "label" = PredSet[,response.var])
+dtrain <- list("data" = as.matrix(TrainSet_xgb), "label" = TrainSet[,response.var])
+dtest <- list("data" = as.matrix(ValidSet_xgb), "label" = ValidSet[,response.var])
+
+modelno = "15.xgb.art.wkend.20rd"
+
+xgb.m1 <- assign(paste0('m', modelno),
+       xgboost(data = dtrain$data, 
+               label = dtrain$label, 
+               max.depth = 6, 
+               eta = 1, 
+               nthread = 2, 
+               nrounds = 20, 
+               objective = "count:poisson"))
 
 pred_train <- predict(m15.xgb.art.wkend.20rd, dtrain$data)
 pred_test <- predict(m15.xgb.art.wkend.20rd, dtest$data)
 pred_pred <- predict(m15.xgb.art.wkend.20rd, dpred$data)
 
-pred_train_weighted <- predict(m15.xgb.art.wkend.25rd.weighted.v2, dtrain$data)
-pred_pred_weighted <- predict(m15.xgb.art.wkend.25rd.weighted.v2, dpred$data)
-
-pred_train_weighted <- predict(m15.xgb.art.wkend.30rd.weighted.v2, dtrain$data)
-pred_pred_weighted <- predict(m15.xgb.art.wkend.30rd.weighted.v2, dpred$data)
+#xgb.m
+importance_matrix <- xgb.importance(feature_names = colnames(dtrain$data), model = xgb.m1)
+xgb.plot.importance(importance_matrix[1:20,])
 
 range(pred_pred) # 0.00407875 4.49043274 ( 10 rounds)  0.0009638735 7.5567440987 (20 rounds) 0-11 (30 rounds) 
-range(pred_pred_weighted) # .002860187 23.191209793 (20 rounds weighted crash) 0.001555491 21.812366486 (25 rounds) .000816789 24.28149 (30 rounds)
 range(PredSet[,response.var]) # 0 - 6 (weighted crashes: 0-27)
+
+# % of variance explained
+cat("% Var explained: \n", 100 * (1-sum(( TrainSet[,response.var] - pred_train )^2) /
+                                    sum(( TrainSet[,response.var] - mean(TrainSet[,response.var]))^2)
+)
+) # 50.17904% using 10 rounds, 58.09369% using 20 rounds, 65.28416% of Var explained using 30 rounds
+
+
+cat("% Var explained: \n", 100 * (1-sum(( PredSet[,response.var] - pred_pred )^2) /
+                                    sum(( PredSet[,response.var] - mean(PredSet[,response.var]))^2)
+)
+) # 43.23524% using 10 rounds, 44.31% of Var explained using 20 rounds, 41.85474% using 30 rounds.
+
+
+# XGboost weighted crash counts, original code for 25 rounds 
+response.var <- response.var.list[4] # use weighted crash counts
+dpred <- list("data" = as.matrix(PredSet_xgb), "label" = PredSet[,response.var])
+dtrain <- list("data" = as.matrix(TrainSet_xgb), "label" = TrainSet[,response.var])
+dtest <- list("data" = as.matrix(ValidSet_xgb), "label" = ValidSet[,response.var])
+
+modelno = "15.xgb.art.wkend.25rd.weighted.v2"
+#modelno = "15.xgb.art.wkend.30rd.weighted.v2" 
+
+xgb.m2 <- assign(paste0('m', modelno),
+       xgboost(data = dtrain$data, 
+               label = dtrain$label, 
+               max.depth = 6, 
+               eta = 1, 
+               nthread = 2, 
+               nrounds = 25, 
+               objective = "count:poisson"))
+
+pred_train_weighted <- predict(m15.xgb.art.wkend.25rd.weighted.v2, dtrain$data)
+pred_test_weighted <- predict(m15.xgb.art.wkend.25rd.weighted.v2, dtest$data)
+pred_pred_weighted <- predict(m15.xgb.art.wkend.25rd.weighted.v2, dpred$data)
+
+#xgb.m2
+importance_matrix <- xgb.importance(feature_names = colnames(dtrain$data), model = xgb.m2)
+xgb.plot.importance(importance_matrix[1:20,])
+
+
+range(pred_pred) # 0.00407875 4.49043274 ( 10 rounds)  0.0009638735 7.5567440987 (20 rounds) 0-11 (30 rounds) 
+range(PredSet[,response.var]) # 0 - 6 (weighted crashes: 0-27)
+range(pred_pred_weighted) # .002860187 23.191209793 (20 rounds weighted crash) 0.001555491 21.812366486 (25 rounds) .000816789 24.28149 (30 rounds)
+
+cat("% Var explained: \n", 100 * (1-sum(( TrainSet[,response.var] - pred_train_weighted )^2) /
+                                    sum(( TrainSet[,response.var] - mean(TrainSet[,response.var]))^2)
+)
+) # 72.00288% (25 rounds, re-run 6/3)
+
+cat("% Var explained: \n", 100 * (1-sum(( PredSet[,response.var] - pred_pred_weighted )^2) /
+                                    sum(( PredSet[,response.var] - mean(PredSet[,response.var]))^2)
+)
+) #  55.71285% (25 rounds)
+
+#pred_train_weighted <- predict(m15.xgb.art.wkend.30rd.weighted.v2, dtrain$data)
+#pred_pred_weighted <- predict(m15.xgb.art.wkend.30rd.weighted.v2, dpred$data)
+
 # todo, double check which model prediction we used in the out file.
 # use WeightedCrashes as the response for the XGBoost model, and add the prediction to the out table.
 
@@ -634,28 +772,6 @@ f <- paste0(visual.loc, '/Bellevue_importance_xgb_',paste0('m', modelno),'.png')
 png(file = f,  width = 6, height = 10, units = 'in', res = 300)
 xgb.plot.importance(importance_matrix = importance_matrix)
 dev.off()
-
-# % of variance explained
-cat("% Var explained: \n", 100 * (1-sum(( TrainSet[,response.var] - pred_train )^2) /
-                                    sum(( TrainSet[,response.var] - mean(TrainSet[,response.var]))^2)
-)
-) # 50.17904% using 10 rounds, 58.09369% using 20 rounds, 65.28416% of Var explained using 30 rounds
-
-
-cat("% Var explained: \n", 100 * (1-sum(( PredSet[,response.var] - pred_pred )^2) /
-                                    sum(( PredSet[,response.var] - mean(PredSet[,response.var]))^2)
-)
-) # 43.23524% using 10 rounds, 44.31% of Var explained using 20 rounds, 41.85474% using 30 rounds.
-
-cat("% Var explained: \n", 100 * (1-sum(( TrainSet[,response.var] - pred_train_weighted )^2) /
-                                    sum(( TrainSet[,response.var] - mean(TrainSet[,response.var]))^2)
-)
-) # 72.00288% (25 rounds, re-run 6/3)
-
-cat("% Var explained: \n", 100 * (1-sum(( PredSet[,response.var] - pred_pred_weighted )^2) /
-                                    sum(( PredSet[,response.var] - mean(PredSet[,response.var]))^2)
-)
-) #  28.70593% (20 rounds) 29.03364% (25 rounds)
 
 # # model output both training and testing errors.
 # train <- xgb.DMatrix(data = dtrain$data, label = dtrain$label)
