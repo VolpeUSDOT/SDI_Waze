@@ -548,6 +548,7 @@ write.csv(model_summary, file.path(output.loc, "RF_model_summary.csv"), row.name
 
 # XGBoost ----
 # build a list containing two things, label and data
+# Try stratifying sampling by day of week/ time of day - crashes are not evening distributed by time
 set.seed(254)
 train_index <- sample(nrow(w.all.4hr.wd), 0.7*nrow(w.all.4hr.wd), replace = FALSE)
 TrainSet <- w.all.4hr.wd[train_index,]
@@ -602,9 +603,9 @@ dpred <- list("data" = as.matrix(PredSet_xgb), "label" = PredSet[,response.var])
 dtrain <- list("data" = as.matrix(TrainSet_xgb), "label" = TrainSet[,response.var])
 dtest <- list("data" = as.matrix(ValidSet_xgb), "label" = ValidSet[,response.var])
 
-n.rds = 60
+n.rds = 30
 n.eta=.2
-m.depth=12
+m.depth=6
 modelno = paste("15.xgb.art.wkend.",n.rds,"rd.",m.depth,"depth", sep='')
 modelno
 
@@ -632,12 +633,23 @@ pred_pred <- predict(xgb.m, dpred$data)
 importance_matrix <- xgb.importance(feature_names = colnames(dtrain$data), model = xgb.m)
 xgb.plot.importance(importance_matrix[1:20,])
 
+# Add Observed-predicted summaries
+trainObsPred <- TrainSet[,response.var] - pred_train
+plot(trainObsPred)
+plot(TrainSet[,response.var],pred_train)
+plot(ValidSet[,response.var],pred_test)
+
 # % of variance explained
 cat("% Var explained: \n", 100 * (1-sum(( TrainSet[,response.var] - pred_train )^2) /
                                     sum(( TrainSet[,response.var] - mean(TrainSet[,response.var]))^2)
 )
 ) # 63% using 50 rounds
 
+
+cat("% Var explained: \n", 100 * (1-sum(( ValidSet[,response.var] - pred_test )^2) /
+                                    sum(( ValidSet[,response.var] - mean(PredSet[,response.var]))^2)
+)
+) # 24.57% using 50 rounds
 
 cat("% Var explained: \n", 100 * (1-sum(( PredSet[,response.var] - pred_pred )^2) /
                                     sum(( PredSet[,response.var] - mean(PredSet[,response.var]))^2)
