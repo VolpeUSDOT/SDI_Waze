@@ -53,6 +53,8 @@ group_by_Waze_Crash <- function(table, ... ) {
       nMagVar150to210S = sum(nMagVar150to210S),
       nMagVar210to270SW = sum(nMagVar210to270SW),
       nMagVar270to330NW = sum(nMagVar270to330NW),
+      meanCirMagVar = mean.circular(meanCirMagVar), #includes zeros from segments with only roads closed? 
+      medCirMagVar = median.circular(medCirMagVar), #includes zeros from segments with only roads closed?
   
 # Crash columns
 # Add weighted crash column based on HSM and IDOT network screening study
@@ -68,7 +70,7 @@ group_by_Waze_Crash <- function(table, ... ) {
       nCrashAllInjury = sum(nCrashAllInjury),
       nCrashPDO = sum(nCrashPDO),
       nCrashWorkzone = sum(nCrashWorkzone),
-      WeightedCrashes = sum(nCrashKSI)*25 + sum(nCrashEvdPossInjury)*10 + sum(nCrashPDO) #check this calculation
+      WeightedCrashes = sum(nCrashKSI)*25 + sum(nCrashEvdPossInjury)*10 + sum(nCrashPDO)
     )
 }
 

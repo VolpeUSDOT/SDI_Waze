@@ -166,7 +166,8 @@ indicator.var.list <- list("seg_var" = seg_var, "other_var" = other_var, "weathe
 response.var.list <- c(
                   "uniqueCrashreports", # number of crashes at each segment at every hour of day
                   "biCrash",            # presence and absence of crash at each segment at every hour of day
-                  "nCrashes"            # total crashes at each segment of entire year 2018
+                  "nCrashes",            # total crashes at each segment of entire year 2018
+                  
                   )
 # ncrash.1yr.excludeInt  # have not created yet, should be "nCrashes" - "Crash_End1" - "Crash_End2"
 # ncrash.4hr = NA # if we use 4 hour window, have not created this variable yet

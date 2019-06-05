@@ -49,7 +49,7 @@ registerDoParallel(cl)
 # writeLines(c(""), paste0("SegAgg_log.txt"))    
 
 foreach(j = todo.months, .packages = c("dplyr", "lubridate", "utils", "circular")) %dopar% {
-   #j = "2018-01"  
+  #j = "2018-01"  
   # sink(paste0("SegAgg_log.txt"), append=TRUE)
   
   cat(paste(Sys.time()), j, "\n")                                                  
@@ -122,9 +122,13 @@ foreach(j = todo.months, .packages = c("dplyr", "lubridate", "utils", "circular"
       nMagVar90to150SE = n_distinct(SDC_uuid[alert_type!="ROAD_CLOSED" & magvar>= 90 & magvar<150]),
       nMagVar150to210S = n_distinct(SDC_uuid[alert_type!="ROAD_CLOSED" & magvar>= 150 & magvar<210]),
       nMagVar210to270SW = n_distinct(SDC_uuid[alert_type!="ROAD_CLOSED" & magvar>= 210 & magvar<270]),
-      nMagVar270to330NW = n_distinct(SDC_uuid[alert_type!="ROAD_CLOSED" & magvar>= 270 & magvar<330])) 
-  
-  
+      nMagVar270to330NW = n_distinct(SDC_uuid[alert_type!="ROAD_CLOSED" & magvar>= 270 & magvar<330]),
+      
+      #This will return warnings for the grid cells/times without any magvar data (roads closed only?)
+      meanCirMagVar = mean.circular(MagVar.circ[alert_type!="ROAD_CLOSED"]),
+      medCirMagVar = median.circular(MagVar.circ[alert_type!="ROAD_CLOSED"])
+      ) 
+
   #Compute grid counts for Bellevue crash data
   # Add accident severity counts by grid cell 
   # names(Crash.seg.time)
@@ -171,9 +175,6 @@ foreach(j = todo.months, .packages = c("dplyr", "lubridate", "utils", "circular"
 
 stopCluster(cl)
 
-#check magvar (circular variable)
-#plot.circular(Waze.seg.time$MagVar.circ)
-
 # Stack and add additional variables ----
 
 # First, loop over all months and bind together
@@ -185,7 +186,14 @@ for(j in avail.months){ # we need the done.months instead of todo.months
   w.all <- rbind(w.all, wazeTime.crash.seg)
 }
 
-dim(w.all) # 61237*60, added more variables
+dim(w.all) # 61237*55, added more variables
+
+#check magvar (circular variable)
+#plot.circular(w.all$meanCirMagVar)
+#hist(as.numeric(w.all$meanCirMagVar))
+#length(which(w.all$meanCirMagVar==0)) #10% are zeros - check original data     
+#for month 1, all roads closed have zero entered along with 11/122 accidents, 376/4220 jams, and 193/1488 weatherhazard
+#many zeros are likely "real" (indicate due North)
 
 # Convert time variable to time format, prepare for temporal analysis
 w.all$time_hr <- as.POSIXct(w.all$segtime, "%Y-%j %H", tz = 'America/Los_Angeles')
@@ -246,6 +254,9 @@ w.all[, numeric_var] <- lapply(w.all[, numeric_var], function(x) as.numeric(as.c
 
 # Create binary crash indicator:
 w.all$biCrash <- ifelse(w.all$uniqueCrashreports > 0, 1, 0)
+
+#Create crash response variables scaled by segment length
+w.all$CrashPerMile = as.numeric(w.all$uniqueCrashreports/(w.all$Shape_STLe*0.000189394))
 
 # LEHD ----
 # TODO: when ready

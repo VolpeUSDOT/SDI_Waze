@@ -54,6 +54,9 @@ load(file.path(seg.loc, fn))
 nrow(w.all.4hr.wd) # total 12,608 rows
 table(w.all.4hr.wd$uniqueCrashreports) # ~10% of the data has non-zero counts, 0.8% of the data has counts larger than 1
 
+# Add crash counts per mile for logistic models
+w.all$CrashPerMile = as.numeric(w.all$uniqueCrashreports/(w.all$Shape_STLe*0.000189394))
+
 # With new code (5/29/19)
 #    0     1     2     3     4     6 
 #11358  1155    75    17     2     1 
@@ -94,8 +97,8 @@ waze_rd_type = grep("WazeRT", names(w.all.4hr.wd), value = T)[-c(1,2,6)] # count
 colSums(w.all.4hr.wd[, waze_rd_type]) #
 #All zero for road type 0, 3, 4, thus removing them
 
-waze_dir_travel = grep("MagVar", names(w.all.4hr.wd), value = T) 
-# colSums(w.all.4hr.wd[,waze_dir_travel]) # none of these columns are all zeros.
+waze_dir_travel = grep("MagVar", names(w.all.4hr.wd), value = T)[-c(7,8)] 
+colSums(w.all.4hr.wd[,waze_dir_travel]) # Remove mean/med MagVar (not sure how to interpret)
 
 weather_var = c('PRCP', 'TMIN', 'TMAX', 'SNOW')
 
@@ -149,6 +152,24 @@ table(w.all.4hr.wd[,c("wkend", "wkday", "wkday.s")])
 #Remove ArterialCL levels with no observations
 w.all.4hr.wd$ArterialCl <- factor(w.all.4hr.wd$ArterialCl) 
 
+# check missing values and all zero columns ----
+# if any other columns are all zeros
+all_var <- vector()
+for (i in 1:length(indicator.var.list)){
+  all_var <- c(all_var, indicator.var.list[[i]])
+}
+
+any(sapply(w.all.4hr.wd[, all_var], function(x) all(x == 0))) # Returns False if no columns have all zeros
+# all variables of w.all.4hr.wd are clean now. None of them are all-zero column. 
+
+# checking missing fields
+sum(is.na(w.all.4hr.wd[, all_var]))
+
+# Check time variables & Time Series visuals ----
+stopifnot(length(unique(w.all.4hr.wd$wkday)) == 7)
+stopifnot(length(unique(w.all.4hr.wd$grp_hr)) == 6)
+
+
 # Correlation & ggpairs ----
 correlations <- cor(w.all.4hr.wd[, c(response.var.list, "Shape_STLe")])
 corrplot(correlations, method="circle", type = "upper",
@@ -181,22 +202,6 @@ for (i in 1:length(indicator.var.list)) {
   }
 }
 
-# check missing values and all zero columns ----
-# if any other columns are all zeros
-all_var <- vector()
-for (i in 1:length(indicator.var.list)){
-  all_var <- c(all_var, indicator.var.list[[i]])
-}
-
-any(sapply(w.all.4hr.wd[, all_var], function(x) all(x == 0))) # Returns False if no columns have all zeros
-# all variables of w.all.4hr.wd are clean now. None of them are all-zero column. 
-
-# checking missing fields
-sum(is.na(w.all.4hr.wd[, all_var]))
-
-# Check time variables & Time Series visuals ----
-stopifnot(length(unique(w.all.4hr.wd$wkday)) == 7)
-stopifnot(length(unique(w.all.4hr.wd$grp_hr)) == 6)
 
 ## ggplot of time series
 f <- paste0(visual.loc, '/Bellevue_WazeAccidents_time_series_4hr_wd.png')
@@ -597,9 +602,9 @@ dpred <- list("data" = as.matrix(PredSet_xgb), "label" = PredSet[,response.var])
 dtrain <- list("data" = as.matrix(TrainSet_xgb), "label" = TrainSet[,response.var])
 dtest <- list("data" = as.matrix(ValidSet_xgb), "label" = ValidSet[,response.var])
 
-n.rds = 50
-n.eta=.3
-m.depth=6
+n.rds = 60
+n.eta=.2
+m.depth=12
 modelno = paste("15.xgb.art.wkend.",n.rds,"rd.",m.depth,"depth", sep='')
 modelno
 
@@ -618,6 +623,10 @@ xgb.m <- assign(paste0('m', modelno),
                nthread = 1, 
                nrounds = n.rds, 
                objective = "count:poisson"))
+
+pred_train <- predict(xgb.m, dtrain$data)
+pred_test <- predict(xgb.m, dtest$data)
+pred_pred <- predict(xgb.m, dpred$data)
 
 #xgb.m
 importance_matrix <- xgb.importance(feature_names = colnames(dtrain$data), model = xgb.m)
@@ -639,9 +648,6 @@ cat("% Var explained: \n", 100 * (1-sum(( PredSet[,response.var] - pred_pred )^2
 #pretty plot - how to interpret?
 xgb.plot.tree(feature_names = colnames(dtrain$data),model=xgb.m, trees = 0, show_node_id = TRUE)
 
-pred_train <- predict(xgb.m, dtrain$data)
-pred_test <- predict(xgb.m, dtest$data)
-pred_pred <- predict(xgb.m, dpred$data)
 
 range(pred_pred) # 0.0005870936 5.9243960381 (eta=.3,50 rounds)
 range(PredSet[,response.var]) # 0 - 6
