@@ -313,30 +313,43 @@ source(file.path(codeloc, 'WA/utility/aggregation_fun().R'))
 
 t_var = "day"
 w.all.4hr <- agg_fun(w.all, t_var)
+# Add crash counts per mile
+w.all.4hr$CrashPerMile = as.numeric(w.all.4hr$uniqueCrashreports/(w.all.4hr$Shape_STLe*0.000189394))
+hist(log(w.all.4hr$CrashPerMile)) #relatively normal distribution
 names(w.all.4hr)
 dim(w.all.4hr)
 
 t_var = "wkday"
 w.all.4hr.wd <- agg_fun(w.all, t_var)
+w.all.4hr.wd$CrashPerMile = as.numeric(w.all.4hr.wd$uniqueCrashreports/(w.all.4hr.wd$Shape_STLe*0.000189394))
+hist(log(w.all.4hr.wd$CrashPerMile)) #relatively normal distribution
 names(w.all.4hr.wd)
 dim(w.all.4hr.wd)
 
 t_var = c("month")
 w.all.4hr.mo <- agg_fun(w.all, t_var)
+w.all.4hr.mo$CrashPerMile = as.numeric(w.all.4hr.mo$uniqueCrashreports/(w.all.4hr.mo$Shape_STLe*0.000189394))
+hist(log(w.all.4hr.mo$CrashPerMile)) #relatively normal distribution
 names(w.all.4hr.mo)
 dim(w.all.4hr.mo)
 
 t_var = c("month", "wkday")
 w.all.4hr.mo.wd <- agg_fun(w.all, t_var)
+w.all.4hr.mo.wd$CrashPerMile = as.numeric(w.all.4hr.mo.wd$uniqueCrashreports/(w.all.4hr.mo.wd$Shape_STLe*0.000189394))
+hist(log(w.all.4hr.mo.wd$CrashPerMile)) #relatively normal distribution
 names(w.all.4hr.mo.wd)
 dim(w.all.4hr.mo.wd)
 
 t_var = c("year")
 w.all.4hr.yr <- agg_fun(w.all, t_var)
+w.all.4hr.yr$CrashPerMile = as.numeric(w.all.4hr.yr$uniqueCrashreports/(w.all.4hr.yr$Shape_STLe*0.000189394))
+hist(log(w.all.4hr.yr$CrashPerMile)) #relatively normal distribution
 names(w.all.4hr.yr)
 dim(w.all.4hr.yr)
 
 w.all.yr.seg <- agg_fun_seg(w.all)
+w.all.yr.seg$CrashPerMile = as.numeric(w.all.yr.seg$uniqueCrashreports/(w.all.yr.seg$Shape_STLe*0.000189394))
+hist(log(w.all.yr.seg$CrashPerMile)) #relatively normal distribution
 names(w.all.yr.seg)
 dim(w.all.yr.seg)
 

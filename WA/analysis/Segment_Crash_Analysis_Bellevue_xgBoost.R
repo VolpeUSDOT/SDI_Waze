@@ -22,7 +22,7 @@ library(dplyr)
 #library(mlbench)
 #library(xts)
 library(lubridate)
-#library(pscl) # zero-inflated Poisson
+library(pscl) # zero-inflated Poisson
 #library(MASS) # NB model
 #library(randomForest) # random forest
 #library(car) # to get vif()
@@ -164,10 +164,9 @@ var(w.all.4hr.wd$uniqueCrashreports) # 0.1211338
 #TrainSet <- w.all.4hr.wd[train_index,]
 #ValidSet <- w.all.4hr.wd[-train_index,]
 #PredSet <- rbind(TrainSet, ValidSet)
-
-table(ValidSet$grp_name)/table(TrainSet$grp_name) #~0.4
-table(ValidSet$wkday)/table(TrainSet$wkday) #~0.4
-table(ValidSet$wd_tod)/table(TrainSet$wd_tod)
+#table(ValidSet$grp_name)/table(TrainSet$grp_name) #~0.4
+#table(ValidSet$wkday)/table(TrainSet$wkday) #~0.4
+#table(ValidSet$wd_tod)/table(TrainSet$wd_tod)
 
 # Stratify random sampling to ensure all Carrier x O_D are represented in training set
 d_s <- w.all.4hr.wd %>%
