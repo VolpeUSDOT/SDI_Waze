@@ -5,7 +5,6 @@
 # Bellevue crash events: when aggregated to segment and hour, have 1362 segment/hours with 1 crash, 3 segment/hours with 2 crashes. This seems reasonable: total was 2800 crash records, but majority are on interstates or SR 520.
 
 #install.packages("circular")
-
 rm(list=ls())
 library(sp)
 library(rgdal) # for readOGR(),writeOGR () needed for reading/writing in ArcM shapefiles
@@ -258,10 +257,6 @@ w.all$biCrash <- ifelse(w.all$uniqueCrashreports > 0, 1, 0)
 #Create crash response variables scaled by segment length
 w.all$CrashPerMile = as.numeric(w.all$uniqueCrashreports/(w.all$Shape_STLe*0.000189394))
 
-# LEHD ----
-# TODO: when ready
-
-
 # Save joined output ---
 
 fn = paste("Bellevue_Waze_Segments_", 
@@ -269,5 +264,113 @@ fn = paste("Bellevue_Waze_Segments_",
            ".RData", sep="")
 
 save(list="w.all", file = file.path(output.loc, fn))
+
+# <><><><><><><><><><><><><><><><><><><><><><><><>
+# Variables organization: Aggregate data to 4 hour window ----
+# Reset output location to save files to model output
+
+seg.loc <- file.path(data.loc, "Segments")
+output.loc <- file.path(data.loc, "Model_output")
+visual.loc <- file.path(data.loc, "Model_visualizations")
+
+# Check if prepared data are available; if not, run Segment Aggregation.
+Waze_Prepared_Data = dir(seg.loc)[grep("^Bellevue_Waze_Segments_", dir(seg.loc))][1] #"Bellevue_Waze_Segments_2018-01_to_2018-12.RData"
+
+if(length(grep(Waze_Prepared_Data, dir(seg.loc))) == 0){
+  stop(paste("No Bellevue segment data available in", seg.loc, "\n Run Segment_Aggregation_Bell.R or check network connection"))
+}  else {
+  load(file.path(seg.loc, Waze_Prepared_Data))
+}
+
+# <><><><><><><><><><><><><><><><><><><><><><><><>
+# Bellevue travel demand model used 6-9 and 3-6 pm, our aggregation should include these two periods, so we can do a crash risk model at these two peak periods of a day.
+# Two ways to aggregate the hour window
+w.all$grp_varhour <- ifelse(w.all$hour %in% c("00", "01", "02","03","04","05"), "Early AM", 
+                            ifelse(w.all$hour %in% c("06", "07", "08", "09"), "AM Peak", 
+                                   ifelse(w.all$hour %in% c("10", "11", "12", "13", "14"), "Mid-day",
+                                          ifelse(w.all$hour %in% c("15", "16", "17", "18"), "PM Peak",
+                                                 ifelse(w.all$hour %in% c("19", "20", "21", "22", "23"), "Evening", NA)))))
+
+# four hour window
+w.all$grp_name <- ifelse(w.all$hour %in% c("03","04","05", "06"), "Early AM", 
+                         ifelse(w.all$hour %in% c("07", "08", "09", "10"), "AM Peak", 
+                                ifelse(w.all$hour %in% c( "11", "12","13", "14"), "Mid-day",
+                                       ifelse(w.all$hour %in% c("15", "16", "17", "18"), "PM Peak",
+                                              ifelse(w.all$hour %in% c("19", "20", "21", "22"), "Evening",
+                                                     ifelse(w.all$hour %in% c("23", "00", "01", "02"), "Mid-night", NA))))))
+
+w.all <- w.all %>% mutate(time_hr = as.POSIXct(segtime, '%Y-%j %H', tz = 'America/Los_Angeles'),
+                          date = as.Date(time_hr, format = '%Y-%j %H', tz = 'America/Los_Angeles'), # need to set them the same timezone, otherwise, some 2018-12-31 records become 2019-01-01 records.
+                          month = as.Date(cut(date, breaks = "month"), tz = 'America/Los_Angeles'),
+                          wkday = as.factor(weekdays(date))
+)
+
+stopifnot(with(w.all, date >= '2018-01-01' & date <= '2018-12-31')) # make sure that all dates are within calendar year 2018.
+
+# all crash and Waze variables need to be aggregated by hour and segment
+# load the aggregation function
+source(file.path(codeloc, 'WA/utility/aggregation_fun().R'))
+
+t_var = "day"
+w.all.4hr <- agg_fun(w.all, t_var)
+names(w.all.4hr)
+dim(w.all.4hr)
+
+t_var = "wkday"
+w.all.4hr.wd <- agg_fun(w.all, t_var)
+names(w.all.4hr.wd)
+dim(w.all.4hr.wd)
+
+t_var = c("month")
+w.all.4hr.mo <- agg_fun(w.all, t_var)
+names(w.all.4hr.mo)
+dim(w.all.4hr.mo)
+
+t_var = c("month", "wkday")
+w.all.4hr.mo.wd <- agg_fun(w.all, t_var)
+names(w.all.4hr.mo.wd)
+dim(w.all.4hr.mo.wd)
+
+t_var = c("year")
+w.all.4hr.yr <- agg_fun(w.all, t_var)
+names(w.all.4hr.yr)
+dim(w.all.4hr.yr)
+
+w.all.yr.seg <- agg_fun_seg(w.all)
+names(w.all.yr.seg)
+dim(w.all.yr.seg)
+
+# examine the sparsity of the crash reports, does not improve a lot
+table(w.all.4hr$uniqueCrashreports)
+# 0     1     2 
+# 50239  1358     6 
+table(w.all.4hr.wd$uniqueCrashreports)
+# 0     1     2     3     4 
+# 11609  1146    82    16     3 
+table(w.all.4hr.mo$uniqueCrashreports)
+# 0     1     2     3 
+# 16300  1248    52     6 
+table(w.all.4hr.mo.wd$uniqueCrashreports)
+# 0     1     2     3 
+# 35025  1339    14     1 
+table(w.all.yr$uniqueCrashreports)
+
+# examine for arterials only
+with(w.all.4hr %>% filter(!ArterialCl %in% "Local"), table(uniqueCrashreports))
+with(w.all.4hr.wd %>% filter(!ArterialCl %in% "Local"), table(uniqueCrashreports))
+with(w.all.4hr.mo %>% filter(!ArterialCl %in% "Local"), table(uniqueCrashreports))
+with(w.all.4hr.mo.wd %>% filter(!ArterialCl %in% "Local"), table(uniqueCrashreports))
+with(w.all.yr %>% filter(!ArterialCl %in% "Local"), table(uniqueCrashreports))
+
+# Are these high counts segments the same or clustered? (need to see in the map)
+unique(w.all.4hr.mo.wd$RDSEG_ID[w.all.4hr.mo.wd$uniqueCrashreports %in% c(2,3)])
+# [1] "1"    "1368" "1737" "2034" "2062" "3079" "325"  "4494" "4515" "4516" "5120" "5122" "9290" "9538" "9865"
+# in ArcGIS, use this SQL code to select these segments: "RDSEG_ID" IN (1,   1368, 1737, 2034, 2062, 3079, 325,  4494, 4515, 4516, 5120, 5122, 9290, 9538,
+#                9865)
+
+# Save the 4 hour data as Rdata
+fn = "Bellevue_Waze_Segments_2018-01_to_2018-12_4hr.RData"
+
+save(list= c("w.all", "w.all.4hr", "w.all.4hr.wd", "w.all.4hr.mo", "w.all.4hr.mo.wd", "w.all.4hr.yr"), file = file.path(seg.loc, fn))
 
 

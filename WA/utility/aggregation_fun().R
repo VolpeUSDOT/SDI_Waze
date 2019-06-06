@@ -134,3 +134,38 @@ agg_fun <- function(w.all, t_var) {
 
   w.all.4hr
 }
+
+
+# function to aggregate when specifying the dataset and segment
+agg_fun_seg <- function(w.all) {
+  
+  # Waze and crash need to match hour and segments
+  grp_cols = c("RDSEG_ID")
+  dots = lapply(grp_cols, as.symbol)
+  w.all.seg <- group_by_Waze_Crash(w.all, .dots = dots)
+  
+  # all other variables need to match segments
+  seg_only_var <- c("RDSEG_ID","OBJECTID", "StreetSegm", "LifeCycleS", "OfficialSt", "FromAddres", "FromAddr_1", "ToAddressL",
+                    "ToAddressR", "LeftJurisd", "RightJuris", "LeftZip", "RightZip", "OneWay", "SpeedLimit",
+                    "ArterialCl", "FunctionCl", "ArterialSw", "EmergencyE", "EmergencyR", "SnowRespon", 
+                    "TruckRoute", "IsAddressa", "IsPrivate", "IsAccessRo", "AnomalyTyp", "StreetName",
+                    "StreetBloc", "Shape_STLe", "End1_IntID", "End2_IntID",
+                    "nCrashes", "Crash_End1", "Crash_End2", "nBikes", "nFARS_1217", "nFARS")
+  seg.only.data <- unique(w.all[, seg_only_var])
+  
+  w.all.seg <- left_join(w.all.seg, seg.only.data, by = 'RDSEG_ID')
+  class(w.all.seg) <- "data.frame" # POSIX date/time not supported for grouped tbl
+  
+
+  if (t_var == 'day') {
+    w.all.seg <- w.all.seg %>% mutate(segtime = paste(paste(year, day, sep = "-"), grp_hr, sep=" "),
+                                      time_hr = as.POSIXct(segtime, '%Y-%j %H', tz = 'America/Los_Angeles'),
+                                      date = as.Date(time_hr, format = '%Y-%j %H', tz = 'America/Los_Angeles'),
+                                      month = as.Date(cut(date, breaks = "month"), tz = 'America/Los_Angeles'),
+                                      weekday = as.factor(weekdays(date))
+    )
+    
+  }
+  
+  w.all.seg
+}
