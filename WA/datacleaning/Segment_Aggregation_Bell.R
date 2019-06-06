@@ -352,15 +352,21 @@ table(w.all.4hr.mo$uniqueCrashreports)
 # 16300  1248    52     6 
 table(w.all.4hr.mo.wd$uniqueCrashreports)
 # 0     1     2     3 
-# 35025  1339    14     1 
-table(w.all.yr$uniqueCrashreports)
+# 34382  1341    13     1 
+table(w.all.4hr.yr$uniqueCrashreports)
+#   0    1    2    3    4    5    6    7    8    9   10 
+#3407  697  163   54   23    7    4    1    1    1    1
+table(w.all.yr.seg$uniqueCrashreports)
+#0    1    2    3    4    5    6    7    8    9   10   11   13   16   18   20 
+#1096  304  117   56   32   15   22   15    9    6    2    1    1    1    1    1 
 
 # examine for arterials only
 with(w.all.4hr %>% filter(!ArterialCl %in% "Local"), table(uniqueCrashreports))
 with(w.all.4hr.wd %>% filter(!ArterialCl %in% "Local"), table(uniqueCrashreports))
 with(w.all.4hr.mo %>% filter(!ArterialCl %in% "Local"), table(uniqueCrashreports))
 with(w.all.4hr.mo.wd %>% filter(!ArterialCl %in% "Local"), table(uniqueCrashreports))
-with(w.all.yr %>% filter(!ArterialCl %in% "Local"), table(uniqueCrashreports))
+with(w.all.4hr.yr %>% filter(!ArterialCl %in% "Local"), table(uniqueCrashreports))
+with(w.all.yr.seg %>% filter(!ArterialCl %in% "Local"), table(uniqueCrashreports))
 
 # Are these high counts segments the same or clustered? (need to see in the map)
 unique(w.all.4hr.mo.wd$RDSEG_ID[w.all.4hr.mo.wd$uniqueCrashreports %in% c(2,3)])
@@ -371,6 +377,6 @@ unique(w.all.4hr.mo.wd$RDSEG_ID[w.all.4hr.mo.wd$uniqueCrashreports %in% c(2,3)])
 # Save the 4 hour data as Rdata
 fn = "Bellevue_Waze_Segments_2018-01_to_2018-12_4hr.RData"
 
-save(list= c("w.all", "w.all.4hr", "w.all.4hr.wd", "w.all.4hr.mo", "w.all.4hr.mo.wd", "w.all.4hr.yr"), file = file.path(seg.loc, fn))
+save(list= c("w.all", "w.all.4hr", "w.all.4hr.wd", "w.all.4hr.mo", "w.all.4hr.mo.wd", "w.all.4hr.yr", "w.all.yr.seg"), file = file.path(seg.loc, fn))
 
 
