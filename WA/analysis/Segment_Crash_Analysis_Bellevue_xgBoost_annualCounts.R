@@ -200,12 +200,12 @@ set.seed(1024)
 xgb.m <- assign(paste0('m', modelno),
                 xgboost(data = dtrain$data, 
                         label = dtrain$label, 
-                        max_depth = 10,
-                        eta = 0.01, 
+                        max_depth = 4,
+                        eta = 0.1, 
                         nthread = 2,
-                        nrounds = 1000,
-                        subsample = .7,
-                        colsample_bytree = 0.9,
+                        nrounds = 50,
+                        subsample = 1,
+                        #colsample_bytree = 0.9,
                         booster = "gbtree",
                         #eval_metric = "mae",
                         objective="count:poisson",
@@ -230,6 +230,9 @@ hist(trainObsPred)
 plot(TrainSet[,response.var],pred_train)
 plot(ValidSet[,response.var],pred_test)
 plot(PredSet[,response.var],pred_pred)
+importance_matrix <- xgb.importance(feature_names = colnames(dtrain$data), model = xgb.m)
+xgb.plot.importance(importance_matrix[1:20,])
+
 
 # Compare totals
 sum(PredSet$uniqueCrashreports)
