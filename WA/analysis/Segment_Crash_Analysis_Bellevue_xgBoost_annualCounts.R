@@ -13,6 +13,7 @@ codeloc <- ifelse(grepl('Flynn', normalizePath('~/')), # grep() does not produce
 # load functions with group_by
 source(file.path(codeloc, 'WA/utility/visual_fun.R'))
 
+library(caret)
 library(tidyverse)
 library(ggplot2)
 #library(GGally)
@@ -27,6 +28,7 @@ library(pscl) # zero-inflated Poisson
 #library(randomForest) # random forest
 #library(car) # to get vif()
 library(xgboost)
+library(Metrics)
 library(DiagrammeR)
 
 # #install from Github (Windows user will need to install Rtools first.)
@@ -49,50 +51,35 @@ load(file.path(seg.loc, fn))
 
 # <><><><><><><><><><><><><><><><><><><><><><><><> Start from prepared data for 4 hour window
 # 4-hr model variables organization:  ----
-nrow(w.all.4hr.wd) # total 12,608 rows
-table(w.all.4hr.wd$uniqueCrashreports) # ~10% of the data has non-zero counts, 0.8% of the data has counts larger than 1
-
-# With new code (5/29/19)
-#    0     1     2     3     4     6 
-#11358  1155    75    17     2     1 
-
-#Other variables
-table(w.all.4hr.wd$nCrashKSI)
-table(w.all.4hr.wd$nCrashInjury)
+nrow(w.all.yr.seg) # total 1679 rows
 
 # Omit or include predictors in this vector:
-alwaysomit = c(grep("RDSEG_ID", names(w.all.4hr.wd), value = T), "year", "wkday", "grp_name", "grp_hr", "nFARS_1217",
-               grep("Crash", names(w.all.4hr.wd), value = T),
+alwaysomit = c(grep("RDSEG_ID", names(w.all.yr.seg), value = T), "year", "wkday", "grp_name", "grp_hr", "nFARS_1217",
+               grep("Crash", names(w.all.yr.seg), value = T),
                "OBJECTID")
 
 alert_types = c("nWazeAccident", "nWazeJam", "nWazeRoadClosed", "nWazeWeatherOrHazard")
 
 alert_subtypes = c("nHazardOnRoad", "nHazardOnShoulder" ,"nHazardWeather", "nWazeAccidentMajor", "nWazeAccidentMinor", "nWazeHazardCarStoppedRoad", "nWazeHazardCarStoppedShoulder", "nWazeHazardConstruction", "nWazeHazardObjectOnRoad", "nWazeHazardPotholeOnRoad", "nWazeHazardRoadKillOnRoad", "nWazeJamModerate", "nWazeJamHeavy" ,"nWazeJamStandStill",  "nWazeWeatherFlood", "nWazeWeatherFog", "nWazeHazardIceRoad")
 
-waze_rd_type = grep("WazeRT", names(w.all.4hr.wd), value = T)[-c(1,2,6)] # counts of events happened at that segment at each hour. 
-colSums(w.all.4hr.wd[, waze_rd_type]) #
+waze_rd_type = grep("WazeRT", names(w.all.yr.seg), value = T)[-c(1,2,6)] # counts of events happened at that segment at each hour. 
+colSums(w.all.yr.seg[, waze_rd_type]) #
 #All zero for road type 0, 3, 4, thus removing them
 
-waze_dir_travel = grep("MagVar", names(w.all.4hr.wd), value = T)[-7] 
-colSums(w.all.4hr.wd[,waze_dir_travel]) # Remove mean MagVar
+waze_dir_travel = grep("MagVar", names(w.all.yr.seg), value = T)[-7] 
+colSums(w.all.yr.seg[,waze_dir_travel]) # Remove mean MagVar
 
 weather_var = c('PRCP', 'TMIN', 'TMAX', 'SNOW')
 
 other_var = c("nBikes", "nFARS_1217")
 
-time_var = c("grp_hr", "wkday", "wkend") # time variable can be used as indicator or to aggregate the temporal resolution.
-
 seg_var = c("Shape_STLe", "SpeedLimit", "ArterialCl")
-            # , "FunctionCl"
-             # "ArterialCl" is complete. There are 6 rows with missing values in "FunctionCl", therefore if we use in the model, we will lose these rows.
-table(w.all.4hr.wd$ArterialCl)
+table(w.all.yr.seg$ArterialCl)
 
 # Create a list to store the indicators
 indicator.var.list <- list("seg_var" = seg_var, 
                            "other_var" = other_var, 
-                           "time_var" = time_var, 
-                           "weather_var" = weather_var, 
-                           "alert_types" = alert_types, 
+                            "alert_types" = alert_types, 
                            #"alert_subtypes" = alert_subtypes, 
                            #"waze_rd_type" = waze_rd_type, 
                            "waze_dir_travel" = waze_dir_travel
@@ -105,28 +92,9 @@ response.var.list <- c(
                   "nCrashes",            # total crashes at each segment of entire year 2018
                   "WeightedCrashes")    #total crashes weighted by severity (25 for KSI, 10 for injury, 1 for PDO)
 
-# Any last-minute data organization: order the levels of weekday
-# create wkend variables using the raw data.
-w.all.4hr.wd$wkend = ifelse(w.all.4hr.wd$wkday %in% c("Sunday","Saturday"), "Weekend", "Weekday")
-
-# re-order the factor level (can run only once)
-w.all.4hr.wd$wkday = factor(w.all.4hr.wd$wkday, levels(w.all.4hr.wd$wkday)[c(4,2,6,7,5,1,3)])
-# create another columns, and rename with short names
-w.all.4hr.wd$wkday.s = w.all.4hr.wd$wkday
-levels(w.all.4hr.wd$wkday.s) <- list(Sun = "Sunday", 
-                                     Mon = "Monday", 
-                                     Tue = "Tuesday", 
-                                     Wed = "Wednesday", 
-                                     Thu = "Thursday", 
-                                     Fri = "Friday", 
-                                     Sat = "Saturday"
-                                     )
-
-# check variables to make sure it is correct
-table(w.all.4hr.wd[,c("wkend", "wkday", "wkday.s")])
-
 #Remove ArterialCL levels with no observations
-w.all.4hr.wd$ArterialCl <- factor(w.all.4hr.wd$ArterialCl) 
+w.all.yr.seg$ArterialCl <- factor(w.all.yr.seg$ArterialCl) 
+table(w.all.yr.seg$ArterialCl)
 
 # check missing values and all zero columns ----
 # if any other columns are all zeros
@@ -135,65 +103,50 @@ for (i in 1:length(indicator.var.list)){
   all_var <- c(all_var, indicator.var.list[[i]])
 }
 
-any(sapply(w.all.4hr.wd[, all_var], function(x) all(x == 0))) # Returns False if no columns have all zeros
-# all variables of w.all.4hr.wd are clean now. None of them are all-zero column. 
+any(sapply(w.all.yr.seg[, all_var], function(x) all(x == 0))) # Returns False if no columns have all zeros
+# all variables of w.all.yr.seg are clean now. None of them are all-zero column. 
 
 # checking missing fields
-sum(is.na(w.all.4hr.wd[, all_var]))
-
-# Check time variables & Time Series visuals ----
-stopifnot(length(unique(w.all.4hr.wd$wkday)) == 7)
-stopifnot(length(unique(w.all.4hr.wd$grp_hr)) == 6)
+sum(is.na(w.all.yr.seg[, all_var]))
 
 # Mean and variance ----
-hist(w.all.4hr.wd$uniqueCrashreports)
-mean(w.all.4hr.wd$uniqueCrashreports) # 0.10866
-var(w.all.4hr.wd$uniqueCrashreports) # 0.1211338
+hist(w.all.yr.seg$uniqueCrashreports)
+mean(w.all.yr.seg$uniqueCrashreports) # 0.8159619
+var(w.all.yr.seg$uniqueCrashreports) # 3.041795
 
 # <><><><><><><><><><><><><><><><><><><><><><><><>
 # XGBoost ----
 # build a list containing two things, label and data
 
-#non-stratefied sampling (use stratefied below instead, to even out sampling among weekday by time of day combinations)
-#w.all.4hr.wd <- w.all.4hr.wd %>% mutate(wd_tod = paste(wkday, grp_name))
-#set.seed(254)
-#train_index <- sample(nrow(w.all.4hr.wd), 0.7*nrow(w.all.4hr.wd), replace = FALSE)
-#TrainSet <- w.all.4hr.wd[train_index,]
-#ValidSet <- w.all.4hr.wd[-train_index,]
-#PredSet <- rbind(TrainSet, ValidSet)
-#table(ValidSet$grp_name)/table(TrainSet$grp_name) #~0.4
-#table(ValidSet$wkday)/table(TrainSet$wkday) #~0.4
-#table(ValidSet$wd_tod)/table(TrainSet$wd_tod)
-
-# Stratify random sampling to ensure all Carrier x O_D are represented in training set
-d_s <- w.all.4hr.wd %>%
-  mutate(train_index = 1:nrow(w.all.4hr.wd))%>%
-  dplyr::select(train_index, wd_tod, wkday, grp_name)
+# Stratify random sampling to ensure all road classes are represented in training set
+d_s <- w.all.yr.seg %>%
+  mutate(train_index = 1:nrow(w.all.yr.seg))%>%
+  dplyr::select(train_index, ArterialCl)
 
 samprow <- vector()
-train_index = 1:nrow(w.all.4hr.wd)
+train_index = 1:nrow(w.all.yr.seg)
 
-for(i in unique(d_s$wd_tod)){
+for(i in unique(d_s$ArterialCl)){
   d <- d_s %>%
-    filter(wd_tod == i)
-  samprow_wd_tod <- sample(d$train_index, nrow(d)*.3, replace = F)
-  samprow <- c(samprow, samprow_wd_tod)
+    filter(ArterialCl == i)
+  samprow_ArterialCl <- sample(d$train_index, nrow(d)*.3, replace = F)
+  samprow <- c(samprow, samprow_ArterialCl)
 }
 
-ValidSet <- w.all.4hr.wd[samprow,]
-TrainSet <- w.all.4hr.wd[!rownames(w.all.4hr.wd) %in% samprow,]
+ValidSet <- w.all.yr.seg[samprow,]
+TrainSet <- w.all.yr.seg[!rownames(w.all.yr.seg) %in% samprow,]
 PredSet <- rbind(TrainSet, ValidSet)
 
 # ensure sampling number adds up
 stopifnot(nrow(ValidSet) == length(samprow))
-stopifnot(nrow(ValidSet) + nrow(TrainSet) == nrow(w.all.4hr.wd))
+stopifnot(nrow(ValidSet) + nrow(TrainSet) == nrow(w.all.yr.seg))
 
 #Check 70/30 ratios by group
-table(ValidSet$grp_name)/table(TrainSet$grp_name) #~0.4
-table(ValidSet$wkday)/table(TrainSet$wkday) #~0.4
-table(ValidSet$wd_tod)/table(TrainSet$wd_tod)
+table(ValidSet$ArterialCl)/table(TrainSet$ArterialCl) #~0.4
+table(ValidSet$ArterialCl)/table(TrainSet$ArterialCl) #~0.4
+table(ValidSet$ArterialCl)/table(TrainSet$ArterialCl)
 
-#save(list = c('ValidSet', 'TrainSet', 'train_index'), file = 'w.all.4hr.wd_train.RData')
+#save(list = c('ValidSet', 'TrainSet', 'train_index'), file = 'w.all.yr.seg_train.RData')
 
 #Select only arterials (do this earlier in the code?)
 Art.Only <- T # False to use all road class, True to Arterial only roads
@@ -202,9 +155,8 @@ if(Art.Only) {ValidSet = ValidSet %>% filter(ArterialCl != "Local")} else {Valid
 if(Art.Only) {PredSet = PredSet %>% filter(ArterialCl != "Local")} else {PredSet = PredSet}
 
 # need to convert character and factor columns to dummy variables.
-continous_var <- c(waze_dir_travel, waze_rd_type, # direction of travel + road types from Waze
+continous_var <- c(waze_dir_travel, #waze_rd_type, # direction of travel + road types from Waze
                    alert_types,     # counts of waze events by alert types
-                   weather_var,     # Weather variables
                    "nBikes",        # bike/ped conflict counts at segment level (no hour)
                    "nFARS_1217",         # FARS variables
                    "Shape_STLe", "SpeedLimit")
@@ -212,31 +164,24 @@ continous_var <- c(waze_dir_travel, waze_rd_type, # direction of travel + road t
 includes = c(
   waze_dir_travel, waze_rd_type, # direction of travel + road types from Waze
   alert_types,     # counts of waze events by alert types
-  alert_subtypes,  # counts of waze alerts by subtype
-  weather_var,     # Weather variables
+  #alert_subtypes,  # counts of waze alerts by subtype
   "nBikes",        # bike/ped conflict counts at segment level (no hour)
   "nFARS_1217",         # FARS variables
-  seg_var, "wkend", "grp_hr"
+  seg_var
 )
 
-includes_xgb <- includes[-which(includes %in% c("ArterialCl", "wkend", "grp_hr"))]
+includes_xgb <- includes[-which(includes %in% "ArterialCl")]
 
 ArterialCl <- TrainSet$ArterialCl
-wkend <- TrainSet$wkend
-grp_hr <- TrainSet$grp_hr
-TrainSet_xgb <- data.frame(TrainSet[, includes_xgb], model.matrix(~ ArterialCl + 0), model.matrix(~ wkend + 0), model.matrix(~ grp_hr + 0))
+TrainSet_xgb <- data.frame(TrainSet[, includes_xgb], model.matrix(~ ArterialCl + 0))
 table(ArterialCl)
 
 ArterialCl <- ValidSet$ArterialCl
-wkend <- ValidSet$wkend
-grp_hr <- ValidSet$grp_hr
-ValidSet_xgb <- data.frame(ValidSet[, includes_xgb], model.matrix(~ ArterialCl + 0), model.matrix(~ wkend + 0), model.matrix(~ grp_hr + 0))
+ValidSet_xgb <- data.frame(ValidSet[, includes_xgb], model.matrix(~ ArterialCl + 0))
 table(ArterialCl)
 
 ArterialCl <- PredSet$ArterialCl
-wkend <- PredSet$wkend
-grp_hr <- PredSet$grp_hr
-PredSet_xgb <- data.frame(PredSet[, includes_xgb], model.matrix(~ ArterialCl + 0), model.matrix(~ wkend + 0), model.matrix(~ grp_hr + 0))
+PredSet_xgb <- data.frame(PredSet[, includes_xgb], model.matrix(~ ArterialCl + 0))
 table(ArterialCl)
 
 # XGboost unique crash counts, updated code to test parameters in xgboost function 
@@ -251,27 +196,25 @@ dpred <- list("data" = as.matrix(PredSet_xgb), "label" = PredSet[,response.var])
 dtrain <- list("data" = as.matrix(TrainSet_xgb), "label" = TrainSet[,response.var])
 dtest <- list("data" = as.matrix(ValidSet_xgb), "label" = ValidSet[,response.var])
 
-n.rds = 60
-n.eta=.2
-m.depth=6
-modelno = paste("15.xgb.art.wkend.",n.rds,"rd.",m.depth,"depth", sep='')
-modelno
-
 set.seed(1024)
 xgb.m <- assign(paste0('m', modelno),
                 xgboost(data = dtrain$data, 
                         label = dtrain$label, 
-                        max.depth = m.depth, #default=6 
-                        min_child_weight=1, #default = 1, range 0 to inf, min sum of instance weight needed in a child start with 1/sqrt(eventrate)?
-                        gamma=0, #default=0, minimum loss reduction to make further partition
-                        eta = n.eta, #default = 0.3 (0 to 1 range, smaller prevents overfitting)
-                        subsample=1, #default = 1, subsample ratio of the training instance
-                        colsample_bytree=1, #default=1, range 0 to 1, subsample ratio of columns when constructing each tree (.3-.5)
-                        max_delta_step=0, #default 0, range 0 to inf, max delta step we allow each tree's weight estimation to be
-                        seed=1,
-                        nthread = 1, 
-                        nrounds = n.rds, 
-                        objective = "count:poisson"))
+                        max_depth = 10,
+                        eta = 0.01, 
+                        nthread = 2,
+                        nrounds = 1000,
+                        subsample = .7,
+                        colsample_bytree = 0.9,
+                        booster = "gbtree",
+                        #eval_metric = "mae",
+                        objective="count:poisson",
+                        #base_score = 0.56,
+                        silent = 1))
+
+y_hat_xgb <- predict(xgb.m, data.matrix(dtest$data %>% as.data.frame))
+xgb_mae <- mae(dtest$label, y_hat_xgb)
+xgb_mae
 
 pred_train <- predict(xgb.m, dtrain$data)
 pred_test <- predict(xgb.m, dtest$data)

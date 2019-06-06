@@ -216,3 +216,16 @@ if(NOTRUN){
               aes(mapping = aes(x = long, y = lat, group = RDSEG_ID)), 
               size=2)
 }
+
+#EDA
+Artclass_means_df <- w.all.yr.seg %>% group_by(ArterialCl) %>% summarise(me = mean(CrashPerMile))
+ggplot(Artclass_means_df, aes(x=reorder(ArterialCl, -me), y=me)) + 
+  geom_bar(stat="identity", fill = "#4682b4") + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(title="Average Collisions/Mile by Segment Type",y = 'Average Collisions/Mile', x = 'Segment Type') 
+
+plot(w.all.yr.seg$uniqueCrashreports~as.numeric(w.all.yr.seg$medCirMagVar))
+plot(w.all.yr.seg$uniqueCrashreports~as.numeric(w.all.yr.seg$nWazeJam))
+plot(w.all.4hr.wd$uniqueCrashreports~as.numeric(w.all.4hr.wd$nWazeJam))
+plot(w.all.yr.seg$nWazeJam~as.numeric(w.all.yr.seg$medCirMagVar))
+plot(w.all.yr.seg$nWazeJam~as.numeric(w.all.yr.seg$meanCirMagVar))
