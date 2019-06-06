@@ -123,10 +123,11 @@ levels(w.all.4hr.wd$wkday.s) <- list(Sun = "Sunday",
                                      )
 
 # check variables to make sure it is correct
-table(w.all.4hr.wd[,c("wkend", "wkday", "wkday.s")])
+#table(w.all.4hr.wd[,c("wkend", "wkday", "wkday.s")])
 
 #Remove ArterialCL levels with no observations
 w.all.4hr.wd$ArterialCl <- factor(w.all.4hr.wd$ArterialCl) 
+table(w.all.4hr.wd$ArterialCl)
 
 # check missing values and all zero columns ----
 # if any other columns are all zeros
@@ -165,9 +166,12 @@ var(w.all.4hr.wd$uniqueCrashreports) # 0.1211338
 #table(ValidSet$wkday)/table(TrainSet$wkday) #~0.4
 #table(ValidSet$wd_tod)/table(TrainSet$wd_tod)
 
-# Stratify random sampling to ensure all Carrier x O_D are represented in training set
+# Stratify random sampling to ensure all times are represented in training set
+w.all.4hr.wd <- w.all.4hr.wd %>%
+  mutate(wd_tod = paste(wkday,grp_name))
+
 d_s <- w.all.4hr.wd %>%
-  mutate(train_index = 1:nrow(w.all.4hr.wd))%>%
+  mutate(train_index = 1:nrow(w.all.4hr.wd)) %>%
   dplyr::select(train_index, wd_tod, wkday, grp_name)
 
 samprow <- vector()
@@ -210,7 +214,8 @@ continous_var <- c(waze_dir_travel, waze_rd_type, # direction of travel + road t
                    "Shape_STLe", "SpeedLimit")
 
 includes = c(
-  waze_dir_travel, waze_rd_type, # direction of travel + road types from Waze
+  waze_dir_travel, 
+  waze_rd_type, # direction of travel + road types from Waze
   alert_types,     # counts of waze events by alert types
   alert_subtypes,  # counts of waze alerts by subtype
   weather_var,     # Weather variables
@@ -280,6 +285,10 @@ pred_pred <- predict(xgb.m, dpred$data)
 #xgb.m
 importance_matrix <- xgb.importance(feature_names = colnames(dtrain$data), model = xgb.m)
 xgb.plot.importance(importance_matrix[1:20,])
+
+y_hat_xgb <- predict(xgb.m, data.matrix(dtest$data %>% as.data.frame))
+xgb_mae <- mae(dtest$label, y_hat_xgb)
+xgb_mae
 
 # Add Observed-predicted summaries
 trainObsPred <- TrainSet[,response.var] - pred_train

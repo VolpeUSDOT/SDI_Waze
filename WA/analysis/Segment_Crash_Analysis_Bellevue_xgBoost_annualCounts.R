@@ -200,7 +200,7 @@ set.seed(1024)
 xgb.m <- assign(paste0('m', modelno),
                 xgboost(data = dtrain$data, 
                         label = dtrain$label, 
-                        max_depth = 4,
+                        max_depth = 6,
                         eta = 0.1, 
                         nthread = 2,
                         nrounds = 50,
