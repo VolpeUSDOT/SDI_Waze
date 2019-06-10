@@ -55,7 +55,7 @@ group_by_Waze_Crash <- function(table, ... ) {
       nMagVar270to330NW = sum(nMagVar270to330NW),
       meanCirMagVar = mean.circular(meanCirMagVar), #includes zeros from segments with only roads closed? 
       medCirMagVar = median.circular(medCirMagVar), #includes zeros from segments with only roads closed?
-  
+      
 # Crash columns
 # Add weighted crash column based on HSM and IDOT network screening study
 # IDOT put further emphasis on the most severe crashes by applying a weighting factor of 25 times a fatal crash, 
@@ -121,6 +121,15 @@ agg_fun <- function(w.all, t_var) {
                                                          ifelse(w.all.4hr$grp_name == "Mid-night", "00", NA))))))
   
   w.all.4hr$biCrash <- ifelse(w.all.4hr$uniqueCrashreports > 0, 1, 0)
+  
+  # mediandirection of travel (categorical)
+  w.all.4hr$medTravDir <- ifelse(w.all.4hr$medCirMagVar >= -30 & w.all.4hr$medCirMagVar<30, "North",
+                       ifelse(w.all.4hr$medCirMagVar >= 30 & w.all.4hr$medCirMagVar<90, "NorthEast",
+                              ifelse(w.all.4hr$medCirMagVar >= 90 & w.all.4hr$medCirMagVar<150, "SouthEast",
+                                     ifelse(w.all.4hr$medCirMagVar >= 150 & w.all.4hr$medCirMagVar< 180 
+                                            | w.all.4hr$medCirMagVar> -180 & w.all.4hr$medCirMagVar< -150, "South",
+                                            ifelse(w.all.4hr$medCirMagVar >= -150 & w.all.4hr$medCirMagVar< -90, "SouthWest",
+                                                   ifelse(w.all.4hr$medCirMagVar >= -90 & w.all.4hr$medCirMagVar< -30, "NorthWest", NA))))))
   
   if (t_var == 'day') {
        w.all.4hr <- w.all.4hr %>% mutate(segtime = paste(paste(year, day, sep = "-"), grp_hr, sep=" "),
