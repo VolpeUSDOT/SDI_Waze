@@ -76,6 +76,8 @@ colSums(w.all.4hr.wd[, waze_rd_type]) #
 waze_dir_travel = grep("MagVar", names(w.all.4hr.wd), value = T)[-7] 
 colSums(w.all.4hr.wd[,waze_dir_travel]) # Remove mean MagVar
 
+waze_dir_travel_cat = "medTravDir"
+
 weather_var = c('PRCP', 'TMIN', 'TMAX', 'SNOW')
 
 other_var = c("nBikes", "nFARS_1217")
@@ -93,9 +95,10 @@ indicator.var.list <- list("seg_var" = seg_var,
                            "time_var" = time_var, 
                            "weather_var" = weather_var, 
                            "alert_types" = alert_types, 
-                           #"alert_subtypes" = alert_subtypes, 
-                           #"waze_rd_type" = waze_rd_type, 
-                           "waze_dir_travel" = waze_dir_travel
+                           "alert_subtypes" = alert_subtypes, 
+                           "waze_rd_type" = waze_rd_type, 
+                           "waze_dir_travel" = waze_dir_travel,
+                           "waze_dir_travel_cat" = waze_dir_travel_cat
                            )
 
 # A list of Response variables
@@ -206,7 +209,8 @@ if(Art.Only) {ValidSet = ValidSet %>% filter(ArterialCl != "Local")} else {Valid
 if(Art.Only) {PredSet = PredSet %>% filter(ArterialCl != "Local")} else {PredSet = PredSet}
 
 # need to convert character and factor columns to dummy variables.
-continous_var <- c(waze_dir_travel, waze_rd_type, # direction of travel + road types from Waze
+continous_var <- c(waze_dir_travel, 
+                   waze_rd_type, # direction of travel + road types from Waze
                    alert_types,     # counts of waze events by alert types
                    weather_var,     # Weather variables
                    "nBikes",        # bike/ped conflict counts at segment level (no hour)
@@ -214,22 +218,25 @@ continous_var <- c(waze_dir_travel, waze_rd_type, # direction of travel + road t
                    "Shape_STLe", "SpeedLimit")
 
 includes = c(
-  waze_dir_travel, 
-  waze_rd_type, # direction of travel + road types from Waze
+  waze_dir_travel,
+  #waze_rd_type, # direction of travel + road types from Waze
   alert_types,     # counts of waze events by alert types
-  alert_subtypes,  # counts of waze alerts by subtype
-  weather_var,     # Weather variables
-  "nBikes",        # bike/ped conflict counts at segment level (no hour)
-  "nFARS_1217",         # FARS variables
-  seg_var, "wkend", "grp_hr"
+  #alert_subtypes,  # counts of waze alerts by subtype
+  #weather_var,     # Weather variables
+  #"nBikes",        # bike/ped conflict counts at segment level (no hour)
+  #"nFARS_1217",         # FARS variables
+  seg_var, 
+  "wkend", "grp_hr", "waze_dir_travel_cat"
 )
 
-includes_xgb <- includes[-which(includes %in% c("ArterialCl", "wkend", "grp_hr"))]
+includes_xgb <- includes[-which(includes %in% c("ArterialCl", "wkend", "grp_hr","waze_dir_travel_cat"))]
 
 ArterialCl <- TrainSet$ArterialCl
 wkend <- TrainSet$wkend
 grp_hr <- TrainSet$grp_hr
-TrainSet_xgb <- data.frame(TrainSet[, includes_xgb], model.matrix(~ ArterialCl + 0), model.matrix(~ wkend + 0), model.matrix(~ grp_hr + 0))
+dir_trav_cat <- TrainSet$medTravDir
+TrainSet_xgb <- data.frame(TrainSet[, includes_xgb], model.matrix(~ ArterialCl + 0), 
+                           model.matrix(~ wkend + 0), model.matrix(~ grp_hr + 0), model.matrix(~ dir_trav_cat + 0))
 table(ArterialCl)
 
 ArterialCl <- ValidSet$ArterialCl
@@ -243,6 +250,7 @@ wkend <- PredSet$wkend
 grp_hr <- PredSet$grp_hr
 PredSet_xgb <- data.frame(PredSet[, includes_xgb], model.matrix(~ ArterialCl + 0), model.matrix(~ wkend + 0), model.matrix(~ grp_hr + 0))
 table(ArterialCl)
+
 
 # XGboost unique crash counts, updated code to test parameters in xgboost function 
 # Side note: "You can use an offset in xgboost for Poisson regression, by setting the base_margin value in the xgb.DMatrix object".
