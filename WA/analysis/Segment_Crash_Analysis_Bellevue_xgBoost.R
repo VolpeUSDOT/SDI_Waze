@@ -233,20 +233,20 @@ includes = c(
   #weather_var,     # Weather variables
   #"nBikes",        # bike/ped conflict counts at segment level (no hour)
   #"nFARS_1217",         # FARS variables
-  #seg_var, 
+  seg_var, 
   "wkend", 
   "grp_hr", 
   "medTravDir"
 )
 
-includes_xgb <- includes[-which(includes %in% c("grp_hr","wkend", "medTravDir"))] #, "ArterialCl", 
+includes_xgb <- includes[-which(includes %in% c("ArterialCl","grp_hr","wkend", "medTravDir"))] #,  
 
 ArterialCl <- TrainSet$ArterialCl
 wkend <- TrainSet$wkend
 grp_hr <- TrainSet$grp_hr
 medTravDir <- TrainSet$medTravDir
 TrainSet_xgb <- data.frame(TrainSet[, includes_xgb], 
-                           #model.matrix(~ ArterialCl + 0), 
+                           model.matrix(~ ArterialCl + 0), 
                            model.matrix(~ wkend + 0), 
                            model.matrix(~ grp_hr + 0), 
                            model.matrix(~ medTravDir + 0)
@@ -258,7 +258,7 @@ wkend <- ValidSet$wkend
 grp_hr <- ValidSet$grp_hr
 medTravDir <- ValidSet$medTravDir
 ValidSet_xgb <- data.frame(ValidSet[, includes_xgb], 
-                           #model.matrix(~ ArterialCl + 0), 
+                           model.matrix(~ ArterialCl + 0), 
                            model.matrix(~ wkend + 0), 
                            model.matrix(~ grp_hr + 0), 
                            model.matrix(~ medTravDir + 0)
@@ -270,7 +270,7 @@ wkend <- PredSet$wkend
 grp_hr <- PredSet$grp_hr
 medTravDir <- PredSet$medTravDir
 PredSet_xgb <- data.frame(PredSet[, includes_xgb], 
-                          #model.matrix(~ ArterialCl + 0), 
+                          model.matrix(~ ArterialCl + 0), 
                           model.matrix(~ wkend + 0), 
                           model.matrix(~ grp_hr + 0), 
                           model.matrix(~ medTravDir + 0)
@@ -373,7 +373,7 @@ includes = c(
   #weather_var,     # Weather variables
   "nBikes",        # bike/ped conflict counts at segment level (no hour)
   "nFARS_1217",         # FARS variables
-  #seg_var, 
+  seg_var, 
   "wkend", 
   "grp_hr", 
   "medTravDir"
