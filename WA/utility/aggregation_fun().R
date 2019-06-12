@@ -129,7 +129,7 @@ agg_fun <- function(w.all, t_var) {
                                      ifelse(w.all.4hr$medCirMagVar >= 150 & w.all.4hr$medCirMagVar< 180 
                                             | w.all.4hr$medCirMagVar> -180 & w.all.4hr$medCirMagVar< -150, "South",
                                             ifelse(w.all.4hr$medCirMagVar >= -150 & w.all.4hr$medCirMagVar< -90, "SouthWest",
-                                                   ifelse(w.all.4hr$medCirMagVar >= -90 & w.all.4hr$medCirMagVar< -30, "NorthWest", NA))))))
+                                                   ifelse(w.all.4hr$medCirMagVar >= -90 & w.all.4hr$medCirMagVar< -30, "NorthWest", "Missing"))))))
   
   if (t_var == 'day') {
        w.all.4hr <- w.all.4hr %>% mutate(segtime = paste(paste(year, day, sep = "-"), grp_hr, sep=" "),

@@ -144,6 +144,12 @@ any(sapply(w.all.4hr.wd[, all_var], function(x) all(x == 0))) # Returns False if
 
 # checking missing fields
 sum(is.na(w.all.4hr.wd[, all_var]))
+which(is.na(w.all.4hr.wd[, all_var]))
+w.all.4hr.wd$medTravDir[which(is.na(w.all.4hr.wd$medTravDir))] <- "Missing"
+sum(is.na(w.all.4hr.wd[, all_var]))
+table(w.all.4hr.wd$medTravDir)
+w.all.4hr.wd$medCirMagVar[which(is.na(w.all.4hr.wd$medCirMagVar))] <- 0
+sum(is.na(w.all.4hr.wd[, all_var]))
 
 # Check time variables & Time Series visuals ----
 stopifnot(length(unique(w.all.4hr.wd$wkday)) == 7)
@@ -208,6 +214,8 @@ if(Art.Only) {TrainSet = TrainSet %>% filter(ArterialCl != "Local")} else {Train
 if(Art.Only) {ValidSet = ValidSet %>% filter(ArterialCl != "Local")} else {ValidSet = ValidSet}
 if(Art.Only) {PredSet = PredSet %>% filter(ArterialCl != "Local")} else {PredSet = PredSet}
 
+
+# Prep data for XGboost ----
 # need to convert character and factor columns to dummy variables.
 continous_var <- c(waze_dir_travel, 
                    waze_rd_type, # direction of travel + road types from Waze
@@ -225,32 +233,55 @@ includes = c(
   #weather_var,     # Weather variables
   #"nBikes",        # bike/ped conflict counts at segment level (no hour)
   #"nFARS_1217",         # FARS variables
-  seg_var, 
-  "wkend", "grp_hr", "waze_dir_travel_cat"
+  #seg_var, 
+  "wkend", 
+  "grp_hr", 
+  "medTravDir"
 )
 
-includes_xgb <- includes[-which(includes %in% c("ArterialCl", "wkend", "grp_hr","waze_dir_travel_cat"))]
+includes_xgb <- includes[-which(includes %in% c("grp_hr","wkend", "medTravDir"))] #, "ArterialCl", 
 
 ArterialCl <- TrainSet$ArterialCl
 wkend <- TrainSet$wkend
 grp_hr <- TrainSet$grp_hr
-dir_trav_cat <- TrainSet$medTravDir
-TrainSet_xgb <- data.frame(TrainSet[, includes_xgb], model.matrix(~ ArterialCl + 0), 
-                           model.matrix(~ wkend + 0), model.matrix(~ grp_hr + 0), model.matrix(~ dir_trav_cat + 0))
-table(ArterialCl)
+medTravDir <- TrainSet$medTravDir
+TrainSet_xgb <- data.frame(TrainSet[, includes_xgb], 
+                           #model.matrix(~ ArterialCl + 0), 
+                           model.matrix(~ wkend + 0), 
+                           model.matrix(~ grp_hr + 0), 
+                           model.matrix(~ medTravDir + 0)
+                           )
+#table(ArterialCl)
 
 ArterialCl <- ValidSet$ArterialCl
 wkend <- ValidSet$wkend
 grp_hr <- ValidSet$grp_hr
-ValidSet_xgb <- data.frame(ValidSet[, includes_xgb], model.matrix(~ ArterialCl + 0), model.matrix(~ wkend + 0), model.matrix(~ grp_hr + 0))
-table(ArterialCl)
+medTravDir <- ValidSet$medTravDir
+ValidSet_xgb <- data.frame(ValidSet[, includes_xgb], 
+                           #model.matrix(~ ArterialCl + 0), 
+                           model.matrix(~ wkend + 0), 
+                           model.matrix(~ grp_hr + 0), 
+                           model.matrix(~ medTravDir + 0)
+                           )
+#table(ArterialCl)
 
 ArterialCl <- PredSet$ArterialCl
 wkend <- PredSet$wkend
 grp_hr <- PredSet$grp_hr
-PredSet_xgb <- data.frame(PredSet[, includes_xgb], model.matrix(~ ArterialCl + 0), model.matrix(~ wkend + 0), model.matrix(~ grp_hr + 0))
-table(ArterialCl)
+medTravDir <- PredSet$medTravDir
+PredSet_xgb <- data.frame(PredSet[, includes_xgb], 
+                          #model.matrix(~ ArterialCl + 0), 
+                          model.matrix(~ wkend + 0), 
+                          model.matrix(~ grp_hr + 0), 
+                          model.matrix(~ medTravDir + 0)
+                          )
+#table(ArterialCl)
 
+#Remove ArterialCL levels with no observations
+#TrainSet$ArterialCl <- factor(TrainSet$ArterialCl) 
+#ValidSet$ArterialCl <- factor(ValidSet$ArterialCl) 
+#PredSet$ArterialCl <- factor(PredSet$ArterialCl) 
+#table(TrainSet$ArterialCl)
 
 # XGboost unique crash counts, updated code to test parameters in xgboost function 
 # Side note: "You can use an offset in xgboost for Poisson regression, by setting the base_margin value in the xgb.DMatrix object".
@@ -264,10 +295,10 @@ dpred <- list("data" = as.matrix(PredSet_xgb), "label" = PredSet[,response.var])
 dtrain <- list("data" = as.matrix(TrainSet_xgb), "label" = TrainSet[,response.var])
 dtest <- list("data" = as.matrix(ValidSet_xgb), "label" = ValidSet[,response.var])
 
-n.rds = 60
-n.eta=.2
+n.rds = 200
+n.eta=.1
 m.depth=6
-modelno = paste("15.xgb.art.wkend.",n.rds,"rd.",m.depth,"depth", sep='')
+modelno = paste("20.xgb.art.wkend.",n.rds,"rd.","depth",m.depth, sep='')
 modelno
 
 set.seed(1024)
@@ -282,21 +313,24 @@ xgb.m <- assign(paste0('m', modelno),
                         colsample_bytree=1, #default=1, range 0 to 1, subsample ratio of columns when constructing each tree (.3-.5)
                         max_delta_step=0, #default 0, range 0 to inf, max delta step we allow each tree's weight estimation to be
                         seed=1,
-                        nthread = 1, 
-                        nrounds = n.rds, 
+                        nthread = 2, 
+                        nrounds = n.rds,
+                        booster = "gbtree",
+                        eval_metric = "mae",
                         objective = "count:poisson"))
 
 pred_train <- predict(xgb.m, dtrain$data)
 pred_test <- predict(xgb.m, dtest$data)
 pred_pred <- predict(xgb.m, dpred$data)
 
+xgb_mae <- mae(dtest$label, pred_test)
+xgb_mae
+
 #xgb.m
 importance_matrix <- xgb.importance(feature_names = colnames(dtrain$data), model = xgb.m)
 xgb.plot.importance(importance_matrix[1:20,])
+xgb.plot.tree(feature_names = colnames(dtest$data),model=xgb.m, trees = 0, show_node_id = TRUE)
 
-y_hat_xgb <- predict(xgb.m, data.matrix(dtest$data %>% as.data.frame))
-xgb_mae <- mae(dtest$label, y_hat_xgb)
-xgb_mae
 
 # Add Observed-predicted summaries
 trainObsPred <- TrainSet[,response.var] - pred_train
@@ -307,29 +341,172 @@ plot(PredSet[,response.var],pred_pred)
 
 # Compare totals
 sum(PredSet$uniqueCrashreports)
+sum(PredSet$WeightedCrashes)
 sum(predict(xgb.m, dpred$data))
 
 # % of variance explained
 cat("% Var explained: \n", 100 * (1-sum(( TrainSet[,response.var] - pred_train )^2) /
                                     sum(( TrainSet[,response.var] - mean(TrainSet[,response.var]))^2)
 )
-) # 63% using 50 rounds
+) 
 
 
 cat("% Var explained: \n", 100 * (1-sum(( ValidSet[,response.var] - pred_test )^2) /
-                                    sum(( ValidSet[,response.var] - mean(PredSet[,response.var]))^2)
+                                    sum(( ValidSet[,response.var] - mean(ValidSet[,response.var]))^2)
 )
-) # 24.57% using 50 rounds
+) 
 
 cat("% Var explained: \n", 100 * (1-sum(( PredSet[,response.var] - pred_pred )^2) /
                                     sum(( PredSet[,response.var] - mean(PredSet[,response.var]))^2)
 )
-) # 49.8% using 50 rounds
+) 
 
+# <><><><><><><><><><><><><><><><><><><><><><><><>
+# Weighted XGBoost ----
+
+includes = c(
+  waze_dir_travel,
+  #waze_rd_type, # direction of travel + road types from Waze
+  alert_types,     # counts of waze events by alert types
+  alert_subtypes,  # counts of waze alerts by subtype
+  #weather_var,     # Weather variables
+  "nBikes",        # bike/ped conflict counts at segment level (no hour)
+  "nFARS_1217",         # FARS variables
+  #seg_var, 
+  "wkend", 
+  "grp_hr", 
+  "medTravDir"
+)
+
+includes_xgb <- includes[-which(includes %in% c("ArterialCl", "grp_hr","wkend", "medTravDir"))] #, 
+
+ArterialCl <- TrainSet$ArterialCl
+wkend <- TrainSet$wkend
+grp_hr <- TrainSet$grp_hr
+medTravDir <- TrainSet$medTravDir
+TrainSet_xgb <- data.frame(TrainSet[, includes_xgb], 
+                           model.matrix(~ ArterialCl + 0), 
+                           model.matrix(~ wkend + 0), 
+                           model.matrix(~ grp_hr + 0), 
+                           model.matrix(~ medTravDir + 0)
+)
+#table(ArterialCl)
+
+ArterialCl <- ValidSet$ArterialCl
+wkend <- ValidSet$wkend
+grp_hr <- ValidSet$grp_hr
+medTravDir <- ValidSet$medTravDir
+ValidSet_xgb <- data.frame(ValidSet[, includes_xgb], 
+                           model.matrix(~ ArterialCl + 0), 
+                           model.matrix(~ wkend + 0), 
+                           model.matrix(~ grp_hr + 0), 
+                           model.matrix(~ medTravDir + 0)
+)
+#table(ArterialCl)
+
+ArterialCl <- PredSet$ArterialCl
+wkend <- PredSet$wkend
+grp_hr <- PredSet$grp_hr
+medTravDir <- PredSet$medTravDir
+PredSet_xgb <- data.frame(PredSet[, includes_xgb], 
+                          model.matrix(~ ArterialCl + 0), 
+                          model.matrix(~ wkend + 0), 
+                          model.matrix(~ grp_hr + 0), 
+                          model.matrix(~ medTravDir + 0)
+)
+
+response.var <- response.var.list[4] # use weighted crash counts
+dpred <- list("data" = as.matrix(PredSet_xgb), "label" = PredSet[,response.var])
+dtrain <- list("data" = as.matrix(TrainSet_xgb), "label" = TrainSet[,response.var])
+dtest <- list("data" = as.matrix(ValidSet_xgb), "label" = ValidSet[,response.var])
+
+n.rds = 400
+n.eta=.1
+m.depth=4
+modelno = paste("21.xgb.art.wkend.weighted.",n.rds,"rd.","depth",m.depth, sep='')
+modelno
+
+set.seed(1024)
+xgb.m <- assign(paste0('m', modelno),
+                xgboost(data = dtrain$data, 
+                        label = dtrain$label, 
+                        max.depth = m.depth, #default=6 
+                        min_child_weight=1, #default = 1, range 0 to inf, min sum of instance weight needed in a child start with 1/sqrt(eventrate)?
+                        gamma=0, #default=0, minimum loss reduction to make further partition
+                        eta = n.eta, #default = 0.3 (0 to 1 range, smaller prevents overfitting)
+                        subsample=1, #default = 1, subsample ratio of the training instance
+                        colsample_bytree=1, #default=1, range 0 to 1, subsample ratio of columns when constructing each tree (.3-.5)
+                        max_delta_step=0, #default 0, range 0 to inf, max delta step we allow each tree's weight estimation to be
+                        seed=1,
+                        nthread = 2, 
+                        nrounds = n.rds,
+                        booster = "gbtree",
+                        eval_metric = "mae",
+                        objective = "count:poisson"))
+
+pred_train <- predict(xgb.m, dtrain$data)
+pred_test <- predict(xgb.m, dtest$data)
+pred_pred <- predict(xgb.m, dpred$data)
+
+xgb_mae <- mae(dtest$label, pred_test)
+xgb_mae
+
+#xgb.m
+importance_matrix <- xgb.importance(feature_names = colnames(dtrain$data), model = xgb.m)
+xgb.plot.importance(importance_matrix[1:20,])
+#xgb.plot.tree(feature_names = colnames(dtest$data),model=xgb.m, trees = 0, show_node_id = TRUE)
+
+
+# Add Observed-predicted summaries
+trainObsPred <- TrainSet[,response.var] - pred_train
+hist(trainObsPred)
+plot(TrainSet[,response.var],pred_train)
+plot(ValidSet[,response.var],pred_test)
+plot(PredSet[,response.var],pred_pred)
+
+# Compare totals
+sum(PredSet$uniqueCrashreports)
+sum(PredSet$WeightedCrashes)
+sum(predict(xgb.m, dpred$data))
+
+# % of variance explained
+cat("% Var explained: \n", 100 * (1-sum(( TrainSet[,response.var] - pred_train )^2) /
+                                    sum(( TrainSet[,response.var] - mean(TrainSet[,response.var]))^2)
+)
+) 
+
+
+cat("% Var explained: \n", 100 * (1-sum(( ValidSet[,response.var] - pred_test )^2) /
+                                    sum(( ValidSet[,response.var] - mean(ValidSet[,response.var]))^2)
+)
+) 
+
+cat("% Var explained: \n", 100 * (1-sum(( PredSet[,response.var] - pred_pred )^2) /
+                                    sum(( PredSet[,response.var] - mean(PredSet[,response.var]))^2)
+)
+) 
+
+
+# Save xgb model output
+model_type = "XGB_models"
+out.name <- file.path(data.loc, 'Model_output', paste0("Bell_",model_type,".Rdata"))
+
+if(file.exists(out.name)){
+  load(out.name)} else {
+    
+    row.name <- c("20.xgb.art.wkend.200rd", "21.xgb.art.wkend.weighted.400rd.depth4")
+    XGB_models <- lapply(row.name, function(x) get(x))
+    save(list = c("XGB_models", "row.name", "TrainSet", "ValidSet", "PredSet", "response.var.list", "pred_pred", "includes_xgb"), file = out.name)
+    
+  }
+
+
+
+
+# Extra XGboost ----
 par(mfrow=c(1,1))
 
 #pretty plot - how to interpret?
-xgb.plot.tree(feature_names = colnames(dtrain$data),model=xgb.m, trees = 0, show_node_id = TRUE)
 
 
 range(pred_pred) # 0.0005870936 5.9243960381 (eta=.3,50 rounds)
