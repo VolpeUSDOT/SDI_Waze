@@ -327,6 +327,7 @@ xgb_mae <- mae(dtest$label, pred_test)
 xgb_mae
 
 #xgb.m
+par(mfrow=c(1,1))
 importance_matrix <- xgb.importance(feature_names = colnames(dtrain$data), model = xgb.m)
 xgb.plot.importance(importance_matrix[1:20,])
 xgb.plot.tree(feature_names = colnames(dtest$data),model=xgb.m, trees = 0, show_node_id = TRUE)
