@@ -444,25 +444,25 @@ xgb.m <- assign(paste0('m', modelno),
                         eval_metric = "mae",
                         objective = "count:poisson"))
 
-pred_train <- predict(xgb.m, dtrain$data)
-pred_test <- predict(xgb.m, dtest$data)
-pred_pred <- predict(xgb.m, dpred$data)
+pred_train_weighted <- predict(xgb.m, dtrain$data)
+pred_test_weighted <- predict(xgb.m, dtest$data)
+pred_pred_weighted <- predict(xgb.m, dpred$data)
 
-xgb_mae <- mae(dtest$label, pred_test)
-xgb_mae
+xgb_mae_weighted <- mae(dtest$label, pred_test_weighted)
+xgb_mae_weighted
 
 #xgb.m
-importance_matrix <- xgb.importance(feature_names = colnames(dtrain$data), model = xgb.m)
-xgb.plot.importance(importance_matrix[1:20,])
+importance_matrix_weighted <- xgb.importance(feature_names = colnames(dtrain$data), model = xgb.m)
+xgb.plot.importance(importance_matrix_weighted[1:20,])
 #xgb.plot.tree(feature_names = colnames(dtest$data),model=xgb.m, trees = 0, show_node_id = TRUE)
 
 
 # Add Observed-predicted summaries
-trainObsPred <- TrainSet[,response.var] - pred_train
+trainObsPred <- TrainSet[,response.var] - pred_train_weighted
 hist(trainObsPred)
-plot(TrainSet[,response.var],pred_train)
-plot(ValidSet[,response.var],pred_test)
-plot(PredSet[,response.var],pred_pred)
+plot(TrainSet[,response.var],pred_train_weighted)
+plot(ValidSet[,response.var],pred_test_weighted)
+plot(PredSet[,response.var],pred_pred_weighted)
 
 # Compare totals
 sum(PredSet$uniqueCrashreports)
@@ -470,18 +470,18 @@ sum(PredSet$WeightedCrashes)
 sum(predict(xgb.m, dpred$data))
 
 # % of variance explained
-cat("% Var explained: \n", 100 * (1-sum(( TrainSet[,response.var] - pred_train )^2) /
+cat("% Var explained: \n", 100 * (1-sum(( TrainSet[,response.var] - pred_train_weighted )^2) /
                                     sum(( TrainSet[,response.var] - mean(TrainSet[,response.var]))^2)
 )
 ) 
 
 
-cat("% Var explained: \n", 100 * (1-sum(( ValidSet[,response.var] - pred_test )^2) /
+cat("% Var explained: \n", 100 * (1-sum(( ValidSet[,response.var] - pred_test_weighted )^2) /
                                     sum(( ValidSet[,response.var] - mean(ValidSet[,response.var]))^2)
 )
 ) 
 
-cat("% Var explained: \n", 100 * (1-sum(( PredSet[,response.var] - pred_pred )^2) /
+cat("% Var explained: \n", 100 * (1-sum(( PredSet[,response.var] - pred_pred_weighted )^2) /
                                     sum(( PredSet[,response.var] - mean(PredSet[,response.var]))^2)
 )
 ) 
@@ -501,6 +501,9 @@ if(file.exists(out.name)){
   }
 
 
+# data with XGBoost model predictions
+out <- cbind(PredSet, "Xgb_Pred" = pred_pred, "Xgb_Pred_Weighted" = pred_pred_weighted)
+write.csv(out, file.path(data.loc, 'Model_output', paste0("Bell_",model_type,"_pred.csv")), row.names = F)
 
 
 # Extra XGboost ----
