@@ -28,6 +28,7 @@ library(pscl) # zero-inflated Poisson
 #library(car) # to get vif()
 library(xgboost)
 library(DiagrammeR)
+library(Metrics) # for mae()
 
 # #install from Github (Windows user will need to install Rtools first.)
 # install.packages("drat", repos="https://cran.rstudio.com")
@@ -74,7 +75,7 @@ colSums(w.all.4hr.wd[, waze_rd_type]) #
 #All zero for road type 0, 3, 4, thus removing them
 
 waze_dir_travel = grep("MagVar", names(w.all.4hr.wd), value = T)[-7] 
-colSums(w.all.4hr.wd[,waze_dir_travel]) # Remove mean MagVar
+colSums(w.all.4hr.wd[,waze_dir_travel]) # Remove mean MagVar, Jessie: medCirMagVar is showing as NA
 
 waze_dir_travel_cat = "medTravDir"
 
@@ -142,7 +143,7 @@ for (i in 1:length(indicator.var.list)){
 any(sapply(w.all.4hr.wd[, all_var], function(x) all(x == 0))) # Returns False if no columns have all zeros
 # all variables of w.all.4hr.wd are clean now. None of them are all-zero column. 
 
-# checking missing fields
+# checking missing fields, missing medTravDir was labled with "Missing", missing medCirMagVar was converted to 0.
 sum(is.na(w.all.4hr.wd[, all_var]))
 which(is.na(w.all.4hr.wd[, all_var]))
 w.all.4hr.wd$medTravDir[which(is.na(w.all.4hr.wd$medTravDir))] <- "Missing"
@@ -186,9 +187,11 @@ d_s <- w.all.4hr.wd %>%
 samprow <- vector()
 train_index = 1:nrow(w.all.4hr.wd)
 
+# Randomly sample for each combination of weekday and time period
 for(i in unique(d_s$wd_tod)){
   d <- d_s %>%
     filter(wd_tod == i)
+  set.seed(256) # set seads so the data is retrievable
   samprow_wd_tod <- sample(d$train_index, nrow(d)*.3, replace = F)
   samprow <- c(samprow, samprow_wd_tod)
 }
@@ -323,11 +326,11 @@ pred_train <- predict(xgb.m, dtrain$data)
 pred_test <- predict(xgb.m, dtest$data)
 pred_pred <- predict(xgb.m, dpred$data)
 
-xgb_mae <- mae(dtest$label, pred_test)
+xgb_mae <- mae(dtest$label, pred_test) # Jessie: could not find function. Looks like this is from the package "Metrics", not available  for R 3.6
 xgb_mae
 
 #xgb.m
-par(mfrow=c(1,1))
+par(mfrow=c(2,1))
 importance_matrix <- xgb.importance(feature_names = colnames(dtrain$data), model = xgb.m)
 xgb.plot.importance(importance_matrix[1:20,])
 xgb.plot.tree(feature_names = colnames(dtest$data),model=xgb.m, trees = 0, show_node_id = TRUE)
@@ -345,22 +348,27 @@ sum(PredSet$uniqueCrashreports)
 sum(PredSet$WeightedCrashes)
 sum(predict(xgb.m, dpred$data))
 
+# Compare maxs
+max(PredSet$uniqueCrashreports)
+max(PredSet$WeightedCrashes)
+max(predict(xgb.m, dpred$data))
+
 # % of variance explained
 cat("% Var explained: \n", 100 * (1-sum(( TrainSet[,response.var] - pred_train )^2) /
                                     sum(( TrainSet[,response.var] - mean(TrainSet[,response.var]))^2)
 )
-) 
+) # 78.15688%
 
 
 cat("% Var explained: \n", 100 * (1-sum(( ValidSet[,response.var] - pred_test )^2) /
                                     sum(( ValidSet[,response.var] - mean(ValidSet[,response.var]))^2)
 )
-) 
+) # 40.33319%
 
 cat("% Var explained: \n", 100 * (1-sum(( PredSet[,response.var] - pred_pred )^2) /
                                     sum(( PredSet[,response.var] - mean(PredSet[,response.var]))^2)
 )
-) 
+) # 66.78816%
 
 # <><><><><><><><><><><><><><><><><><><><><><><><>
 # Weighted XGBoost ----
@@ -466,26 +474,31 @@ plot(ValidSet[,response.var],pred_test_weighted)
 plot(PredSet[,response.var],pred_pred_weighted)
 
 # Compare totals
-sum(PredSet$uniqueCrashreports)
-sum(PredSet$WeightedCrashes)
-sum(predict(xgb.m, dpred$data))
+sum(PredSet$uniqueCrashreports) # 1274
+sum(PredSet$WeightedCrashes) # 4229
+sum(predict(xgb.m, dpred$data)) # 4007
+
+# Compare maxs
+max(PredSet$uniqueCrashreports) # 6
+max(PredSet$WeightedCrashes) # 27
+max(predict(xgb.m, dpred$data)) # 26.982
 
 # % of variance explained
 cat("% Var explained: \n", 100 * (1-sum(( TrainSet[,response.var] - pred_train_weighted )^2) /
                                     sum(( TrainSet[,response.var] - mean(TrainSet[,response.var]))^2)
 )
-) 
+) # 81%
 
 
 cat("% Var explained: \n", 100 * (1-sum(( ValidSet[,response.var] - pred_test_weighted )^2) /
                                     sum(( ValidSet[,response.var] - mean(ValidSet[,response.var]))^2)
 )
-) 
+) # 12.93513%
 
 cat("% Var explained: \n", 100 * (1-sum(( PredSet[,response.var] - pred_pred_weighted )^2) /
                                     sum(( PredSet[,response.var] - mean(PredSet[,response.var]))^2)
 )
-) 
+) # 63.47352% 
 
 
 # Save xgb model output
@@ -495,7 +508,7 @@ out.name <- file.path(data.loc, 'Model_output', paste0("Bell_",model_type,".Rdat
 if(file.exists(out.name)){
   load(out.name)} else {
     
-    row.name <- c("20.xgb.art.wkend.200rd", "21.xgb.art.wkend.weighted.400rd.depth4")
+    row.name <- c("20.xgb.art.wkend.200rd.depth6", "21.xgb.art.wkend.weighted.400rd.depth4")
     XGB_models <- lapply(row.name, function(x) get(x))
     save(list = c("XGB_models", "row.name", "TrainSet", "ValidSet", "PredSet", "response.var.list", "pred_pred", "includes_xgb"), file = out.name)
     
