@@ -11,7 +11,7 @@ library(sp)
 library(rgdal) # for readOGR(),writeOGR () needed for reading/writing in ArcM shapefiles
 library(tidyverse)
 library(doParallel)
-library(circular)
+library(circular) # for mean.circular() and median.circular()
 
 codeloc <- ifelse(grepl('Flynn', normalizePath('~/')),
                   "~/git/SDI_Waze", "~/GitHub/SDI_Waze")
@@ -313,8 +313,6 @@ stopifnot(with(w.all, date >= '2018-01-01' & date <= '2018-12-31')) # make sure 
 # all crash and Waze variables need to be aggregated by hour and segment
 # load the aggregation function
 source(file.path(codeloc, 'WA/utility/aggregation_fun().R'))
-
-# Jessie: where is the mean.circular(), need to load here: could not find function "mean.circular"
 
 t_var = "day"
 w.all.4hr <- agg_fun(w.all, t_var)
