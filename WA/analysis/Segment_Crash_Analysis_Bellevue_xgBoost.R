@@ -503,12 +503,12 @@ cat("% Var explained: \n", 100 * (1-sum(( PredSet[,response.var] - pred_pred_wei
 
 # Save xgb model output
 model_type = "XGB_models"
-out.name <- file.path(data.loc, 'Model_output', paste0("Bell_",model_type,".Rdata"))
+out.name <- file.path(data.loc, 'Model_output', paste0("Bell_",model_type,"061419.Rdata"))
 
 if(file.exists(out.name)){
   load(out.name)} else {
     
-    row.name <- c("20.xgb.art.wkend.200rd.depth6", "21.xgb.art.wkend.weighted.400rd.depth4")
+    row.name <- c("m20.xgb.art.wkend.200rd.depth6", "m21.xgb.art.wkend.weighted.400rd.depth4")
     XGB_models <- lapply(row.name, function(x) get(x))
     save(list = c("XGB_models", "row.name", "TrainSet", "ValidSet", "PredSet", "response.var.list", "pred_pred", "includes_xgb"), file = out.name)
     
@@ -517,7 +517,7 @@ if(file.exists(out.name)){
 
 # data with XGBoost model predictions
 out <- cbind(PredSet, "Xgb_Pred" = pred_pred, "Xgb_Pred_Weighted" = pred_pred_weighted)
-write.csv(out, file.path(data.loc, 'Model_output', paste0("Bell_",model_type,"_pred.csv")), row.names = F)
+write.csv(out, file.path(data.loc, 'Model_output', paste0("Bell_",model_type,"_pred061419.csv")), row.names = F)
 
 
 # Extra XGboost ----
