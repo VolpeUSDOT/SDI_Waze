@@ -4,6 +4,7 @@
 loadpacks <- c(
             "Amelia",
             "aws.s3", # AWS convenience functions s3save and s3load
+            "circular", # circular transformation of magvar
             "corrplot",
             "doParallel",
             "DT",

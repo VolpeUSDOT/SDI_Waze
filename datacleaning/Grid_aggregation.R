@@ -13,6 +13,7 @@ library(lubridate)
 library(utils)
 library(doParallel)
 library(foreach)
+library(circular)
 
 output.loc <- "~/agg_out"
 user <- paste0( "/home/", system("whoami", intern = TRUE)) #the user directory to use
@@ -109,6 +110,7 @@ for(state in states){ # state = "CT"
     
     StartTime <- Sys.time()
     waze.hex <- Waze.hex.time %>%
+      mutate(MagVar.circ = circular(magvar, units = "degrees", template = "geographics")) %>%
       group_by(GRID_ID, GRID_ID_NW, GRID_ID_N, GRID_ID_NE, GRID_ID_SW, GRID_ID_S, GRID_ID_SE,
                day = format(GridDayHour, "%j"), hour = format(GridDayHour, "%H"), weekday = format(GridDayHour, "%u")) %>%
       summarize(
@@ -158,27 +160,31 @@ for(state in states){ # state = "CT"
         nWazeWeatherFog = n_distinct(uuid.waze[sub_type=="HAZARD_WEATHER_FOG"]),
         nWazeHazardIceRoad = n_distinct(uuid.waze[sub_type=="HAZARD_ON_ROAD_ICE"]),
         
-        nWazeRT3 = n_distinct(uuid.waze[road_type=="3"]),
-        nWazeRT4 = n_distinct(uuid.waze[road_type=="4"]),
-        nWazeRT6 = n_distinct(uuid.waze[road_type=="6"]),
-        nWazeRT7 = n_distinct(uuid.waze[road_type=="7"]),
-        nWazeRT2 = n_distinct(uuid.waze[road_type=="2"]),
-        nWazeRT0 = n_distinct(uuid.waze[road_type=="0"]),
-        nWazeRT1 = n_distinct(uuid.waze[road_type=="1"]),
-        nWazeRT20 = n_distinct(uuid.waze[road_type=="20"]),
-        nWazeRT17 = n_distinct(uuid.waze[road_type=="17"]),
+        #Omit road closures from counts (not reported by users)
+        nWazeRT3 = n_distinct(uuid.waze[alert_type!="ROAD_CLOSED" & roadclass=="3"]),
+        nWazeRT4 = n_distinct(uuid.waze[alert_type!="ROAD_CLOSED" & roadclass=="4"]),
+        nWazeRT6 = n_distinct(uuid.waze[alert_type!="ROAD_CLOSED" & roadclass=="6"]),
+        nWazeRT7 = n_distinct(uuid.waze[alert_type!="ROAD_CLOSED" & roadclass=="7"]),
+        nWazeRT2 = n_distinct(uuid.waze[alert_type!="ROAD_CLOSED" & roadclass=="2"]),
+        nWazeRT0 = n_distinct(uuid.waze[alert_type!="ROAD_CLOSED" & roadclass=="0"]),
+        nWazeRT1 = n_distinct(uuid.waze[alert_type!="ROAD_CLOSED" & roadclass=="1"]),
+        nWazeRT20 = n_distinct(uuid.waze[alert_type!="ROAD_CLOSED" & roadclass=="20"]),
+        nWazeRT17 = n_distinct(uuid.waze[alert_type!="ROAD_CLOSED" & roadclass=="17"]),
         
         medLastRepRate = median(last.reportRating),
         medLastConf = median(last.confidence),
         medLastReliab = median(last.reliability),
         
-        medMagVar = median(magvar),
-        nMagVar330to30 = n_distinct(uuid.waze[magvar>= 330 & magvar<30]),
-        nMagVar30to60 = n_distinct(uuid.waze[magvar>= 60 & magvar<120]),
-        nMagVar90to180 = n_distinct(uuid.waze[magvar>= 120 & magvar<180]),
-        nMagVar180to240 = n_distinct(uuid.waze[magvar>= 180 & magvar<240]),
-        nMagVar240to360 = n_distinct(uuid.waze[magvar>= 240 & magvar<360]),
+        meanCirMagVar = mean.circular(MagVar.circ[alert_type!="ROAD_CLOSED"]),
+        medCirMagVar = median.circular(MagVar.circ[alert_type!="ROAD_CLOSED"]),
         
+        nMagVar330to30N = n_distinct(uuid.waze[alert_type!="ROAD_CLOSED" & magvar>= 330 | magvar<30]),
+        nMagVar30to90NE = n_distinct(uuid.waze[alert_type!="ROAD_CLOSED" & magvar>= 30 & magvar<90]),
+        nMagVar90to150SE = n_distinct(uuid.waze[alert_type!="ROAD_CLOSED" & magvar>= 90 & magvar<150]),
+        nMagVar150to210S = n_distinct(uuid.waze[alert_type!="ROAD_CLOSED" & magvar>= 150 & magvar<210]),
+        nMagVar210to270SW = n_distinct(uuid.waze[alert_type!="ROAD_CLOSED" & magvar>= 210 & magvar<270]),
+        nMagVar270to330NW = n_distinct(uuid.waze[alert_type!="ROAD_CLOSED" & magvar>= 270 & magvar<330]),  
+    
         UA_Cluster = 1*any(Waze_UA_Type == 'C' & !is.na(Waze_UA_Type)),
         UA_Urban = 1*any(Waze_UA_Type == 'U' & !is.na(Waze_UA_Type)),
         UA_Rural = 1*any(is.na(Waze_UA_Type))
