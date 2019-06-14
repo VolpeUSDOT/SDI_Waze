@@ -153,6 +153,8 @@ agg_fun_seg <- function(w.all) {
   dots = lapply(grp_cols, as.symbol)
   w.all.seg <- group_by_Waze_Crash(w.all, .dots = dots)
   
+  # weather need to match day and segments, however, this data is yearly data by segments, so we don't join the weather data.
+  
   # all other variables need to match segments
   seg_only_var <- c("RDSEG_ID","OBJECTID", "StreetSegm", "LifeCycleS", "OfficialSt", "FromAddres", "FromAddr_1", "ToAddressL",
                     "ToAddressR", "LeftJurisd", "RightJuris", "LeftZip", "RightZip", "OneWay", "SpeedLimit",
@@ -164,17 +166,6 @@ agg_fun_seg <- function(w.all) {
   
   w.all.seg <- left_join(w.all.seg, seg.only.data, by = 'RDSEG_ID')
   class(w.all.seg) <- "data.frame" # POSIX date/time not supported for grouped tbl
-  
-
-  if (t_var == 'day') {
-    w.all.seg <- w.all.seg %>% mutate(segtime = paste(paste(year, day, sep = "-"), grp_hr, sep=" "),
-                                      time_hr = as.POSIXct(segtime, '%Y-%j %H', tz = 'America/Los_Angeles'),
-                                      date = as.Date(time_hr, format = '%Y-%j %H', tz = 'America/Los_Angeles'),
-                                      month = as.Date(cut(date, breaks = "month"), tz = 'America/Los_Angeles'),
-                                      weekday = as.factor(weekdays(date))
-    )
-    
-  }
   
   w.all.seg
 }

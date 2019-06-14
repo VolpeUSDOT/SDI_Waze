@@ -4,6 +4,7 @@
 # Notes: input shows suprisingly few Waze events on road segments. For instance, only 9 total Waze events on road segments on 2018-01-01. Load j = "2018-01", see table(format(Waze.seg.time$SegDayHour, '%d')). Can be true, Waze_snapped only 70,226 total for 2018. End result of segment aggregation and binding all months together ~ 60,000 rows. Checked against Waze_Snapped50ft_MatchName, these numbers are correct. Should also check against exported data from SDC.
 # Bellevue crash events: when aggregated to segment and hour, have 1362 segment/hours with 1 crash, 3 segment/hours with 2 crashes. This seems reasonable: total was 2800 crash records, but majority are on interstates or SR 520.
 
+# Set up ----
 #install.packages("circular")
 rm(list=ls())
 library(sp)
@@ -267,6 +268,8 @@ save(list="w.all", file = file.path(output.loc, fn))
 
 # <><><><><><><><><><><><><><><><><><><><><><><><>
 # Variables organization: Aggregate data to 4 hour window ----
+# Before run this chunk, please re-run set up chunk for packages and working directories
+# If "Bellevue_Waze_Segments_2018-01_to_2018-12.RData" exist, let's load it to produce the 4 hour data.
 # Reset output location to save files to model output
 
 seg.loc <- file.path(data.loc, "Segments")
@@ -310,6 +313,8 @@ stopifnot(with(w.all, date >= '2018-01-01' & date <= '2018-12-31')) # make sure 
 # all crash and Waze variables need to be aggregated by hour and segment
 # load the aggregation function
 source(file.path(codeloc, 'WA/utility/aggregation_fun().R'))
+
+# Jessie: where is the mean.circular(), need to load here: could not find function "mean.circular"
 
 t_var = "day"
 w.all.4hr <- agg_fun(w.all, t_var)
