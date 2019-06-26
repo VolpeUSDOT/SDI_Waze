@@ -461,15 +461,7 @@ if(file.exists(out.name)){
     
   }
 
-
-# 4/3/2019 Todos : 1. scale the numeric columns, and re-run logistic regressions. 2. Lasso; 3. logistic regression - present the coefficients using OR; 4. logistic regression with mixed effects; 5. double check the hour column; 6. aggregate data into multi-hour window; 7. Do a model with just the one hour of data. 8. incoporate day of week, month, hour of day as the temporal indicators; 9. XGBoost
-# x <- w.all %>% group_by(hour) %>% summarize(sumCrash = sum(uniqueCrashreports))
-# use as reference: https://medium.com/geoai/using-machine-learning-to-predict-car-accident-risk-4d92c91a7d57
-# https://gduer.github.io/Collision-Prediction-in-Louisville-KY/#5_model_selection
-
 # once we aggregate to a 4 hour window or a day, the counts might change, then we will need a zero-inflated NB model.
-
-
 # create a summary table with diagnostics for all the linear model ----
 # Get the list of linear models
 ClassFilter <- function(x) inherits(get(x), 'lm' ) & !inherits(get(x), 'glm') # excluding other potential classes that contains "lm" as the keywords.
