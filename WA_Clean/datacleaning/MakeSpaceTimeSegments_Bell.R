@@ -1,3 +1,7 @@
+# Takes the shape files prepared in ArcGIS from the Bellevue point data and road network.
+# Inputs: 1) RoadNetwork_Jurisdiction_withData.shp; 2) Crashes_Snapped50ft_MatchName.shp; 3) "Waze_Snapped50ft_MatchName.shp
+# Outputs: twelve WazeSegTimeList_2018-01.RData for calendar year 2018. 
+# These are lists of segment and time windows with crash or Waze data for each hour. 
 # Precursor to Segment_Aggregation_Bell.R
 # Jessie validated this code on 4/1/2019
 
@@ -32,7 +36,7 @@ waze_snapped <- readOGR(dsn = file.path(data.loc, "Shapefiles"), layer = "Waze_S
 waze_snapped <- spTransform(waze_snapped, CRS(proj))
 
 # Load unsnapped Waze data as well. time variable was reduced to just date in the shapefile, so we will join with the original data to get precise time
-# TODO: Export again with last.pull.time, also add that to the join
+# To get event duration: Export again with last.pull.time, also add that to the join
 
 wazetb <- read_csv(file.path(data.loc, 'Export', 'WA_Bellevue_Prep_Export.csv'),
                    locale = locale(tz = 'America/Los_Angeles'))

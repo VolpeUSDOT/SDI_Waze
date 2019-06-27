@@ -1,8 +1,8 @@
 # Aggregation of Waze and Bellevue crash data by segment and hour
-# After completion, append weathers, FARS, and (when ready) LEHD to segments
+# After completion, append weathers, FARS to segments
 
-# Notes: input shows suprisingly few Waze events on road segments. For instance, only 9 total Waze events on road segments on 2018-01-01. Load j = "2018-01", see table(format(Waze.seg.time$SegDayHour, '%d')). Can be true, Waze_snapped only 70,226 total for 2018. End result of segment aggregation and binding all months together ~ 60,000 rows. Checked against Waze_Snapped50ft_MatchName, these numbers are correct. Should also check against exported data from SDC.
-# Bellevue crash events: when aggregated to segment and hour, have 1362 segment/hours with 1 crash, 3 segment/hours with 2 crashes. This seems reasonable: total was 2800 crash records, but majority are on interstates or SR 520.
+# Bellevue crash events: when aggregated to segment and hour, have 1362 segment/hours with 1 crash, 3 segment/hours with 2 crashes. 
+# This seems reasonable: total was 2800 crash records, but majority are on interstates or SR 520.
 
 # Set up ----
 #install.packages("circular")
@@ -58,8 +58,7 @@ foreach(j = todo.months, .packages = c("dplyr", "lubridate", "utils", "circular"
   # Aggregate: new data frame will have one row per segment, per hour, per day.
   # Response variable column: count of unique crash events in this segment, within this time window. 
   # Counts for the number of Waze events of each alert_type and sub_type, inside this segment at this time.
-  # TODO: include neighboring segments?
-  
+
   StartTime <- Sys.time()
   Waze.seg.time$MagVar.circ <- circular(Waze.seg.time$magvar, units = "degrees", template = "geographics")
   Waze.seg.time$Sin.MagVar <- sin(Waze.seg.time$magvar)
