@@ -15,17 +15,9 @@ source(file.path(codeloc, 'WA/utility/visual_fun.R'))
 
 library(tidyverse)
 library(ggplot2)
-#library(GGally)
 library(dplyr)
-#library(corrplot)
-#library(Amelia)
-#library(mlbench)
-#library(xts)
 library(lubridate)
 library(pscl) # zero-inflated Poisson
-#library(MASS) # NB model
-#library(randomForest) # random forest
-#library(car) # to get vif()
 library(xgboost)
 library(DiagrammeR)
 library(Metrics) # for mae()

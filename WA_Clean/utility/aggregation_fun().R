@@ -53,8 +53,8 @@ group_by_Waze_Crash <- function(table, ... ) {
       nMagVar150to210S = sum(nMagVar150to210S),
       nMagVar210to270SW = sum(nMagVar210to270SW),
       nMagVar270to330NW = sum(nMagVar270to330NW),
-      meanCirMagVar = mean.circular(meanCirMagVar), #includes zeros from segments with only roads closed? 
-      medCirMagVar = median.circular(medCirMagVar), #includes zeros from segments with only roads closed?
+      meanCirMagVar = mean.circular(meanCirMagVar),
+      medCirMagVar = median.circular(medCirMagVar),
       
 # Crash columns
 # Add weighted crash column based on HSM and IDOT network screening study
@@ -79,7 +79,7 @@ group_by_Waze_Crash <- function(table, ... ) {
 group_by_Weather <- function(table, ... ) {
   table %>% group_by(.dots = ...) %>% 
     summarise(
-      PRCP = mean(PRCP, na.rm = T), # Should not be any NA, just to be safe adding na.rm = T
+      PRCP = mean(PRCP, na.rm = T),
       TMIN = mean(TMIN, na.rm = T),                        
       TMAX = mean(TMAX, na.rm = T),
       SNOW = mean(SNOW, na.rm = T)
@@ -122,7 +122,7 @@ agg_fun <- function(w.all, t_var) {
   
   w.all.4hr$biCrash <- ifelse(w.all.4hr$uniqueCrashreports > 0, 1, 0)
   
-  # mediandirection of travel (categorical)
+  # median direction of travel (categorical)
   w.all.4hr$medTravDir <- ifelse(w.all.4hr$medCirMagVar >= -30 & w.all.4hr$medCirMagVar<30, "North",
                        ifelse(w.all.4hr$medCirMagVar >= 30 & w.all.4hr$medCirMagVar<90, "NorthEast",
                               ifelse(w.all.4hr$medCirMagVar >= 90 & w.all.4hr$medCirMagVar<150, "SouthEast",

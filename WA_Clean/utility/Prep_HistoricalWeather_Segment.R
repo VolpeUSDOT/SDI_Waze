@@ -7,13 +7,10 @@ state = "WA"
 localdir <- file.path(user, "workingdata", state) # full path for readOGR
 use.tz <- "US/Pacific"
 teambucket <- "s3://prod-sdc-sdi-911061262852-us-east-1-bucket"
-codeloc = '~/SDI_Waze'
+codeloc = '~/' #replace with directory to code
 setwd(localdir)
 # Ensure all data are in place
 source(file.path(codeloc, 'utility', 'Workstation_setup.R'))
-
-# Don't need here for Bellevue, this was for clipping TN grid to state
-censusdir <- file.path(user, "workingdata/census") # full path for readOGR, for buffered state shapefile created in first step of data pipeline, ReduceWaze_SDC.R
 
 temp.outputdir <- "~/tempout" # to hold daily output files as they are generated, and then sent to team bucket
 
@@ -43,9 +40,10 @@ if(length(grep(prepname, dir(file.path(localdir, "Weather")))) == 0) {
   core_vars = c("STATION", "NAME", "DATE", 
                 "PRCP", "SNOW", "SNWD", "TMAX", "TMIN")
   # longer set of possible variables
-  # vars = c("STATION", "NAME", "DATE", "AWND", "DAPR", "MDPR", "PGTM", "PRCP", "SNOW", "SNWD", "TAVG", "TMAX", "TMIN", "TOBS", "WSFG", "WT01", "WT02", "WT03", "WT04", "WT05", "WT06", "WT08", "WT10", "WT11")
+  # vars = c("STATION", "NAME", "DATE", "AWND", "DAPR", "MDPR", "PGTM", "PRCP", "SNOW", "SNWD", "TAVG", 
+  # "TMAX", "TMIN", "TOBS", "WSFG", "WT01", "WT02", "WT03", "WT04", "WT05", "WT06", "WT08", "WT10", "WT11")
 
-  for(k in wx.files){ # k = wx.files[1]
+  for(k in wx.files){
     if(length(grep('stations', k))==0){
       wxx <- read.csv(file.path(localdir, "Weather", k))
       wx <- rbind(wx, wxx[core_vars])
@@ -61,15 +59,8 @@ if(length(grep(prepname, dir(file.path(localdir, "Weather")))) == 0) {
   wx$DATE <- as.Date(as.character(wx$DATE))
   
   wx <- wx[order(wx$DATE, wx$STATION),]
-  
-  # Make sure values are reasonable
-  # range(wx$PRCP, na.rm=T)
-  # wx %>%
-  #   filter(TMAX < 10) # None, ok
-  # wx %>%
-  #   filter(TMIN < -10) # None
 
-  wx$TMIN[wx$TMIN == -99] = NA # leaving in here, although none in these data
+  wx$TMIN[wx$TMIN == -99] = NA
   wx$TMAX[wx$TMAX == -99] = NA
 
   wx <- left_join(wx, stations[1:5], by = "STATION")
@@ -90,9 +81,6 @@ if(length(grep(prepname, dir(file.path(localdir, "Weather")))) == 0) {
   rd_shp <- rgdal::readOGR(file.path(localdir, "Roadway", "OSTSafetyInitiative_20181121"), layer = "RoadNetwork")
   rd_shp <- spTransform(rd_shp, CRS(proj.USGS)) 
   
-  # Quick check before spTransforming (default maps doesn't use CRS):
-  # maps::map('state', 'WA'); plot(rd_shp, add = T, col = 'midnightblue'); plot(wx.proj, add = T, pch = 21, bg = 'white')
-  # plot(rd_shp); plot(wx.proj, add = T, pch = 21, bg = 'white')
   
   wx <- wx %>%
     mutate(mo = format(DATE, "%m"))
@@ -116,7 +104,6 @@ if(length(grep(prepname, dir(file.path(localdir, "Weather")))) == 0) {
   # For Bellevue, use the total wx.proj as the surface rather than rd_shp, because the Bellevue road network is a smaller subset of the whole area of King County
   
   grd <- as.data.frame(spsample(wx.proj, 'regular', n = 5000))
-  # Should be similar : t(bbox(wx.proj)) and sapply(grd, range)
   names(grd) <- c("X", "Y")
   coordinates(grd) <- c("X", "Y")
   gridded(grd) <- TRUE # for SpatialPixel
@@ -132,7 +119,6 @@ if(length(grep(prepname, dir(file.path(localdir, "Weather")))) == 0) {
   wx.grd.day <- foreach(day = unique(wx$DATE), 
                       .packages = c('raster','gstat','dplyr','rgdal'), 
                       .combine = rbind) %dopar% {
-    # day = unique(wx$DATE)[1]
                         
     cat(paste(Sys.time()), as.character(day), "\n", 
         file = paste0("Prep_Weather_Bellevue_log.txt"), append = T) 
@@ -160,29 +146,18 @@ if(length(grep(prepname, dir(file.path(localdir, "Weather")))) == 0) {
     vg_prcp <- gstat::variogram(PRCP ~ 1, locations = wx.day[!is.na(wx.day$PRCP),])
     dat.fit <- fit.variogram(vg_prcp, fit.ranges = F, fit.sills = F,
                              vgm(model = "Sph"))
-    # plot(vg_prcp, dat.fit) # Plot the semi variogram. 
     dat.krg.prcp <- krige(f.p, wx.day[!is.na(wx.day$PRCP),], grd, dat.fit)
     
     # Rasterize
     prcp_r <- raster::raster(dat.krg.prcp)
-    # prcp_r <- mask(prcp_r, rd_shp) # Can the mask step for SpatialLines
-    # plot(prcp_r,  
-    #      main = "Map of precipitation on 2017-04-01")
-     
-    # Plot the 95% confidence intervals
-    # prcp_ci <- sqrt(raster(dat.krg.prcp, layer = 'var1.var')) * 1.96
-    # prcp_ci <- mask(prcp_ci, rd_shp)
-    # plot(prcp_ci, main = "95% CI map of precipitation on 2017-04-01",
-    #      sub = "Smaller values = greater confidence")
-    
-    # Now do tmin, tmax, and snow
+
+    # Do tmin, tmax, and snow
     f.tmin <- as.formula(TMIN ~ 1)
     vg_tmin <- variogram(TMIN ~ 1, wx.day[!is.na(wx.day$TMIN),])
     dat.fit <- fit.variogram(vg_tmin, fit.ranges = F, fit.sills = F,
                              vgm(model = "Sph"))
     dat.krg.tmin <- krige(f.tmin, wx.day[!is.na(wx.day$TMIN),], grd, dat.fit)
     tmin_r <- raster::raster(dat.krg.tmin)
-    # tmin_r <- mask(tmin_r, rd_shp)
     
     f.tmax <- as.formula(TMAX ~ 1)
     vg_tmax <- variogram(TMAX ~ 1, wx.day[!is.na(wx.day$TMAX),])
@@ -190,7 +165,6 @@ if(length(grep(prepname, dir(file.path(localdir, "Weather")))) == 0) {
                              vgm(model = "Sph"))
     dat.krg.tmax <- krige(f.tmax, wx.day[!is.na(wx.day$TMAX),], grd, dat.fit)
     tmax_r <- raster::raster(dat.krg.tmax)
-    # tmax_r <- mask(tmax_r, rd_shp)
     
     f.snow <- as.formula(SNOW ~ 1)
     vg_snow <- variogram(SNOW ~ 1, wx.day[!is.na(wx.day$SNOW),])
@@ -198,7 +172,6 @@ if(length(grep(prepname, dir(file.path(localdir, "Weather")))) == 0) {
                              vgm(model = "Sph"))
     dat.krg.snow <- krige(f.snow, wx.day[!is.na(wx.day$SNOW),], grd, dat.fit)
     snow_r <- raster::raster(dat.krg.snow)
-    # snow_r <- mask(snow_r, rd_shp)
     
     # Apply to segments in year-day ----
 
@@ -240,7 +213,7 @@ if(length(grep(prepname, dir(file.path(localdir, "Weather")))) == 0) {
     
     daily_result <- full_join(daily_result, snow_extr)
     
-    # Save to S3 as temporary location in case the process is interruptedf
+    # Save to S3 as temporary location in case the process is interrupted
     fn = paste("Prep_Weather_Daily_", day,"_Bellevue.RData", sep="")
     
     save(list="daily_result", file = file.path(temp.outputdir, fn))
@@ -277,7 +250,6 @@ if(length(grep(prepname, dir(file.path(localdir, "Weather")))) == 0) {
 }
 
 
-# 51 days with all NA for PRCP, check what is going on. No PRCP for any station on these days?
 no_prcp = wx.grd.day %>% 
   filter(is.na(PRCP)) %>%
   group_by(day) %>%
@@ -285,8 +257,8 @@ no_prcp = wx.grd.day %>%
 
 # Export ----
 # Export for joining with other road segment data and modeling off SDC
-format(object.size(wx.grd.day), 'Mb') # 187.4 Mb
-dim(wx.grd.day) # 3.7 M rows
+format(object.size(wx.grd.day), 'Mb')
+dim(wx.grd.day)
 
 
 write.csv(wx.grd.day, file = file.path(localdir, 'Weather', 'Prepared_Bellevue_Wx_2018.csv'), row.names = F)

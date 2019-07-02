@@ -1,5 +1,6 @@
 # Takes the shape files prepared in ArcGIS from the Bellevue point data and road network.
 # Inputs: 1) RoadNetwork_Jurisdiction_withData.shp; 2) Crashes_Snapped50ft_MatchName.shp; 3) "Waze_Snapped50ft_MatchName.shp
+#         4) WA_Bellevue_Prep_Export.csv; 5) 20190314_All_roads_Bellevue.csv
 # Outputs: twelve WazeSegTimeList_2018-01.RData for calendar year 2018. 
 # These are lists of segment and time windows with crash or Waze data for each hour. 
 # Precursor to Segment_Aggregation_Bell.R
@@ -10,34 +11,31 @@
 # Setup ----
 rm(list= ls())
 library(sp)
-library(rgdal) # for readOGR(),writeOGR () needed for reading/writing in ArcM shapefiles
+library(rgdal) # for readOGR(),writeOGR() needed for reading/writing in ArcM shapefiles
 library(tidyverse)
 library(doParallel)
 
-codeloc <- ifelse(grepl('Flynn', normalizePath('~/')),
-                  "~/git/SDI_Waze", "~/GitHub/SDI_Waze")
+codeloc <- "~/" #replace with location of code
 
 source(file.path(codeloc, 'utility/get_packages.R'))
 
-## Working on shared drive
-wazeshareddir <- "//vntscex.local/DFS/Projects/PROJ-OS62A1/SDI Waze Phase 2"
-output.loc <- file.path(wazeshareddir, "Output/WA")
-data.loc <- file.path(wazeshareddir, "Data/Bellevue")
+## Working directories
+wazeshareddir <- #replace with path to root directory
+data.loc <- #replace with path to data folder in root directory
 
 # GIS layer projection
 proj <- showP4(showWKT("+init=epsg:6597"))
 
 # Load the network data, for the definitive RDSEG_ID to join to
-roadnettb_snapped <- readOGR(dsn = file.path(data.loc, "Shapefiles"), layer = "RoadNetwork_Jurisdiction_withData") # 6647 * 14, new: 6647*38
+roadnettb_snapped <- readOGR(dsn = file.path(data.loc, "Shapefiles"), layer = "RoadNetwork_Jurisdiction_withData")
 roadnettb_snapped <- spTransform(roadnettb_snapped, CRS(proj))
 
 # Load Waze data (old data based on 20 months, and the new data is based on 12 months) ----
-waze_snapped <- readOGR(dsn = file.path(data.loc, "Shapefiles"), layer = "Waze_Snapped50ft_MatchName") # 114614*15, new: 70226*17
+waze_snapped <- readOGR(dsn = file.path(data.loc, "Shapefiles"), layer = "Waze_Snapped50ft_MatchName")
 waze_snapped <- spTransform(waze_snapped, CRS(proj))
 
-# Load unsnapped Waze data as well. time variable was reduced to just date in the shapefile, so we will join with the original data to get precise time
-# To get event duration: Export again with last.pull.time, also add that to the join
-
+# Load unsnapped Waze data to get precise time
+# To get event duration: Export again with last.pull.time
 wazetb <- read_csv(file.path(data.loc, 'Export', 'WA_Bellevue_Prep_Export.csv'),
                    locale = locale(tz = 'America/Los_Angeles'))
 
@@ -49,14 +47,12 @@ stopifnot(sum(is.na(waze_snapped$time)) == 0) # check if there are any NAs.
 stopifnot(any(class(waze_snapped$time) %in% 'POSIXct')) # time is correctly formatted.
 
 # Load Crash data ----
-crash_snapped <- readOGR(dsn = file.path(data.loc, "Shapefiles"), layer = "Crashes_Snapped50ft_MatchName") # 2085*29, new: 1369*51 
+crash_snapped <- readOGR(dsn = file.path(data.loc, "Shapefiles"), layer = "Crashes_Snapped50ft_MatchName")
 crash_snapped <- spTransform(crash_snapped, CRS(proj))
 
 # Load unsnapped crash data for confirmation on date
 # Raw Crash points - potential to add additional variables to the final model
-crashtb <- read.csv(file = file.path(data.loc, "Crash","20190314_All_roads_Bellevue.csv")) # 2018
-# names(crashtb) # Looks like this is a full crash database
-# dim(crashtb) # 2825  254, a total of 4417 crashes.
+crashtb <- read.csv(file = file.path(data.loc, "Crash","20190314_All_roads_Bellevue.csv"))
 
 # format timestamp
 crashtb$time <- as.POSIXct(paste(crashtb$DATE, crashtb$X24.HR.TIME), tz = 'America/Los_Angeles', format = "%m/%d/%Y %H:%M")
@@ -71,7 +67,7 @@ stopifnot(any(class(crash_snapped$time) %in% 'POSIXct')) # time is correctly for
 # <><><><><><><><><><><><><><><><><><><><>
 # Process to monthly segment x hour files ----
 # Segment unique ID: RDSEG_ID
-SegIDall <- roadnettb_snapped$RDSEG_ID # 6647 segments 
+SegIDall <- roadnettb_snapped$RDSEG_ID
 
 # All year, month, and hour
 # Calendar year 2018
@@ -91,8 +87,7 @@ writeLines(c(""), "Make_SpaceTime_log.txt")
 
 foreach(j = todo.months, .packages = c("dplyr", "lubridate", "utils")) %dopar% {
   sink("Make_SpaceTime_log.txt", append=TRUE)
-  cat(paste(Sys.time()), j, "\n")                                                
-  # j = todo.months[1]
+  cat(paste(Sys.time()), j, "\n") 
   waze.j <- waze_snapped[year.month.w == j,]
   crash.j <- crash_snapped[year.month.c == j,]
 
@@ -140,7 +135,7 @@ foreach(j = todo.months, .packages = c("dplyr", "lubridate", "utils")) %dopar% {
     
     i=i+3600
     counter = counter + 1
-    if(counter %% 3600*24 == 0) cat(paste(i, "\n")) # If counter == 0, will output the time with issues. Not sure if it is necessary here
+    if(counter %% 3600*24 == 0) cat(paste(i, "\n")) # If counter == 0, will output the time with issues.
   } # end loop
   
   # Remove any duplicates and NA segment IDs. Should be none.

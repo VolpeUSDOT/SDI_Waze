@@ -5,7 +5,6 @@
 # This seems reasonable: total was 2800 crash records, but majority are on interstates or SR 520.
 
 # Set up ----
-#install.packages("circular")
 rm(list=ls())
 library(sp)
 library(rgdal) # for readOGR(),writeOGR () needed for reading/writing in ArcM shapefiles
@@ -13,20 +12,18 @@ library(tidyverse)
 library(doParallel)
 library(circular) # for mean.circular() and median.circular()
 
-codeloc <- ifelse(grepl('Flynn', normalizePath('~/')),
-                  "~/git/SDI_Waze", "~/GitHub/SDI_Waze")
+codeloc <- "~/" #replace with location of code
 
 #source(file.path(codeloc, 'utility/get_packages.R')) #run if packages are needed
 
-## Working on shared drive
-wazeshareddir <- "//vntscex.local/DFS/Projects/PROJ-OS62A1/SDI Waze Phase 2"
-data.loc <- file.path(wazeshareddir, "Data/Bellevue")
+## Working directories
+wazeshareddir <- #Insert path to root directory
+  data.loc <- #Insert path to data folder in root directory
 output.loc <- file.path(data.loc, "Segments")
 
 setwd(data.loc)
 
-# Set up months to do ----
-
+# Set up months to do --
 segfiles <- dir(output.loc)[grep('^WazeSegTimeList_', dir(output.loc))]
 
 avail.months = substr(unlist(
@@ -41,17 +38,12 @@ todo.months = sort(avail.months)[avail.months %in% done.months]
 #todo.months = sort(avail.months)[!avail.months %in% done.months] 
 
 # Start aggregation by month ----
-# The files have already been created, need to update this with a if exist clause.
-
 cl <- makeCluster(parallel::detectCores()) # make a cluster of all available cores
 registerDoParallel(cl)
 
-# writeLines(c(""), paste0("SegAgg_log.txt"))    
 
 foreach(j = todo.months, .packages = c("dplyr", "lubridate", "utils", "circular")) %dopar% {
-  #j = "2018-01"  
-  # sink(paste0("SegAgg_log.txt"), append=TRUE)
-  
+
   cat(paste(Sys.time()), j, "\n")                                                  
   load(file.path(output.loc, paste0("WazeSegTimeList_", j, ".RData"))) # includes both Waze (link.seg.waze) and crash data (link.seg.crash) 
 
@@ -123,14 +115,13 @@ foreach(j = todo.months, .packages = c("dplyr", "lubridate", "utils", "circular"
       nMagVar210to270SW = n_distinct(SDC_uuid[alert_type!="ROAD_CLOSED" & magvar>= 210 & magvar<270]),
       nMagVar270to330NW = n_distinct(SDC_uuid[alert_type!="ROAD_CLOSED" & magvar>= 270 & magvar<330]),
       
-      #This will return warnings for the grid cells/times without any magvar data (roads closed only?)
+      #This will return warnings for the grid cells/times without any magvar data
       meanCirMagVar = mean.circular(MagVar.circ[alert_type!="ROAD_CLOSED"]),
       medCirMagVar = median.circular(MagVar.circ[alert_type!="ROAD_CLOSED"])
       ) 
 
   #Compute grid counts for Bellevue crash data
-  # Add accident severity counts by grid cell 
-  # names(Crash.seg.time)
+  # Add accident severity counts by grid cell
   crash.seg <- 
     Crash.seg.time %>%
     group_by(RDSEG_ID, year = format(time, "%Y"), day = format(time, "%j"), hour = format(time, "%H")) %>%
@@ -148,19 +139,15 @@ foreach(j = todo.months, .packages = c("dplyr", "lubridate", "utils", "circular"
     ) 
   
   #Merge  crash counts to waze counts by segment ID 
-  names(waze.seg)
-  names(crash.seg)
-  
   wazeTime.crash.seg <- full_join(waze.seg, crash.seg, by = c("RDSEG_ID", "year", "day", "hour")) 
   wazeTime.crash.seg[is.na(wazeTime.crash.seg)] <- 0
-  # %>% mutate_all(list(replace(., is.na(.), 0))) # keep having error running this code, probably because the packages have been updated.
   # Replace NA with zero (for the grid counts here, 0 means there were no reported Waze events or Bellevue crashes in the segment at that hour)
   
   # Update time variable 
   segtimeChar <- paste(paste(wazeTime.crash.seg$year, wazeTime.crash.seg$day, sep = "-"), wazeTime.crash.seg$hour, sep=" ") # day is the day of the year
-  wazeTime.crash.seg$segtime <- segtimeChar # strptime(segtimeChar, "%Y-%j %H", tz = 'America/Los_Angeles')
+  wazeTime.crash.seg$segtime <- segtimeChar
   
-  class(wazeTime.crash.seg) <- "data.frame" # POSIX date/time not supported for grouped tbl
+  class(wazeTime.crash.seg) <- "data.frame"
   
   fn = paste("WazeSegTimeAll_", j, ".RData", sep="")
   
@@ -179,20 +166,11 @@ stopCluster(cl)
 # First, loop over all months and bind together
 w.all <- vector()
 
-for(j in avail.months){ # we need the done.months instead of todo.months
+for(j in avail.months){
   fn = paste("WazeSegTimeAll_", j, ".RData", sep="")
   load(file.path(output.loc, fn))
   w.all <- rbind(w.all, wazeTime.crash.seg)
 }
-
-dim(w.all) # 61237*55, added more variables
-
-#check magvar (circular variable)
-#plot.circular(w.all$meanCirMagVar)
-#hist(as.numeric(w.all$meanCirMagVar))
-#length(which(w.all$meanCirMagVar==0)) #10% are zeros - check original data     
-#for month 1, all roads closed have zero entered along with 11/122 accidents, 376/4220 jams, and 193/1488 weatherhazard
-#many zeros are likely "real" (indicate due North)
 
 # Convert time variable to time format, prepare for temporal analysis
 w.all$time_hr <- as.POSIXct(w.all$segtime, "%Y-%j %H", tz = 'America/Los_Angeles')
@@ -213,7 +191,6 @@ w.all <- left_join(w.all, wx.grd.day, by = c('RDSEG_ID'='ID', 'year', 'day'))
 
 # FARS ----
 FARS_snapped <- readOGR(dsn = file.path(data.loc, "Shapefiles"), layer = "FARS_Snapped50ft_MatchName") 
-# 13 x 19 
 
 # Join only segment; tabulate to get counts across segments 
 FARS_segment = FARS_snapped@data %>%
@@ -224,29 +201,15 @@ w.all <- left_join(w.all, FARS_segment, by = 'RDSEG_ID')
 
 
 # Fill 0s
-#This affects the distribution of the numeric variables - mean/median of magvar. now that we removed the medMagVar, so this is fine.
 w.all[is.na(w.all)] = 0
 
 # Joined the BellevueSegment data (e.g., ) ----
 # Load the network data, for the definitive RDSEG_ID to join to
 roadnettb_snapped <- readOGR(dsn = file.path(data.loc, "Shapefiles"), layer = "RoadNetwork_Jurisdiction_withData") # 6647 * 14, new: 6647*38
-names(roadnettb_snapped)
 
 w.all <- left_join(w.all, roadnettb_snapped@data, by = 'RDSEG_ID')
 
-# don't think we need to fill NAs with zeros.
-names(w.all)
-# Compare nFARS and nFARS_1217
-w.all[, c("nFARS", "nFARS_1217")] 
-sum(as.numeric(w.all$nFARS) - as.numeric(w.all$nFARS_1217)) # -61237, The two columns are not equal.
-w.all[as.numeric(w.all$nFARS) != as.numeric(as.character(w.all$nFARS_1217)), c("nFARS", "nFARS_1217")] # Great. Two columns match. Need to convert a factor to character then to numeric.
-
-# data check between uniqueCrashreports and nCrashes
-w.all[as.numeric(w.all$uniqueCrashreports) != as.numeric(as.character(w.all$nCrashes)), c("uniqueCrashreports", "nCrashes")]
-# nCrashes is the total # of crashes of a segment at all hours
-# uniqueCrashreports is the # of crash of a segment at each hour.
-
-# We found many variables are not in its correct data type, so Convert a few variables from factor to numeric, due to GIS auto-converting numeric columns to factors
+#Convert a few variables from factor to numeric, due to GIS auto-converting numeric columns to factors
 sapply(roadnettb_snapped@data,class) # all but "Shape_STLe" are factor type
 numeric_var <- c("SpeedLimit", "nWaze_All", "nWazeAcc", "nCrashes", "Crash_End1", "Crash_End2", "nBikes", "nFARS_1217")
 w.all[, numeric_var] <- lapply(w.all[, numeric_var], function(x) as.numeric(as.character(x)))
@@ -272,8 +235,6 @@ save(list="w.all", file = file.path(output.loc, fn))
 # Reset output location to save files to model output
 
 seg.loc <- file.path(data.loc, "Segments")
-output.loc <- file.path(data.loc, "Model_output")
-visual.loc <- file.path(data.loc, "Model_visualizations")
 
 # Check if prepared data are available; if not, run Segment Aggregation.
 Waze_Prepared_Data = dir(seg.loc)[grep("^Bellevue_Waze_Segments_", dir(seg.loc))][1] #"Bellevue_Waze_Segments_2018-01_to_2018-12.RData"
@@ -285,7 +246,8 @@ if(length(grep(Waze_Prepared_Data, dir(seg.loc))) == 0){
 }
 
 # <><><><><><><><><><><><><><><><><><><><><><><><>
-# Bellevue travel demand model used 6-9 and 3-6 pm, our aggregation should include these two periods, so we can do a crash risk model at these two peak periods of a day.
+# Bellevue travel demand model used 6-9 and 3-6 pm, our aggregation includes these two periods,
+# so we do a crash risk model at these two peak periods of a day.
 # Two ways to aggregate the hour window
 w.all$grp_varhour <- ifelse(w.all$hour %in% c("00", "01", "02","03","04","05"), "Early AM", 
                             ifelse(w.all$hour %in% c("06", "07", "08", "09"), "AM Peak", 
@@ -302,7 +264,7 @@ w.all$grp_name <- ifelse(w.all$hour %in% c("03","04","05", "06"), "Early AM",
                                                      ifelse(w.all$hour %in% c("23", "00", "01", "02"), "Mid-night", NA))))))
 
 w.all <- w.all %>% mutate(time_hr = as.POSIXct(segtime, '%Y-%j %H', tz = 'America/Los_Angeles'),
-                          date = as.Date(time_hr, format = '%Y-%j %H', tz = 'America/Los_Angeles'), # need to set them the same timezone, otherwise, some 2018-12-31 records become 2019-01-01 records.
+                          date = as.Date(time_hr, format = '%Y-%j %H', tz = 'America/Los_Angeles'),
                           month = as.Date(cut(date, breaks = "month"), tz = 'America/Los_Angeles'),
                           wkday = as.factor(weekdays(date))
 )
@@ -311,87 +273,33 @@ stopifnot(with(w.all, date >= '2018-01-01' & date <= '2018-12-31')) # make sure 
 
 # all crash and Waze variables need to be aggregated by hour and segment
 # load the aggregation function
-source(file.path(codeloc, 'WA/utility/aggregation_fun().R'))
+source(file.path(codeloc, 'utility/aggregation_fun().R'))
 
 t_var = "day"
 w.all.4hr <- agg_fun(w.all, t_var)
 # Add crash counts per mile
 w.all.4hr$CrashPerMile = as.numeric(w.all.4hr$uniqueCrashreports/(w.all.4hr$Shape_STLe*0.000189394))
-hist(log(w.all.4hr$CrashPerMile)) #relatively normal distribution
-names(w.all.4hr)
-dim(w.all.4hr)
 
 t_var = "wkday"
 w.all.4hr.wd <- agg_fun(w.all, t_var)
 w.all.4hr.wd$CrashPerMile = as.numeric(w.all.4hr.wd$uniqueCrashreports/(w.all.4hr.wd$Shape_STLe*0.000189394))
-hist(log(w.all.4hr.wd$CrashPerMile)) #relatively normal distribution
-names(w.all.4hr.wd)
-dim(w.all.4hr.wd)
 
 t_var = c("month")
 w.all.4hr.mo <- agg_fun(w.all, t_var)
 w.all.4hr.mo$CrashPerMile = as.numeric(w.all.4hr.mo$uniqueCrashreports/(w.all.4hr.mo$Shape_STLe*0.000189394))
-hist(log(w.all.4hr.mo$CrashPerMile)) #relatively normal distribution
-names(w.all.4hr.mo)
-dim(w.all.4hr.mo)
 
 t_var = c("month", "wkday")
 w.all.4hr.mo.wd <- agg_fun(w.all, t_var)
 w.all.4hr.mo.wd$CrashPerMile = as.numeric(w.all.4hr.mo.wd$uniqueCrashreports/(w.all.4hr.mo.wd$Shape_STLe*0.000189394))
-hist(log(w.all.4hr.mo.wd$CrashPerMile)) #relatively normal distribution
-names(w.all.4hr.mo.wd)
-dim(w.all.4hr.mo.wd)
 
 t_var = c("year")
 w.all.4hr.yr <- agg_fun(w.all, t_var)
 w.all.4hr.yr$CrashPerMile = as.numeric(w.all.4hr.yr$uniqueCrashreports/(w.all.4hr.yr$Shape_STLe*0.000189394))
-hist(log(w.all.4hr.yr$CrashPerMile)) #relatively normal distribution
-names(w.all.4hr.yr)
-dim(w.all.4hr.yr)
 
 w.all.yr.seg <- agg_fun_seg(w.all)
 w.all.yr.seg$CrashPerMile = as.numeric(w.all.yr.seg$uniqueCrashreports/(w.all.yr.seg$Shape_STLe*0.000189394))
-hist(log(w.all.yr.seg$CrashPerMile)) #relatively normal distribution
-names(w.all.yr.seg)
-dim(w.all.yr.seg)
-
-# examine the sparsity of the crash reports, does not improve a lot
-table(w.all.4hr$uniqueCrashreports)
-# 0     1     2 
-# 50239  1358     6 
-table(w.all.4hr.wd$uniqueCrashreports)
-# 0     1     2     3     4 
-# 11609  1146    82    16     3 
-table(w.all.4hr.mo$uniqueCrashreports)
-# 0     1     2     3 
-# 16300  1248    52     6 
-table(w.all.4hr.mo.wd$uniqueCrashreports)
-# 0     1     2     3 
-# 34382  1341    13     1 
-table(w.all.4hr.yr$uniqueCrashreports)
-#   0    1    2    3    4    5    6    7    8    9   10 
-#3407  697  163   54   23    7    4    1    1    1    1
-table(w.all.yr.seg$uniqueCrashreports)
-#0    1    2    3    4    5    6    7    8    9   10   11   13   16   18   20 
-#1096  304  117   56   32   15   22   15    9    6    2    1    1    1    1    1 
-
-# examine for arterials only
-with(w.all.4hr %>% filter(!ArterialCl %in% "Local"), table(uniqueCrashreports))
-with(w.all.4hr.wd %>% filter(!ArterialCl %in% "Local"), table(uniqueCrashreports))
-with(w.all.4hr.mo %>% filter(!ArterialCl %in% "Local"), table(uniqueCrashreports))
-with(w.all.4hr.mo.wd %>% filter(!ArterialCl %in% "Local"), table(uniqueCrashreports))
-with(w.all.4hr.yr %>% filter(!ArterialCl %in% "Local"), table(uniqueCrashreports))
-with(w.all.yr.seg %>% filter(!ArterialCl %in% "Local"), table(uniqueCrashreports))
-
-# Are these high counts segments the same or clustered? (need to see in the map)
-unique(w.all.4hr.mo.wd$RDSEG_ID[w.all.4hr.mo.wd$uniqueCrashreports %in% c(2,3)])
-# [1] "1"    "1368" "1737" "2034" "2062" "3079" "325"  "4494" "4515" "4516" "5120" "5122" "9290" "9538" "9865"
-# in ArcGIS, use this SQL code to select these segments: "RDSEG_ID" IN (1,   1368, 1737, 2034, 2062, 3079, 325,  4494, 4515, 4516, 5120, 5122, 9290, 9538,
-#                9865)
 
 # Save the 4 hour data as Rdata
 fn = "Bellevue_Waze_Segments_2018-01_to_2018-12_4hr.RData"
 
 save(list= c("w.all", "w.all.4hr", "w.all.4hr.wd", "w.all.4hr.mo", "w.all.4hr.mo.wd", "w.all.4hr.yr", "w.all.yr.seg"), file = file.path(seg.loc, fn))
-
-

@@ -1,7 +1,7 @@
 # Functions for working with Waze and crash data
 
 # Make a link table to match events
-# making more generic: accident file (usually EDT) and inicident file (usually Waze)
+# making more generic: accident file (usually EDT) and incident file (usually Waze)
 # Location in EDT is in GPSLong_New and GPS_Lat, time is in CrashDate_Local.
 # Location in Waze is in lon and lat, time is in time.
 
@@ -21,7 +21,7 @@ makelink <- function(accfile = edt.april, incfile = waze.april,
   linktable <- vector()
   
   starttime <- Sys.time()
-  writeLines("", paste0("TN_Waze_log_", j, "_", Sys.Date(), ".txt")) # to store messages by year-month i, now it is "j" in months_shared
+  writeLines("", paste0("TN_Waze_log_", j, "_", Sys.Date(), ".txt")) # store messages by year-month i, as "j" in months_shared
   
   # Start of %dopar% loop
   linktable <- foreach(i=1:nrow(accfile), .combine = rbind, .packages = "sp") %dopar% {
@@ -41,7 +41,6 @@ makelink <- function(accfile = edt.april, incfile = waze.april,
     
     # ei: was EDT events, now TN crashes. We want to look from the time of crash event -60 minutes to crash event +60 minutes, and find Waze events in this window
     # d.sp: Waze events. inctimevar2 is the *end* of the event and inctimevar1 is the *start* of the event. We look to see if the end of the event is greater than EDT event -60 minutes and see if the start of the Waze event is less than the EDT event +60 minutes.
-    # hist(as.numeric(d.sp[,inctimevar2] - d.sp[,inctimevar1])) # some Waze events have large difference between the two, the range of the Waze events do not matter.
     
     d.t <- d.sp[d.sp[,inctimevar2] >= ei[,acctimevar]-60*60 & d.sp[,inctimevar1] <= ei[,acctimevar]+60*60,] 
     
@@ -63,74 +62,6 @@ makelink <- function(accfile = edt.april, incfile = waze.april,
   linktable # Give all Waze accident IDs with EDT incident IDs
   }
   
-# Non-parallel
-makelink.nonpar <- function(accfile = edt.april, incfile = waze.april,
-                       acctimevar = "CrashDate_Local",
-                       inctimevar1 = "time",
-                       inctimevar2 = "last.pull.time",
-                       accidvar = "ID",
-                       incidvar = "uuid"
-                       ){
-    
-    linktable <- vector()
-  
-    # keeping non-parallized version here for reference
-    for(i in 1:nrow(accfile)){ # i=which(edt$ID == "2023680")
-      ei = accfile[i,]
-      
-      dist.i <- spDists(ei, incfile, longlat = T)*0.6213712 # spDists gives units in km, convert to miles
-      dist.i.5 <- which(dist.i <= 0.5)
-      
-      # Spatially matching
-      d.sp <- incfile[dist.i.5,]
-      
-      # Temporally matching
-      # Match between the first reported time and last pull time of the Waze event. Last pull time is after the earliest time of EDT, and first reported time is earlier than the latest time of EDT
-      if(class(ei)=="SpatialPointsDataFrame") { ei <- as.data.frame(ei) }
-      if(class(d.sp)=="SpatialPointsDataFrame") { d.sp <- as.data.frame(d.sp) }
-      
-      
-      d.t <- d.sp[d.sp[,inctimevar2] >= ei[,acctimevar]-60*60 & d.sp[,inctimevar1] <= ei[,acctimevar]+60*60,] 
-      
-      id.accident <- rep(as.character(ei[,accidvar]), nrow(d.t))
-      id.incidents <- as.character(d.t[,incidvar])
-      
-      linktable <- rbind(linktable, data.frame(id.accident, id.incidents))
-      
-      if(i %% 1000 == 0) {
-        timediff <- round(Sys.time()-starttime, 2)
-        cat(i, "complete \n", timediff, attr(timediff, "units"), "elapsed \n", rep("<>",20), "\n")
-      }
-    } # end loop
-    
-    
-    linktable
-  }
-
-
-# moving files from a temporary directory on local machine to shared drive. 
-# Files are removed from the local machine by this process.
-movefiles <- function(filelist, temp = outdir, wazedir){
-  
-  # Check to make sure the from and to directories are accessible
-  if(!dir.exists(wazedir)) stop("Destination output directory does not exist or shared drive is not connected")
-  if(length(filelist) < 1) stop("No files selected to move, check filelist argument")
-  if(length(dir(temp)[grep(filelist[1], dir(temp))]) < 1) stop("Selected files not found in the temporary output directory")
-    
-  if(.Platform$OS.type == "windows"){
-    # Fix path separators for Windows / R 
-    temp <- gsub("\\\\", "/", temp)
-    temp <- gsub("C:/U", "C://U", temp)
-  }
-  
-  for(i in filelist){
-      
-    # Encase the destination path in quotes, because of spaces in path name
-    system(paste0("mv ", file.path(temp, i), ' \"', file.path(wazedir, i), '\"'))
-    
-  }
-}
-
 # Function to return the most frequent value for character vectors.
 # Breaks ties by taking the first value
 ModeString <- function(x) {
@@ -209,9 +140,6 @@ prep.hex <- function(hexname, state, month, bucket = teambucket){
   wte <- get(ls(envir = environment())[grep("WazeTime", ls(envir = environment()), ignore.case = T)])
   
   class(wte) <- "data.frame" 
-  # if(length(grep("DayOfWeek", names(wte)) > 0)){
-  #   wte$DayOfWeek <- as.factor(wte$DayOfWeek)
-  # }
 
   if(length(grep("weekday", names(wte)) > 0)){
     wte$DayOfWeek <- as.factor(wte$weekday)
