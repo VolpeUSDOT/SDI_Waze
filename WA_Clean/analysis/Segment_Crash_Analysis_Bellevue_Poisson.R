@@ -173,7 +173,7 @@ out.name <- file.path(output.loc, "Bell_Poi_model_summary_list.Rdata")
 
 if(file.exists(out.name)){
   load(out.name)} else {
-    source(file.path(codeloc, "/WA/utility/Model_Summary().R"))
+    source(file.path(codeloc, "utility/Model_Summary().R"))
     Poisson_model_summary_list <- Poisson_model_summary(model_list, out.name)
   }
 

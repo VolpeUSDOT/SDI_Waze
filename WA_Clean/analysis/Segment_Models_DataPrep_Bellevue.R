@@ -413,7 +413,7 @@ out.name <- file.path(data.loc, 'Segments', "Bell_logistic_model_summary_list.Rd
 
 if(file.exists(out.name)){
   load(out.name)} else {
-    source(file.path(codeloc, "/WA/utility/Model_Summary().R"))
+    source(file.path(codeloc, "utility/Model_Summary().R"))
     logistic_model_summary_list <- logistic_model_summary(model_list, out.name)
   }
 
