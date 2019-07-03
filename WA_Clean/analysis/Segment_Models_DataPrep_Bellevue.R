@@ -10,12 +10,11 @@
 # Setup ---- 
 rm(list=ls()) # Start fresh
 
-codeloc <- ifelse(grepl('Flynn', normalizePath('~/')), # grep() does not produce a logical outcome (T/F), it gives the positive where there is a match, or no outcome if there is no match. grepl() is what we need here.
-                  "~/git/SDI_Waze", "~/GitHub/SDI_Waze") # Jessie's codeloc is ~/GitHub/SDI_Waze
+codeloc <- "~/" #replace with location of code
 
-#source(file.path(codeloc, 'utility/get_packages.R'))
+#source(file.path(codeloc, 'utility/get_packages.R'))#run if packages are needed
 # load functions with group_by
-source(file.path(codeloc, 'WA/utility/visual_fun.R'))
+source(file.path(codeloc, 'utility/visual_fun.R'))
 
 library(tidyverse)
 library(ggplot2)
@@ -29,8 +28,8 @@ library(lubridate)
 
 
 ## Working on shared drive
-wazeshareddir <- "//vntscex.local/DFS/Projects/PROJ-OS62A1/SDI Waze Phase 2"
-data.loc <- file.path(wazeshareddir, "Data/Bellevue")
+wazeshareddir <- #replace with path to root directory
+data.loc <-#replace with path to data folder in root directory
 seg.loc <- file.path(data.loc, "Segments")
 output.loc <- file.path(data.loc, "Model_output")
 visual.loc <- file.path(data.loc, "Model_visualizations")
@@ -38,7 +37,7 @@ visual.loc <- file.path(data.loc, "Model_visualizations")
 setwd(data.loc)
 
 # Check if prepared data are available; if not, run Segment Aggregation.
-Waze_Prepared_Data = dir(seg.loc)[grep("^Bellevue_Waze_Segments_", dir(seg.loc))][1] #"Bellevue_Waze_Segments_2018-01_to_2018-12.RData"
+Waze_Prepared_Data = dir(seg.loc)[grep("^Bellevue_Waze_Segments_", dir(seg.loc))][1]
 
 if(length(grep(Waze_Prepared_Data, dir(seg.loc))) == 0){
   stop(paste("No Bellevue segment data available in", seg.loc, "\n Run Segment_Aggregation_Bell.R or check network connection"))
@@ -74,53 +73,19 @@ stopifnot(with(w.all, date >= '2018-01-01' & date <= '2018-12-31')) # make sure 
 
 # all crash and Waze variables need to be aggregated by hour and segment
 # load the aggregation function
-source(file.path(codeloc, 'WA/utility/aggregation_fun().R'))
+source(file.path(codeloc, 'utility/aggregation_fun().R'))
 
 t_var = "day"
 w.all.4hr <- agg_fun(w.all, t_var)
-names(w.all.4hr)
-dim(w.all.4hr)
 
 t_var = "wkday"
 w.all.4hr.wd <- agg_fun(w.all, t_var)
-names(w.all.4hr.wd)
-dim(w.all.4hr.wd)
 
 t_var = c("month")
 w.all.4hr.mo <- agg_fun(w.all, t_var)
-names(w.all.4hr.mo)
-dim(w.all.4hr.mo)
 
 t_var = c("month", "wkday")
 w.all.4hr.mo.wd <- agg_fun(w.all, t_var)
-names(w.all.4hr.mo.wd)
-dim(w.all.4hr.mo.wd)
-
-# examine the sparsity of the crash reports, does not improve a lot
-table(w.all.4hr$uniqueCrashreports)
-# 0     1     2 
-# 50239  1358     6 
-table(w.all.4hr.wd$uniqueCrashreports)
-# 0     1     2     3     4 
-# 11609  1146    82    16     3 
-table(w.all.4hr.mo$uniqueCrashreports)
-# 0     1     2     3 
-# 16300  1248    52     6 
-table(w.all.4hr.mo.wd$uniqueCrashreports)
-# 0     1     2     3 
-# 35025  1339    14     1 
-
-# examine for arterials only
-with(w.all.4hr %>% filter(!ArterialCl %in% "Local"), table(uniqueCrashreports))
-with(w.all.4hr.wd %>% filter(!ArterialCl %in% "Local"), table(uniqueCrashreports))
-with(w.all.4hr.mo %>% filter(!ArterialCl %in% "Local"), table(uniqueCrashreports))
-with(w.all.4hr.mo.wd %>% filter(!ArterialCl %in% "Local"), table(uniqueCrashreports))
-
-# Are these high counts segments the same or clustered? (need to see in the map)
-unique(w.all.4hr.mo.wd$RDSEG_ID[w.all.4hr.mo.wd$uniqueCrashreports %in% c(2,3)])
-# [1] "1"    "1368" "1737" "2034" "2062" "3079" "325"  "4494" "4515" "4516" "5120" "5122" "9290" "9538" "9865"
-# in ArcGIS, use this SQL code to select these segments: "RDSEG_ID" IN (1,   1368, 1737, 2034, 2062, 3079, 325,  4494, 4515, 4516, 5120, 5122, 9290, 9538,
-#                9865)
 
 # Save the 4 hour data as Rdata
 fn = "Bellevue_Waze_Segments_2018-01_to_2018-12_4hr.RData"
@@ -132,9 +97,6 @@ save(list= c("w.all", "w.all.4hr", "w.all.4hr.wd", "w.all.4hr.mo", "w.all.4hr.mo
 
 # <><><><><><><><><><><><><><><><><><><><><><><><> Start linear and logistic regression from prepared data for 1 hour window
 # 1-hr model Variables organization:----
-table(w.all$uniqueCrashreports) # only 3 segment have more than 1 crash, logistic regression is more appropriate for this data.
-# 0     1     2 
-# 59870  1364     3 
 
 # Omit or include predictors in this vector:
 alwaysomit = c(grep("RDSEG_ID", names(w.all), value = T), "year", "day", "segtime", "weekday", 
@@ -155,9 +117,7 @@ other_var = c("nBikes", "nFARS")
 
 time_var = c("hour", "mo", "weekday", "day") # time variable can be used as indicator or to aggregate the temporal resolution.
 
-seg_var = c("Shape_STLe", "SpeedLimit", "ArterialCl"
-            # , "FunctionCl"
-            ) # "ArterialCl" has no missing values. There are 6 rows with missing values in "FunctionCl", therefore if we use in the model, we will lose these rows.
+seg_var = c("Shape_STLe", "SpeedLimit", "ArterialCl")
 
 # Create a list to store the indicators
 indicator.var.list <- list("seg_var" = seg_var, "other_var" = other_var, "weather_var" = weather_var, "alert_types" = alert_types, "alert_subtypes" = alert_subtypes, "waze_rd_type" = waze_rd_type, "waze_dir_travel" = waze_dir_travel)
@@ -166,25 +126,9 @@ indicator.var.list <- list("seg_var" = seg_var, "other_var" = other_var, "weathe
 response.var.list <- c(
                   "uniqueCrashreports", # number of crashes at each segment at every hour of day
                   "biCrash",            # presence and absence of crash at each segment at every hour of day
-                  "nCrashes",            # total crashes at each segment of entire year 2018
+                  "nCrashes"            # total crashes at each segment of entire year 2018
                   
                   )
-# ncrash.1yr.excludeInt  # have not created yet, should be "nCrashes" - "Crash_End1" - "Crash_End2"
-# ncrash.4hr = NA # if we use 4 hour window, have not created this variable yet
-
-
-
-# Correlation & ggpairs ----
-# correlations <- cor(w.all[, c(response.var.list, "Shape_STLe")])
-# corrplot(correlations, method="circle", type = "upper", 
-#          diag = F,
-#          tl.col = "black"
-#          # , tl.srt = 45
-#          # , main = "Correlation Plots"
-# )
-
-# ggpairs to look at scatter, boxplot, and density plots, as well as correlation, tried to save as pdf, too slow to open.
-# alternative: use boxplots for categorical variables
 
 for (i in 1:length(indicator.var.list)) {
   
@@ -207,9 +151,6 @@ for (i in 1:length(indicator.var.list)) {
   }
 }
 
-# check missing values and all zero columns ----
-# Checked all interested predictors listed above, they are good!
-# missmap(w.all[, alert_types], col = c("blue", "red"), legend = FALSE)
 
 for (i in 1:length(indicator.var.list)) {
   
@@ -230,25 +171,16 @@ for (i in 1:length(indicator.var.list)) {
   }
 }
 
-# if any other columns are all zeros
-all_var <- vector()
-for (i in 1:length(indicator.var.list)){
-  all_var <- c(all_var, indicator.var.list[[i]])
-}
-
-any(sapply(w.all[, all_var], function(x) all(x == 0))) # all variables are clean now. None of them are all-zero column. Returns FALSE if no columns have all zeros
-
 # Check time variables & Time Series visuals ----
-stopifnot(length(unique(w.all$day)) == 365) # 365
-stopifnot(length(unique(w.all$mo)) == 12)   # 12
-stopifnot(length(unique(w.all$hour)) == 24) # 24
+stopifnot(length(unique(w.all$day)) == 365)
+stopifnot(length(unique(w.all$mo)) == 12)
+stopifnot(length(unique(w.all$hour)) == 24)
 
 # create a data frame with only one variable, including all hours in 2018
 day.hour <- data.frame("time_hr" = seq(from = as.POSIXct("2018-01-01 0:00", tz = 'America/Los_Angeles'), 
                   to = as.POSIXct("2018-12-31 0:00", tz = 'America/Los_Angeles'),
                   by = "hour")
                   )
-# day.hour <- as.character(day.hour)
 
 # Create time_hr in w.all
 w.all = w.all %>%
@@ -288,9 +220,6 @@ w.sub_seg <- w.sub_seg %>% mutate(time_hr = as.POSIXct(time_hr, '%Y-%j %H', tz =
 
 # order the levels of weekday
 w.sub_seg$weekday = factor(w.sub_seg$weekday, levels(w.sub_seg$weekday)[c(4,2,6,7,5,1,3)])
-
-# # Convert to timeseries
-# df2 <- xts(x = w.sub_seg[!names(w.sub_seg) %in% 'time_hr'], order.by = w.sub_seg$time_hr)
 
 # check if the data is sorted by time
 stopifnot(!is.unsorted(w.sub_seg$time_hr)) # still in the order
@@ -369,11 +298,7 @@ p3 <- ggplot(data = ts_group_by(w.sub_seg, month), aes(x = month, y = nCrashKSI)
   ylab("KSI Crashes") +
   scale_x_date(date_breaks = "1 month", date_labels = "%b")
 
-# by week
-# p4 <- ggplot(data = ts_group_by(w.sub_seg, week), aes(x = week, y = nCrashKSI)) +
-#   geom_line(color = "darkorchid4", size = 1) + geom_point() +
-#   ylab("Crashes") +
-#   scale_x_date(date_breaks = "1 week", date_labels = "%W")
+
 # by weekday
 p4 <- ggplot(data = ts_group_by(w.sub_seg, weekday), aes(x = weekday, y = nCrashKSI)) +
   geom_line(color = "darkorchid4", size = 1, group = 1) + geom_point() +
@@ -440,12 +365,8 @@ response.var <- response.var.list[2] # binary data, biCrash
                                  paste(predvars, collapse = "+"))) )
 
 assign(paste0('m', modelno),
-       # lm(use.formula, data = w.all) # Linear model
        glm(use.formula, data = w.all, family = "binomial") # logistic regression
        )
-
-# Summarize
-summary(get(paste0('m', modelno)))
 
 # extract logistic model objects, save in a list
 model_type = "logistic_models"
@@ -472,7 +393,7 @@ out.name <- file.path(output.loc, "Bell_linear_model_summary_list.Rdata")
 
 if(file.exists(out.name)){
   load(out.name)} else {
-    source(file.path(codeloc, "/WA/utility/Model_Summary().R"))
+    source(file.path(codeloc, "utility/Model_Summary().R"))
     linear_model_summary_list <- linear_model_summary(model_list, out.name)
   }
 # save(list = c("linear_model_summary_list"), file = file.path(data.loc, 'Segments', "Bell_linear_model_summary_list.Rdata"))
@@ -495,7 +416,6 @@ if(file.exists(out.name)){
     source(file.path(codeloc, "/WA/utility/Model_Summary().R"))
     logistic_model_summary_list <- logistic_model_summary(model_list, out.name)
   }
-# save(list = c("logistic_model_summary_list"), file = file.path(data.loc, 'Segments', "Bell_logistic_model_summary_list.Rdata"))
 
 M <- logistic_model_summary_list$M
 model_summary  <- logistic_model_summary_list$model_summary
