@@ -42,7 +42,7 @@ RF_model_summary <- function(model_list, out.name, TrainSet, ValidSet, Art.Only,
     n <- nvec[i] # upper index
     m <- mvec[i] # lower index
     M[m:n,1] = row.name[i]
-    M[m:n,2] = paste(format(formula(lm)), collapse = "") # formula
+    M[m:n,2] = paste(format(formula(lm)), collapse = "")
     M[m:n,3] = ifelse(length(lm$call[[3]]) > 1, paste(format(lm$call[[3]]), collapse = ""), paste(lm$call[[4]])) # data
     M[m:n,4] = length(lm$predicted) # N of obs trained in the model
     M[m:n,5] = nrow(FullSet)
@@ -90,7 +90,7 @@ Poisson_model_summary <- function(model_list, out.name){
     n <- nvec[i] # upper index
     m <- mvec[i] # lower index
     M[m:n,1] = row.name[i]
-    M[m:n,2] = paste(format(formula(lm)), collapse = "") # formula
+    M[m:n,2] = paste(format(formula(lm)), collapse = "")
     M[m:n,3] = ifelse(length(lm$call[[3]]) > 1, paste(format(lm$call[[3]]), collapse = ""), paste(lm$call[[4]])) # data
     M[m:n,4] = length(fitted(lm)) # N of obs
     M[m:n,5] = round(summary(lm)$aic,2) # get AIC
@@ -138,13 +138,16 @@ logistic_model_summary <- function(model_list, out.name){
   
   colnames(M) <- c("Model","Formula","Data","AIC","Variable","OR", "vif")
   
+  
+  
   for(i in 1:length(model_list)){
-    lm <- paste0("Logistic-", model_list[[i]])
+    mod_name = paste0("Logistic-", names(model_list)[i])
+    lm <- model_list[[i]]
     ni <- nrow(summary(lm)$coef)
     n <- nvec[i] # upper index
     m <- mvec[i] # lower index
     M[m:n,1] = row.name[i]
-    M[m:n,2] = paste(format(formula(lm)), collapse = "") # formula
+    M[m:n,2] = paste(format(formula(lm)), collapse = "")
     M[m:n,3] = ifelse(length(lm$call[[3]]) > 1, paste(format(lm$call[[3]]), collapse = ""), paste(lm$call[[4]])) # data
     M[m:n,4] = round(summary(lm)$aic,2) # get AIC
     for (k in 1:ni){
@@ -153,13 +156,14 @@ logistic_model_summary <- function(model_list, out.name){
       M[m+k-1, 6] = paste0(round(exp(summary(lm)$coef[k,1]),2), p_value) # convert coefficients to odds ratio
     }
     for (j in 2:ni){
-      M[m+j-1, 7] = ifelse(nrow(summary(lm)$coef)<=2, NA, paste0(round(vif(lm)[j-1],4)))
+      M[m+j-1, 7] = ifelse(nrow(summary(lm)$coef)<=2, NA, paste0(round(car::vif(lm)[j-1],4)))
     }
+    rm(lm)
   }
   
   model_summary <- reshape(M[, 1:7], timevar = c("Variable"), idvar = c("Model", "Formula", "Data", "AIC"), direction = "wide")
   
-  model_compare <- model_summary %>% group_by("Model", "Formula", "Data", "AIC") %>% summarize(multicollinarity = ifelse(any(vif) > 2, "Yes", "No"))
+  model_compare <- model_summary %>% group_by("Model", "Formula", "Data", "AIC")
   
   logistic_model_summary_list <- list("model_summary" = model_summary, "M" = M, "model_compare" = model_compare)
   save(list = c("logistic_model_summary_list"), file = out.name)
@@ -190,12 +194,12 @@ linear_model_summary <- function(model_list, out.name){
   colnames(M) <- c("Model","Formula","Data","R-squared","Variable","Coef", "vif")
   
   for(i in 1:length(model_list)){
-    lm <- paste0("OLS-", model_list[[i]])
+    lm <- model_list[[i]]
     ni <- nrow(summary(model_list[[i]])$coef)
     n <- nvec[i] # upper index
     m <- mvec[i] # lower index
     M[m:n,1] = row.name[i]
-    M[m:n,2] = paste(format(formula(lm)), collapse = "") # formula
+    M[m:n,2] = paste(format(formula(lm)), collapse = "")
     M[m:n,3] = ifelse(length(lm$call[[3]]) > 1, paste(format(lm$call[[3]]), collapse = ""), paste(lm$call[[3]])) # data
     M[m:n,4] = round(summary(lm)$r.squared,2)
     for (k in 1:ni){
@@ -210,6 +214,7 @@ linear_model_summary <- function(model_list, out.name){
   
   model_summary <- reshape(M[, 1:6], timevar = c("Variable"), idvar = c("Model", "Formula", "Data", "R-squared"), direction = "wide")
   
+  # model_compare <- unique(M[, 1:4])
   model_compare <- model_summary %>% group_by("Model", "Formula", "Data", "R-squared") %>% summarize(multicollinarity = ifelse(any(vif) > 2, "Yes", "No"))
   
   linear_model_summary_list <- list("model_summary" = model_summary, "M" = M, "model_compare" = model_compare)

@@ -26,7 +26,8 @@ library(Amelia)
 library(mlbench)
 library(xts)
 library(lubridate)
-
+library(circular)
+library(car)
 
 ## Working on shared drive
 wazeshareddir <- "//vntscex.local/DFS/Projects/PROJ-OS62A1/SDI Waze Phase 2"
@@ -166,7 +167,7 @@ indicator.var.list <- list("seg_var" = seg_var, "other_var" = other_var, "weathe
 response.var.list <- c(
                   "uniqueCrashreports", # number of crashes at each segment at every hour of day
                   "biCrash",            # presence and absence of crash at each segment at every hour of day
-                  "nCrashes",            # total crashes at each segment of entire year 2018
+                  "nCrashes"            # total crashes at each segment of entire year 2018
                   
                   )
 # ncrash.1yr.excludeInt  # have not created yet, should be "nCrashes" - "Crash_End1" - "Crash_End2"
@@ -402,7 +403,7 @@ dev.off()
 
 
 # <><><><><><><><><><><><><><><><><><><><><><><><>
-# Start Modelings ----
+# Start Modeling ----
 # Start simple
 # 01 Base: Road network (seg_var)
 # 02: Add FARS only ("nFARS")
@@ -457,6 +458,7 @@ if(file.exists(out.name)){
     ClassFilter <- function(x) inherits(get(x), 'glm')
     row.name <- Filter(ClassFilter, ls() )
     logistic_models <- lapply(row.name, function(x) get(x))
+    names(logistic_models) <- row.name # Dan added
     save(list = c("logistic_models"), file = out.name)
     
   }
@@ -495,6 +497,7 @@ model_compare <- linear_model_summary_list$model_compare
 ClassFilter <- function(x) inherits(get(x), 'glm')
 row.name <- Filter( ClassFilter, ls() )
 model_list <- lapply( row.name, function(x) get(x) )
+names(model_list) <- row.name
 
 out.name <- file.path(data.loc, 'Segments', "Bell_logistic_model_summary_list.Rdata")
 

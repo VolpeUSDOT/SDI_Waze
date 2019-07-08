@@ -150,8 +150,11 @@ logistic_model_summary <- function(model_list, out.name){
   
   colnames(M) <- c("Model","Formula","Data","AIC","Variable","OR", "vif")
   
+  
+  
   for(i in 1:length(model_list)){
-    lm <- paste0("Logistic-", model_list[[i]])
+    mod_name = paste0("Logistic-", names(model_list)[i])
+    lm <- model_list[[i]]
     ni <- nrow(summary(lm)$coef)
     n <- nvec[i] # upper index
     m <- mvec[i] # lower index
@@ -165,14 +168,15 @@ logistic_model_summary <- function(model_list, out.name){
       M[m+k-1, 6] = paste0(round(exp(summary(lm)$coef[k,1]),2), p_value) # convert coefficients to odds ratio
     }
     for (j in 2:ni){
-      M[m+j-1, 7] = ifelse(nrow(summary(lm)$coef)<=2, NA, paste0(round(vif(lm)[j-1],4)))
+      M[m+j-1, 7] = ifelse(nrow(summary(lm)$coef)<=2, NA, paste0(round(car::vif(lm)[j-1],4)))
     }
+    rm(lm)
   }
   
   model_summary <- reshape(M[, 1:7], timevar = c("Variable"), idvar = c("Model", "Formula", "Data", "AIC"), direction = "wide")
   
   # model_compare <- unique(M[, 1:4])
-  model_compare <- model_summary %>% group_by("Model", "Formula", "Data", "AIC") %>% summarize(multicollinarity = ifelse(any(vif) > 2, "Yes", "No"))
+  model_compare <- model_summary %>% group_by("Model", "Formula", "Data", "AIC")
   
   logistic_model_summary_list <- list("model_summary" = model_summary, "M" = M, "model_compare" = model_compare)
   save(list = c("logistic_model_summary_list"), file = out.name)
@@ -204,7 +208,7 @@ linear_model_summary <- function(model_list, out.name){
   colnames(M) <- c("Model","Formula","Data","R-squared","Variable","Coef", "vif")
   
   for(i in 1:length(model_list)){
-    lm <- paste0("OLS-", model_list[[i]])
+    lm <- model_list[[i]]
     ni <- nrow(summary(model_list[[i]])$coef)
     n <- nvec[i] # upper index
     m <- mvec[i] # lower index

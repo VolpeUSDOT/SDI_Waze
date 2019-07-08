@@ -6,11 +6,11 @@
 # Setup ---- 
 rm(list=ls()) # Start fresh
 
-codeloc <- "~/" #Replace with path to code
+codeloc <- "~/" #replace with location of code
 
-#source(file.path(codeloc, 'utility/get_packages.R')) #run if need packages
+
 # load functions with group_by
-source(file.path(codeloc, 'utility/visual_fun.R'))
+source(file.path(codeloc, 'WA/utility/visual_fun.R'))
 
 library(tidyverse)
 library(ggplot2)
@@ -19,7 +19,7 @@ library(lubridate)
 library(pscl)
 library(xgboost)
 library(DiagrammeR)
-library(Metrics)
+library(Metrics) # for mae()
 
 ## Working on shared drive
 wazeshareddir <- #replace with path to root directory
@@ -30,12 +30,13 @@ visual.loc <- file.path(data.loc, "Model_visualizations")
 
 setwd(data.loc)
 
+SHOW_ALL_OUTPUT <- FALSE #whether to display plots
+
 # Load both the 1hr and 4hr data
 fn = "Bellevue_Waze_Segments_2018-01_to_2018-12_4hr.RData"
 load(file.path(seg.loc, fn))
 
 # <><><><><><><><><><><><><><><><><><><><><><><><> Start from prepared data for 4 hour window
-# 4-hr model variables organization:  ----
 # Omit or include predictors in this vector:
 alwaysomit = c(grep("RDSEG_ID", names(w.all.4hr.wd), value = T), "year", "wkday", "grp_name", "grp_hr", "nFARS_1217",
                grep("Crash", names(w.all.4hr.wd), value = T),
@@ -78,7 +79,7 @@ response.var.list <- c(
                   "nCrashes",            # total crashes at each segment of entire year 2018
                   "WeightedCrashes")    #total crashes weighted by severity (25 for KSI, 10 for injury, 1 for PDO)
 
-# order the levels of weekday
+# Any last-minute data organization: order the levels of weekday
 # create wkend variables using the raw data.
 w.all.4hr.wd$wkend = ifelse(w.all.4hr.wd$wkday %in% c("Sunday","Saturday"), "Weekend", "Weekday")
 
@@ -95,12 +96,33 @@ levels(w.all.4hr.wd$wkday.s) <- list(Sun = "Sunday",
                                      Sat = "Saturday"
                                      )
 
+
 #Remove ArterialCL levels with no observations
 w.all.4hr.wd$ArterialCl <- factor(w.all.4hr.wd$ArterialCl) 
-table(w.all.4hr.wd$ArterialCl)
+
+# check missing values and all zero columns ----
+# if any other columns are all zeros
+all_var <- vector()
+for (i in 1:length(indicator.var.list)){
+  all_var <- c(all_var, indicator.var.list[[i]])
+}
+
+# Check time variables & Time Series visuals ----
+stopifnot(length(unique(w.all.4hr.wd$wkday)) == 7)
+stopifnot(length(unique(w.all.4hr.wd$grp_hr)) == 6)
+
+# Mean and variance ----
+if (SHOW_ALL_OUTPUT){
+  hist(w.all.4hr.wd$uniqueCrashreports)
+  mean(w.all.4hr.wd$uniqueCrashreports)
+  var(w.all.4hr.wd$uniqueCrashreport)
+}
+
 
 # <><><><><><><><><><><><><><><><><><><><><><><><>
 # XGBoost ----
+# build a list containing two things, label and data
+
 # Stratify random sampling to ensure all times are represented in training set
 w.all.4hr.wd <- w.all.4hr.wd %>%
   mutate(wd_tod = paste(wkday,grp_name))
@@ -128,7 +150,6 @@ PredSet <- rbind(TrainSet, ValidSet)
 # ensure sampling number adds up
 stopifnot(nrow(ValidSet) == length(samprow))
 stopifnot(nrow(ValidSet) + nrow(TrainSet) == nrow(w.all.4hr.wd))
-ve(list = c('ValidSet', 'TrainSet', 'train_index'), file = 'w.all.4hr.wd_train.RData')
 
 #Select only arterials
 Art.Only <- T # False to use all road class, True to Arterial only roads
@@ -196,8 +217,7 @@ PredSet_xgb <- data.frame(PredSet[, includes_xgb],
                           model.matrix(~ medTravDir + 0)
                           )
 
-
-# XGboost unique crash counts, updated code to test parameters in xgboost function 
+# XGboost unique crash counts
 response.var <- response.var.list[1] # use crash counts
 dpred <- list("data" = as.matrix(PredSet_xgb), "label" = PredSet[,response.var])
 dtrain <- list("data" = as.matrix(TrainSet_xgb), "label" = TrainSet[,response.var])
@@ -213,7 +233,7 @@ xgb.m <- assign(paste0('m', modelno),
                 xgboost(data = dtrain$data, 
                         label = dtrain$label, 
                         max.depth = m.depth, #default=6 
-                        min_child_weight=1, #default = 1, range 0 to inf, min sum of instance weight needed in a child start with 1/sqrt(eventrate)?
+                        min_child_weight=1, #default = 1, range 0 to inf, min sum of instance weight needed in a child start with 1/sqrt(eventrate)
                         gamma=0, #default=0, minimum loss reduction to make further partition
                         eta = n.eta, #default = 0.3 (0 to 1 range, smaller prevents overfitting)
                         subsample=1, #default = 1, subsample ratio of the training instance
@@ -233,10 +253,65 @@ pred_pred <- predict(xgb.m, dpred$data)
 xgb_mae <- mae(dtest$label, pred_test)
 
 #xgb.m
+
 importance_matrix <- xgb.importance(feature_names = colnames(dtrain$data), model = xgb.m)
+if(SHOW_ALL_OUTPUT){
+  par(mfrow=c(2,1))
+}
+if(SHOW_ALL_OUTPUT){
+  xgb.plot.importance(importance_matrix[1:20,])
+}
+if(SHOW_ALL_OUTPUT){
+  xgb.plot.tree(feature_names = colnames(dtest$data),model=xgb.m, trees = 0, show_node_id = TRUE)
+}
+
+
 
 # Add Observed-predicted summaries
 trainObsPred <- TrainSet[,response.var] - pred_train
+if (SHOW_ALL_OUTPUT){
+  hist(trainObsPred)
+}
+if (SHOW_ALL_OUTPUT){
+  plot(TrainSet[,response.var],pred_train)
+}
+if (SHOW_ALL_OUTPUT){
+  plot(ValidSet[,response.var],pred_test)
+}
+if (SHOW_ALL_OUTPUT){
+  plot(PredSet[,response.var],pred_pred)
+}
+
+
+# Compare totals
+if (SHOW_ALL_OUTPUT){
+  sum(PredSet$uniqueCrashreports)
+  sum(PredSet$WeightedCrashes)
+  sum(predict(xgb.m, dpred$data))
+  
+  # Compare maxs
+  max(PredSet$uniqueCrashreports)
+  max(PredSet$WeightedCrashes)
+  max(predict(xgb.m, dpred$data))
+  
+  # % of variance explained
+  cat("% Var explained: \n", 100 * (1-sum(( TrainSet[,response.var] - pred_train )^2) /
+                                      sum(( TrainSet[,response.var] - mean(TrainSet[,response.var]))^2)
+  )
+  ) # 78.15688%
+  
+  
+  cat("% Var explained: \n", 100 * (1-sum(( ValidSet[,response.var] - pred_test )^2) /
+                                      sum(( ValidSet[,response.var] - mean(ValidSet[,response.var]))^2)
+  )
+  ) # 40.33319%
+  
+  cat("% Var explained: \n", 100 * (1-sum(( PredSet[,response.var] - pred_pred )^2) /
+                                      sum(( PredSet[,response.var] - mean(PredSet[,response.var]))^2)
+  )
+  ) # 66.78816%
+}
+
 
 # <><><><><><><><><><><><><><><><><><><><><><><><>
 # Weighted XGBoost ----
@@ -305,7 +380,7 @@ xgb.m <- assign(paste0('m', modelno),
                 xgboost(data = dtrain$data, 
                         label = dtrain$label, 
                         max.depth = m.depth, #default=6 
-                        min_child_weight=1, #default = 1, range 0 to inf, min sum of instance weight needed in a child start with 1/sqrt(eventrate)?
+                        min_child_weight=1, #default = 1, range 0 to inf, min sum of instance weight needed in a child start with 1/sqrt(eventrate)
                         gamma=0, #default=0, minimum loss reduction to make further partition
                         eta = n.eta, #default = 0.3 (0 to 1 range, smaller prevents overfitting)
                         subsample=1, #default = 1, subsample ratio of the training instance
@@ -326,11 +401,56 @@ xgb_mae_weighted <- mae(dtest$label, pred_test_weighted)
 
 #xgb.m
 importance_matrix_weighted <- xgb.importance(feature_names = colnames(dtrain$data), model = xgb.m)
+if(SHOW_ALL_OUTPUT){
+  xgb.plot.importance(importance_matrix_weighted[1:20,])
+}
+
 
 
 # Add Observed-predicted summaries
 trainObsPred <- TrainSet[,response.var] - pred_train_weighted
-hist(trainObsPred)
+if(SHOW_ALL_OUTPUT){
+  hist(trainObsPred)
+}
+if(SHOW_ALL_OUTPUT){
+  plot(TrainSet[,response.var],pred_train_weighted)
+}
+if(SHOW_ALL_OUTPUT){
+  plot(ValidSet[,response.var],pred_test_weighted)
+}
+if(SHOW_ALL_OUTPUT){
+  plot(PredSet[,response.var],pred_pred_weighted)
+}
+
+if(SHOW_ALL_OUTPUT){
+  # Compare totals
+  sum(PredSet$uniqueCrashreports) # 1274
+  sum(PredSet$WeightedCrashes) # 4229
+  sum(predict(xgb.m, dpred$data)) # 4007
+  
+  # Compare maxs
+  max(PredSet$uniqueCrashreports) # 6
+  max(PredSet$WeightedCrashes) # 27
+  max(predict(xgb.m, dpred$data)) # 26.982
+  
+  # % of variance explained
+  cat("% Var explained: \n", 100 * (1-sum(( TrainSet[,response.var] - pred_train_weighted )^2) /
+                                      sum(( TrainSet[,response.var] - mean(TrainSet[,response.var]))^2)
+  )
+  ) # 81%
+  
+  
+  cat("% Var explained: \n", 100 * (1-sum(( ValidSet[,response.var] - pred_test_weighted )^2) /
+                                      sum(( ValidSet[,response.var] - mean(ValidSet[,response.var]))^2)
+  )
+  ) # 12.93513%
+  
+  cat("% Var explained: \n", 100 * (1-sum(( PredSet[,response.var] - pred_pred_weighted )^2) /
+                                      sum(( PredSet[,response.var] - mean(PredSet[,response.var]))^2)
+  )
+  ) # 63.47352%  
+}
+
 
 # Save xgb model output
 model_type = "XGB_models"
@@ -352,6 +472,12 @@ write.csv(out, file.path(data.loc, 'Model_output', paste0("Bell_",model_type,"_p
 
 
 # Extra XGboost ----
+if(SHOW_ALL_OUTPUT){
+  par(mfrow=c(1,1)) 
+  range(pred_pred)
+  range(PredSet[,response.var])
+}
+
 #cross-validation function (xgb.cv) - can use to select features
 set.seed(1024)
 xgb.cv <- assign(paste0('m.cv', modelno), 
@@ -371,8 +497,8 @@ xgb.cv <- assign(paste0('m.cv', modelno),
                         early.stopping.rounds = 3,
                         objective = "count:poisson"))
 
-# XGboost unique crash counts, original code for 20 rounds 
-response.var <- response.var.list[1] # use crash counts
+# XGboost unique crash counts
+response.var <- response.var.list[1]
 dpred <- list("data" = as.matrix(PredSet_xgb), "label" = PredSet[,response.var])
 dtrain <- list("data" = as.matrix(TrainSet_xgb), "label" = TrainSet[,response.var])
 dtest <- list("data" = as.matrix(ValidSet_xgb), "label" = ValidSet[,response.var])
@@ -394,6 +520,26 @@ pred_pred <- predict(m15.xgb.art.wkend.20rd, dpred$data)
 
 #xgb.m
 importance_matrix <- xgb.importance(feature_names = colnames(dtrain$data), model = xgb.m1)
+if(SHOW_ALL_OUTPUT){
+  xgb.plot.importance(importance_matrix[1:20,])
+}
+
+if(SHOW_ALL_OUTPUT){
+  range(pred_pred) # 0.00407875 4.49043274 ( 10 rounds)  0.0009638735 7.5567440987 (20 rounds) 0-11 (30 rounds) 
+  range(PredSet[,response.var]) # 0 - 6 (weighted crashes: 0-27)
+  
+  # % of variance explained
+  cat("% Var explained: \n", 100 * (1-sum(( TrainSet[,response.var] - pred_train )^2) /
+                                      sum(( TrainSet[,response.var] - mean(TrainSet[,response.var]))^2)
+  )
+  ) # 50.17904% using 10 rounds, 58.09369% using 20 rounds, 65.28416% of Var explained using 30 rounds
+  
+  
+  cat("% Var explained: \n", 100 * (1-sum(( PredSet[,response.var] - pred_pred )^2) /
+                                      sum(( PredSet[,response.var] - mean(PredSet[,response.var]))^2)
+  )
+  ) # 43.23524% using 10 rounds, 44.31% of Var explained using 20 rounds, 41.85474% using 30 rounds.
+}
 
 # XGboost weighted crash counts, original code for 25 rounds 
 response.var <- response.var.list[4] # use weighted crash counts
@@ -418,8 +564,27 @@ pred_pred_weighted <- predict(m15.xgb.art.wkend.25rd.weighted.v2, dpred$data)
 
 #xgb.m2
 importance_matrix <- xgb.importance(feature_names = colnames(dtrain$data), model = xgb.m2)
+if(SHOW_ALL_OUTPUT){
+  xgb.plot.importance(importance_matrix[1:20,])
+}
 
-# use WeightedCrashes as the response for the XGBoost model, and add the prediction to the out table.
+
+if(SHOW_ALL_OUTPUT){
+  range(pred_pred) # 0.00407875 4.49043274 ( 10 rounds)  0.0009638735 7.5567440987 (20 rounds) 0-11 (30 rounds) 
+  range(PredSet[,response.var]) # 0 - 6 (weighted crashes: 0-27)
+  range(pred_pred_weighted) # .002860187 23.191209793 (20 rounds weighted crash) 0.001555491 21.812366486 (25 rounds) .000816789 24.28149 (30 rounds)
+  
+  cat("% Var explained: \n", 100 * (1-sum(( TrainSet[,response.var] - pred_train_weighted )^2) /
+                                      sum(( TrainSet[,response.var] - mean(TrainSet[,response.var]))^2)
+  )
+  ) # 72.00288% (25 rounds, re-run 6/3)
+  
+  cat("% Var explained: \n", 100 * (1-sum(( PredSet[,response.var] - pred_pred_weighted )^2) /
+                                      sum(( PredSet[,response.var] - mean(PredSet[,response.var]))^2)
+  )
+  ) #  55.71285% (25 rounds)
+}
+
 # compare the distribution of response and prediction
 f <- paste0(visual.loc, '/Bellevue_hist_obs_pred_xgb_',paste0('m', modelno),'.png')
 png(file = f,  width = 6, height = 10, units = 'in', res = 300)
@@ -430,12 +595,14 @@ dev.off()
 
 # importance matrix
 importance_matrix <- xgb.importance(model = m15.xgb.art.wkend.25rd.weighted.v2)
+if(SHOW_ALL_OUTPUT){
+  print(importance_matrix)
+}
 
 f <- paste0(visual.loc, '/Bellevue_importance_xgb_',paste0('m', modelno),'.png')
 png(file = f,  width = 6, height = 10, units = 'in', res = 300)
 xgb.plot.importance(importance_matrix = importance_matrix)
 dev.off()
-
 
 # Save xgb model output
 model_type = "XGB_models"
