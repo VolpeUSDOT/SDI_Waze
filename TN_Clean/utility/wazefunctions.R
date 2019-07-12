@@ -352,14 +352,7 @@ append.hex <- function(hexname, data.to.add, state, na.action = c("omit", "keep"
     if(!exists(prepname)) {
     
     cat("Preparing", data.to.add, "\n")
-    # Spread for multiple columns by road functional class
-    
-    # dd.vol <- dd %>% 
-    #   group_by(GRID_ID, month, dayofweek, hour) %>%
-    #   tidyr::spread(key = F_SYSTEM, value = volume, fill = 0, sep = "_")
-    
-    # Rows ahave to be uniquely described by grid id, month, dayofweek, hour, and road class
-    # summary(duplicated(with(dd, paste(GRID_ID, MONTH, DAYOFWEEK, HOUR, F_SYSTEM))))
+   
     dd <- dd[!duplicated(with(dd, paste(GRID_ID, MONTH, DAYOFWEEK, HOUR, F_SYSTEM))),]
       
     dd.summax <- dd %>%
@@ -471,17 +464,6 @@ append.hex <- function(hexname, data.to.add, state, na.action = c("omit", "keep"
     
   }
   
-  # Not needed in multistate -- could put inside TN special event with a prepname lookup like in VMT
-  # else {
-  #   
-  #   # Create vectors in w for month of year, day of week, hour of day in w. This is used for joining on the grid ID and time factors
-  #   
-  #   dd = get(prepname, envir = globalenv()) # Use the already prepared data if present in the working enviroment
-  #   
-  #   
-  # }
-  
-  
   # End data type if statements, now merge with w data frame of Waze-EDT data
   # join ----
   
@@ -501,21 +483,7 @@ append.hex <- function(hexname, data.to.add, state, na.action = c("omit", "keep"
   
   if(length(grep("max_aadt_by_grid", data.to.add)) > 0){
     
-    # summary(unique(w$GRID_ID) %in% unique(dd$GRID_ID)) # should be all T, but there are 1620 F in April MD? 
-    # summary(w$vmt_time %in% dd$vmt_time) # all T
-    
-    # month / day of week / hour of day is duplicated within GRID ID in w, which is expected
-    # summary(duplicated(paste(w$GRID_ID, w$vmt_time)))
-    # summary(duplicated(paste(dd$GRID_ID, dd$vmt_time))) # should be all F
-    # summary(duplicated(paste(dd$GRID_ID, dd$month, dd$dayofweek, dd$hour))) 
-    
     w2 <- left_join(w, dd %>% ungroup() %>% select(-MONTH, -DAYOFWEEK, -HOUR), by = c("GRID_ID", "vmt_time")) 
-  
-    # check:
-    # 1Z-48, day 229 (August, dayofweek = 5) hour 16: max hourly 4 = 0.809305; 5 = 0.066670
-    # format(strptime("2017-229", "%Y-%j"), "%m") 
-    # lubridate::wday(strptime("2017-229", "%Y-%j")) 
-    # dd[dd$GRID_ID == "1Z-48" & dd$month == 8 & dd$dayofweek == 5 & dd$hour == 16,]
   
   }
   
