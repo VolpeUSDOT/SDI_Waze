@@ -1,12 +1,14 @@
-# Analysis of crashes on Bellevue road network segmetns.
+# Analysis of crashes on Bellevue road network segments.
+# Inputs: 
+# Outputs: 
 # Analysis approaches:
-# - Xgboost - Typically model performance is better than other methods, try here
+# - Xgboost - Typically model performance is better than other methods
 # Test different hypotheses with inclusion of time, FARS, LEHD, weather, and other variables.
 
 # Setup ---- 
 rm(list=ls()) # Start fresh
 
-codeloc <- "~/" #replace with location of code
+codeloc <- "~/WA/code" #replace with file path for code folder
 
 
 # load functions with group_by
@@ -22,8 +24,8 @@ library(DiagrammeR)
 library(Metrics) # for mae()
 
 ## Working on shared drive
-wazeshareddir <- #replace with path to root directory
-data.loc <- #replace with path to data folder in root directory
+wazeshareddir <- "~/WA" #replace with path to root directory
+data.loc <- "~/WA/data" #replace with path to data folder in root directory
 seg.loc <- file.path(data.loc, "Segments")
 output.loc <- file.path(data.loc, "Model_output")
 visual.loc <- file.path(data.loc, "Model_visualizations")

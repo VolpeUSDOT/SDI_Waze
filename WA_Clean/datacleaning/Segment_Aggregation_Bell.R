@@ -1,6 +1,7 @@
 # Aggregation of Waze and Bellevue crash data by segment and hour
 # After completion, append weathers, FARS to segments
-
+# Inputs: 
+# Outputs: 
 # Bellevue crash events: when aggregated to segment and hour, have 1362 segment/hours with 1 crash, 3 segment/hours with 2 crashes. 
 # This seems reasonable: total was 2800 crash records, but majority are on interstates or SR 520.
 
@@ -12,13 +13,13 @@ library(tidyverse)
 library(doParallel)
 library(circular) # for mean.circular() and median.circular()
 
-codeloc <- "~/" #replace with location of code
+codeloc <- "~/WA/code" #replace with file path for code folder
 
 #source(file.path(codeloc, 'utility/get_packages.R')) #run if packages are needed
 
 ## Working directories
-wazeshareddir <- #Insert path to root directory
-  data.loc <- #Insert path to data folder in root directory
+wazeshareddir <- "~/WA" #replace with path to root directory
+  data.loc <- "~/WA/data" #replace with path to data folder in root directory
 output.loc <- file.path(data.loc, "Segments")
 
 setwd(data.loc)

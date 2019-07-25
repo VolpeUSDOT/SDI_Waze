@@ -4,7 +4,7 @@
 # Outputs: twelve WazeSegTimeList_2018-01.RData for calendar year 2018. 
 # These are lists of segment and time windows with crash or Waze data for each hour. 
 # Precursor to Segment_Aggregation_Bell.R
-# Jessie validated this code on 4/1/2019
+# Code validated on 4/1/2019
 
 
 # <><><><><><><><><><><><><><><><><><><><>
@@ -15,13 +15,13 @@ library(rgdal) # for readOGR(),writeOGR() needed for reading/writing in ArcM sha
 library(tidyverse)
 library(doParallel)
 
-codeloc <- "~/" #replace with location of code
+codeloc <- "~/WA/code" #replace with file path for code folder
 
 source(file.path(codeloc, 'utility/get_packages.R'))
 
 ## Working directories
-wazeshareddir <- #replace with path to root directory
-data.loc <- #replace with path to data folder in root directory
+wazeshareddir <- "~/WA" #replace with path to root directory
+data.loc <- "~/WA/data" #replace with path to data folder in root directory
 
 # GIS layer projection
 proj <- showP4(showWKT("+init=epsg:6597"))
