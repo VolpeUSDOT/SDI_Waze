@@ -232,7 +232,7 @@ save(list="w.all", file = file.path(output.loc, fn))
 # <><><><><><><><><><><><><><><><><><><><><><><><>
 # Variables organization: Aggregate data to 4 hour window ----
 # Before run this chunk, please re-run set up chunk for packages and working directories
-# If "Bellevue_Waze_Segments_2018-01_to_2018-12.RData" exist, let's load it to produce the 4 hour data.
+# If "Bellevue_Waze_Segments_2018-01_to_2018-12.RData" exist, load it to produce the 4 hour data.
 # Reset output location to save files to model output
 
 seg.loc <- file.path(data.loc, "Segments")
