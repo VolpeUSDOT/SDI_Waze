@@ -1,4 +1,25 @@
 # Analysis of crashes on Bellevue road network segmetns.
+# Inputs:
+# Bellevue_Waze_Segments_2018-01_to_2018-12.RData
+# Bellevue_Waze_Segments_2018-01_to_2018-12_4hr.RData
+# 
+# Outputs:
+# ggpairs_other_var.png
+# ggpairs_seg_var.png
+# ggpairs_weather_var.png
+# ggpairs_alert_types.png
+# ggpairs_alert_subtypes.png
+# ggpairs_waze_rd_type.png
+# ggpairs_waze_dir_travel.png
+# missmap_other_var.png
+# missmap_seg_var.png
+# missmap_weather_var.png
+# missmap_alert_types.png
+# missmap_alert_subtypes.png
+# missmap_waze_rd_type.png
+# missmap_waze_dir_travel.png
+# Bellevue_WazeAccidents_time_series.png
+# 
 # Analysis approaches:
 # - Simple linear regression for count of crashes
 # - Simple logistic regression for presence of crashes

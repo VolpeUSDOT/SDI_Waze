@@ -1,10 +1,26 @@
 # Analysis of crashes on Bellevue road network segmetns.
+# Inputs:
+# Bellevue_Waze_Segments_2018-01_to_2018-12_4hr.RData
+# Bell_Poi_model_summary_list.Rdata
+# 
+# Outputs:
+# Bell_Poisson_models.Rdata
+# Poisson_model_summary_update.csv
+#
 # Analysis approaches:
 # - Poisson
 # - Random forests 
 # - Xgboost Perhaps, but likely not as useful in this context since we want to interpret coefficients of individual factors 
 # But typically model performance is better so worth trying
 # In each of these, test different hypotheses with inclusion of time, FARS, LEHD, weather, and other variables.
+
+###Inputs###
+#Bellevue_Waze_Segments_2018-01_to_2018-12_4hr.RData
+#Bell_Poi_model_summary_list.Rdata
+
+###Outputs###
+#Bell_Poisson_models.Rdata
+#Poisson_model_summary_update.csv
 
 # Setup ---- 
 rm(list=ls()) # Start fresh

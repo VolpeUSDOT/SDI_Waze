@@ -1,7 +1,8 @@
 # Takes the shape files prepared in ArcGIS from the Bellevue point data and road network.
 # Inputs: 1) RoadNetwork_Jurisdiction_withData.shp; 2) Crashes_Snapped50ft_MatchName.shp; 3) "Waze_Snapped50ft_MatchName.shp
 #         4) WA_Bellevue_Prep_Export.csv; 5) 20190314_All_roads_Bellevue.csv
-# Outputs: twelve WazeSegTimeList_2018-01.RData for calendar year 2018. 
+# Outputs: twelve WazeSegTimeList_2018-01.RData for each month of calendar year 2018.
+#
 # These are lists of segment and time windows with crash or Waze data for each hour. 
 # Precursor to Segment_Aggregation_Bell.R
 # Code validated on 4/1/2019

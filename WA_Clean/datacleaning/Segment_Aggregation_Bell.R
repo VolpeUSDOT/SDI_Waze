@@ -1,7 +1,15 @@
 # Aggregation of Waze and Bellevue crash data by segment and hour
 # After completion, append weathers, FARS to segments
-# Inputs: 
-# Outputs: 
+# Inputs:
+# twelve WazeSegTimeList_2018-01.RData for each month of calendar year 2018
+# Prepared_Bellevue_Wx_2018.RData
+# FARS_Snapped50ft_MatchName.shp
+# RoadNetwork_Jurisdiction_withData.shp
+# 
+# Outputs:
+# Bellevue_Waze_Segments_2018-01_to_2018-12.RData
+# Bellevue_Waze_Segments_2018-01_to_2018-12_4hr.RData
+# 
 # Bellevue crash events: when aggregated to segment and hour, have 1362 segment/hours with 1 crash, 3 segment/hours with 2 crashes. 
 # This seems reasonable: total was 2800 crash records, but majority are on interstates or SR 520.
 

@@ -1,6 +1,14 @@
 # Analysis of crashes on Bellevue road network segments.
 # Inputs: 
+# Bellevue_Waze_Segments_2018-01_to_2018-12_4hr.RData 
+#
 # Outputs: 
+# Bell_XGB_models061419.Rdata
+# Bell_XGB_models_pred061419.csv
+# Bellevue_hist_obs_pred_xgb_m15.xgb.art.wkend.25rd.weighted.v2.png
+# Bellevue_importance_xgb_m15.xgb.art.wkend.25rd.weighted.v2.png
+# Bell_XGB_models.Rdata
+#
 # Analysis approaches:
 # - Xgboost - Typically model performance is better than other methods
 # Test different hypotheses with inclusion of time, FARS, LEHD, weather, and other variables.
