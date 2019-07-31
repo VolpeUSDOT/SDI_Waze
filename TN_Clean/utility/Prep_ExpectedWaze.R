@@ -3,18 +3,6 @@
 
 # Start from PredictWeek_TN.R, where w.allmonths is already loaded
 
-# Test code for 1% of the data
-# w.test <- w.allmonths[sample(1:nrow(w.allmonths), nrow(w.allmonths)/100, replace = F),]
-# 
-# w.expected <- w.test %>%
-#   group_by(GRID_ID, mo, DayOfWeek, hour) %>%
-#   summarize(nWazeAccident = median(nWazeAccident, na.rm=T),
-#             nWazeWeatherOrHazard = median(nWazeWeatherOrHazard, na.rm=T),
-#             nWazeJam = median(nWazeJam, na.rm=T),
-#             nWazeRoadClosed = median(nWazeRoadClosed, na.rm=T)
-#             )
-
-
 waze_date_range <- paste(range(w.allmonths$date), collapse = "_to_")
 
 prepname =  paste0("TN_Waze_Expected_", g, "_", waze_date_range, ".RData")
