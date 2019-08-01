@@ -3,20 +3,16 @@
 # Run from RandomForest_WazeGrid_TN.R
 # already in memory are localdir and g, which repreresents the grid type to use
 # Next step after this script is to run append.hex function to add 
-censusdir <- paste0(user, "/workingdata/census") # full path for readOGR, for buffered state shapefile created in first step of data pipeline, ReduceWaze_SDC.R
+censusdir <- normalizePath("~/TN/Data/Census") # full path for readOGR, for buffered state shapefile created in first step of data pipeline, ReduceWaze_SDC.R
 
-temp.outputdir <- "~/tempout" # to hold daily output files as they are generated, and then sent to team bucket
+temp.outputdir <- normalizePath("~/TN/Data/tempout") # to hold daily output files as they are generated, and then sent to team bucket
 
 proj.USGS <- "+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs +ellps=GRS80 +towgs84=0,0,0"
-
-# Problem with parallel process after 10 months:
-# Error in { : task 285 failed - "sink stack is full". 
-# Needed to add sink() at end of foreach loop to close that diversion of output. Now avoiding by not using sink() at all, just cat(append=T).
 
 # Check to see if these processing steps have been done yet; load from prepared file if so
 prepname = paste("Prepared", "Weather", g, sep="_")
 
-if(length(grep(prepname, dir(file.path(localdir, "Weather")))) == 0) { 
+if(length(grep(prepname, dir(file.path(localdir,"Data","Weather")))) == 0) { 
   library(gstat) # For kriging
   library(raster) # masks several functions from dplyr, use caution
   library(doParallel)
@@ -25,7 +21,7 @@ if(length(grep(prepname, dir(file.path(localdir, "Weather")))) == 0) {
   cat("Preparing", "Weather", g, "\n")
   
   # Read in GHCN data
-  wx.files <- dir(file.path(localdir, "Weather", "GHCN"))
+  wx.files <- dir(file.path(localdir,"Data", "Weather", "GHCN"))
   wx <- vector()
   
   # Most stations don't have most of the wx variables. Simplify to core variables, per GHCN documentation:
@@ -36,13 +32,13 @@ if(length(grep(prepname, dir(file.path(localdir, "Weather")))) == 0) {
 
   for(k in wx.files){ # k = wx.files[1]
     if(length(grep('stations', k))==0){
-      wxx <- read.csv(file.path(localdir, "Weather", "GHCN", k))
+      wxx <- read.csv(file.path(localdir,"Data", "Weather", "GHCN", k))
       wx <- rbind(wx, wxx[core_vars])
       rm(wxx)
     }
   }
 
-  station_file <- file.path(localdir, "Weather", "GHCN", wx.files[grep('stations', wx.files)])
+  station_file <- file.path(localdir,"Data", "Weather", "GHCN", wx.files[grep('stations', wx.files)])
   stations <- read_fwf(station_file,
                        col_positions = fwf_empty(station_file))
   names(stations) = c("STATION", "lat", "lon", "masl", "NAME", "x1", "x2", "x3")
@@ -50,13 +46,7 @@ if(length(grep(prepname, dir(file.path(localdir, "Weather")))) == 0) {
   wx$DATE <- as.Date(as.character(wx$DATE))
   
   wx <- wx[order(wx$DATE, wx$STATION),]
-  
-  # Make sure values are reasonable
-  # range(wx$PRCP, na.rm=T)
-  # wx %>%
-  #   filter(TMAX < 10) # Looks possible
-  # wx %>%
-  #   filter(TMIN < -10) # Replace -99 with NA
+
    
   wx$TMIN[wx$TMIN == -99] = NA
   wx$TMAX[wx$TMAX == -99] = NA
@@ -81,7 +71,7 @@ if(length(grep(prepname, dir(file.path(localdir, "Weather")))) == 0) {
   wx.proj <- spTransform(wx.proj, CRS(proj.USGS))
   
   # Read in grid
-  grid_shp <- rgdal::readOGR(file.path(localdir, "Shapefiles"), layer = g)
+  grid_shp <- rgdal::readOGR(file.path(localdir,"Data", "Shapefiles"), layer = g)
   grid_shp <- spTransform(grid_shp, CRS(proj.USGS))
   
   # Read in buffered state shapefile
@@ -97,7 +87,7 @@ if(length(grep(prepname, dir(file.path(localdir, "Weather")))) == 0) {
     mutate(mo = format(DATE, "%m"))
   
   # Plot average Jan and June max temp by station to check
-  source(file.path(codeloc, 'TN', 'datacleaning', 'Plot_weather_points.R'))
+  source(file.path(codeloc, 'datacleaning', 'Plot_weather_points.R'))
   
   # Options: nearest neighbor interpolation, inverse distance weighted, ordinary kriging...
   # Will make one raster for each variable of interest, per day, and then apply to grid/hour.
@@ -128,22 +118,19 @@ if(length(grep(prepname, dir(file.path(localdir, "Weather")))) == 0) {
   wx.grd.day <- foreach(day = use_wx_days, 
                       .packages = c('raster','gstat','dplyr','rgdal'), 
                       .combine = rbind) %dopar% {
-    # day = unique(wx$DATE)[1]
                         
     cat(paste(Sys.time()), as.character(day), "\n", 
         file = paste0("Prep_Weather_", g, "_log.txt"), append = T) 
         
-    # Scan team bucket for completed daily weather prep ----
     fn = paste("Prep_Weather_Daily_", day,"_", g, ".RData", sep="")
     
-    # See if exists in S3. Load if so. If not, carry out kriging steps.
     exists_fn <- length(
-      system(paste("aws s3 ls",
-                 file.path(teambucket, state, 'Daily_Weather_Prep', fn)), intern= T)) > 0
+      system(paste("ls",
+                 file.path("~/TN","Data", "Weather", 'Daily_Weather_Prep', fn)), intern= T)) > 0
     
     if(exists_fn){
-      system(paste("aws s3 cp",
-                   file.path(teambucket, state, 'Daily_Weather_Prep', fn),
+      system(paste("cp",
+                   file.path("~/TN","Data", "Weather", 'Daily_Weather_Prep', fn),
                    file.path(temp.outputdir, fn)
       ))
       load(file.path(temp.outputdir, fn))
@@ -156,20 +143,12 @@ if(length(grep(prepname, dir(file.path(localdir, "Weather")))) == 0) {
     vg_prcp <- gstat::variogram(PRCP ~ 1, locations = wx.day[!is.na(wx.day$PRCP),])
     dat.fit <- fit.variogram(vg_prcp, fit.ranges = F, fit.sills = F,
                              vgm(model = "Sph"))
-    # plot(vg_prcp, dat.fit) # Plot the semi variogram. 
+
     dat.krg.prcp <- krige(f.p, wx.day[!is.na(wx.day$PRCP),], grd, dat.fit)
     
     # Rasterize
     prcp_r <- raster::raster(dat.krg.prcp)
     prcp_r <- mask(prcp_r, grid_shp)
-    # plot(prcp_r,  
-    #      main = "Map of precipitation on 2017-04-01")
-     
-    # Plot the 95% confidence intervals
-    # prcp_ci <- sqrt(raster(dat.krg.prcp, layer = 'var1.var')) * 1.96
-    # prcp_ci <- mask(prcp_ci, grid_shp)
-    # plot(prcp_ci, main = "95% CI map of precipitation on 2017-04-01",
-    #      sub = "Smaller values = greater confidence")
     
     # Now do tmin, tmax, and snow
     f.tmin <- as.formula(TMIN ~ 1)
@@ -198,14 +177,6 @@ if(length(grep(prepname, dir(file.path(localdir, "Weather")))) == 0) {
     
     # Apply to grid cells in year-day ----
     
-    # Trying to speed up with rasterize. Doesn't help, because converts to the grid cell dimensions of the raster object, we need to preserve the polygon geometry
-    # extracttimestart <- Sys.time()
-    # clip1 <- crop(prcp_r, extent(grid_shp))
-    # grid_rst <- rasterize(grid_shp, clip1, mask = T) # still slow, but faster than extract
-    # prcp_extr_r <- getValues(grid_rst) # instant
-    # cat(Sys.time()-extracttimestart)
-    # extracttimestart <- Sys.time()
-    # Need to extract values from the raster layers to the polygons
     prcp_extr <- raster::extract(x = prcp_r,   # Raster object
                                  y = grid_shp, # SpatialPolygons
                                  fun = mean,
@@ -251,7 +222,7 @@ if(length(grep(prepname, dir(file.path(localdir, "Weather")))) == 0) {
     # Copy to S3
     system(paste("aws s3 cp",
                  file.path(temp.outputdir, fn),
-                 file.path(teambucket, state, 'Daily_Weather_Prep', fn)))
+                 file.path(teambucket,"Data", "Weather", 'Daily_Weather_Prep', fn)))
     
     EndTime <- Sys.time()-StartTime
     cat(as.character(day), 'completed', round(EndTime, 2), attr(EndTime, 'units'), '\n',
@@ -262,20 +233,20 @@ if(length(grep(prepname, dir(file.path(localdir, "Weather")))) == 0) {
   } # end parallel loop
    
   # Plot gridded versions of same point maps to check
-  source(file.path(codeloc, 'TN', 'datacleaning', 'Plot_weather_gridded.R'))
+  source(file.path(codeloc, 'Data', 'datacleaning', 'Plot_weather_gridded.R'))
   
   EndTime <- Sys.time() - StartTime
   cat(round(EndTime, 2), attr(EndTime, "units"), "\n")
    
   save(list = c("wx.grd.day"), 
-       file = file.path(localdir, "Weather", paste0(prepname, ".RData")))
+       file = file.path(localdir, "Data", "Weather", paste0(prepname, ".RData")))
 
   # Copy to S3
-  system(paste("aws s3 cp",
-               file.path(localdir, "Weather", paste0(prepname, ".RData")),
-               file.path(teambucket, state, "Weather", paste0(prepname, ".RData"))))
+  system(paste("cp",
+               file.path(localdir, "Data","Weather", paste0(prepname, ".RData")),
+               file.path(teambucket, "Data", "Weather", paste0(prepname, ".RData"))))
 
   } else {
-  load(file.path(localdir, "Weather", paste0(prepname, ".RData")))
+  load(file.path(localdir,"Data", "Weather", paste0(prepname, ".RData")))
 }
 
