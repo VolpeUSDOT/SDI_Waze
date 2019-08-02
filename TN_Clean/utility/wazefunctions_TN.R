@@ -41,8 +41,7 @@ makelink <- function(accfile = edt.april, incfile = waze.april,
     
     # ei: was EDT events, now TN crashes. We want to look from the time of crash event -60 minutes to crash event +60 minutes, and find Waze events in this window
     # d.sp: Waze events. inctimevar2 is the *end* of the event and inctimevar1 is the *start* of the event. We look to see if the end of the event is greater than EDT event -60 minutes and see if the start of the Waze event is less than the EDT event +60 minutes.
-    # hist(as.numeric(d.sp[,inctimevar2] - d.sp[,inctimevar1])) # some Waze events have large difference between the two, the range of the Waze events do not matter.
-    
+
     d.t <- d.sp[d.sp[,inctimevar2] >= ei[,acctimevar]-60*60 & d.sp[,inctimevar1] <= ei[,acctimevar]+60*60,] 
     
     id.accident <- rep(as.character(ei[,accidvar]), nrow(d.t)) # TN crash ID
@@ -55,7 +54,7 @@ makelink <- function(accfile = edt.april, incfile = waze.april,
         rep("<>",20), "\n\n",
        file = paste0("EDT_Waze_log_", i, "_", Sys.Date(), ".txt"), append = T) }
 
-    data.frame(id.accident, id.incidents) # rbind this output
+    data.frame(id.accident, id.incidents)
   } # end %dopar% loop
   
   stopCluster(cl) # stop the cluster.
@@ -75,7 +74,7 @@ makelink.nonpar <- function(accfile = edt.april, incfile = waze.april,
     linktable <- vector()
   
     # keeping non-parallized version here for reference
-    for(i in 1:nrow(accfile)){ # i=which(edt$ID == "2023680")
+    for(i in 1:nrow(accfile)){
       ei = accfile[i,]
       
       dist.i <- spDists(ei, incfile, longlat = T)*0.6213712 # spDists gives units in km, convert to miles
@@ -200,18 +199,14 @@ prep.hex <- function(hexname, state, month, bucket = teambucket){
   # Defaults to read from S3 bucket specified with teambucket 
   # Specify month as 6-digit character value, e.g. "2017-04" for April 2017
   # Specify full path in hexname, e.g. for MD weather-overlaid files: file.path(inputdir, paste0("WazeTimeEdtHexWx_", mo,".RData"))
-  # system(paste0('aws s3 ls ', bucket, '/', state, '/'))
   
   mo = month
-  system(paste0('aws s3 cp ', bucket, '/', state, '/', hexname, ' ~/workingdata/', state))
-  load(file.path("~/workingdata", state, hexname))
+  system(paste0('cp ', bucket, '/', 'Data', '/', hexname))
+  load(file.path("~/TN","Data", hexname))
 
   wte <- get(ls(envir = environment())[grep("WazeTime", ls(envir = environment()), ignore.case = T)])
   
   class(wte) <- "data.frame" 
-  # if(length(grep("DayOfWeek", names(wte)) > 0)){
-  #   wte$DayOfWeek <- as.factor(wte$DayOfWeek)
-  # }
 
   if(length(grep("weekday", names(wte)) > 0)){
     wte$DayOfWeek <- as.factor(wte$weekday)
@@ -308,11 +303,6 @@ append.hex <- function(hexname, data.to.add, state, na.action = c("omit", "keep"
     dd <- crash
     
     dd$hour <- as.numeric(format(dd$date, "%H"))
-    
-    # Variables to create:
-    # Total crashes, by grid ID, for last 5 years prior to study period (2011-2016)
-    # Fatal/serious crashes, same
-    # Can also consider adding crashes by time block, by day of week, or by month
     
     dd1 <- dd %>%
       filter(year >= 2011 & year <= 2016) %>%
