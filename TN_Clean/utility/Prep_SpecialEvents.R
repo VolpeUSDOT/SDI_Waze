@@ -7,28 +7,44 @@
 # already in memory are localdir and g, which repreresents the grid type to use
 # Run after TN_Data_Format.R for initial formatting of crash and special event data
 
+# append.hex2(hexname = w, data.to.add = "TN_SpecialEvent", state = state, na.action = na.action)
 library(rgeos)
 library(rgdal)
 library(doParallel)
 library(foreach)
+
+
+# # If not running from RandomForest_Wazegrid_TN.R, set it up manually by running following code.
+# grids = c("TN_01dd_fishnet",
+#           "TN_1sqmile_hexagons")
+# g = grids[2]
+# 
+# user <- if(length(grep("@securedatacommons.com", getwd())) > 0) {
+#   paste0( "/home/", system("whoami", intern = TRUE), "@securedatacommons.com")
+# } else {
+#   paste0( "/home/", system("whoami", intern = TRUE))
+# } # find the user directory to use
+# 
+# localdir <- file.path("~","TN","workingdata", "TN") # full path for readOGR
+
 
 # Check to see if these processing steps have been done yet; load from prepared file if so
 prepname = paste("Prepared", "TN_SpecialEvent", g, sep="_")
 
 # Apply holidays statewide later.
 
-if(!file.exists(file.path(localdir,"Data", "SpecialEvents", prepname))) { # if doen't exist in TN/SpecialEvents, make it
+if(!file.exists(file.path(localdir, "SpecialEvents", prepname))) { # if doen't exist in TN/SpecialEvents, make it
   
   cat("Preparing", "TN_SpecialEvent", g, "\n")
 
   proj.USGS <- "+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs +ellps=GRS80 +towgs84=0,0,0"
   
   # Combine 2017, 2018, 2019 data
-  load(file.path(localdir,"Data", "SpecialEvents", "TN_SpecialEvent_2017.RData")) # 9 columns
+  load(file.path(localdir, "SpecialEvents", "TN_SpecialEvent_2017.RData")) # 9 columns
   spev2017 <- spev # 670 rows
-  load(file.path(localdir,"Data", "SpecialEvents", "TN_SpecialEvent_2018.RData")) # 13 columns
+  load(file.path(localdir, "SpecialEvents", "TN_SpecialEvent_2018.RData")) # 13 columns
   spev2018 <- spev[,names(spev2017)] # 813 rows
-  load(file.path(localdir,"Data", "SpecialEvents", "TN_SpecialEvent_2019.RData")) # 13 columns
+  load(file.path(localdir, "SpecialEvents", "TN_SpecialEvent_2019.RData")) # 13 columns
   spev2019 <- spev[,names(spev2017)] # 634 rows
   
   spev <- rbind(spev2017, spev2018, spev2019) # 2117 rows
@@ -41,7 +57,7 @@ if(!file.exists(file.path(localdir,"Data", "SpecialEvents", prepname))) { # if d
   dd$Lon <- as.numeric(gsub("[[:space:]]", "", dd$Lon))
   
   # Apply to grid
-  grid_shp <- rgdal::readOGR(file.path(localdir,"Data", "Shapefiles"), layer = g)
+  grid_shp <- rgdal::readOGR(file.path(localdir, "Shapefiles"), layer = g)
   grid_shp <- spTransform(grid_shp, CRS(proj.USGS))
   
   # Project special events
@@ -50,7 +66,6 @@ if(!file.exists(file.path(localdir,"Data", "SpecialEvents", prepname))) { # if d
   
   dd <- spTransform(dd, CRS(proj.USGS))
   
-
   buffdist.mi = 3 # Change this to have different buffers by event type
   
   buffdist <- buffdist.mi * 1609.344 # units are meters in shapefiles
@@ -90,7 +105,7 @@ if(!file.exists(file.path(localdir,"Data", "SpecialEvents", prepname))) { # if d
   names(GridIDTime) <- c("GridDayHour", "GRID_ID")
   
   # Convert all to Central for consistency. We will use Central time (America/Chicago) for all analysis, and convert results back to appropriate local time as needed.
-  # Cannot pass tz arguments as a vector of mixed tz in strptime. Need to loop, unfortuantely
+  # Cannot pass tz arguments as a vector of mixed tz in strptime. Need to loop.
   to_tz = "America/Chicago"
   start.hr <- end.hr <- vector()
   
@@ -159,7 +174,7 @@ if(!file.exists(file.path(localdir,"Data", "SpecialEvents", prepname))) { # if d
   hours = formatC(seq(0, 23, by = 1), width = 2, flag = 0)
   gdh.dd = vector()
   
-  for(i in 1:nrow(dd)){ # i = 1
+  for(i in 1:nrow(dd)){
     
     dh = strptime(paste(dd$Event_Date[i], paste0(hours, ":00:00")),
              tz = to_tz,
@@ -168,7 +183,7 @@ if(!file.exists(file.path(localdir,"Data", "SpecialEvents", prepname))) { # if d
 
     gdh.dd = rbind(gdh.dd, data.frame(gdh, dd[i,]) )
     
-  } # end  loop
+  }
 
   
   spev.grid.time <- filter(spev.grid.time.all, !is.na(GRID_ID))   
@@ -178,12 +193,7 @@ if(!file.exists(file.path(localdir,"Data", "SpecialEvents", prepname))) { # if d
   spev.grid.time.holiday = spev.grid.time.holiday[order(spev.grid.time.holiday$GridDayHour, spev.grid.time.holiday$GRID_ID),]
   
   save(list = c("spev.grid.time", "spev.grid.time.holiday"), 
-       file = file.path(localdir,"Data", "SpecialEvents", paste0(prepname, ".RData")))
-  
-  # Copy to S3
-  system(paste("cp",
-               file.path(localdir,"Data", "SpecialEvents", paste0(prepname, ".RData")),
-               file.path(teambucket,"Data", "SpecialEvents", paste0(prepname, ".RData"))))
+       file = file.path(localdir, "SpecialEvents", paste0(prepname, ".RData")))
   
   rm(dd, grid_dd_pip, grid_shp, spev2017, spev2018, spev2019, cl,
      dh, g.i, gdh, gdh.dd, GridIDTime, spev, xx,
@@ -192,7 +202,7 @@ if(!file.exists(file.path(localdir,"Data", "SpecialEvents", prepname))) { # if d
      t.max, t.min, t)
   
 } else {
-  load(file.path(localdir,"Data", "SpecialEvents", paste0(prepname, ".RData")))
+  load(file.path(localdir, "SpecialEvents", paste0(prepname, ".RData")))
 }
 
 

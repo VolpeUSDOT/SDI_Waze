@@ -4,8 +4,8 @@
 library(randomForest)
 library(tidyverse)
 
-codeloc = '~/git/SDI_Waze'
-volpedrive = "//vntscex.local/DFS/Projects/PROJ-OS62A1/SDI Waze Phase 2/Output/TN"
+codeloc = '~/SDI_Waze'
+refit_outputloc = file.path("~/TN", "workingdata")
 
 grids = c("TN_01dd_fishnet",
           "TN_1sqmile_hexagons")
@@ -22,7 +22,7 @@ state = "TN"
 
 # Refit just on output csv files ----
 
-rfdir <- file.path(volpedrive, paste0('Output_', version))
+rfdir <- file.path(refit_outputloc, paste0('Output_', version))
 
 modfiles <- dir(rfdir)[grep(g, dir(rfdir))]
 modfiles <- modfiles[grep('.csv$', modfiles)]
@@ -30,7 +30,7 @@ modfiles <- modfiles[grep('^TN_Model_', modfiles)]
 
 counts = vector() # To store confusion matrix outputs
 
-for(i in modfiles){ # i = modfiles[5]
+for(i in modfiles){
   
   cat(i, "\n")
   
@@ -83,7 +83,7 @@ for(i in modfiles){ # i = modfiles[5]
              y = c(0.95, 0.05, 0.46,0.81),
              hjust = 0,
              label = c("Accuracy", "False Positive Rate", "Precision", "Recall"))
-  print(gp4); ggsave(filename = file.path(volpedrive, paste0(i, '_Prec_recall_tradoff.jpg')),
+  print(gp4); ggsave(filename = file.path(refit_outputloc, paste0(i, '_Prec_recall_tradoff.jpg')),
                      width = 8, height = 7)      
   
   recall_prec_diff = pt.vec['recall',]-pt.vec['precision',]
@@ -123,8 +123,6 @@ for(i in modfiles){ # i = modfiles[5]
                    dnn = c("Predicted","Observed")) 
   if(sum(dim(predtab))==4 ) {bin.diag = bin.mod.diagnostics(predtab)} else {bin.diag = NA}
   
-  # plot(pROC::roc(out.df$Obs, out.df$Prob.Crash, auc = TRUE))
-  
   (model_auc <- pROC::auc(out.df$Obs, out.df$Prob.Crash))
   
   co = data.frame(co, t(bin.diag), AUC = as.numeric(model_auc))
@@ -138,7 +136,7 @@ write.csv(counts, file = file.path(rfdir, 'Refit', paste0("Confusion_matrix_coun
 
 # Extract values from RF objects ----
 
-rfdir <- file.path(volpedrive, paste0('Random_Forest_Output_', version))
+rfdir <- file.path(refit_outputloc, paste0('Random_Forest_Output_', version))
 
 modfiles <- dir(rfdir)[grep(g, dir(rfdir))]
 modfiles <- modfiles[grep('.RData$', modfiles)]
@@ -172,10 +170,10 @@ for(i in modfiles){ # i = modfiles[6]
 modelno = '06'
 
 # Load full input data
-w.all <- read.csv(file.path(volpedrive, paste0("Random_Forest_Output_", version), paste0("TN_2017-04_to_2018-03_", g, ".csv")))
+w.all <- read.csv(file.path(refit_outputloc, paste0("Random_Forest_Output_", version), paste0("TN_2017-04_to_2018-03_", g, ".csv")))
 
 # Load fitted model
-load(file.path(volpedrive, paste0("Random_Forest_Output_", version), paste0("TN_Model_", modelno, "_", g, "_RandomForest_Output.RData")))
+load(file.path(refit_outputloc, paste0("Random_Forest_Output_", version), paste0("TN_Model_", modelno, "_", g, "_RandomForest_Output.RData")))
 
 # Visualizations ----
 
@@ -239,7 +237,6 @@ gp1 <- ggplot(out.df, aes(Prob.Crash, fill = Obs)) +
   #theme_bw() + 
   scale_fill_brewer(palette="Set1")
 
-print(gp1)
 
 gp2 <- ggplot(out.df, aes(Prob.Crash, fill = CorrectPred)) + 
   geom_histogram(alpha = 0.5, position = "identity", binwidth = 0.01) + 
@@ -250,7 +247,6 @@ gp2 <- ggplot(out.df, aes(Prob.Crash, fill = CorrectPred)) +
   scale_fill_brewer(palette="Set1") +
   ggtitle("Frequency of classification as crash by observed values \n (Truncated at count = 500; Max = 600,000)")
 
-print(gp2)
 # Plotting historgram of difference from observed and estimated, by grid cell aggregated over time ----
 levels(out.df$Pred) = c(1, 0) # from Crash, NoCrash
 levels(out.df$Obs.bin) = c(0, 1) # from Obs  =NoCrash, Obs = Crash
@@ -265,13 +261,11 @@ pct.diff.grid <- out.df %>%
 
 pct.diff.grid$Pct.diff[is.na(pct.diff.grid$Pct.diff) | pct.diff.grid$Pct.diff == Inf] = 0
 
-#hist(pct.diff.grid$Pct.diff)
 
 # Aggregate for report table
 pct.diff.table = as.data.frame(table(pct.diff.cut <- cut(pct.diff.grid$Pct.diff, breaks = c(-2000, -100, -50, -1, 0, 50, 100, 2000))))
 # https://drsimonj.svbtle.com/pretty-histograms-with-ggplot2. Trick is fill = cut()
 
-# levels(cut(pct.diff.grid$Pct.diff, 25)) # create manual colors to match tablesu 
 
 gp3 <- ggplot(pct.diff.grid, aes(Pct.diff, fill = cut(Pct.diff, 
                                                       breaks = c(-1000, -100, -50, -25, 
@@ -282,10 +276,6 @@ gp3 <- ggplot(pct.diff.grid, aes(Pct.diff, fill = cut(Pct.diff,
   ggtitle("Summary of percent difference from observed and estimated EDT-level crashes") +
   xlab("Percent difference") + ylab("Frequency by GRID_ID") +
   scale_fill_brewer(palette = "RdBu", direction = -1)
-#
-#  scale_color_gradient(low = 'red', high = 'midnightblue')
-
-print(gp3)
 
 # Choosing cutoffs ----
 
@@ -344,10 +334,6 @@ gp4 <- ggplot(prec.recall, aes(x = Cutoff, y = Value, group = Metric)) +
 print(gp4)      
 
 dev.off()
-
-
-
-# TODO 2019-02-07 add model refitting steps. Below is old from first iteration <><><><><><>
 
 # RF inputs
 response.var = "MatchEDT_buffer_Acc"

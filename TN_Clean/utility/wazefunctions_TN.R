@@ -41,7 +41,7 @@ makelink <- function(accfile = edt.april, incfile = waze.april,
     
     # ei: was EDT events, now TN crashes. We want to look from the time of crash event -60 minutes to crash event +60 minutes, and find Waze events in this window
     # d.sp: Waze events. inctimevar2 is the *end* of the event and inctimevar1 is the *start* of the event. We look to see if the end of the event is greater than EDT event -60 minutes and see if the start of the Waze event is less than the EDT event +60 minutes.
-
+    
     d.t <- d.sp[d.sp[,inctimevar2] >= ei[,acctimevar]-60*60 & d.sp[,inctimevar1] <= ei[,acctimevar]+60*60,] 
     
     id.accident <- rep(as.character(ei[,accidvar]), nrow(d.t)) # TN crash ID
@@ -54,7 +54,7 @@ makelink <- function(accfile = edt.april, incfile = waze.april,
         rep("<>",20), "\n\n",
        file = paste0("EDT_Waze_log_", i, "_", Sys.Date(), ".txt"), append = T) }
 
-    data.frame(id.accident, id.incidents)
+    data.frame(id.accident, id.incidents) # rbind this output
   } # end %dopar% loop
   
   stopCluster(cl) # stop the cluster.
@@ -74,7 +74,7 @@ makelink.nonpar <- function(accfile = edt.april, incfile = waze.april,
     linktable <- vector()
   
     # keeping non-parallized version here for reference
-    for(i in 1:nrow(accfile)){
+    for(i in 1:nrow(accfile)){ # i=which(edt$ID == "2023680")
       ei = accfile[i,]
       
       dist.i <- spDists(ei, incfile, longlat = T)*0.6213712 # spDists gives units in km, convert to miles
@@ -123,7 +123,6 @@ movefiles <- function(filelist, temp = outdir, wazedir){
   }
   
   for(i in filelist){
-      
     # Encase the destination path in quotes, because of spaces in path name
     system(paste0("mv ", file.path(temp, i), ' \"', file.path(wazedir, i), '\"'))
     
@@ -195,18 +194,18 @@ bin.mod.diagnostics <- function(predtab){
 
 
 # Read in hexagonally-gridded data of a specific name, prep fields, and save it as a short-named data frame
+# Will not be used in TN Case Study
 prep.hex <- function(hexname, state, month, bucket = teambucket){
-  # Defaults to read from S3 bucket specified with teambucket 
   # Specify month as 6-digit character value, e.g. "2017-04" for April 2017
   # Specify full path in hexname, e.g. for MD weather-overlaid files: file.path(inputdir, paste0("WazeTimeEdtHexWx_", mo,".RData"))
   
   mo = month
-  system(paste0('cp ', bucket, '/', 'Data', '/', hexname))
-  load(file.path("~/TN","Data", hexname))
+  load(file.path("~/TN","workingdata", hexname))
 
   wte <- get(ls(envir = environment())[grep("WazeTime", ls(envir = environment()), ignore.case = T)])
   
   class(wte) <- "data.frame" 
+
 
   if(length(grep("weekday", names(wte)) > 0)){
     wte$DayOfWeek <- as.factor(wte$weekday)

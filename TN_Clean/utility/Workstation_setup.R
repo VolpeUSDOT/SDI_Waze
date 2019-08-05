@@ -1,7 +1,7 @@
-# Setting up workstation in Secure Data Commons. This example script can be modified for the computing infrastructure used by THP
+# Setting up workstation on local machine. This example script can be modified for the computing infrastructure used by THP
+# Not used in TN Case Study, but can be used to develop 
 
 # Make directories to work in:
-# - ~/workingdata especially, this is where we can pull things down from S3 team bucket and push outputs back up to S3 
 
 # Pull key data files from S3 bucket, including:
 # - Shapefiles (census counties, hex tesselations)
@@ -76,10 +76,6 @@ for(state in states){
 
 
 # census ----
-
-# cb_2016_us_ua10_500k
-# cb_2017_us_county_500k
-
 # Get all contents 
 
 census.ls <- system(paste("aws s3 ls", 

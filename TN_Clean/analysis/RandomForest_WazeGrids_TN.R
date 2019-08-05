@@ -15,19 +15,11 @@ source(file.path(codeloc, 'utility/get_packages.R')) # installs necessary packag
 grids = c("TN_01dd_fishnet",
           "TN_1sqmile_hexagons")
 
-codeloc <- "~/SDI_Waze" 
-
-user <- if(length(grep("@securedatacommons.com", getwd())) > 0) {
-  paste0( "/home/", system("whoami", intern = TRUE), "@securedatacommons.com")
-} else {
-  paste0( "/home/", system("whoami", intern = TRUE))
-} # find the user directory to use
+user <- normalizePath("~/TN")
 
 localdir <- paste0(user, "/workingdata/TN") # full path for readOGR
 
-teambucket <- "s3://prod-sdc-sdi-911061262852-us-east-1-bucket"
-
-source(file.path(codeloc, "TN", "utility/wazefunctions_TN.R")) 
+source(file.path(codeloc, "utility/wazefunctions_TN.R")) 
 
 setwd(localdir)
 
@@ -36,7 +28,7 @@ g = grids[1] # start with square grids, now running hex also. Change between 1 a
 state = "TN"
 # <><><><><>
 
-# Manually setting months to run here; could also scan S3 for months available for this state
+# Manually setting months to run here
 do.months = c(paste("2017", c("04","05","06","07","08","09", "10", "11", "12"), sep="-"),
               paste("2018", c("01","02","03"), sep="-"))#,"04","05","06","07","08","09"), sep="-"))
 
@@ -51,13 +43,11 @@ system(paste('mkdir -p', outputdir))
 # read random forest function
 source(file.path(codeloc, "analysis/RandomForest_WazeGrid_Fx.R"))
 
-# View the files available in S3 for this state: system(paste0('aws s3 ls ', teambucket, '/', state, '/'))
-
 Waze_Prepared_Data = paste0(state, '_', do.months[1], '_to_', do.months[length(do.months)], '_', g)
 
 # <><><><><><><><><><><><><><><><><><><><><><><><>
 # Start data prep. Run this if the data for this time period and grid size are not ready yet, otherwise read from prepared data.
-
+# Skip and run after line 126
 if(length(grep(Waze_Prepared_Data, dir(localdir))) == 0){
   
 # rename data files by month. For each month, prep time and response variables
@@ -90,11 +80,11 @@ monthfiles = sub("-", "_", monthfiles)
 # Append supplemental data ----
 
 # Both 2017 and 2018 special event data now
-source(file.path(codeloc, "TN", "utility", "Prep_SpecialEvents.R")) # gives spev.grid.time and spev.grid.time.holiday. Prep of 1sqmile ~ 4 hours, 01dd ~ 5 min.
+source(file.path(codeloc, "utility", "Prep_SpecialEvents.R")) # gives spev.grid.time and spev.grid.time.holiday. Prep of 1sqmile ~ 4 hours, 01dd ~ 5 min.
 
-source(file.path(codeloc, "TN", "utility", "Prep_HistoricalCrash.R")) # gives crash
+source(file.path(codeloc, "utility", "Prep_HistoricalCrash.R")) # gives crash
 
-source(file.path(codeloc, "TN", "utility", "Prep_HistoricalWeather.R")) # gives wx.grd.day. Weather variables, by grid ID, by day. Takes ~ 2 hrs for 0.1 dd on 16 core instance.
+source(file.path(codeloc, "utility", "Prep_HistoricalWeather.R")) # gives wx.grd.day. Weather variables, by grid ID, by day. Takes ~ 2 hrs for 0.1 dd on 16 core instance.
 # Run for 1sqmile hex, after optimizing now approx 20 hours.
 
 # Add prepared special events and historical crash data, with grid ID
@@ -129,7 +119,7 @@ save(w.allmonths,
 
 # format(object.size(w.allmonths), "Gb")
 # To save for export, after running both grid sizes for these months:
-# source(file.path(codeloc, "TN", "analysis/scratch/bundle_RF_inputs.R"))
+# source(file.path(codeloc, "analysis/scratch/bundle_RF_inputs.R"))
  
 } # End data prep 
 # <><><><><><><><><><><><><><><><><><><><><><><><>
@@ -137,7 +127,7 @@ save(w.allmonths,
 
 # Start from prepared data
  
-load(file.path(localdir, paste0(Waze_Prepared_Data, ".RData")))
+w.allmonths <- read.csv(file.path(localdir, paste0(Waze_Prepared_Data, ".csv")))
                   
 avail.cores = parallel::detectCores()
 
@@ -407,10 +397,4 @@ system(paste('zip', file.path('~/workingdata', zipname),
              file.path(outputdir, paste0('TN_Model_06_', g, '_RandomForest_Output.RData'))
              
              ))
-
-system(paste(
-  'aws s3 cp',
-  file.path('~/workingdata', zipname),
-  file.path(teambucket, 'export_requests', zipname)
-))
 

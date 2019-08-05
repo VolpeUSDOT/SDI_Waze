@@ -146,7 +146,6 @@ do.rf <- function(train.dat, omits, response.var = "MatchEDT_buffer_Acc", model.
        ylim = c(0, 1), xlim = c(1, 0))
   legend("bottomright", legend = round(model_auc, 4), title = "AUC", inset = 0.25)
   
-  # dev.print(device = jpeg, file = paste0("AUC_", model.no, ".jpg"), width = 500, height = 500)
   dev.off()
 
   out.df <- data.frame(test.dat.use[, c("GRID_ID", "Year", "day", "hour", response.var)], rf.pred, rf.prob)
@@ -192,11 +191,6 @@ do.rf <- function(train.dat, omits, response.var = "MatchEDT_buffer_Acc", model.
   
   save(list = savelist, file = file.path(outputdir, fn))
   
-  # Copy to S3
-  system(paste("aws s3 cp",
-               file.path(outputdir, fn),
-               file.path(teambucket, state, "RandomForest_Output", fn)))
-  
   # Output is list of three elements: Nobs data frame, predtab table, binary model diagnotics table, and mean squared error
   if(class(rundat[,response.var])=="factor"){
   outlist =  list(Nobs, predtab, diag = bin.mod.diagnostics(predtab), 
@@ -241,20 +235,24 @@ do.rf <- function(train.dat, omits, response.var = "MatchEDT_buffer_Acc", model.
 #       model.no = "01", rf.inputs = rf.inputs) 
 
 # Function to re-assess model predictions and diagnostics for an already-fit model ----
-# To do: validate using testrows and training rows from previous model runs
-# To do: For SDC, change s3load to system(aws s3 cp) etc, since aws.s3 package won't work on SDC
-
+#Will not be run by the random forest models
 reassess.rf <- function(train.dat, omits, response.var = "MatchEDT_buffer_Acc", model.no,
                         test.dat = NULL,
                         rf.inputs = list(ntree.use = 500, avail.cores = 4, mtry = NULL, maxnodes = NULL, nodesize = 5),
-                        cutoff = c(0.8, 0.2)){
+                        cutoff = c(0.8, 0.2),
+                        in_aws = F){
 
   class(train.dat) <- "data.frame"
 
   # Load fitted model
   cat("Loading", model.no, "\n")
-  s3load(object = file.path(outputdir, paste("Model", model.no, "RandomForest_Output.RData", sep= "_")),
-         bucket = waze.bucket)  
+  if(in_aws){
+    s3load(object = file.path(outputdir, paste("Model", model.no, "RandomForest_Output.RData", sep= "_")),
+           bucket = waze.bucket)  
+  }else{
+    load(object = file.path(outputdir, paste("Model", model.no, "RandomForest_Output.RData", sep= "_")))
+  }
+  
   
   fitvars <- names(train.dat)[is.na(match(names(train.dat), omits))]
   
@@ -343,9 +341,17 @@ reassess.rf <- function(train.dat, omits, response.var = "MatchEDT_buffer_Acc", 
   savelist = c("rf.out", "rf.pred", "rf.prob", "out.df") 
   if(is.null(test.dat)) savelist = c(savelist, "testrows", "trainrows")
 
-  s3save(list = savelist,
-         object = file.path(outputdir, paste("Model", model.no, "RandomForest_Output.RData", sep= "_")),
-         bucket = waze.bucket)
+  if(!in_aws){
+    s3save(list = savelist,
+           object = file.path(outputdir, paste("Model", model.no, "RandomForest_Output.RData", sep= "_")),
+           bucket = waze.bucket)
+  }else{
+    save(list = savelist,
+         object = file.path(outputdir, paste("Model", model.no, "RandomForest_Output.RData", sep= "_")))
+  }
+
+  
+
   
   # Output is list of three elements: Nobs data frame, predtab table, binary model diagnotics table, and mean squared error
   if(class(rundat[,response.var])=="factor"){

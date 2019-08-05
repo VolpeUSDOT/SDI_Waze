@@ -22,8 +22,6 @@ grid_shp <- grid_shp[as.vector(grid_intersects),]
 plotgrid <- grid_shp
 
 # Plot by day, aggregated 
-# TODO: loop over hours, animate... make into time blocks
-# for now just use one day
 pred_dat <- next_week_out %>%
   group_by(GRID_ID, date.x) %>%
   summarize(Crash_pred = sum(as.numeric(Crash_pred)),

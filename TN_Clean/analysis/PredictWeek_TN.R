@@ -21,20 +21,13 @@ library(rgdal)
 
 grids = c("TN_01dd_fishnet",
           "TN_1sqmile_hexagons")
+ 
 
-codeloc <- "~/SDI_Waze" 
-
-user <- if(length(grep("@securedatacommons.com", getwd())) > 0) {
-  paste0( "/home/", system("whoami", intern = TRUE), "@securedatacommons.com")
-} else {
-  paste0( "/home/", system("whoami", intern = TRUE))
-} # find the user directory to use
+user <- normalizePath("~/TN")
 
 localdir <- paste0(user, "/workingdata/TN") # full path for readOGR
 
-teambucket <- "s3://prod-sdc-sdi-911061262852-us-east-1-bucket"
-
-source(file.path(codeloc, "TN", "utility/wazefunctions_TN.R")) 
+source(file.path(codeloc, "utility/wazefunctions_TN.R")) 
 
 # read random forest function
 source(file.path(codeloc, "analysis/RandomForest_WazeGrid_Fx.R"))
@@ -89,7 +82,6 @@ grid_x_day <- grid_x_day %>%
          DayOfWeek = format(hextime, '%u'), # Monday = 1
          date = format(hextime, '%Y-%m-%d'))
 
-# dim(grid_x_day) # 215,040 rows, 7 columns for 01dd fishnet
 na.action = "fill0" # This is an argument in append.hex, below. Other options are 'omit' or 'keep'.
 
 # Get special events for next week ----
@@ -103,7 +95,7 @@ next_week <- append.hex(hexname = 'grid_x_day',
 
 # Get weather for next week ----
 
-source(file.path(codeloc, 'TN', 'utility', 'Prep_ForecastWeather.R'))
+source(file.path(codeloc, 'utility', 'Prep_ForecastWeather.R'))
 
 wx.grd.day$day <- as.Date(wx.grd.day$day)
 
@@ -112,7 +104,7 @@ next_week <- append.hex(hexname = 'next_week',
 
 # Generate Waze events for next week ----
 
-source(file.path(codeloc, 'TN', 'utility', 'Prep_ExpectedWaze.R'))
+source(file.path(codeloc, 'utility', 'Prep_ExpectedWaze.R'))
 
 next_week <- left_join(next_week, w.expected,
                         by = c('GRID_ID', 'mo', 'DayOfWeek', 'hour'))
@@ -166,13 +158,6 @@ system(paste('zip', file.path('~/workingdata', zipname),
              paste0('TN_Model_05_Predictions', g, Sys.Date(), '.csv')
              ))
 
-system(paste(
-  'aws s3 cp',
-  file.path('~/workingdata', zipname),
-  file.path(teambucket, 'export_requests', zipname)
-))
-
-
 # Visualize predictions -----
 # use the following objects to make visualizations
 # next_week_out
@@ -180,5 +165,5 @@ system(paste(
 next_week_out <- read.csv(paste0('TN_Model_05_Predictions', g, '2019-05-06', '.csv'))
 VIZ = T
 if(VIZ){
-  source(codeloc, 'TN', 'analysis', 'Visualize_Next_Week.R')
+  source(codeloc, 'analysis', 'Visualize_Next_Week.R')
 }

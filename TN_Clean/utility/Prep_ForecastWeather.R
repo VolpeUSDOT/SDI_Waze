@@ -1,36 +1,36 @@
 # Prepare forecasted weather for random forest work.
 # Need to create an interpolated grid based on forecasted weather.
 
-# Run from PredictWeek_TN.R, following Get_weather_forecasts.R, which provides data
+# Run from PredictWeek_TN.R, following Get_weather_forecasts.R, which provides dat 
 # already in memory: localdir, teambucket, codeloc, state, and g, which repreresents the grid type to use
 
 # Also already in memory is `next_week`, a data frame of the grid ID and date/time for the next week
  
-censusdir <- normalizePath("~/TN/Data/census") # for buffered state shapefile created in first step of data pipeline, ReduceWaze_SDC.R
+censusdir <- normalize("~TN/workingdata/census") # full path for readOGR, for buffered state shapefile created in first step of data pipeline, ReduceWaze_SDC.R
 
-temp.outputdir <- normalizePath("~/TN/Data/tempout") # to hold daily output files as they are generated, and then sent to team bucket
+temp.outputdir <- "~TN/tempout" # to hold daily output files as they are generated, and then sent to team bucket
 
 proj.USGS <- "+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs +ellps=GRS80 +towgs84=0,0,0"
 
 library(gstat) # For kriging
 library(rgeos) # for gIntersects
 library(rgdal)
-library(raster)
+library(raster) # masks several functions from dplyr, use caution
 library(doParallel)
 library(foreach)
 
 prepname =  paste0("TN_Forecasts_Gridded_", g, Sys.Date(), ".RData")
 
-if(!file.exists(file.path(localdir,'Data', 'Weather', prepname))) {
+if(!file.exists(file.path(localdir, 'Weather', prepname))) {
 
   cat("Preparing Forecasts to", as.character(max(next_week$date)), "for", g, "\n")
   
   # Get weather forecast for the next week
   # First check to see if forecast has been run already from today (to not over-user API call)
-  if(file.exists(file.path(localdir,'Data', 'Weather', paste0("TN_Forecasts_", Sys.Date(), ".RData")))) {
-    load(file.path(localdir,'Data', 'Weather', paste0("TN_Forecasts_", Sys.Date(), ".RData")))
+  if(file.exists(file.path(localdir, 'Weather', paste0("TN_Forecasts_", Sys.Date(), ".RData")))) {
+    load(file.path(localdir, 'Weather', paste0("TN_Forecasts_", Sys.Date(), ".RData")))
   } else {
-    source(file.path(codeloc,'Data', 'datacleaning', 'Get_weather_forecasts.R'))
+    source(file.path(codeloc, 'datacleaning', 'Get_weather_forecasts.R'))
   }
   
   
@@ -89,23 +89,14 @@ if(!file.exists(file.path(localdir,'Data', 'Weather', prepname))) {
   wx.grd.day <- foreach(day = all_wx_days, 
                       .packages = c('raster','gstat','dplyr','rgdal'), 
                       .combine = rbind) %dopar% {
-                        
     cat(paste(Sys.time()), as.character(day), "\n", 
         file = paste("Prep_Weather_to", max(next_week$date), g, "log.txt", sep="_"), append = T) 
         
     # Scan team bucket for completed daily weather prep ----
     fn = paste("Prep_Weather_Daily_", day,"_", g, ".RData", sep="")
     
-    # See if exists in local folder. Load if so. If not, carry out kriging steps.
-    exists_fn <- length(
-      system(paste("ls",
-                 file.path(teambucket, 'Data', 'Daily_Weather_Prep', fn)), intern= T)) > 0
-    
-    if(exists_fn){
-      system(paste("cp",
-                   file.path(teambucket, 'Data', 'Daily_Weather_Prep', fn),
-                   file.path(temp.outputdir, fn)
-      ))
+    # See if exists in outputdir. Load if so. If not, carry out kriging steps.
+    if(file.exists(file.path(file.path(temp.outputdir, fn)))){
       load(file.path(temp.outputdir, fn))
     } else {
     
@@ -116,7 +107,6 @@ if(!file.exists(file.path(localdir,'Data', 'Weather', prepname))) {
     vg_prcp <- gstat::variogram(precipIntensityMax  ~ 1, locations = wx.day[!is.na(wx.day$precipIntensityMax ),])
     dat.fit <- fit.variogram(vg_prcp, fit.ranges = F, fit.sills = F,
                              vgm(model = "Sph"))
-    
     dat.krg.prcp <- krige(f.p, wx.day[!is.na(wx.day$precipIntensityMax),], grd, dat.fit)
     
     # Rasterize
@@ -140,7 +130,7 @@ if(!file.exists(file.path(localdir,'Data', 'Weather', prepname))) {
     tmax_r <- raster::raster(dat.krg.tmax)
     tmax_r <- mask(tmax_r, grid_shp)
     
-    # SNOW: model fitted with historical data had a variable called SNOW.
+    # SNOW: model fitted with historical data had a variable called SNOW. Forecast does not, but does have precipType, so create SNOW from this.
     wx.day@data <- wx.day@data %>%
       mutate(SNOW = ifelse(precipType == 'snow', precipIntensity, 0))
     
@@ -192,11 +182,11 @@ if(!file.exists(file.path(localdir,'Data', 'Weather', prepname))) {
     
     daily_result <- full_join(daily_result, snow_extr)
     
-    # Save to S3 as temporary location in case the process is interrupted
+    # Save in temporary location in case the process is interrupted
     fn = paste("Prep_Weather_Daily_", day,"_", g, ".RData", sep="")
     
     save(list="daily_result", file = file.path(temp.outputdir, fn))
-
+    
     EndTime <- Sys.time()-StartTime
     cat(as.character(day), 'completed', round(EndTime, 2), attr(EndTime, 'units'), '\n',
         file = paste0("Prep_Weather_", g, "_log.txt"), append = T) 
@@ -209,14 +199,9 @@ if(!file.exists(file.path(localdir,'Data', 'Weather', prepname))) {
   cat(round(EndTime, 2), attr(EndTime, "units"), "\n")
    
   save(list = c("wx.grd.day"), 
-       file = file.path(localdir,"Data", "Weather", prepname))
-
-  # Copy to local directory
-  system(paste("cp",
-               file.path(localdir,"Data", "Weather", prepname),
-               file.path(teambucket,"Data", "Weather", prepname)))
+       file = file.path(localdir, "Weather", prepname))
 
   } else {
-  load(file.path(localdir,"Data", "Weather", prepname))
+  load(file.path(localdir, "Weather", prepname))
 }
 

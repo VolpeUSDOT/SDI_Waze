@@ -3,6 +3,7 @@
 
 # Start from PredictWeek_TN.R, where w.allmonths is already loaded
 
+
 waze_date_range <- paste(range(w.allmonths$date), collapse = "_to_")
 
 prepname =  paste0("TN_Waze_Expected_", g, "_", waze_date_range, ".RData")
@@ -18,14 +19,9 @@ w.expected <- w.allmonths %>%
             )
 
 save(list = c("w.expected"), 
-     file = file.path(localdir, "Waze", prepname))
-
-# Copy to S3
-system(paste("aws s3 cp",
-             file.path(localdir, "Waze", prepname),
-             file.path(teambucket, state, "Waze", prepname)))
+     file = file.path(localdir,"Waze", prepname))
 
 } else {
-  load(file.path(localdir, "Waze", prepname))
+  load(file.path(localdir,"Waze", prepname))
 }
 
