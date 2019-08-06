@@ -6,7 +6,7 @@
 
 # Also already in memory is `next_week`, a data frame of the grid ID and date/time for the next week
  
-censusdir <- normalize("~TN/workingdata/census") # full path for readOGR, for buffered state shapefile created in first step of data pipeline, ReduceWaze_SDC.R
+censusdir <- normalizePath("~/TN/workingdata/census") # full path for readOGR, for buffered state shapefile created in first step of data pipeline, ReduceWaze_SDC.R
 
 temp.outputdir <- "~TN/tempout" # to hold daily output files as they are generated, and then sent to team bucket
 

@@ -128,7 +128,11 @@ save(w.allmonths,
 # Start from prepared data
  
 w.allmonths <- read.csv(file.path(localdir, paste0(Waze_Prepared_Data, ".csv")))
-                  
+
+w.allmonths$MatchTN_buffer <- as.factor(w.allmonths$MatchTN_buffer)
+w.allmonths$MatchTN_buffer_Acc <- as.factor(w.allmonths$MatchTN_buffer_Acc)
+w.allmonths$TN_crash <- as.factor(w.allmonths$TN_crash)
+                
 avail.cores = parallel::detectCores()
 
 # if(avail.cores > 8) avail.cores = 12 # Limit usage below max if on r4.4xlarge instance. Comment this out to run largest models.
@@ -184,7 +188,7 @@ if(!REASSESS){
                                 omits, response.var = "MatchTN_buffer_Acc", 
                                 model.no = modelno, rf.inputs = rf.inputs,
                                 cutoff = c(0.95, 0.05)
-                                #, thin.dat = 0.2
+                                # , thin.dat = 0.001
                                 ) 
   
   save("keyoutputs", file = paste0("Output_to_", modelno))

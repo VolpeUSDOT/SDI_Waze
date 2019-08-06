@@ -21,7 +21,7 @@ state = "TN"
 
 output.loc <- "~/tempout"
 
-localdir <- normalizePath("~/TN") # full path for readOGR
+localdir <- normalizePath("~/TN/workingdata") # full path for readOGR
 
 setwd(localdir)
 
@@ -30,7 +30,8 @@ wazedir <- normalizePath(file.path(localdir, state, "Waze")) # has State_Year-mo
 
 # Flag for SDC work
 ON_SDC = F
-teambucket <- "<Path_to_AWS_S3_Bucket_For_Waze_Data>"
+if(ON_SDC){teambucket <- "<Path_to_AWS_S3_Bucket_For_Waze_Data>"}
+
 
 source(file.path(codeloc, "utility/wazefunctions.R")) 
 
@@ -46,7 +47,7 @@ proj <- showP4(showWKT("+init=epsg:102008"))
 proj.USGS <- "+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs +ellps=GRS80 +towgs84=0,0,0"
 
 # Make TN/Overlay directory, if it doesn't already exist
-system(paste('mkdir -p', file.path(localdir, "TN", "Overlay")))
+system(paste('mkdir -p', file.path(localdir, "Overlay")))
 
 TEST = F      # Change to F to run for all available months, T for only a subset of months
 CHECKPLOT = T # Make plots for each stage, to make sure of spatial overlay
@@ -70,7 +71,7 @@ co <- spTransform(co, CRS(proj.USGS))
 grids = c("TN_01dd_fishnet",
           "TN_1sqmile_hexagons")
 
-for(g in grids){ # g = grids[1]
+for(g in grids){
   
   grid = readOGR(file.path(localdir, state, "Shapefiles"), layer = g) # the grid layer
   grid <- spTransform(grid, CRS(proj.USGS))
@@ -86,7 +87,6 @@ for(g in grids){ # g = grids[1]
   grid <- grid[instate,]
   
   # Files -- 
-  # load(file.path(localdir, state, "Crash", "TN_Crash.RData")) # 791 Mb version, 80 columns 829,301 rows 
   # about 29% are missing lat/long, and additional checks were done in TN_Data_Format.R for lat / long validity.
   load(file.path(localdir, state, "Crash", "TN_Crash_Simple_2008-2018.RData")) # 135.6 Mb, 26 columns, 447,224 rows
   tn_crash <- crash
@@ -107,14 +107,11 @@ for(g in grids){ # g = grids[1]
   wazemonthfiles <- wazemonthfiles[grep("TN_\\d{4}-\\d{2}.RData$", wazemonthfiles)]
   wazemonths <- sort(unique(substr(wazemonthfiles, 4, 10)))
   
-  # !!!! TODO: allow manual set for just Waze data for all availale months of Waze, for exporting to TN
   months_shared <- sort(tn_crash_months[tn_crash_months %in% wazemonths])
-  # Not months all are shared -- TN crash data through Sept 2018 
-  #  summary(wazemonths %in% tn_crash_months)
   
   # Restrict TN crash data to just shared months
   tn_crash <- tn_crash[!is.na(match(tn_crash$YM, months_shared)),]
-  dim(tn_crash) # 123,124
+  dim(tn_crash)
   
   avail.cores <- parallel::detectCores()
   if(avail.cores > length(months_shared)) avail.cores = length(months_shared) # use only cores necessary
@@ -125,7 +122,6 @@ for(g in grids){ # g = grids[1]
   
   # Start parallel loop over yearmonths within state ----
   foreach(mo = months_shared, .packages = c("dplyr", "tidyr","sp","rgdal","scales")) %dopar% {
-    # mo = "2018-03" # mo = "2017-04"
     
     # Waze: Comes from aggregated monthly Waze events, clipped to a 0.5 mile buffer around state, for each month.  All the waze files share the same object name, mb
     load(file.path(wazedir, wazemonthfiles[grep(mo, wazemonthfiles)]))
@@ -144,7 +140,7 @@ for(g in grids){ # g = grids[1]
       
       new.mb <- vector()
       
-      for(tz in unique(mbtz)){ # tz = "CST"
+      for(tz in unique(mbtz)){
         mbx.tz = mb[mbtz == tz,] # subset data frame mb to just rows with this time zone
         mbx.tz$time = as.POSIXct(mbt[mbtz == tz], tz = tz)
         mbx.tz$last.pull.time = as.POSIXct(mbt.last[mbtz == tz], tz = tz)
@@ -175,9 +171,8 @@ for(g in grids){ # g = grids[1]
     # Urban area overlay ----
     
     waze_ua_pip <- over(mb, ua[,c("NAME10","UATYP10")]) # Match a urban area name and type to each row in mb (Waze events data). UATYPE10 is Census 2010 Urban Type, U = Urban Area, C = Urban Cluster.
-    table(ua$UATYP10) # have C and U, no R as named type
-    # C    U 
-    # 3104  497 
+    table(ua$UATYP10)
+    
     edt_ua_pip <- over(tn_crash, ua[,c("NAME10","UATYP10")]) # Match a urban area name and type to each row in tn_crash. 
     mb@data <- data.frame(mb@data, waze_ua_pip)
     names(mb@data)[(length(mb@data)-1):length(mb@data)] <- c("Waze_UA_Name", "Waze_UA_Type") # Rename the two added columns
@@ -209,11 +204,9 @@ for(g in grids){ # g = grids[1]
     
     # Save Waze data as dataframe
     waze.df <- mb@data 
-    # names(waze.df)
     
     # Save EDT data as dataframe, and subset to just the month of interest
     crash.df <- tn_crash@data  %>% filter(YM == mo)
-    # names(crash.df)
     
     # before carrying out the join, rename the TN crash grid cell columns 
     names(crash.df)[grep("^GRID", names(crash.df))] <- paste(names(crash.df)[grep("^GRID", names(crash.df))], state, sep = ".")
@@ -227,7 +220,6 @@ for(g in grids){ # g = grids[1]
     link.waze$match <- ifelse(is.na(link.waze$match), 'W', link.waze$match)
     
     # now has M for rows with matching TN crahes, and W for all others in column "match"
-    # summary(as.factor(link.waze$match))
     
     # Join TN crash data to Waze-link table (full join)
     crash.df$MstrRecNbrTxt <- as.character(crash.df$MstrRecNbrTxt)
@@ -237,7 +229,7 @@ for(g in grids){ # g = grids[1]
     
     # Add T code to match column to indicate only TN crash data
     link.waze.tn$match <- ifelse(is.na(link.waze.tn$match), 'T', link.waze.tn$match)
-    # table(link.waze.tn$match)
+
     
     # rename ID variables for compatibility with existing code
     names(link.waze.tn)[grep("id.incident", names(link.waze.tn))] = "uuid.waze"
@@ -247,11 +239,13 @@ for(g in grids){ # g = grids[1]
     fn = paste0("merged.waze.tn.", g, "_", mo, ".RData")
     
     save(list=c("link.waze.tn", "crash.df"), file = file.path(localdir, "TN", "Overlay", fn))
-    
-    system(paste("aws s3 cp",
-                 file.path(localdir, "TN", "Overlay", fn),
-                 file.path(teambucket, "TN", "Overlay", fn)))
-    
+    if(ON_SDC){
+      system(paste("aws s3 cp",
+                   file.path(localdir,"Overlay", fn),
+                   file.path(teambucket, "Overlay", fn)))
+      
+    }
+
     if(CHECKPLOT) { 
       lwe.sp <- SpatialPoints(link.waze.tn[!is.na(link.waze.tn$lon) | !is.na(link.waze.tn$lat),c("lon", "lat")],
                                    proj4string = CRS("+proj=longlat +datum=WGS84")) 

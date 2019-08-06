@@ -191,6 +191,8 @@ do.rf <- function(train.dat, omits, response.var = "MatchEDT_buffer_Acc", model.
   
   save(list = savelist, file = file.path(outputdir, fn))
   
+  if(class(rundat[,response.var])!="factor" & class(rundat[,response.var])=="numeric") stop("response.var is neither a factor nor a numeric")  
+  
   # Output is list of three elements: Nobs data frame, predtab table, binary model diagnotics table, and mean squared error
   if(class(rundat[,response.var])=="factor"){
   outlist =  list(Nobs, predtab, diag = bin.mod.diagnostics(predtab), 
@@ -273,7 +275,9 @@ reassess.rf <- function(train.dat, omits, response.var = "MatchEDT_buffer_Acc", 
                      length(rundat$nWazeAccident[train.dat$nWazeAccident>0]) )
   
   colnames(Nobs) = c("N", "No EDT", "EDT present", "Waze accident present")
-  
+
+  if(class(rundat[,response.var])!="factor" | class(rundat[,response.var])=="numeric") stop("response.var is neither a factor nor a numeric")
+    
   # Begin if factor response variable  
   if(class(rundat[,response.var])=="factor"){
     rf.pred <- predict(rf.out, test.dat.use[fitvars], cutoff = cutoff)
@@ -341,13 +345,13 @@ reassess.rf <- function(train.dat, omits, response.var = "MatchEDT_buffer_Acc", 
   savelist = c("rf.out", "rf.pred", "rf.prob", "out.df") 
   if(is.null(test.dat)) savelist = c(savelist, "testrows", "trainrows")
 
-  if(!in_aws){
+  if(in_aws){
     s3save(list = savelist,
            object = file.path(outputdir, paste("Model", model.no, "RandomForest_Output.RData", sep= "_")),
            bucket = waze.bucket)
   }else{
     save(list = savelist,
-         object = file.path(outputdir, paste("Model", model.no, "RandomForest_Output.RData", sep= "_")))
+         file.path(outputdir, paste("Model", model.no, "RandomForest_Output.RData", sep= "_")))
   }
 
   

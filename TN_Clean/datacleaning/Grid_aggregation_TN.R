@@ -11,7 +11,8 @@ source(file.path(codeloc, 'utility/get_packages.R'))
 
 # Flag for SDC work
 ON_SDC = F
-teambucket <- "<Path_to_AWS_S3_Bucket_For_Waze_Data>"
+if(ON_SDC){teambucket <- "<Path_to_AWS_S3_Bucket_For_Waze_Data>"}
+
 
 library(tidyverse)
 library(lubridate)
@@ -31,13 +32,13 @@ localdir <- normalizePath("~/TN") # full path for readOGR
 
 setwd(localdir)
 
-wazemonthdir <- file.path(localdir, "Overlay") # contains the merged.waze.tn.YYYY-mm_<state>.RData files
-temp.outputdir = "~/agg_out" # Will contain the WazeHexTimeList_YYYY-mm_grids_<state>.RData files
+wazemonthdir <- file.path(localdir,"workingdata", "Overlay") # contains the merged.waze.tn.YYYY-mm_<state>.RData files
+temp.outputdir = file.path(localdir, "agg_out") # Will contain the WazeHexTimeList_YYYY-mm_grids_<state>.RData files
 
 source(file.path(codeloc, "utility/wazefunctions.R")) 
 
-crashdir <- normalizePath(file.path(localdir, "Crash"))
-wazedir <- normalizePath(file.path(localdir, "Waze"))
+crashdir <- normalizePath(file.path(localdir,"workingdata", "Crash"))
+wazedir <- normalizePath(file.path(localdir,"workingdata", "Waze"))
 
 if(ON_SDC){
 
@@ -254,12 +255,12 @@ for(g in grids){ # g = grids[2]
     fn = paste("WazeTimeEdtHexAll_", j,"_", g, ".RData", sep="")
     
     save(list="wazeTime.tn.hexAll", file = file.path(temp.outputdir, fn))
-
-    # Copy to S3
-    system(paste("aws s3 cp",
-                 file.path(temp.outputdir, fn),
-                 file.path(teambucket, state, fn)))
-    
+    if(ON_SDC){
+      # Copy to S3
+      system(paste("aws s3 cp",
+                   file.path(temp.outputdir, fn),
+                   file.path(teambucket, state, fn)))
+    }
     EndTime <- Sys.time()-StartTime
     cat(j, 'completed', round(EndTime, 2), attr(EndTime, 'units'), '\n')
 
@@ -286,12 +287,14 @@ for(g in grids){ # g = grids[1]
   for(j in avail.months){
   fn = paste("WazeTimeEdtHexAll_", j,"_", g, ".RData", sep="")
   
-  # Copy to S3
-  system(paste("aws s3 cp",
-               file.path(temp.outputdir, fn),
-               file.path(teambucket, state, fn)))
+  if(ON_SDC){
+    # Copy to S3
+    system(paste("aws s3 cp",
+                 file.path(temp.outputdir, fn),
+                 file.path(teambucket, state, fn)))
   }
-}
+  }
+  }
 }
 # Check with plots -- 
 
@@ -303,7 +306,7 @@ library(maps) # for state.fips
 
 if(CHECKPLOT){  
   
-  co <- rgdal::readOGR(file.path(localdir, 'census'), layer = "cb_2017_us_county_500k")
+  co <- rgdal::readOGR(file.path(localdir,"workingdata", 'census'), layer = "cb_2017_us_county_500k")
 
   FIPS = state.fips[state.fips$abb %in% state,]
   FIPS = FIPS[!duplicated(FIPS$abb),]
@@ -317,7 +320,7 @@ if(CHECKPLOT){
   state.co <- co[co$STATEFP == FIPS[FIPS$abb==state,"fips"],]
     
   # Read in hexagon shapefile. This is a rectangular surface of 1 sq mi area hexagons, 
-  hex = readOGR(file.path(localdir, "TN", "Shapefiles"), layer = g)
+  hex = readOGR(file.path(localdir,"workingdata", "TN", "Shapefiles"), layer = g)
     
   hex2 <- spTransform(hex, proj4string(state.co))
   

@@ -3,7 +3,7 @@
 
 # Start from PredictWeek_TN.R, where w.allmonths is already loaded
 
-
+w.allmonths$date <- as.numeric(w.allmonths$date)
 waze_date_range <- paste(range(w.allmonths$date), collapse = "_to_")
 
 prepname =  paste0("TN_Waze_Expected_", g, "_", waze_date_range, ".RData")

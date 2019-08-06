@@ -17,14 +17,7 @@ library(readxl) # read excel
 library(foreach)
 library(doParallel)
 
-# Location of SDC SDI Waze team S3 bucket. Files will first be written to a temporary directory in this EC2 instance, then copied to the team bucket.
-# Flag for SDC work
-ON_SDC = F
-teambucket <- "<Path_to_AWS_S3_Bucket_For_Waze_Data>"
-
-if(ON_SDC){ source(file.path(codeloc, 'utility/Workstation_setup.R')) } # Download necessary files from S3
-
-localdir <- normalizePath("~/TN") # full path for readOGR
+localdir <- normalizePath("~/TN/workingdata/TN") # full path for readOGR
 
 setwd(localdir)
 
@@ -87,9 +80,6 @@ var <- c("MstrRecNbrTxt" # Unique crash ID
 crash <- crash[,var]
 
 # Data completeness
-# crash[!complete.cases(crash),] # Error: C stack usage  8200812 is too close to the limit, the data is stil too large
-# format(object.size(crash), "Mb") = 425 Mb
-
 # Further reduce the data
 var1 <- c("MstrRecNbrTxt", "CollisionDte", "LatDecimalNmb", "LongDecimalNmb") # only take ID, time, and location
 crash1 <- crash[, var1]
@@ -97,8 +87,6 @@ crash1[!complete.cases(crash1),] # display rows with missing data, looks like mo
 
 colSums(is.na(crash1)) # Number of missing data.
 colSums(is.na(crash1))*100/nrow(crash1) # percent of missing data, ~29% missing Lat/Lon
-
-# round(colSums(is.na(crash))*100/nrow(crash), 2) # Large amounts of data are missing for some columns, such as BlockNbrTxt, IntersectionInd, IntersectLocalIDTxt, IntersectRoadNameTxt. If we plan to use these columns, need to understand why the missing data are not captured in is.na(). This might be due to blanks. 
 
 # Get columns in the right format
 numcol <- grep("Nmb$", names(crash))
@@ -176,10 +164,12 @@ crash %>%
 
 save("crash", file = "Crash/TN_Crash_Simple_2008-2018.RData")
 
-# Transfer the file to team bucket
-system(paste("aws s3 cp",
-             file.path(localdir, 'Crash',"TN_Crash_Simple_2008-2018.RData"),
-             file.path(teambucket, "TN", "Crash", "TN_Crash_Simple_2008-2018.RData")))
+if(ON_SDC){
+  # Transfer the file to team bucket
+  system(paste("aws s3 cp",
+               file.path(localdir, 'Crash',"TN_Crash_Simple_2008-2018.RData"),
+               file.path(teambucket, "TN", "Crash", "TN_Crash_Simple_2008-2018.RData")))
+}
 
 # <><><><><><><><><><><><><><><><><><>
 # 2019 Special Events ----

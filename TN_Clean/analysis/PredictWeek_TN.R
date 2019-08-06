@@ -48,10 +48,9 @@ outputdir <- file.path(localdir, "Random_Forest_Output")
 load(file.path(outputdir, paste0('TN_Model_05_', g, '_RandomForest_Output.RData')))
 
 # Load data used for fitting - prepared also in RandomForest_wazeGrids_TN.R
+Waze_Prepared_Data = dir(localdir)[grep(paste0('^', state, '_\\d{4}-\\d{2}_to_\\d{4}-\\d{2}_', g, '.csv'), dir(localdir))]
 
-Waze_Prepared_Data = dir(localdir)[grep(paste0('^', state, '_\\d{4}-\\d{2}_to_\\d{4}-\\d{2}_', g, '.RData'), dir(localdir))]
-
-load(file.path(localdir, Waze_Prepared_Data))
+read.csv(file.path(localdir, Waze_Prepared_Data))
 
 # Create week ----
 # Create GRID_ID by time variables for the next week, to join everything else into 

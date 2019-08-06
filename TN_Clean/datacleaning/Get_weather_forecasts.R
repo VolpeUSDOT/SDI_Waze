@@ -1,13 +1,14 @@
-# Get Weather forecasts for Tennessee, using Dark Sky API
+# Get Weather forecasts for Tennessee, using Weatherunderground API
+
 
 # Setup ----
 codeloc <- "~/SDI_Waze"
 source(file.path(codeloc, 'utility/get_packages.R'))
-
-# Location of SDC SDI Waze team S3 bucket. Files will first be written to a temporary directory in this EC2 instance, then copied to the team bucket.
-# Flag for SDC work
 ON_SDC = F
-teambucket <- "<Path_to_AWS_S3_Bucket_For_Waze_Data>"
+if(ON_SDC){
+  teambucket <- "s3://prod-sdc-sdi-911061262852-us-east-1-bucket"
+  user <- file.path( "/home", system("whoami", intern = TRUE)) # the user directory 
+}
 
 library(ggmap)
 library(httr) # for GET
@@ -15,9 +16,8 @@ library(tidyverse)
 library(xml2) # for xml parsing in tidy way
 library(XML) # for xmlToList
 library(jsonlite)
-library(rgdal) # reading spatial data
 
-localdir <- normalizePath("~/TN") # full path for readOGR
+localdir <- file.path("~", "TN ", "workingdata", "TN") # full path for readOGR
 
 setwd(localdir)
 
@@ -31,16 +31,17 @@ proj.USGS <- "+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 +x_0=0 +y_0
 wu <- scan(file = "Weather/WeatherUnderground_171228.txt",
            what = 'character')
 
+
 xmlnames <- wu[grep(".xml$", wu)]
 
 outnames <- xmlnames[nchar(xmlnames) < 15]
 innames <- xmlnames[nchar(xmlnames) > 15]
 
-# Using DarkSky 
+# Using DarkSky now
 DARKSKY = T
 if(DARKSKY) {
   
-  ds_key = scan(file.path(localdir, 'Weather', 'DarkSky_Key.txt'), what = 'character')
+  ds_key = scan(file.path(localdir,"Weather", 'DarkSky_Key.txt'), what = 'character')
   ds_ll_query = ll = vector()
   
   for(i in innames){
@@ -86,7 +87,8 @@ if(DARKSKY) {
   
   # Overlay timezone ----
   # Read tz file
-  tz <- readOGR(file.path(localdir, 'Shapefiles'), layer = 'combined-shapefile')
+  tz <- readOGR(file.path(localdir, 'dist'), layer = 'combined-shapefile')
+  
   
   tz <- spTransform(tz, CRS(proj.USGS))
   
@@ -109,14 +111,15 @@ if(DARKSKY) {
   
   save(list=c('wx_dat', 'wx_dat.proj'),
        file = file.path(localdir, "Weather", fn))
-  
   if(ON_SDC){
-  # Copy to S3
-  system(paste("aws s3 cp",
+    # Copy to S3
+    system(paste("aws s3 cp",
                  file.path(localdir, "Weather", fn),
                  file.path(teambucket, "TN", "Weather", fn)))
   }
 }
+
+
 
 
 
@@ -182,14 +185,14 @@ if(!DARKSKY){
   forecasts <- dir(file.path(localdir, "Weather"))[grep("^TN_Forecasts_", dir(file.path(localdir, "Weather")))]
   
   if(ON_SDC){
-  # Copy to S3
-  for(f in forecasts){
-    system(paste("aws s3 cp",
-                 file.path(localdir, "Weather", f),
-                 file.path(teambucket, "TN", "Weather", f)
-    ))
+    # Copy to S3
+    for(f in forecasts){
+      system(paste("aws s3 cp",
+                   file.path(localdir, "Weather", f),
+                   file.path(teambucket, "TN", "Weather", f))) 
   }
   }
+  
   
 # Next steps: interpolate to state level using kriging or other methods, see 
 # http://rspatial.org/analsis/rst/4-interpolation.html
