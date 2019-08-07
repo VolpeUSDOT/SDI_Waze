@@ -1,6 +1,6 @@
 # Aggregation of Waze and EDT by grid cell
 # Goal: create a gridded data set where grid cell contain the count of 
-# Start from UrbanArea_overlay.R
+# Follows Hex_UA_Overlay_SDC.R
 
 
 # <><><><><><><><><><><><><><><><><><><><>
@@ -67,7 +67,7 @@ for(state in states){ # state = "CT"
   # Manually set done.months to just the 2017 months, re-do all 2018 the same way
   done.months <- done.months[grep('2017', done.months)]
   
-  todo.months = sort(avail.months[!avail.months %in% done.months])
+  todo.months = avail.months #sort(avail.months[!avail.months %in% done.months])
   
   use.tz <- tzs$tz[tzs$states == state]
   
@@ -77,7 +77,7 @@ for(state in states){ # state = "CT"
   
   writeLines(c(""), paste0(state, "_log.txt"))    
   
-  foreach(j = todo.months, .packages = c("dplyr", "lubridate", "utils")) %dopar% {
+  foreach(j = todo.months, .packages = c("dplyr", "lubridate", "utils", "circular")) %dopar% {
     # j = '2018-02'  
     sink(paste0(state, "_log.txt"), append=TRUE)
     
@@ -161,15 +161,15 @@ for(state in states){ # state = "CT"
         nWazeHazardIceRoad = n_distinct(uuid.waze[sub_type=="HAZARD_ON_ROAD_ICE"]),
         
         #Omit road closures from counts (not reported by users)
-        nWazeRT3 = n_distinct(uuid.waze[alert_type!="ROAD_CLOSED" & roadclass=="3"]),
-        nWazeRT4 = n_distinct(uuid.waze[alert_type!="ROAD_CLOSED" & roadclass=="4"]),
-        nWazeRT6 = n_distinct(uuid.waze[alert_type!="ROAD_CLOSED" & roadclass=="6"]),
-        nWazeRT7 = n_distinct(uuid.waze[alert_type!="ROAD_CLOSED" & roadclass=="7"]),
-        nWazeRT2 = n_distinct(uuid.waze[alert_type!="ROAD_CLOSED" & roadclass=="2"]),
-        nWazeRT0 = n_distinct(uuid.waze[alert_type!="ROAD_CLOSED" & roadclass=="0"]),
-        nWazeRT1 = n_distinct(uuid.waze[alert_type!="ROAD_CLOSED" & roadclass=="1"]),
-        nWazeRT20 = n_distinct(uuid.waze[alert_type!="ROAD_CLOSED" & roadclass=="20"]),
-        nWazeRT17 = n_distinct(uuid.waze[alert_type!="ROAD_CLOSED" & roadclass=="17"]),
+        nWazeRT3 = n_distinct(uuid.waze[alert_type!="ROAD_CLOSED" & road_type=="3"]),
+        nWazeRT4 = n_distinct(uuid.waze[alert_type!="ROAD_CLOSED" & road_type=="4"]),
+        nWazeRT6 = n_distinct(uuid.waze[alert_type!="ROAD_CLOSED" & road_type=="6"]),
+        nWazeRT7 = n_distinct(uuid.waze[alert_type!="ROAD_CLOSED" & road_type=="7"]),
+        nWazeRT2 = n_distinct(uuid.waze[alert_type!="ROAD_CLOSED" & road_type=="2"]),
+        nWazeRT0 = n_distinct(uuid.waze[alert_type!="ROAD_CLOSED" & road_type=="0"]),
+        nWazeRT1 = n_distinct(uuid.waze[alert_type!="ROAD_CLOSED" & road_type=="1"]),
+        nWazeRT20 = n_distinct(uuid.waze[alert_type!="ROAD_CLOSED" & road_type=="20"]),
+        nWazeRT17 = n_distinct(uuid.waze[alert_type!="ROAD_CLOSED" & road_type=="17"]),
         
         medLastRepRate = median(last.reportRating),
         medLastConf = median(last.confidence),

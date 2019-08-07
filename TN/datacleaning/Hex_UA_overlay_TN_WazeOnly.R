@@ -95,6 +95,7 @@ for(g in grids){ # g = grids[1]
   
   # Use just Waze data
   months_shared <- wazemonths #sort(tn_crash_months[tn_crash_months %in% wazemonths])
+  
   # Not months all are shared -- TN crash data through Sept 2018 
   #  summary(wazemonths %in% tn_crash_months)
   

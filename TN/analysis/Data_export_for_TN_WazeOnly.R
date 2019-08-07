@@ -94,3 +94,29 @@ for(g in grids){ # g = grids[1]
   
 }
 
+
+### Additional exports -----
+
+# Export prepared special events, prepared historical crash, and prepared weather
+# This will allow local running of RF models with exported, gridded data
+
+zipname = paste0('TN_NonWaze_ModelInputs_', Sys.Date(), '.zip')
+
+outfiles = c(file.path(localdir, 'Crash', 'Prepared_TN_Crash_TN_01dd_fishnet.RData'),
+             file.path(localdir, 'Crash', 'Prepared_TN_Crash_TN_1sqmile_hexagons.RData'),
+             file.path(localdir, 'SpecialEvents', 'Prepared_TN_SpecialEvent_TN_01dd_fishnet.RData'),
+             file.path(localdir, 'SpecialEvents', 'Prepared_TN_SpecialEvent_TN_1sqmile_hexagons.RData'),
+             file.path(localdir, 'Weather', 'Prepared_Weather_TN_01dd_fishnet.RData'),
+             file.path(localdir, 'Weather', 'Prepared_Weather_TN_1sqmile_hexagons.RData')
+)
+
+system(paste('zip -j', file.path(temp.outputdir, zipname),
+             paste(outfiles, collapse = " "))
+)
+
+system(paste(
+  'aws s3 cp',
+  file.path(temp.outputdir, zipname),
+  file.path(teambucket, 'export_requests', zipname)
+))
+
