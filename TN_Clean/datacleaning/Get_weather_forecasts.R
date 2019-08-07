@@ -17,7 +17,7 @@ library(xml2) # for xml parsing in tidy way
 library(XML) # for xmlToList
 library(jsonlite)
 
-localdir <- file.path("~", "TN ", "workingdata", "TN") # full path for readOGR
+localdir <- file.path("~", "TN", "workingdata", "TN") # full path for readOGR
 
 setwd(localdir)
 
