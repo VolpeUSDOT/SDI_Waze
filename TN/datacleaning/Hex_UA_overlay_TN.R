@@ -85,7 +85,7 @@ for(g in grids){ # g = grids[1]
   # Limit grid to only cells which touch a county in this state
   grid_o <- gIntersects(grid, co_i, byid = T)
   instate <- apply(grid_o, 2, function(x) any(x))
-  grid <- grid[instate,]
+  grid <- grid[instate,] # dim(grid) = 42,982 grid cells of 1 sq mile hex resolution that touch TN
   
   # Files -- 
   # load(file.path(localdir, state, "Crash", "TN_Crash.RData")) # 791 Mb version, 80 columns 829,301 rows 
