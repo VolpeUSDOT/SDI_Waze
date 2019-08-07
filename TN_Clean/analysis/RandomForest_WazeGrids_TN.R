@@ -37,7 +37,7 @@ do.months = c(paste("2017", c("04","05","06","07","08","09", "10", "11", "12"), 
 REASSESS = F # re-assess model fit and diagnostics using reassess.rf instead of do.rf
 
 outputdir <- file.path(localdir, "Random_Forest_Output")
-# Make outputdir if not alreday there
+# Make outputdir if not already there
 system(paste('mkdir -p', outputdir))
 
 # read random forest function
@@ -46,8 +46,8 @@ source(file.path(codeloc, "analysis/RandomForest_WazeGrid_Fx.R"))
 Waze_Prepared_Data = paste0(state, '_', do.months[1], '_to_', do.months[length(do.months)], '_', g)
 
 # <><><><><><><><><><><><><><><><><><><><><><><><>
-# Start data prep. Run this if the data for this time period and grid size are not ready yet, otherwise read from prepared data.
-# Skip and run after line 126
+# Start data prep if the data for this time period and grid size are not ready yet, otherwise read from prepared data.
+
 if(length(grep(Waze_Prepared_Data, dir(localdir))) == 0){
   
 # rename data files by month. For each month, prep time and response variables
@@ -188,12 +188,11 @@ if(!REASSESS){
                                 omits, response.var = "MatchTN_buffer_Acc", 
                                 model.no = modelno, rf.inputs = rf.inputs,
                                 cutoff = c(0.95, 0.05)
-                                # , thin.dat = 0.001
+                                # , thin.dat = 0.01
                                 ) 
   
   save("keyoutputs", file = paste0("Output_to_", modelno))
   } else {
-
 redo_outputs[[modelno]] = reassess.rf(train.dat = w.allmonths, 
                               omits, response.var = "MatchTN_buffer_Acc", 
                               model.no = modelno, rf.inputs = rf.inputs) 
