@@ -4,10 +4,10 @@
 # g: grid name, string
 #
 
-censusdir <- paste0(user, "/workingdata/census") # full path for readOGR, for buffered state shapefile created in first step of data pipeline, ReduceWaze_SDC.R
+censusdir <- "~/TN/Input/census"
 proj.USGS <- "+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs +ellps=GRS80 +towgs84=0,0,0"
 
-grid_shp <- rgdal::readOGR(file.path(localdir, "Shapefiles"), layer = g)
+grid_shp <- rgdal::readOGR(file.path(inputdir, "Shapefiles"), layer = g)
 grid_shp <- spTransform(grid_shp, CRS(proj.USGS))
 
 # Read in buffered state shapefile

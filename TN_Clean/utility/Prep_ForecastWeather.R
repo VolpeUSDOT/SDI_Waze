@@ -2,13 +2,13 @@
 # Need to create an interpolated grid based on forecasted weather.
 
 # Run from PredictWeek_TN.R, following Get_weather_forecasts.R, which provides dat 
-# already in memory: localdir, teambucket, codeloc, state, and g, which repreresents the grid type to use
+# already in memory: inputdir, teambucket, codeloc, state, and g, which repreresents the grid type to use
 
 # Also already in memory is `next_week`, a data frame of the grid ID and date/time for the next week
- 
-censusdir <- normalizePath("~/TN/workingdata/census") # full path for readOGR, for buffered state shapefile created in first step of data pipeline, ReduceWaze_SDC.R
 
-temp.outputdir <- "~TN/tempout" # to hold daily output files as they are generated, and then sent to team bucket
+censusdir <- "~/TN/Input/census"
+outputdir <- "~/TN/Output" # to hold daily output files as they are generated
+inputdir <- "~/TN/Input"
 
 proj.USGS <- "+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs +ellps=GRS80 +towgs84=0,0,0"
 
@@ -21,14 +21,14 @@ library(foreach)
 
 prepname =  paste0("TN_Forecasts_Gridded_", g, Sys.Date(), ".RData")
 
-if(!file.exists(file.path(localdir, 'Weather', prepname))) {
+if(!file.exists(file.path(inputdir, 'Weather', prepname))) {
 
   cat("Preparing Forecasts to", as.character(max(next_week$date)), "for", g, "\n")
   
   # Get weather forecast for the next week
   # First check to see if forecast has been run already from today (to not over-user API call)
-  if(file.exists(file.path(localdir, 'Weather', paste0("TN_Forecasts_", Sys.Date(), ".RData")))) {
-    load(file.path(localdir, 'Weather', paste0("TN_Forecasts_", Sys.Date(), ".RData")))
+  if(file.exists(file.path(inputdir, 'Weather', paste0("TN_Forecasts_", Sys.Date(), ".RData")))) {
+    load(file.path(inputdir, 'Weather', paste0("TN_Forecasts_", Sys.Date(), ".RData")))
   } else {
     source(file.path(codeloc, 'datacleaning', 'Get_weather_forecasts.R'))
   }
@@ -42,7 +42,7 @@ if(!file.exists(file.path(localdir, 'Weather', prepname))) {
   wx.proj <- spTransform(wx_dat.proj, CRS(proj.USGS))
   
   # Read in grid
-  grid_shp <- rgdal::readOGR(file.path(localdir, "Shapefiles"), layer = g)
+  grid_shp <- rgdal::readOGR(file.path(inputdir, "Shapefiles"), layer = g)
   grid_shp <- spTransform(grid_shp, CRS(proj.USGS))
   
   # Read in buffered state shapefile
@@ -55,9 +55,9 @@ if(!file.exists(file.path(localdir, 'Weather', prepname))) {
   grid_shp <- grid_shp[as.vector(grid_intersects),]
   
   wx <- wx_dat %>%
-    mutate(local_time = as.POSIXct(local_time, '%Y-%m-%d %H:%M:%s'),
-           mo = format(local_time, "%m"),
-           date = format(local_time, '%Y-%m-%d'))
+    mutate(local_time = as.POSIXct(tz = local_time, format = '%Y-%m-%d %H:%M:%s'),
+           mo = format(local_time,"%m"),
+           date = format(local_time,'%Y-%m-%d'))
   
   wx.proj@data <- wx.proj@data %>%
     mutate(local_time = as.POSIXct(local_time, '%Y-%m-%d %H:%M:%s'),
@@ -96,8 +96,8 @@ if(!file.exists(file.path(localdir, 'Weather', prepname))) {
     fn = paste("Prep_Weather_Daily_", day,"_", g, ".RData", sep="")
     
     # See if exists in outputdir. Load if so. If not, carry out kriging steps.
-    if(file.exists(file.path(file.path(temp.outputdir, fn)))){
-      load(file.path(temp.outputdir, fn))
+    if(file.exists(file.path(file.path(outputdir, fn)))){
+      load(file.path(outputdir, fn))
     } else {
     
     wx.day = wx.proj[wx.proj$date == day,]
@@ -185,7 +185,7 @@ if(!file.exists(file.path(localdir, 'Weather', prepname))) {
     # Save in temporary location in case the process is interrupted
     fn = paste("Prep_Weather_Daily_", day,"_", g, ".RData", sep="")
     
-    save(list="daily_result", file = file.path(temp.outputdir, fn))
+    save(list="daily_result", file = file.path(outputdir, fn))
     
     EndTime <- Sys.time()-StartTime
     cat(as.character(day), 'completed', round(EndTime, 2), attr(EndTime, 'units'), '\n',
@@ -199,9 +199,9 @@ if(!file.exists(file.path(localdir, 'Weather', prepname))) {
   cat(round(EndTime, 2), attr(EndTime, "units"), "\n")
    
   save(list = c("wx.grd.day"), 
-       file = file.path(localdir, "Weather", prepname))
+       file = file.path(inputdir, "Weather", prepname))
 
   } else {
-  load(file.path(localdir, "Weather", prepname))
+  load(file.path(inputdir, "Weather", prepname))
 }
 

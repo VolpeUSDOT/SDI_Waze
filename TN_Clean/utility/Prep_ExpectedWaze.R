@@ -8,7 +8,7 @@ waze_date_range <- paste(range(w.allmonths$date), collapse = "_to_")
 
 prepname =  paste0("TN_Waze_Expected_", g, "_", waze_date_range, ".RData")
 
-if(!file.exists(file.path(localdir, 'Waze', prepname))){
+if(!file.exists(file.path(inputdir, 'Waze', prepname))){
 
 w.expected <- w.allmonths %>%
   group_by(GRID_ID, mo, DayOfWeek, hour) %>%
@@ -19,9 +19,9 @@ w.expected <- w.allmonths %>%
             )
 
 save(list = c("w.expected"), 
-     file = file.path(localdir,"Waze", prepname))
+     file = file.path(inputdir,"Waze", prepname))
 
 } else {
-  load(file.path(localdir,"Waze", prepname))
+  load(file.path(inputdir,"Waze", prepname))
 }
 

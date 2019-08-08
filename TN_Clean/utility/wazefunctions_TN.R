@@ -200,7 +200,7 @@ prep.hex <- function(hexname, state, month, bucket = teambucket){
   # Specify full path in hexname, e.g. for MD weather-overlaid files: file.path(inputdir, paste0("WazeTimeEdtHexWx_", mo,".RData"))
   
   mo = month
-  load(file.path("~/TN","workingdata", hexname))
+  load(file.path("~/TN","Input", hexname))
 
   wte <- get(ls(envir = environment())[grep("WazeTime", ls(envir = environment()), ignore.case = T)])
   
@@ -334,8 +334,6 @@ append.hex <- function(hexname, data.to.add, state, na.action = c("omit", "keep"
   # join ----
   
   dd$GRID_ID <- as.character(dd$GRID_ID)
-  
-
   if(length(grep("TN_SpecialEvent", data.to.add)) > 0){
     
     class(dd) = "data.frame"

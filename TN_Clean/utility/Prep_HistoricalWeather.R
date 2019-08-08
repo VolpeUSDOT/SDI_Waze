@@ -1,18 +1,18 @@
 # Prepare historical weather for random forest work
 
 # Run from RandomForest_WazeGrid_TN.R
-# already in memory are localdir and g, which repreresents the grid type to use
+# already in memory are  g, which repreresents the grid type to use
 # Next step after this script is to run append.hex function to add 
-censusdir <- paste0(user, "/workingdata/census") # full path for readOGR, for buffered state shapefile created in first step of data pipeline, ReduceWaze_SDC.R
-
-temp.outputdir <- "~/tempout" # to hold daily output files as they are generated, and then sent to team bucket
+censusdir <- "~/TN/Input/census"
+outputdir <- "~/TN/Output" # to hold daily output files as they are generated
+inputdir <- "~/TN/Input"
 
 proj.USGS <- "+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs +ellps=GRS80 +towgs84=0,0,0"
 
 # Check to see if these processing steps have been done yet; load from prepared file if so
 prepname = paste("Prepared", "Weather", g, sep="_")
 
-if(length(grep(prepname, dir(file.path(localdir, "Weather")))) == 0) { 
+if(length(grep(prepname, dir(file.path(inputdir, "Weather")))) == 0) { 
   library(gstat) # For kriging
   library(raster) # masks several functions from dplyr, use caution
   library(doParallel)
@@ -21,7 +21,7 @@ if(length(grep(prepname, dir(file.path(localdir, "Weather")))) == 0) {
   cat("Preparing", "Weather", g, "\n")
   
   # Read in GHCN data
-  wx.files <- dir(file.path(localdir, "Weather", "GHCN"))
+  wx.files <- dir(file.path(inputdir, "Weather", "GHCN"))
   wx <- vector()
   
   # Most stations don't have most of the wx variables. Simplify to core variables, per GHCN documentation:
@@ -32,13 +32,13 @@ if(length(grep(prepname, dir(file.path(localdir, "Weather")))) == 0) {
 
   for(k in wx.files){
     if(length(grep('stations', k))==0){
-      wxx <- read.csv(file.path(localdir, "Weather", "GHCN", k))
+      wxx <- read.csv(file.path(inputdir, "Weather", "GHCN", k))
       wx <- rbind(wx, wxx[core_vars])
       rm(wxx)
     }
   }
 
-  station_file <- file.path(localdir, "Weather", "GHCN", wx.files[grep('stations', wx.files)])
+  station_file <- file.path(inputdir, "Weather", "GHCN", wx.files[grep('stations', wx.files)])
   stations <- read_fwf(station_file,
                        col_positions = fwf_empty(station_file))
   names(stations) = c("STATION", "lat", "lon", "masl", "NAME", "x1", "x2", "x3")
@@ -71,7 +71,7 @@ if(length(grep(prepname, dir(file.path(localdir, "Weather")))) == 0) {
   wx.proj <- spTransform(wx.proj, CRS(proj.USGS))
   
   # Read in grid
-  grid_shp <- rgdal::readOGR(file.path(localdir, "Shapefiles"), layer = g)
+  grid_shp <- rgdal::readOGR(file.path(inputdir, "Shapefiles"), layer = g)
   grid_shp <- spTransform(grid_shp, CRS(proj.USGS))
   
   # Read in buffered state shapefile
@@ -126,8 +126,8 @@ if(length(grep(prepname, dir(file.path(localdir, "Weather")))) == 0) {
     
     # See if exists. Load if so. If not, carry out kriging steps.
     
-    if(file.path(temp.outputdir, fn)){
-      load(file.path(temp.outputdir, fn))
+    if(file.path(outputdir, fn)){
+      load(file.path(outputdir, fn))
     } else {
     
     wx.day = wx.proj[wx.proj$DATE == day,]
@@ -212,7 +212,7 @@ if(length(grep(prepname, dir(file.path(localdir, "Weather")))) == 0) {
     # Save to S3 as temporary location in case the process is interrupted
     fn = paste("Prep_Weather_Daily_", day,"_", g, ".RData", sep="")
     
-    save(list="daily_result", file = file.path(temp.outputdir, fn))
+    save(list="daily_result", file = file.path(outputdir, fn))
     
     EndTime <- Sys.time()-StartTime
     cat(as.character(day), 'completed', round(EndTime, 2), attr(EndTime, 'units'), '\n',
@@ -229,9 +229,9 @@ if(length(grep(prepname, dir(file.path(localdir, "Weather")))) == 0) {
   cat(round(EndTime, 2), attr(EndTime, "units"), "\n")
    
   save(list = c("wx.grd.day"), 
-       file = file.path(localdir, "Weather", paste0(prepname, ".RData")))
+       file = file.path(inputdir, "Weather", paste0(prepname, ".RData")))
 
   } else {
-  load(file.path(localdir, "Weather", paste0(prepname, ".RData")))
+  load(file.path(inputdir, "Weather", paste0(prepname, ".RData")))
 }
 

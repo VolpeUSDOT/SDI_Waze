@@ -2,7 +2,10 @@
 
 
 # Setup ----
-codeloc <- "~/SDI_Waze"
+codeloc <- "~/TN/SDI_Waze" 
+inputdir <- "~/TN/Input"
+outputdir<-"~/TN/Output"
+
 source(file.path(codeloc, 'utility/get_packages.R'))
 ON_SDC = F
 if(ON_SDC){
@@ -17,9 +20,7 @@ library(xml2) # for xml parsing in tidy way
 library(XML) # for xmlToList
 library(jsonlite)
 
-localdir <- file.path("~", "TN", "workingdata", "TN") # full path for readOGR
-
-setwd(localdir)
+setwd(inputdir)
 
 proj.USGS <- "+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 +x_0=0 +y_0=0 +wx_datum=NAD83 +units=m +no_defs +ellps=GRS80 +towgs84=0,0,0"
 
@@ -41,7 +42,7 @@ innames <- xmlnames[nchar(xmlnames) > 15]
 DARKSKY = T
 if(DARKSKY) {
   
-  ds_key = scan(file.path(localdir,"Weather", 'DarkSky_Key.txt'), what = 'character')
+  ds_key = scan(file.path(inputdir,"Weather", 'DarkSky_Key.txt'), what = 'character')
   ds_ll_query = ll = vector()
   
   for(i in innames){
@@ -87,7 +88,7 @@ if(DARKSKY) {
   
   # Overlay timezone ----
   # Read tz file
-  tz <- readOGR(file.path(localdir, 'dist'), layer = 'combined-shapefile')
+  tz <- readOGR(file.path(inputdir,"Shapefiles", 'TimeZone'), layer = 'combined-shapefile')
   
   
   tz <- spTransform(tz, CRS(proj.USGS))
@@ -110,11 +111,11 @@ if(DARKSKY) {
   fn = paste0("TN_Forecasts_", Sys.Date(), ".RData")
   
   save(list=c('wx_dat', 'wx_dat.proj'),
-       file = file.path(localdir, "Weather", fn))
+       file = file.path(inputdir, "Weather", fn))
   if(ON_SDC){
     # Copy to S3
     system(paste("aws s3 cp",
-                 file.path(localdir, "Weather", fn),
+                 file.path(inputdir, "Weather", fn),
                  file.path(teambucket, "TN", "Weather", fn)))
   }
 }
@@ -180,15 +181,15 @@ if(!DARKSKY){
   # Save forecasts ----
   
   save(list='wx_dat',
-       file = file.path(localdir, "Weather", paste0("TN_Forecasts_", Sys.wx_date(), ".Rwx_data")))
+       file = file.path(inputdir, "Weather", paste0("TN_Forecasts_", Sys.wx_date(), ".Rwx_data")))
   
-  forecasts <- dir(file.path(localdir, "Weather"))[grep("^TN_Forecasts_", dir(file.path(localdir, "Weather")))]
+  forecasts <- dir(file.path(inputdir, "Weather"))[grep("^TN_Forecasts_", dir(file.path(inputdir, "Weather")))]
   
   if(ON_SDC){
     # Copy to S3
     for(f in forecasts){
       system(paste("aws s3 cp",
-                   file.path(localdir, "Weather", f),
+                   file.path(inputdir, "Weather", f),
                    file.path(teambucket, "TN", "Weather", f))) 
   }
   }

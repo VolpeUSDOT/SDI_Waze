@@ -10,7 +10,11 @@
 
 # Setup ---- 
 rm(list=ls()) # Start fresh
-codeloc <- "~/SDI_Waze" 
+
+codeloc <- "~/TN/SDI_Waze"
+inputdir <- "~/TN/Input"
+outputdir<-"~/TN/Output"
+
 source(file.path(codeloc, 'utility/get_packages.R')) # installs necessary packages
 
 library(randomForest)
@@ -21,18 +25,13 @@ library(rgdal)
 
 grids = c("TN_01dd_fishnet",
           "TN_1sqmile_hexagons")
- 
-
-user <- normalizePath("~/TN")
-
-localdir <- paste0(user, "/workingdata/TN") # full path for readOGR
 
 source(file.path(codeloc, "utility/wazefunctions_TN.R")) 
 
 # read random forest function
 source(file.path(codeloc, "analysis/RandomForest_WazeGrid_Fx.R"))
 
-setwd(localdir)
+setwd(outputdir)
 
 # <><><><><>
 g = grids[1] # start with square grids, now running hex also. Change between 1 and 2.
@@ -43,14 +42,18 @@ state = "TN"
 # Loads rf.out, the model object, which we will feed new data to predict on.
 # New data will need the same structure as the data used in the model fitting.
 
-outputdir <- file.path(localdir, "Random_Forest_Output")
-
 load(file.path(outputdir, paste0('TN_Model_05_', g, '_RandomForest_Output.RData')))
 
 # Load data used for fitting - prepared also in RandomForest_wazeGrids_TN.R
-Waze_Prepared_Data = dir(localdir)[grep(paste0('^', state, '_\\d{4}-\\d{2}_to_\\d{4}-\\d{2}_', g, '.csv'), dir(localdir))]
+Waze_Prepared_Data = dir(inputdir)[grep(paste0('^', state, '_\\d{4}-\\d{2}_to_\\d{4}-\\d{2}_', g, '.csv'), dir(inputdir))]
 
-w.allmonths = read.csv(file.path(localdir, Waze_Prepared_Data))
+w.allmonths = read.csv(file.path(inputdir, Waze_Prepared_Data))
+
+w.allmonths$MatchTN_buffer <- as.factor(w.allmonths$MatchTN_buffer)
+w.allmonths$MatchTN_buffer_Acc <- as.factor(w.allmonths$MatchTN_buffer_Acc)
+w.allmonths$TN_crash <- as.factor(w.allmonths$TN_crash)
+w.allmonths$date <- as.Date(w.allmonths$date)
+w.allmonths$GRID_ID <- as.character(w.allmonths$GRID_ID)
 
 # Create week ----
 # Create GRID_ID by time variables for the next week, to join everything else into 
@@ -86,7 +89,7 @@ na.action = "fill0" # This is an argument in append.hex, below. Other options ar
 # Get special events for next week ----
 
 # Start with last week of 2018; need to get 2019. This is created by Prep_SpecialEvents.R
-load(file.path(localdir, 'SpecialEvents', paste0('Prepared_TN_SpecialEvent_', g, '.RData')))
+load(file.path(inputdir, 'SpecialEvents', paste0('Prepared_TN_SpecialEvent_', g, '.RData')))
 
 # Join with append.hex
 next_week <- append.hex(hexname = 'grid_x_day',
@@ -105,6 +108,8 @@ next_week <- append.hex(hexname = 'next_week',
 
 source(file.path(codeloc, 'utility', 'Prep_ExpectedWaze.R'))
 
+w.expected$mo <- as.character(w.expected$mo)
+w.expected$DayOfWeek <- as.character(w.expected$DayOfWeek)
 next_week <- left_join(next_week, w.expected,
                         by = c('GRID_ID', 'mo', 'DayOfWeek', 'hour'))
   

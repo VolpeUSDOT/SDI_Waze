@@ -1,10 +1,12 @@
+#Not needed for TN Case Study, as processed special events data has been provided. Code provided for completeness.
+
 # Prepare historical crash data for random forest work
 # Need to apply points to grids
 # This now expands the special events from a point to a buffered polygon. Currently using a fixed 3 mile radius for each special event, but this can be changed; consider different radius by event type.
 # Also, now using America/Chicago for all analysis steps.
 
 # Run from RandomForest_WazeGrid_TN.R
-# already in memory are localdir and g, which repreresents the grid type to use
+# already in memory are inputdir and g, which repreresents the grid type to use
 # Run after TN_Data_Format.R for initial formatting of crash and special event data
 
 # append.hex2(hexname = w, data.to.add = "TN_SpecialEvent", state = state, na.action = na.action)
@@ -25,7 +27,7 @@ library(foreach)
 #   paste0( "/home/", system("whoami", intern = TRUE))
 # } # find the user directory to use
 # 
-# localdir <- file.path("~","TN","workingdata", "TN") # full path for readOGR
+# inputdir <- "~/TN/Input"
 
 
 # Check to see if these processing steps have been done yet; load from prepared file if so
@@ -33,18 +35,18 @@ prepname = paste("Prepared", "TN_SpecialEvent", g, sep="_")
 
 # Apply holidays statewide later.
 
-if(!file.exists(file.path(localdir, "SpecialEvents", prepname))) { # if doen't exist in TN/SpecialEvents, make it
+if(!file.exists(file.path(inputdir, "SpecialEvents", prepname))) { # if doen't exist in TN/SpecialEvents, make it
   
   cat("Preparing", "TN_SpecialEvent", g, "\n")
 
   proj.USGS <- "+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs +ellps=GRS80 +towgs84=0,0,0"
   
   # Combine 2017, 2018, 2019 data
-  load(file.path(localdir, "SpecialEvents", "TN_SpecialEvent_2017.RData")) # 9 columns
+  load(file.path(inputdir, "SpecialEvents", "TN_SpecialEvent_2017.RData")) # 9 columns
   spev2017 <- spev # 670 rows
-  load(file.path(localdir, "SpecialEvents", "TN_SpecialEvent_2018.RData")) # 13 columns
+  load(file.path(inputdir, "SpecialEvents", "TN_SpecialEvent_2018.RData")) # 13 columns
   spev2018 <- spev[,names(spev2017)] # 813 rows
-  load(file.path(localdir, "SpecialEvents", "TN_SpecialEvent_2019.RData")) # 13 columns
+  load(file.path(inputdir, "SpecialEvents", "TN_SpecialEvent_2019.RData")) # 13 columns
   spev2019 <- spev[,names(spev2017)] # 634 rows
   
   spev <- rbind(spev2017, spev2018, spev2019) # 2117 rows
@@ -57,7 +59,7 @@ if(!file.exists(file.path(localdir, "SpecialEvents", prepname))) { # if doen't e
   dd$Lon <- as.numeric(gsub("[[:space:]]", "", dd$Lon))
   
   # Apply to grid
-  grid_shp <- rgdal::readOGR(file.path(localdir, "Shapefiles"), layer = g)
+  grid_shp <- rgdal::readOGR(file.path(inputdir, "Shapefiles"), layer = g)
   grid_shp <- spTransform(grid_shp, CRS(proj.USGS))
   
   # Project special events
@@ -193,7 +195,7 @@ if(!file.exists(file.path(localdir, "SpecialEvents", prepname))) { # if doen't e
   spev.grid.time.holiday = spev.grid.time.holiday[order(spev.grid.time.holiday$GridDayHour, spev.grid.time.holiday$GRID_ID),]
   
   save(list = c("spev.grid.time", "spev.grid.time.holiday"), 
-       file = file.path(localdir, "SpecialEvents", paste0(prepname, ".RData")))
+       file = file.path(inputdir, "SpecialEvents", paste0(prepname, ".RData")))
   
   rm(dd, grid_dd_pip, grid_shp, spev2017, spev2018, spev2019, cl,
      dh, g.i, gdh, gdh.dd, GridIDTime, spev, xx,
@@ -202,7 +204,7 @@ if(!file.exists(file.path(localdir, "SpecialEvents", prepname))) { # if doen't e
      t.max, t.min, t)
   
 } else {
-  load(file.path(localdir, "SpecialEvents", paste0(prepname, ".RData")))
+  load(file.path(inputdir, "SpecialEvents", paste0(prepname, ".RData")))
 }
 
 

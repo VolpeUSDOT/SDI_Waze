@@ -4,8 +4,8 @@
 library(randomForest)
 library(tidyverse)
 
-codeloc = '~/SDI_Waze'
-refit_outputloc = file.path("~/TN", "workingdata")
+codeloc <- "~/TN/SDI_Waze"
+outputdir <- "~/TN/Output"
 
 grids = c("TN_01dd_fishnet",
           "TN_1sqmile_hexagons")
@@ -22,7 +22,7 @@ state = "TN"
 
 # Refit just on output csv files ----
 
-rfdir <- file.path(refit_outputloc, paste0('Output_', version))
+rfdir <- file.path(outputdir, paste0('Output_', version))
 
 modfiles <- dir(rfdir)[grep(g, dir(rfdir))]
 modfiles <- modfiles[grep('.csv$', modfiles)]
@@ -83,7 +83,7 @@ for(i in modfiles){
              y = c(0.95, 0.05, 0.46,0.81),
              hjust = 0,
              label = c("Accuracy", "False Positive Rate", "Precision", "Recall"))
-  print(gp4); ggsave(filename = file.path(refit_outputloc, paste0(i, '_Prec_recall_tradoff.jpg')),
+  print(gp4); ggsave(filename = file.path(outputdir, paste0(i, '_Prec_recall_tradoff.jpg')),
                      width = 8, height = 7)      
   
   recall_prec_diff = pt.vec['recall',]-pt.vec['precision',]
@@ -136,7 +136,7 @@ write.csv(counts, file = file.path(rfdir, 'Refit', paste0("Confusion_matrix_coun
 
 # Extract values from RF objects ----
 
-rfdir <- file.path(refit_outputloc, paste0('Random_Forest_Output_', version))
+rfdir <- file.path(outputdir, paste0('Random_Forest_Output_', version))
 
 modfiles <- dir(rfdir)[grep(g, dir(rfdir))]
 modfiles <- modfiles[grep('.RData$', modfiles)]
@@ -170,10 +170,10 @@ for(i in modfiles){ # i = modfiles[6]
 modelno = '06'
 
 # Load full input data
-w.all <- read.csv(file.path(refit_outputloc, paste0("Random_Forest_Output_", version), paste0("TN_2017-04_to_2018-03_", g, ".csv")))
+w.all <- read.csv(file.path(outputdir, paste0("Random_Forest_Output_", version), paste0("TN_2017-04_to_2018-03_", g, ".csv")))
 
 # Load fitted model
-load(file.path(refit_outputloc, paste0("Random_Forest_Output_", version), paste0("TN_Model_", modelno, "_", g, "_RandomForest_Output.RData")))
+load(file.path(outputdir, paste0("Random_Forest_Output_", version), paste0("TN_Model_", modelno, "_", g, "_RandomForest_Output.RData")))
 
 # Visualizations ----
 
@@ -210,7 +210,7 @@ w.grid %>%
   filter(RoadClosed > 2000)
 
 # variable importance ----
-pdf(file.path(localdir, "Figures", paste0(state, "_Variable_Importance_Model_", modelno, ".pdf")), width = 8, height = 8)
+pdf(file.path(outputdir, paste0(state, "_Variable_Importance_Model_", modelno, ".pdf")), width = 8, height = 8)
 
 varImpPlot(rf.out, 
            main = paste(state, "Model",modelno,"Variable Importance"),
@@ -219,7 +219,7 @@ varImpPlot(rf.out,
 
 dev.off()
 # Classification ----
-pdf(file.path(localdir, "Figures", paste0(state, "_Visualzing_classification_Model_", modelno, ".pdf")), width = 10, height = 10)
+pdf(file.path(outputdir, paste0(state, "_Visualzing_classification_Model_", modelno, ".pdf")), width = 10, height = 10)
 
 out.df$CorrectPred = out.df$TN | out.df$TP
 levels(out.df$Obs) = c("Obs = NoCrash", "Obs = Crash")

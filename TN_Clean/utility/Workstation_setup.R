@@ -1,5 +1,5 @@
 # Setting up workstation on local machine. This example script can be modified for the computing infrastructure used by THP
-# Not used in TN Case Study, but can be used to develop 
+# Not used in TN Case Study, but provided as a potential way to set up directories 
 
 # Make directories to work in:
 

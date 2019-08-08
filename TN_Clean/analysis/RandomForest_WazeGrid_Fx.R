@@ -28,6 +28,7 @@ do.rf <- function(train.dat, omits, response.var = "MatchEDT_buffer_Acc", model.
                   thin.dat = NULL,
                   cutoff = c(0.8, 0.2),
                   rf.inputs = list(ntree.use = 500, avail.cores = 4, mtry = NULL, maxnodes = NULL, nodesize = 5)){
+  outputdir<-"~/TN/Output"
   
   if(!is.null(test.dat) & !missing(test.split)) stop("Specify either test.dat or test.split, but not both")
 
@@ -139,7 +140,7 @@ do.rf <- function(train.dat, omits, response.var = "MatchEDT_buffer_Acc", model.
   # pROC::roc - response, predictor
   model_auc <- pROC::auc(test.dat.use[,response.var], rf.prob[,colnames(rf.prob)=="1"])
 
-  pdf(file = paste0("AUC_", model.no, ".pdf"), width = 6, height = 6)
+  pdf(file = file.path(outputdir,paste0("AUC_", model.no, ".pdf")), width = 6, height = 6)
   plot(pROC::roc(test.dat.use[,response.var], rf.prob[,colnames(rf.prob)=="1"]),
        main = paste0("Model ", model.no),
        grid=c(0.1, 0.2),
@@ -243,7 +244,7 @@ reassess.rf <- function(train.dat, omits, response.var = "MatchEDT_buffer_Acc", 
                         rf.inputs = list(ntree.use = 500, avail.cores = 4, mtry = NULL, maxnodes = NULL, nodesize = 5),
                         cutoff = c(0.8, 0.2),
                         in_aws = F){
-
+  outputdir<-"~/TN/Output"
   class(train.dat) <- "data.frame"
 
   # Load fitted model
@@ -299,7 +300,7 @@ reassess.rf <- function(train.dat, omits, response.var = "MatchEDT_buffer_Acc", 
     # pROC::roc - response, predictor
     model_auc <- pROC::auc(test.dat.use[,response.var], rf.prob[,colnames(rf.prob)=="1"])
     
-    pdf(file = paste0("AUC_", model.no, ".pdf"), width = 6, height = 6)
+    pdf(file = file.path(outputdir, paste0("AUC_", model.no, ".pdf")), width = 6, height = 6)
     plot(pROC::roc(test.dat.use[,response.var], rf.prob[,colnames(rf.prob)=="1"]),
          main = paste0("Model ", model.no),
          grid=c(0.1, 0.2),
