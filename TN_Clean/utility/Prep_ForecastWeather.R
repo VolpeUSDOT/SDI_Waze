@@ -55,12 +55,12 @@ if(!file.exists(file.path(inputdir, 'Weather', prepname))) {
   grid_shp <- grid_shp[as.vector(grid_intersects),]
   
   wx <- wx_dat %>%
-    mutate(local_time = as.POSIXct(local_time,'%Y-%m-%d %H:%M:%s'),
-           mo = format(local_time,"%m"),
+    mutate(local_time = as.POSIXct(local_time),
+           mo = format(local_time, "%m"),
            date = format(local_time,'%Y-%m-%d'))
   
   wx.proj@data <- wx.proj@data %>%
-    mutate(local_time = as.POSIXct(local_time, '%Y-%m-%d %H:%M:%s'),
+    mutate(local_time = as.POSIXct(local_time),
            mo = format(local_time, "%m"),
            date = format(local_time, '%Y-%m-%d'))
   
