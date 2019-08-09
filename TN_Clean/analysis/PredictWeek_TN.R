@@ -137,11 +137,12 @@ next_week <- left_join(next_week, w.staticvars,
 fitvars <- read.csv('Fitvars_05_TN_01dd_fishnet.csv')
 
 # Fill NA with 0
-next_week[,c(1,3:13,15:22)][is.na(next_week)[,c(1,3:13,15:22)]] = 0
+next_week[,sapply(next_week,notDate)][is.na(next_week[,sapply(next_week,notDate)])] = 0
 
 next_week$DayOfWeek <- as.factor(next_week$DayOfWeek)
 levels(next_week$DayOfWeek) = c(levels(next_week$DayOfWeek), '0')
 next_week_pred <- next_week[,names(next_week) %in% fitvars$fitvars]
+
 
 # see Precision-recall tradeoff plots from re-fit local
 cutoff = 0.05
