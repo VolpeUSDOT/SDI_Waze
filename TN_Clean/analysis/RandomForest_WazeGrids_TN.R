@@ -340,7 +340,7 @@ if(!REASSESS){
   keyoutputs[[modelno]] = do.rf(train.dat = w.allmonths, 
                                 omits, response.var = "TN_crash", 
                                 model.no = modelno, rf.inputs = rf.inputs,
-                                cutoff = c(0.9, 0.1))  
+                                cutoff = c(0.9, 0.1), thin.dat= 0.01)  
   
   save("keyoutputs", file = paste0("Output_to_", modelno))
 } else {
