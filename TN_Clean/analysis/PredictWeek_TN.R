@@ -13,7 +13,7 @@ rm(list=ls()) # Start fresh
 
 codeloc <- "~/TN/SDI_Waze"
 inputdir <- "~/TN/Input"
-outputdir<-"~/TN/Output"
+outputdir<- "~/TN/Output"
 
 source(file.path(codeloc, 'utility/get_packages.R')) # installs necessary packages
 
@@ -41,18 +41,21 @@ state = "TN"
 # Load a fitted model from local machine -- run RandomForest_WazeGrids_TN.R to generate models
 # Loads rf.out, the model object, which we will feed new data to predict on.
 # New data will need the same structure as the data used in the model fitting.
+# This script is based on model 05, which performed the best of the models we tested.
 
-load(file.path(outputdir, paste0('TN_Model_05_', g, '_RandomForest_Output.RData')))
+load(file.path(outputdir, 'Random_Forest_Output', paste0('TN_Model_05_', g, '_RandomForest_Output.RData')))
 
 # Load data used for fitting - prepared also in RandomForest_wazeGrids_TN.R
-Waze_Prepared_Data = dir(inputdir)[grep(paste0('^', state, '_\\d{4}-\\d{2}_to_\\d{4}-\\d{2}_', g, '.csv'), dir(inputdir))]
+Waze_Prepared_Data = dir(outputdir)[grep(paste0('^', state, '_\\d{4}-\\d{2}_to_\\d{4}-\\d{2}_', g, '.csv'), dir(outputdir))]
 
-w.allmonths = read.csv(file.path(inputdir, Waze_Prepared_Data))
+w.allmonths = read.csv(file.path(outputdir, Waze_Prepared_Data))
 
 w.allmonths$MatchTN_buffer <- as.factor(w.allmonths$MatchTN_buffer)
 w.allmonths$MatchTN_buffer_Acc <- as.factor(w.allmonths$MatchTN_buffer_Acc)
 w.allmonths$TN_crash <- as.factor(w.allmonths$TN_crash)
 w.allmonths$date <- as.Date(w.allmonths$date)
+w.allmonths$weekday <- as.factor(w.allmonths$weekday)
+w.allmonths$DayOfWeek <- as.factor(w.allmonths$DayOfWeek)
 w.allmonths$GRID_ID <- as.character(w.allmonths$GRID_ID)
 
 # Create week ----
@@ -154,13 +157,6 @@ colnames(prob_next_week) = c('Prob_NoCrash', 'Prob_Crash')
 next_week_out <- data.frame(next_week, Crash_pred = predict_next_week, prob_next_week)
 
 write.csv(next_week_out, file = paste0('TN_Model_05_Predictions', g, Sys.Date(), '.csv'), row.names = F)
-
-zipname = paste0('TN_RandomForest_Predictions_', g, "_", Sys.Date(), '.zip')
-
-system(paste('zip', file.path('~/workingdata', zipname),
-             'Fitvars_05_TN_01dd_fishnet.csv',
-             paste0('TN_Model_05_Predictions', g, Sys.Date(), '.csv')
-             ))
 
 # Visualize predictions -----
 # use the following objects to make visualizations

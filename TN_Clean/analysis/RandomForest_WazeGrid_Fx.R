@@ -28,7 +28,6 @@ do.rf <- function(train.dat, omits, response.var = "MatchEDT_buffer_Acc", model.
                   thin.dat = NULL,
                   cutoff = c(0.8, 0.2),
                   rf.inputs = list(ntree.use = 500, avail.cores = 4, mtry = NULL, maxnodes = NULL, nodesize = 5)){
-  outputdir<-"~/TN/Output"
   
   if(!is.null(test.dat) & !missing(test.split)) stop("Specify either test.dat or test.split, but not both")
 
@@ -140,7 +139,7 @@ do.rf <- function(train.dat, omits, response.var = "MatchEDT_buffer_Acc", model.
   # pROC::roc - response, predictor
   model_auc <- pROC::auc(test.dat.use[,response.var], rf.prob[,colnames(rf.prob)=="1"])
 
-  pdf(file = file.path(outputdir,paste0("AUC_", model.no, ".pdf")), width = 6, height = 6)
+  pdf(file = file.path(outputdir, 'Figures', paste0("AUC_", model.no, ".pdf")), width = 6, height = 6)
   plot(pROC::roc(test.dat.use[,response.var], rf.prob[,colnames(rf.prob)=="1"]),
        main = paste0("Model ", model.no),
        grid=c(0.1, 0.2),
@@ -181,7 +180,7 @@ do.rf <- function(train.dat, omits, response.var = "MatchEDT_buffer_Acc", model.
   } # end if continuous response variable
   
   write.csv(out.df,
-            file = file.path(outputdir, paste(model.no, "RandomForest_pred.csv", sep = "_")),
+            file = file.path(outputdir, 'Random_Forest_Output', paste(model.no, "RandomForest_pred.csv", sep = "_")),
             row.names = F)
   
   savelist = c("rf.out", "rf.pred", "rf.prob", "out.df") 
@@ -190,7 +189,7 @@ do.rf <- function(train.dat, omits, response.var = "MatchEDT_buffer_Acc", model.
   
   fn = paste(state, "Model", model.no, "RandomForest_Output.RData", sep= "_")
   
-  save(list = savelist, file = file.path(outputdir, fn))
+  save(list = savelist, file = file.path(outputdir, 'Random_Forest_Output', fn))
   
   if(class(rundat[,response.var])!="factor" & class(rundat[,response.var])=="numeric") stop("response.var is neither a factor nor a numeric")  
   

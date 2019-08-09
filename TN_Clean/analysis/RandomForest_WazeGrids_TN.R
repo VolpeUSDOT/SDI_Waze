@@ -11,7 +11,7 @@ library(rgdal)
 
 codeloc <- "~/TN/SDI_Waze" 
 inputdir <- "~/TN/Input"
-outputdir<-"~/TN/Output"
+outputdir <-"~/TN/Output"
 
 source(file.path(codeloc, 'utility/get_packages.R')) # installs necessary packages
 
@@ -19,6 +19,9 @@ grids = c("TN_01dd_fishnet",
           "TN_1sqmile_hexagons")
 
 source(file.path(codeloc, "utility/wazefunctions_TN.R")) 
+
+# Make outputdir if not already there
+if(!dir.exists(outputdir)) { dir.create(outputdir) }
 
 setwd(outputdir)
 
@@ -35,19 +38,15 @@ do.months = c(paste("2017", c("04","05","06","07","08","09", "10", "11", "12"), 
 
 REASSESS = F # re-assess model fit and diagnostics using reassess.rf instead of do.rf
 
-# Make outputdir if not already there
-system(paste('mkdir -p', outputdir))
-
-# read random forest function
+# read random forest function, do.rf()
 source(file.path(codeloc, "analysis/RandomForest_WazeGrid_Fx.R"))
 
 Waze_Prepared_Data = paste0(state, '_', do.months[1], '_to_', do.months[length(do.months)], '_', g)
 
 # <><><><><><><><><><><><><><><><><><><><><><><><>
-# Start data prep if the data for this time period and grid size are not ready yet, otherwise read from prepared data
-# past line 125
+# Start data prep if the data for this time period and grid size are not ready yet, otherwise this will read from prepared data
 
-if(length(grep(Waze_Prepared_Data, dir(inputdir))) == 0){
+if(length(grep(Waze_Prepared_Data, dir(outputdir))) == 0){
   
 # rename data files by month. For each month, prep time and response variables
 # See prep.hex() in wazefunctions.R for details.
@@ -117,21 +116,21 @@ save(w.allmonths,
                                         row.names = F)
 
 # format(object.size(w.allmonths), "Gb")
-# To save for export, after running both grid sizes for these months:
-# source(file.path(codeloc, "analysis/scratch/bundle_RF_inputs.R"))
- 
+
 } # End data prep 
 # <><><><><><><><><><><><><><><><><><><><><><><><>
 
 
 # Start from prepared data
  
-w.allmonths <- read.csv(file.path(inputdir, paste0(Waze_Prepared_Data, ".csv")))
+w.allmonths <- read.csv(file.path(outputdir, paste0(Waze_Prepared_Data, ".csv")))
 
 w.allmonths$MatchTN_buffer <- as.factor(w.allmonths$MatchTN_buffer)
 w.allmonths$MatchTN_buffer_Acc <- as.factor(w.allmonths$MatchTN_buffer_Acc)
 w.allmonths$TN_crash <- as.factor(w.allmonths$TN_crash)
 w.allmonths$date <- as.Date(w.allmonths$date)
+w.allmonths$weekday <- as.factor(w.allmonths$weekday)
+w.allmonths$DayOfWeek <- as.factor(w.allmonths$DayOfWeek)
 w.allmonths$GRID_ID <- as.character(w.allmonths$GRID_ID)
                 
 avail.cores = parallel::detectCores()
@@ -184,12 +183,14 @@ names(w.allmonths)[is.na(match(names(w.allmonths), omits))]
 
 modelno = paste("01", g, sep = "_")
 
+# Running the models. To test, uncomment the 'thin.dat' line, which will make a randomized subsample of the data, reducing the data by that fraction. For example, when thin.dat = 0.01, only 1% of the data will be used.
+
 if(!REASSESS){
   keyoutputs[[modelno]] = do.rf(train.dat = w.allmonths, 
                                 omits, response.var = "MatchTN_buffer_Acc", 
                                 model.no = modelno, rf.inputs = rf.inputs,
                                 cutoff = c(0.95, 0.05)
-                                # , thin.dat = 0.01
+                                 , thin.dat = 0.1
                                 ) 
   
   save("keyoutputs", file = paste0("Output_to_", modelno))
@@ -381,21 +382,3 @@ if(!REASSESS){
 
 timediff <- Sys.time() - starttime
 cat(round(timediff, 2), attr(timediff, "units"), "to complete script")
-
-# zip and export outputs
-# Using system zip:
-# system(paste('zip ~/workingdata/zipfilename.zip ~/path/to/your/file'))
-
-zipname = paste0('TN_RandomForest_Outputs_', g, "_", Sys.Date(), '.zip')
-
-system(paste('zip', file.path('~/workingdata', zipname),
-             file.path(outputdir, paste0('Output_to_06_', g)),
-             file.path(outputdir, paste0('TN_Model_01_', g, '_RandomForest_Output.RData')),
-             file.path(outputdir, paste0('TN_Model_02_', g, '_RandomForest_Output.RData')),
-             file.path(outputdir, paste0('TN_Model_03_', g, '_RandomForest_Output.RData')),
-             file.path(outputdir, paste0('TN_Model_04_', g, '_RandomForest_Output.RData')),
-             file.path(outputdir, paste0('TN_Model_05_', g, '_RandomForest_Output.RData')),
-             file.path(outputdir, paste0('TN_Model_06_', g, '_RandomForest_Output.RData'))
-             
-             ))
-
