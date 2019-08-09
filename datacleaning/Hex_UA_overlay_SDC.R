@@ -29,8 +29,7 @@ teambucket <- "s3://prod-sdc-sdi-911061262852-us-east-1-bucket"
 
 source(file.path(codeloc, "utility/wazefunctions.R")) 
 
-states = c("CT", "UT", 
-  "VA", "MD")
+states = c("CT", "UT", "VA", "MD")
 
 # Time zone picker:
 tzs <- data.frame(states, 

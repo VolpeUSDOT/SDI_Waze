@@ -64,7 +64,9 @@ tzs <- data.frame(states,
 # Get year/month, year/month/day, and last day of month vectors to create the SQL queries
 yearmonths = c(
 #  paste(2017, formatC(4:12, width = 2, flag = "0"), sep="-"),
-  paste(2019, formatC(1:5, width = 2, flag = "0"), sep="-")
+#  paste(2019, formatC(1:5, width = 2, flag = "0"), sep="-")
+   paste(2018, formatC(1:12, width = 2, flag = "0"), sep="-")
+  
 )
 yearmonths.1 <- paste(yearmonths, "01", sep = "-")
 lastdays <- days_in_month(as.POSIXct(yearmonths.1)) # from lubridate

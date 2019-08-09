@@ -315,7 +315,7 @@ for(state in states){
 }
 } # end scratch
 
-# Check with plots -- written for ATA, needs update for SDC 2018-08-15
+# Check with plots 
 
 CHECKPLOT = T
 

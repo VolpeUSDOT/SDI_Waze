@@ -18,7 +18,7 @@ source(file.path(codeloc, 'utility/get_packages.R')) # installs necessary packag
 HEXSIZE = 1 
 
 # Manually setting months to run here; could also scan S3 for months available for this state
-do.months = paste("2017", c("04","05","06","07","08","09"), sep="-")
+do.months = paste("2018", formatC(1:12, flag = 0, width = 2), sep="-")
 
 REASSESS = F # re-assess model fit and diagnostics using reassess.rf instead of do.rf
 
