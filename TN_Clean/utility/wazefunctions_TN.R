@@ -359,7 +359,7 @@ append.hex <- function(hexname, data.to.add, state, na.action = c("omit", "keep"
   }
   
   # Consider assigning 0 to NA values after joining; e.g. no road info available, give 0 miles
-  if(na.action == "fill0") { w2[,sapply(next_week,notDate)][is.na(w2[,sapply(next_week,notDate)])] = 0 }
+  if(na.action == "fill0") { w2[,sapply(w2,notDate)][is.na(w2[,sapply(w2,notDate)])] = 0 }
   if(na.action == "omit") { w2 = w2[complete.cases(w2),] }
   
   assign(hexname, w2, envir = globalenv()) 

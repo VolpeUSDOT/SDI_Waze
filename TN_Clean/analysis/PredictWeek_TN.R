@@ -134,7 +134,7 @@ next_week <- left_join(next_week, w.staticvars,
 # Use rf.out from Model 5 for this grid size
 # Make sure we have factor variables, with same levels as in the fitted data.
 # Model 05
-fitvars <- read.csv('Fitvars_05_TN_01dd_fishnet.csv')
+fitvars <- read.csv(file.path(outputdir,'Fitvars_05_TN_01dd_fishnet.csv'))
 
 # Fill NA with 0
 next_week[,sapply(next_week,notDate)][is.na(next_week[,sapply(next_week,notDate)])] = 0
