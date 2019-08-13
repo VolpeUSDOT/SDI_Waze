@@ -96,8 +96,8 @@ if(!file.exists(file.path(inputdir, 'Weather', prepname))) {
     fn = paste("Prep_Weather_Daily_", day,"_", g, ".RData", sep="")
     
     # See if exists in outputdir. Load if so. If not, carry out kriging steps.
-    if(file.exists(file.path(file.path(outputdir, fn)))){
-      load(file.path(outputdir, fn))
+    if(file.exists(file.path(file.path(inputdir,"Weather", fn)))){
+      load(file.path(inputdir,"Weather", fn))
     } else {
     
     wx.day = wx.proj[wx.proj$date == day,]
@@ -185,7 +185,7 @@ if(!file.exists(file.path(inputdir, 'Weather', prepname))) {
     # Save in temporary location in case the process is interrupted
     fn = paste("Prep_Weather_Daily_", day,"_", g, ".RData", sep="")
     
-    save(list="daily_result", file = file.path(outputdir, fn))
+    save(list="daily_result", file = file.path(inputdir,"Weather", fn))
     
     EndTime <- Sys.time()-StartTime
     cat(as.character(day), 'completed', round(EndTime, 2), attr(EndTime, 'units'), '\n',

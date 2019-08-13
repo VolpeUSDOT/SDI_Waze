@@ -122,7 +122,7 @@ next_week <- left_join(next_week, w.expected,
 w.staticvars <- w.allmonths %>% 
   filter(!duplicated(GRID_ID)) %>%
   dplyr::select(GRID_ID, 
-                UA_Cluster, UA_Urban, UA_Rural,
+                TN_UA_C, TN_UA_U,
                 TotalHistCrashsum, TotalFatalCrashsum)
 
 next_week <- left_join(next_week, w.staticvars,
@@ -134,14 +134,15 @@ next_week <- left_join(next_week, w.staticvars,
 # Use rf.out from Model 5 for this grid size
 # Make sure we have factor variables, with same levels as in the fitted data.
 # Model 05
-fitvars <- read.csv('Fitvars_05_TN_01dd_fishnet.csv')
+fitvars <- read.csv(file.path(outputdir,'Fitvars_05_TN_01dd_fishnet.csv'))
 
 # Fill NA with 0
-next_week[is.na(next_week)] = 0
+next_week[,sapply(next_week,notDate)][is.na(next_week[,sapply(next_week,notDate)])] = 0
 
 next_week$DayOfWeek <- as.factor(next_week$DayOfWeek)
 levels(next_week$DayOfWeek) = c(levels(next_week$DayOfWeek), '0')
 next_week_pred <- next_week[,names(next_week) %in% fitvars$fitvars]
+
 
 # see Precision-recall tradeoff plots from re-fit local
 cutoff = 0.05
@@ -162,8 +163,8 @@ write.csv(next_week_out, file = paste0('TN_Model_05_Predictions', g, Sys.Date(),
 # use the following objects to make visualizations
 # next_week_out
 
-next_week_out <- read.csv(paste0('TN_Model_05_Predictions', g, '2019-05-06', '.csv'))
+next_week_out <- read.csv(paste0('TN_Model_05_Predictions', g, Sys.Date(), '.csv'))
 VIZ = T
 if(VIZ){
-  source(codeloc, 'analysis', 'Visualize_Next_Week.R')
+  source(file.path(codeloc, 'analysis', 'Visualize_Next_Week.R'))
 }

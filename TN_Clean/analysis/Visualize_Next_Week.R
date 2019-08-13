@@ -5,6 +5,7 @@
 #
 
 censusdir <- "~/TN/Input/census"
+outputdir<- "~/TN/Output"
 proj.USGS <- "+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs +ellps=GRS80 +towgs84=0,0,0"
 
 grid_shp <- rgdal::readOGR(file.path(inputdir, "Shapefiles"), layer = g)
@@ -30,7 +31,7 @@ pred_dat <- next_week_out %>%
 
 pred_dat$GRID_ID <- as.character(pred_dat$GRID_ID)
 
-pdf(paste0('Crash_prob_', g, "_", Sys.Date(),'.pdf'),
+pdf(file.path(outputdir,"Figures",paste0('Crash_prob_', g, "_", Sys.Date(),'.pdf')),
     width = 8, height = 5)
 
 for(day in as.character(unique(pred_dat$date.x))){
