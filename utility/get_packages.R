@@ -12,6 +12,8 @@ loadpacks <- c(
             "geonames",
             "getPass",
             "GGally",
+            "ggmap",
+            "gstat",
             "kableExtra",
             "lubridate",
             "maps",
