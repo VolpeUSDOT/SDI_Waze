@@ -4,8 +4,8 @@
 rm(list=ls()) # Start fresh
 
 # Directories
-codeloc <- "~/git/SDI_Waze" 
-localdir <- "//vntscex.local/DFS/Projects/PROJ-OS62A1/SDI Waze Phase 2/Output"
+codeloc <- "~/SDI_Waze" 
+localdir <- '~/workingdata' #"//vntscex.local/DFS/Projects/PROJ-OS62A1/SDI Waze Phase 2/Output"
 outputdir <- file.path(localdir, "Random_Forest_Output", "Multi-state_2019", "Refit")
 setwd(localdir)
 
@@ -122,3 +122,55 @@ if(SCRATCH){
   d.day # Compare with day of week table in Tableau
   
 }
+
+
+# Variable importance ----
+
+outputdir <- file.path(localdir, "Random_Forest_Output")
+
+varimps <- vector()
+
+for(state in states){ 
+  # state = 'CT'
+  for(modelno in modelnos){
+    # modelno = 18  
+    cat("\n", rep("<>", 10), "\n", state, modelno,"\n\n")
+    
+    load(file.path(outputdir, paste(state, "Model", modelno, "RandomForest_Output.RData", sep= "_")))
+    imp <- as.data.frame(rf.out$importance)
+    imp <- imp %>% 
+      mutate(state = state,
+             model = modelno,
+             Predictor = rownames(rf.out$importance),
+             rank_Importance = rank(1/MeanDecreaseGini))
+    
+    varimps <- rbind(varimps, imp)
+  }}
+
+# Top 3 by state for model 30
+varimps %>% 
+  filter(model == 30 & rank_Importance <= 3) %>%
+  group_by(state) 
+
+# Top 1 across all models - always nWazeAccident (not using EDT buffer match)
+varimps %>% 
+  filter(rank_Importance == 1) %>%
+  group_by(state, Predictor) %>%
+  summarize(n())
+
+varimps %>% 
+  filter(rank_Importance == 2) %>%
+  group_by(state, Predictor) %>%
+  summarize(n())
+
+# At 3rd most important, start to see first non-Waze preditor, hour
+varimps %>% 
+  filter(rank_Importance == 3) %>%
+  group_by(state, Predictor) %>%
+  summarize(n())
+
+# max aadt, precip, temperature, day of week start to come in at 4th most important,
+varimps %>% 
+  filter(rank_Importance == 4) %>%
+  group_by(state, Predictor) %>%
+  summarize(n())

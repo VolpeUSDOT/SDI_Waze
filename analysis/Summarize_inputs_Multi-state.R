@@ -33,16 +33,19 @@ for(state in states){
   sumtab <- rbind(sumtab, c('State' = state,
                             'Waze_Total' = sum(w.allmonths$uniqueWazeEvents),
                             'Waze_Crash' = sum(w.allmonths$nWazeAccident),
-                            'EDT_Crash' = sum(w.allmonths$uniqEDTreports))
+                            'EDT_Crash' = sum(w.allmonths$uniqEDTreports),
+                            'N_grids' = length(unique(w.allmonths$GRID_ID)),
+                            'N_total' = nrow(w.allmonths))
                   )
   
   print(sumtab)
+  
 }
 
-sumtab <- as.data.frame(sumtab)
+(sumtab <- as.data.frame(sumtab))
 
-#   State Waze_Total Waze_Crash EDT_Crash
-# 1    CT    3350744     101745    108893
-# 2    MD    7835169     259518    117121
-# 3    UT    1028665      41427     38504
-# 4    VA    9381757     317070    131420
+#   State Waze_Total Waze_Crash EDT_Crash N_grids N_total
+# 1    CT    3350744     101745    108893    4502 1780165
+# 2    MD    7835169     259518    117121    7612 3617348
+# 3    UT    1028665      41427     38504    5950  625428
+# 4    VA    9381757     317070    131420   20782 4595456
