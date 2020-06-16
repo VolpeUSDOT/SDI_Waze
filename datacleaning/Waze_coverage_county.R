@@ -8,7 +8,10 @@ library(raster)
 # Location of SDC SDI Waze team S3 bucket. Files will first be written to a temporary directory in this EC2 instance, then copied to the team bucket.
 teambucket <- "prod-sdc-sdi-911061262852-us-east-1-bucket"
 output.loc <- "~/tempout"
-codeloc <- "~/SDI_Waze"
+codeloc <- "~/covid_waze"
+
+user <- paste0( "/home/", system("whoami", intern = TRUE)) #the user directory to use
+localdir <- paste0(user, "/workingdata/") # full path for readOGR
 
 # Connect to Redshift 
 source(file.path(codeloc, 'utility/connect_redshift_pgsql.R'))
@@ -88,6 +91,7 @@ gc()
 co <- rgdal::readOGR("/home/daniel/workingdata/census", "cb_2017_us_county_500k")
 
 # go over stateresults and apply COUNTYFP to each value
+# use maps::state.fips to confirm only counties in this state being used.
 compiled_counts <- vector()
 
 starttime = Sys.time()
@@ -96,6 +100,9 @@ for(i in states){
   state_file = file.path(output.loc, paste0(i, "_events_distinct.RData"))
   # Check to see query ran before, if so just append to stateresults
   load(state_file)
+  
+  # Find the FIPS code for this state. We will use this to filter out non-state data
+  use_fips = usmap::fips(i)
   
   numconv <- c("location_lon", "location_lat")
 
@@ -109,134 +116,49 @@ for(i in states){
 
   d <- data.frame(results, x1)
 
+  d <- d %>% filter(STATEFP == use_fips)
+  
   d$yearday <- format(d$pub_utc_timestamp, "%Y-%m-%d")
   d$hour <- format(d$pub_utc_timestamp, "%H")
   
   d$pub_utc_timestamp <- as.character(d$pub_utc_timestamp)
 
-
-  # with complete(), fills all combinations of statefp, countyfp, and yearday, including missing values (so we can fill with 0). 1,126,993 rows for 2017-03-07 to 2018-04-18.
-  
   county_count <- d %>%
     filter(!is.na(COUNTYFP)) %>%
     group_by(STATEFP, COUNTYFP, yearday, hour, alert_type) %>%
     summarise(count = n()) 
 
-  compiled_counts <- rbind(compiled_counts, county_count)
+  compiled_counts <- rbind(compiled_counts, as.data.frame(county_count))
   
   timediff = Sys.time() - starttime
   cat(i, 'completed in', round(timediff, 2), attr(timediff, 'units'), '\n')
 }
- 
+
+# Save ----
+# Write to .RData and .csv, place in team bucket.
+# Also, zip together and place in export_request
+
 save(list = c("compiled_counts"), file = file.path(output.loc, "Compiled_county_counts.RData"))
 
-# to do: spread across all possible year-day values in the sample, providing 0's, without consuming all the RAM using complete().
-system("aws s3 cp /home/daniel/tempout/Yearday_County_Waze_AccidentCounts.RData s3://prod-sdc-sdi-911061262852-us-east-1-bucket/CountyCounts/")
+system(paste0("aws s3 cp ", file.path(output.loc,  "Compiled_county_counts.RData"), " s3://prod-sdc-sdi-911061262852-us-east-1-bucket/CountyCounts/"))
+
+write.csv(compiled_counts, file = file.path(output.loc, "Compiled_county_counts.csv"), row.names = F)
+
+system(paste0("aws s3 cp ", file.path(output.loc,  "Compiled_county_counts.csv"), " s3://prod-sdc-sdi-911061262852-us-east-1-bucket/CountyCounts/"))
+
+filestozip = file.path(output.loc, 
+                       c("Compiled_county_counts.RData",
+                         "Compiled_county_counts.csv"))
+
+zipname = paste0('Compiled_county_counts_', Sys.Date(), '.zip')
+
+system(paste('zip -j', file.path(output.loc, zipname),
+             paste(filestozip, collapse = " ")))
+
+system(paste(
+  'aws s3 cp',
+  file.path(output.loc, zipname),
+  file.path(teambucket, 'export_requests', zipname)
+))
 
 system("aws s3 ls prod-sdc-sdi-911061262852-us-east-1-bucket/")
-
-
-# Old test query by month vs entire timeframe -----
-# 2.03 hr for RI. No accidents until October
-
-state = "RI"
-
-stateresults <- vector()
-starttime = Sys.time()
-
-for(i in 1:length(yearmonths)){ # i = 1
-  
-  # read data by state for processing
-  alert_query <- paste0("SELECT location_lat, location_lon, street, city, pub_utc_timestamp, sub_type
-                        FROM alert WHERE state='", state,
-                        "' AND alert_type='ACCIDENT' 
-                        AND pub_utc_timestamp BETWEEN to_timestamp('", yearmonths.1[i], 
-                        " 00:00:00','YYYY-MM-DD HH24:MI:SS') AND to_timestamp('", yearmonths.end[i], " 23:59:59','YYYY-MM-DD HH24:MI:SS')") # end query
-  
-  
-  results <- DBI::dbGetQuery(conn, alert_query) # can be ~ 2-3 min per month; consider moving the summarise steps below to the SQL query.
-  
-  
-  
-  stateresults <- rbind(stateresults, results)
-  
-  cat(yearmonths[i], "queried, ", format(nrow(results), big.mark = ","), "observations \n")
-  timediff <- Sys.time() - starttime
-  cat(round(timediff, 2), attr(timediff, "units"), "elapsed \n")
-  
-}  
-
-# Convert values to numeric
-numconv <- c("location_lon", "location_lat")
-
-stateresults[numconv] <- apply(stateresults[numconv], 2, function(x) as.numeric(x))
-
-save("stateresults", file = paste(state, "accidents.RData", sep="_"))
-
-dbDisconnect(conn) # Must disconnect to prevent leakage
-
-
-# Old State results, no loop ----
-# 12 minutes only. much better not in a loop
-state = "RI"
-
-stateresults <- vector()
-starttime = Sys.time()
-
-source(file.path(codeloc, 'utility/connect_redshift_pgsql.R'))
-
-# read data by state for processing
-alert_query <- paste0("SELECT DISTINCT alert_uuid, location_lat, location_lon, street, city, pub_utc_timestamp, sub_type
-                      FROM alert WHERE state='", state,
-                      "' AND alert_type='ACCIDENT' 
-                      AND pub_utc_timestamp BETWEEN to_timestamp('", yearmonths.1[1], 
-                      " 00:00:00','YYYY-MM-DD HH24:MI:SS') AND to_timestamp('", yearmonths.end[length(yearmonths.end)], " 23:59:59','YYYY-MM-DD HH24:MI:SS')") # end query
-
-results <- DBI::dbGetQuery(conn, alert_query) 
-
-stateresults <- rbind(stateresults, results)
-
-cat(format(nrow(results), big.mark = ","), "observations \n")
-timediff <- Sys.time() - starttime
-cat(round(timediff, 2), attr(timediff, "units"), "elapsed \n")
-
-# Convert values to numeric
-numconv <- c("location_lon", "location_lat")
-
-stateresults[numconv] <- apply(stateresults[numconv], 2, function(x) as.numeric(x))
-
-save("stateresults", file = paste(state, "accidents_distinct.RData", sep="_"))
-
-
-
-dbDisconnect(conn) # Must disconnect to prevent leakage
-
-
-
-# State count of alerts. See Waze_coverage.Rmd ----
-state_alert_query <- paste0("SELECT COUNT(DISTINCT alert_uuid), state, alert_type
-                            FROM alert 
-                            WHERE pub_utc_timestamp BETWEEN to_timestamp('2017-04-01 00:00:00','YYYY-MM-DD HH24:MI:SS') AND to_timestamp('2018-03-30 23:59:59','YYYY-MM-DD HH24:MI:SS')
-                            GROUP BY state, alert_type;")
-system.time(results <- dbGetQuery(conn, state_alert_query))
-
-write.csv(results, "~/workingdata/State_Alert-Type_Count.csv", row.names= F)
-
-
-
-# Test states in Redshift
-# Need to extract location_lat, location_lon, street, city, pub_utc_timestamp, alert_subtype 
-# completely by state
-# Where alert_type = ACCIDENT
-# First, get state names
-state_name_query <- paste0("SELECT DISTINCT state
-                           FROM alert 
-                           WHERE pub_utc_timestamp BETWEEN to_timestamp('2018-03-30 00:00:00','YYYY-MM-DD HH24:MI:SS') AND to_timestamp('2018-03-30 23:59:59','YYYY-MM-DD HH24:MI:SS');")
-
-# 2+ hours... only 33 states represented that day. 
-# After resetting system, still 43 min for this query
-# system.time(results <- dbGetQuery(conn, state_name_query))
-# dbDisconnect(conn)
-
-
-s

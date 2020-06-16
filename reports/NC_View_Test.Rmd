@@ -1,0 +1,203 @@
+---
+title: "NC Dynamic View Test"
+author: "Dan Flynn"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = T)
+library(rgdal)
+library(rgeos)
+library(sp)
+library(tidyverse)
+library(lubridate)
+library(maps)
+
+#connect to Redshift
+source('~/covid_waze/utility/connect_redshift_pgsql.R')
+
+```
+
+## 2020 Test
+
+Assess if the dynamic view of the North Carolina data in Redshift is done correctly.
+
+- Query NC data for 2020 in dynamic view, `dw_waze.v_alert_geofence_northcarolina`
+- Plot over state borders from census file
+- Query NC data for 2020 from standard view, `dw_waze.alert`
+- Repeat for some months in 2017 for comparison
+
+```{r NC_query}
+
+alert_query_NC <- "SELECT * FROM dw_waze.v_alert_geofence_northcarolina 
+                    WHERE pub_utc_timestamp BETWEEN to_timestamp('2020-01-01 00:00:00','YYYY-MM-DD HH24:MI:SS') 
+                                          AND     to_timestamp('2020-05-31 23:59:59','YYYY-MM-DD HH24:MI:SS')
+                      " # end query. 
+
+system.time(results <- dbGetQuery(conn, alert_query_NC))
+
+save(file = '~/tempout/NC_view_test.RData', list = 'results')
+dim(results)
+
+
+alert_query_NC2 <- "SELECT * FROM dw_waze.alert
+                    WHERE state='NC'
+                    AND pub_utc_timestamp BETWEEN to_timestamp('2020-01-01 00:00:00','YYYY-MM-DD HH24:MI:SS') 
+                                          AND     to_timestamp('2020-05-31 23:59:59','YYYY-MM-DD HH24:MI:SS')
+                      " # end query. 
+
+system.time(results2 <- dbGetQuery(conn, alert_query_NC2))
+
+save(file = '~/tempout/NC_view_test2.RData', list = 'results2')
+dim(results2)
+
+
+
+
+```
+
+Querying from 2020-01-01 to 2020-05-31 results in a data frame with 27 columns and 6,864,560 rows. The query takes ~ 135 seconds.
+
+For comparison, the same query on `dw_waze.alert` with the inclusion of `state=NC` results in a data frame of 27 columns and 6,965,662 rows, with the query taking 95 seconds.
+
+```{r make_spatial}
+proj.USGS <- "+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs +ellps=GRS80 +towgs84=0,0,0"
+
+co <- readOGR(file.path('~/workingdata', "census"), layer = "cb_2017_us_county_500k")
+co <- spTransform(co, CRS(proj.USGS))
+
+# Subset to NC
+FIPS_i = formatC(state.fips[state.fips$abb == 'NC', "fips"][1], width = 2, flag = "0")
+co_i <- co[co$STATEFP == FIPS_i,]
+
+
+# Make NC data into spatial points data frame
+results$location_lat <- as.numeric(results$location_lat)
+results$location_lon <- as.numeric(results$location_lon)
+
+spdf <- SpatialPointsDataFrame(results[,c('location_lon', 'location_lat')], 
+                               results[,c('alert_uuid', 'alert_type','sub_type','street','city','state','location_lat','location_lon',
+                                      'pub_millis')], 
+                              proj4string = CRS("+proj=longlat +datum=WGS84"))  
+
+spdf <-spTransform(spdf, CRS(proj.USGS))
+
+```
+
+Count how many points are out of the census file vs inside
+
+```{r count_in_out}
+spdf_co <- over(spdf, co_i[c("STATEFP", "COUNTYFP")])
+spdf_in <- spdf[!is.na(spdf_co$COUNTYFP),] 
+spdf_out <- spdf[is.na(spdf_co$COUNTYFP),] 
+
+cat(paste(nrow(spdf_in), 'observations in, or \n'), paste(round(nrow(spdf_in)/nrow(spdf)*100, 2), 'percent in \n'),
+      paste(nrow(spdf_out), 'observations out, or \n'), paste(round(nrow(spdf_out)/nrow(spdf)*100, 2), 'percent out'))
+
+```
+
+Using a 2017 census shapefile, `r format(nrow(spdf_in), big.mark=',')` of the observations (`r round(nrow(spdf_in)/nrow(spdf)*100, 2)`%) where contained in the state boundaries.
+There were `r format(nrow(spdf_out), big.mark=',')` observations (`r round(nrow(spdf_out)/nrow(spdf)*100, 2)`%) outside of the state boundaries.
+
+```{r plot_in_out}
+
+plot(co_i, col = 'lightgrey')
+points(spdf_out, pch = '+', col = 'red')
+title(main = 'Plotting points outside of 2017 census boundary, 2020 query test')
+
+```
+
+For these points outside of the 2017 state boundary, and which have a city named, some points do in fact appear to be in South Carolina. Others are correctly in North Carolina, and the discrepancy is likely due only to the difference in the definition of the borders for the shapefiles used in defining the dynamic view.
+
+```{r cities}
+print(sort(table(spdf_out$city), decreasing = T))
+```
+
+
+## 2017 Test
+
+```{r NC_query_2017}
+
+alert_query_NC <- "SELECT * FROM dw_waze.v_alert_geofence_northcarolina 
+                    WHERE pub_utc_timestamp BETWEEN to_timestamp('2017-05-01 00:00:00','YYYY-MM-DD HH24:MI:SS') 
+                                          AND     to_timestamp('2017-09-30 23:59:59','YYYY-MM-DD HH24:MI:SS')
+                      " # end query. 
+
+system.time(results <- dbGetQuery(conn, alert_query_NC))
+
+save(file = '~/tempout/NC_view_test_2017.RData', list = 'results')
+dim(results)
+
+
+alert_query_NC2 <- "SELECT * FROM dw_waze.alert
+                    WHERE state='NC'
+                    AND pub_utc_timestamp BETWEEN to_timestamp('2020-01-01 00:00:00','YYYY-MM-DD HH24:MI:SS') 
+                                          AND     to_timestamp('2020-05-31 23:59:59','YYYY-MM-DD HH24:MI:SS')
+                      " # end query. 
+
+system.time(results2 <- dbGetQuery(conn, alert_query_NC2))
+
+save(file = '~/tempout/NC_view_test_20172.RData', list = 'results2')
+dim(results2)
+
+
+
+
+```
+
+Querying from 2017-05-01 to 2017-09-30 results in a data frame with `r ncol(results)` columns and `r format(nrow(results), big.mark=',')` rows. 
+
+For comparison, the same query on `dw_waze.alert` with the inclusion of `state=NC` results in a data frame of `r ncol(results2)` columns and `r format(nrow(results2), big.mark=',')` rows.
+
+```{r make_spatial_2017}
+proj.USGS <- "+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs +ellps=GRS80 +towgs84=0,0,0"
+
+co <- readOGR(file.path('~/workingdata', "census"), layer = "cb_2017_us_county_500k")
+co <- spTransform(co, CRS(proj.USGS))
+
+# Subset to NC
+FIPS_i = formatC(state.fips[state.fips$abb == 'NC', "fips"][1], width = 2, flag = "0")
+co_i <- co[co$STATEFP == FIPS_i,]
+
+
+# Make NC data into spatial points data frame
+results$location_lat <- as.numeric(results$location_lat)
+results$location_lon <- as.numeric(results$location_lon)
+
+spdf <- SpatialPointsDataFrame(results[,c('location_lon', 'location_lat')], 
+                               results[,c('alert_uuid', 'alert_type','sub_type','street','city','state','location_lat','location_lon',
+                                      'pub_millis')], 
+                              proj4string = CRS("+proj=longlat +datum=WGS84"))  
+
+spdf <-spTransform(spdf, CRS(proj.USGS))
+
+```
+
+Count how many points are out of the census file vs inside
+
+```{r count_in_out_2017}
+spdf_co <- over(spdf, co_i[c("STATEFP", "COUNTYFP")])
+spdf_in <- spdf[!is.na(spdf_co$COUNTYFP),] 
+spdf_out <- spdf[is.na(spdf_co$COUNTYFP),] 
+
+```
+
+Using a 2017 census shapefile, `r format(nrow(spdf_in), big.mark=',')` of the observations (`r round(nrow(spdf_in)/nrow(spdf)*100, 2)`%) where contained in the state boundaries.
+There were `r format(nrow(spdf_out), big.mark=',')` observations (`r round(nrow(spdf_out)/nrow(spdf)*100, 2)`%) outside of the state boundaries.
+
+```{r plot_in_out_2017}
+
+plot(co_i, col = 'lightgrey')
+points(spdf_out, pch = '+', col = 'red')
+title(main = 'Plotting points outside of 2017 census boundary, 2017 query test')
+
+```
+
+Count of these points outside of the 2017 state boundary, and which have a city named:
+
+```{r cities_2017}
+print(sort(table(spdf_out$city), decreasing = T))
+```
