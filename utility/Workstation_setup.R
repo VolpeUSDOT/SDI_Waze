@@ -39,7 +39,7 @@ for (i in workinglevel){
 
 teambucket <- "s3://prod-sdc-sdi-911061262852-us-east-1-bucket"
 
-states = c("CT", "MD", "TN", "UT", "VA", "WA")
+states = 'TN' # c("CT", "MD", "TN", "UT", "VA", "WA")
 
 
 for (i in states){
@@ -497,6 +497,11 @@ if(MOVEFROMUPLOAD){
   system(paste("aws s3 ls", 
                file.path(teambucket, system('whoami', intern = T), "uploaded_files/")
   ))
+  
+  system(paste("aws s3 cp", 
+               file.path(teambucket, system('whoami', intern = T), "uploaded_files", "TMAS.zip"),
+               file.path(teambucket, "TMAS", "TMAS.zip"))
+  )
   
   system(paste("aws s3 mv", 
                file.path(teambucket, system('whoami', intern = T), "uploaded_files", "2019_Special_Events.xlsx"),

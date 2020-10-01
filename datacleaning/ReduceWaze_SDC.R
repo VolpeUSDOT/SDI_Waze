@@ -9,7 +9,7 @@
 # Check for package installations
 codeloc <- "~/SDI_Waze"
 source(file.path(codeloc, 'utility/get_packages.R')) #comment out unless needed for first setup, takes a long time to compile
-source(file.path(codeloc, 'utility/Workstation_setup.R')) # Download necessary files from S3
+# source(file.path(codeloc, 'utility/Workstation_setup.R')) # Download necessary files from S3
 
 VALIDATE = T # to display values from Redshift query for validataion in SQL Workbench
 
@@ -37,17 +37,19 @@ source(file.path(codeloc, 'utility/connect_redshift_pgsql.R'))
 # states with available EDT data for model testing. Adding NC for disaster test
 # states = c("CT", "MD", "NC", "TN", "UT", "VA", "WA")
 
-states = c("CT", "MD", "TN", "UT", "VA", "WA")
+#states = c("CT", "MD", "TN", "UT", "VA", "WA")
 
+states = 'TN'
 # Time zone picker. 'USE_SHAPEFILE' flag for states with multiple timezones:
 tzs <- data.frame(states, 
-                  tz = c("US/Eastern",
-                         "US/Eastern",
+                  tz = c(#"US/Eastern",
                          #"US/Eastern",
-                         "USE_SHAPEFILE",
-                         "US/Mountain",
-                         "US/Eastern",
-                         "US/Pacific"),
+                         #"US/Eastern",
+                         "USE_SHAPEFILE"#,
+                         #"US/Mountain",
+                         #"US/Eastern",
+                         #"US/Pacific"
+                         ),
                   stringsAsFactors = F)
 
 ## TN only
@@ -65,7 +67,7 @@ tzs <- data.frame(states,
 yearmonths = c(
 #  paste(2017, formatC(4:12, width = 2, flag = "0"), sep="-"),
 #  paste(2019, formatC(1:5, width = 2, flag = "0"), sep="-")
-   paste(2018, formatC(1:12, width = 2, flag = "0"), sep="-")
+   paste(2019, formatC(1:12, width = 2, flag = "0"), sep="-")
   
 )
 yearmonths.1 <- paste(yearmonths, "01", sep = "-")
@@ -262,7 +264,7 @@ for(i in states){ # i = "TN"
         if(use.tz == "USE_SHAPEFILE"){
           
           # Read tz file
-          tz <- readOGR(file.path(localdir, 'TN', 'dist'), layer = 'combined-shapefile')
+          tz <- readOGR(file.path(normalizePath(localdir), 'TN', 'Shapefiles', 'dist'), layer = 'combined-shapefile')
           
           # Project to Albers equal area, ESRI 102008
           proj <- showP4(showWKT("+init=epsg:102008"))

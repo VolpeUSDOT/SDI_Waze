@@ -1,0 +1,444 @@
+\PassOptionsToPackage{unicode=true}{hyperref} % options for packages loaded elsewhere
+\PassOptionsToPackage{hyphens}{url}
+%
+\documentclass[]{article}
+\usepackage{lmodern}
+\usepackage{amssymb,amsmath}
+\usepackage{ifxetex,ifluatex}
+\usepackage{fixltx2e} % provides \textsubscript
+\ifnum 0\ifxetex 1\fi\ifluatex 1\fi=0 % if pdftex
+  \usepackage[T1]{fontenc}
+  \usepackage[utf8]{inputenc}
+  \usepackage{textcomp} % provides euro and other symbols
+\else % if luatex or xelatex
+  \usepackage{unicode-math}
+  \defaultfontfeatures{Ligatures=TeX,Scale=MatchLowercase}
+\fi
+% use upquote if available, for straight quotes in verbatim environments
+\IfFileExists{upquote.sty}{\usepackage{upquote}}{}
+% use microtype if available
+\IfFileExists{microtype.sty}{%
+\usepackage[]{microtype}
+\UseMicrotypeSet[protrusion]{basicmath} % disable protrusion for tt fonts
+}{}
+\IfFileExists{parskip.sty}{%
+\usepackage{parskip}
+}{% else
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{6pt plus 2pt minus 1pt}
+}
+\usepackage{hyperref}
+\hypersetup{
+            pdftitle={NC Dynamic View Test},
+            pdfauthor={Dan Flynn},
+            pdfborder={0 0 0},
+            breaklinks=true}
+\urlstyle{same}  % don't use monospace font for urls
+\usepackage[margin=1in]{geometry}
+\usepackage{color}
+\usepackage{fancyvrb}
+\newcommand{\VerbBar}{|}
+\newcommand{\VERB}{\Verb[commandchars=\\\{\}]}
+\DefineVerbatimEnvironment{Highlighting}{Verbatim}{commandchars=\\\{\}}
+% Add ',fontsize=\small' for more characters per line
+\usepackage{framed}
+\definecolor{shadecolor}{RGB}{248,248,248}
+\newenvironment{Shaded}{\begin{snugshade}}{\end{snugshade}}
+\newcommand{\AlertTok}[1]{\textcolor[rgb]{0.94,0.16,0.16}{#1}}
+\newcommand{\AnnotationTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
+\newcommand{\AttributeTok}[1]{\textcolor[rgb]{0.77,0.63,0.00}{#1}}
+\newcommand{\BaseNTok}[1]{\textcolor[rgb]{0.00,0.00,0.81}{#1}}
+\newcommand{\BuiltInTok}[1]{#1}
+\newcommand{\CharTok}[1]{\textcolor[rgb]{0.31,0.60,0.02}{#1}}
+\newcommand{\CommentTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textit{#1}}}
+\newcommand{\CommentVarTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
+\newcommand{\ConstantTok}[1]{\textcolor[rgb]{0.00,0.00,0.00}{#1}}
+\newcommand{\ControlFlowTok}[1]{\textcolor[rgb]{0.13,0.29,0.53}{\textbf{#1}}}
+\newcommand{\DataTypeTok}[1]{\textcolor[rgb]{0.13,0.29,0.53}{#1}}
+\newcommand{\DecValTok}[1]{\textcolor[rgb]{0.00,0.00,0.81}{#1}}
+\newcommand{\DocumentationTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
+\newcommand{\ErrorTok}[1]{\textcolor[rgb]{0.64,0.00,0.00}{\textbf{#1}}}
+\newcommand{\ExtensionTok}[1]{#1}
+\newcommand{\FloatTok}[1]{\textcolor[rgb]{0.00,0.00,0.81}{#1}}
+\newcommand{\FunctionTok}[1]{\textcolor[rgb]{0.00,0.00,0.00}{#1}}
+\newcommand{\ImportTok}[1]{#1}
+\newcommand{\InformationTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
+\newcommand{\KeywordTok}[1]{\textcolor[rgb]{0.13,0.29,0.53}{\textbf{#1}}}
+\newcommand{\NormalTok}[1]{#1}
+\newcommand{\OperatorTok}[1]{\textcolor[rgb]{0.81,0.36,0.00}{\textbf{#1}}}
+\newcommand{\OtherTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{#1}}
+\newcommand{\PreprocessorTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textit{#1}}}
+\newcommand{\RegionMarkerTok}[1]{#1}
+\newcommand{\SpecialCharTok}[1]{\textcolor[rgb]{0.00,0.00,0.00}{#1}}
+\newcommand{\SpecialStringTok}[1]{\textcolor[rgb]{0.31,0.60,0.02}{#1}}
+\newcommand{\StringTok}[1]{\textcolor[rgb]{0.31,0.60,0.02}{#1}}
+\newcommand{\VariableTok}[1]{\textcolor[rgb]{0.00,0.00,0.00}{#1}}
+\newcommand{\VerbatimStringTok}[1]{\textcolor[rgb]{0.31,0.60,0.02}{#1}}
+\newcommand{\WarningTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
+\usepackage{graphicx,grffile}
+\makeatletter
+\def\maxwidth{\ifdim\Gin@nat@width>\linewidth\linewidth\else\Gin@nat@width\fi}
+\def\maxheight{\ifdim\Gin@nat@height>\textheight\textheight\else\Gin@nat@height\fi}
+\makeatother
+% Scale images if necessary, so that they will not overflow the page
+% margins by default, and it is still possible to overwrite the defaults
+% using explicit options in \includegraphics[width, height, ...]{}
+\setkeys{Gin}{width=\maxwidth,height=\maxheight,keepaspectratio}
+\setlength{\emergencystretch}{3em}  % prevent overfull lines
+\providecommand{\tightlist}{%
+  \setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+\setcounter{secnumdepth}{0}
+% Redefines (sub)paragraphs to behave more like sections
+\ifx\paragraph\undefined\else
+\let\oldparagraph\paragraph
+\renewcommand{\paragraph}[1]{\oldparagraph{#1}\mbox{}}
+\fi
+\ifx\subparagraph\undefined\else
+\let\oldsubparagraph\subparagraph
+\renewcommand{\subparagraph}[1]{\oldsubparagraph{#1}\mbox{}}
+\fi
+
+% set default figure placement to htbp
+\makeatletter
+\def\fps@figure{htbp}
+\makeatother
+
+
+\title{NC Dynamic View Test}
+\author{Dan Flynn}
+\date{2020-06-15}
+
+\begin{document}
+\maketitle
+
+\hypertarget{test}{%
+\subsection{2020 Test}\label{test}}
+
+Assess if the dynamic view of the North Carolina data in Redshift is
+done correctly.
+
+\begin{itemize}
+\tightlist
+\item
+  Query NC data for 2020 in dynamic view,
+  \texttt{dw\_waze.v\_alert\_geofence\_northcarolina}
+\item
+  Plot over state borders from census file
+\item
+  Query NC data for 2020 from standard view, \texttt{dw\_waze.alert}
+\item
+  Repeat for some months in 2017 for comparison
+\end{itemize}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{alert_query_NC <-}\StringTok{ "SELECT * FROM dw_waze.v_alert_geofence_northcarolina }
+\StringTok{                    WHERE pub_utc_timestamp BETWEEN to_timestamp('2020-01-01 00:00:00','YYYY-MM-DD HH24:MI:SS') }
+\StringTok{                                          AND     to_timestamp('2020-05-31 23:59:59','YYYY-MM-DD HH24:MI:SS')}
+\StringTok{                      "} \CommentTok{# end query. }
+
+\KeywordTok{system.time}\NormalTok{(results <-}\StringTok{ }\KeywordTok{dbGetQuery}\NormalTok{(conn, alert_query_NC))}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+##    user  system elapsed 
+##  88.149  14.418 131.563
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{save}\NormalTok{(}\DataTypeTok{file =} \StringTok{'~/tempout/NC_view_test.RData'}\NormalTok{, }\DataTypeTok{list =} \StringTok{'results'}\NormalTok{)}
+\KeywordTok{dim}\NormalTok{(results)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## [1] 6864560      27
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{alert_query_NC2 <-}\StringTok{ "SELECT * FROM dw_waze.alert}
+\StringTok{                    WHERE state='NC'}
+\StringTok{                    AND pub_utc_timestamp BETWEEN to_timestamp('2020-01-01 00:00:00','YYYY-MM-DD HH24:MI:SS') }
+\StringTok{                                          AND     to_timestamp('2020-05-31 23:59:59','YYYY-MM-DD HH24:MI:SS')}
+\StringTok{                      "} \CommentTok{# end query. }
+
+\KeywordTok{system.time}\NormalTok{(results2 <-}\StringTok{ }\KeywordTok{dbGetQuery}\NormalTok{(conn, alert_query_NC2))}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+##    user  system elapsed 
+##  65.209  14.617  90.054
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{save}\NormalTok{(}\DataTypeTok{file =} \StringTok{'~/tempout/NC_view_test2.RData'}\NormalTok{, }\DataTypeTok{list =} \StringTok{'results2'}\NormalTok{)}
+\KeywordTok{dim}\NormalTok{(results2)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## [1] 6965562      27
+\end{verbatim}
+
+Querying from 2020-01-01 to 2020-05-31 results in a data frame with 27
+columns and 6,864,560 rows. The query takes \textasciitilde{} 135
+seconds.
+
+For comparison, the same query on \texttt{dw\_waze.alert} with the
+inclusion of \texttt{state=NC} results in a data frame of 27 columns and
+6,965,662 rows, with the query taking 95 seconds.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{proj.USGS <-}\StringTok{ "+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs +ellps=GRS80 +towgs84=0,0,0"}
+
+\NormalTok{co <-}\StringTok{ }\KeywordTok{readOGR}\NormalTok{(}\KeywordTok{file.path}\NormalTok{(}\StringTok{'~/workingdata'}\NormalTok{, }\StringTok{"census"}\NormalTok{), }\DataTypeTok{layer =} \StringTok{"cb_2017_us_county_500k"}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## OGR data source with driver: ESRI Shapefile 
+## Source: "/home/daniel/workingdata/census", layer: "cb_2017_us_county_500k"
+## with 3233 features
+## It has 9 fields
+## Integer64 fields read as strings:  ALAND AWATER
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{co <-}\StringTok{ }\KeywordTok{spTransform}\NormalTok{(co, }\KeywordTok{CRS}\NormalTok{(proj.USGS))}
+
+\CommentTok{# Subset to NC}
+\NormalTok{FIPS_i =}\StringTok{ }\KeywordTok{formatC}\NormalTok{(state.fips[state.fips}\OperatorTok{$}\NormalTok{abb }\OperatorTok{==}\StringTok{ 'NC'}\NormalTok{, }\StringTok{"fips"}\NormalTok{][}\DecValTok{1}\NormalTok{], }\DataTypeTok{width =} \DecValTok{2}\NormalTok{, }\DataTypeTok{flag =} \StringTok{"0"}\NormalTok{)}
+\NormalTok{co_i <-}\StringTok{ }\NormalTok{co[co}\OperatorTok{$}\NormalTok{STATEFP }\OperatorTok{==}\StringTok{ }\NormalTok{FIPS_i,]}
+
+
+\CommentTok{# Make NC data into spatial points data frame}
+\NormalTok{results}\OperatorTok{$}\NormalTok{location_lat <-}\StringTok{ }\KeywordTok{as.numeric}\NormalTok{(results}\OperatorTok{$}\NormalTok{location_lat)}
+\NormalTok{results}\OperatorTok{$}\NormalTok{location_lon <-}\StringTok{ }\KeywordTok{as.numeric}\NormalTok{(results}\OperatorTok{$}\NormalTok{location_lon)}
+
+\NormalTok{spdf <-}\StringTok{ }\KeywordTok{SpatialPointsDataFrame}\NormalTok{(results[,}\KeywordTok{c}\NormalTok{(}\StringTok{'location_lon'}\NormalTok{, }\StringTok{'location_lat'}\NormalTok{)], }
+\NormalTok{                               results[,}\KeywordTok{c}\NormalTok{(}\StringTok{'alert_uuid'}\NormalTok{, }\StringTok{'alert_type'}\NormalTok{,}\StringTok{'sub_type'}\NormalTok{,}\StringTok{'street'}\NormalTok{,}\StringTok{'city'}\NormalTok{,}\StringTok{'state'}\NormalTok{,}\StringTok{'location_lat'}\NormalTok{,}\StringTok{'location_lon'}\NormalTok{,}
+                                      \StringTok{'pub_millis'}\NormalTok{)], }
+                              \DataTypeTok{proj4string =} \KeywordTok{CRS}\NormalTok{(}\StringTok{"+proj=longlat +datum=WGS84"}\NormalTok{))  }
+
+\NormalTok{spdf <-}\KeywordTok{spTransform}\NormalTok{(spdf, }\KeywordTok{CRS}\NormalTok{(proj.USGS))}
+\end{Highlighting}
+\end{Shaded}
+
+Count how many points are out of the census file vs inside
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{spdf_co <-}\StringTok{ }\KeywordTok{over}\NormalTok{(spdf, co_i[}\KeywordTok{c}\NormalTok{(}\StringTok{"STATEFP"}\NormalTok{, }\StringTok{"COUNTYFP"}\NormalTok{)])}
+\NormalTok{spdf_in <-}\StringTok{ }\NormalTok{spdf[}\OperatorTok{!}\KeywordTok{is.na}\NormalTok{(spdf_co}\OperatorTok{$}\NormalTok{COUNTYFP),] }
+\NormalTok{spdf_out <-}\StringTok{ }\NormalTok{spdf[}\KeywordTok{is.na}\NormalTok{(spdf_co}\OperatorTok{$}\NormalTok{COUNTYFP),] }
+
+\KeywordTok{cat}\NormalTok{(}\KeywordTok{paste}\NormalTok{(}\KeywordTok{nrow}\NormalTok{(spdf_in), }\StringTok{'observations in, or }\CharTok{\textbackslash{}n}\StringTok{'}\NormalTok{), }\KeywordTok{paste}\NormalTok{(}\KeywordTok{round}\NormalTok{(}\KeywordTok{nrow}\NormalTok{(spdf_in)}\OperatorTok{/}\KeywordTok{nrow}\NormalTok{(spdf)}\OperatorTok{*}\DecValTok{100}\NormalTok{, }\DecValTok{2}\NormalTok{), }\StringTok{'percent in }\CharTok{\textbackslash{}n}\StringTok{'}\NormalTok{),}
+      \KeywordTok{paste}\NormalTok{(}\KeywordTok{nrow}\NormalTok{(spdf_out), }\StringTok{'observations out, or }\CharTok{\textbackslash{}n}\StringTok{'}\NormalTok{), }\KeywordTok{paste}\NormalTok{(}\KeywordTok{round}\NormalTok{(}\KeywordTok{nrow}\NormalTok{(spdf_out)}\OperatorTok{/}\KeywordTok{nrow}\NormalTok{(spdf)}\OperatorTok{*}\DecValTok{100}\NormalTok{, }\DecValTok{2}\NormalTok{), }\StringTok{'percent out'}\NormalTok{))}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## 6860441 observations in, or 
+##  99.94 percent in 
+##  4119 observations out, or 
+##  0.06 percent out
+\end{verbatim}
+
+Using a 2017 census shapefile, 6,860,441 of the observations (99.94\%)
+where contained in the state boundaries. There were 4,119 observations
+(0.06\%) outside of the state boundaries.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{plot}\NormalTok{(co_i, }\DataTypeTok{col =} \StringTok{'lightgrey'}\NormalTok{)}
+\KeywordTok{points}\NormalTok{(spdf_out, }\DataTypeTok{pch =} \StringTok{'+'}\NormalTok{, }\DataTypeTok{col =} \StringTok{'red'}\NormalTok{)}
+\KeywordTok{title}\NormalTok{(}\DataTypeTok{main =} \StringTok{'Plotting points outside of 2017 census boundary, 2020 query test'}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\includegraphics{NC_View_Test_files/figure-latex/plot_in_out-1.pdf}
+
+For these points outside of the 2017 state boundary, and which have a
+city named, some points do in fact appear to be in South Carolina.
+Others are correctly in North Carolina, and the discrepancy is likely
+due only to the difference in the definition of the borders for the
+shapefiles used in defining the dynamic view.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{print}\NormalTok{(}\KeywordTok{sort}\NormalTok{(}\KeywordTok{table}\NormalTok{(spdf_out}\OperatorTok{$}\NormalTok{city), }\DataTypeTok{decreasing =}\NormalTok{ T))}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## 
+##         Lake Wylie, SC          Fort Mill, SC       Emerald Isle, NC 
+##                    892                    264                     84 
+##      Morehead City, NC     Atlantic Beach, NC         James City, NC 
+##                     16                     11                      8 
+##          Pineville, NC             Clover, SC         Kure Beach, NC 
+##                      5                      4                      4 
+##            Belmont, NC           New Bern, NC         Oak Island, NC 
+##                      3                      3                      2 
+## Wrightsville Beach, NC 
+##                      1
+\end{verbatim}
+
+\hypertarget{test-1}{%
+\subsection{2017 Test}\label{test-1}}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{alert_query_NC <-}\StringTok{ "SELECT * FROM dw_waze.v_alert_geofence_northcarolina }
+\StringTok{                    WHERE pub_utc_timestamp BETWEEN to_timestamp('2017-05-01 00:00:00','YYYY-MM-DD HH24:MI:SS') }
+\StringTok{                                          AND     to_timestamp('2017-09-30 23:59:59','YYYY-MM-DD HH24:MI:SS')}
+\StringTok{                      "} \CommentTok{# end query. }
+
+\KeywordTok{system.time}\NormalTok{(results <-}\StringTok{ }\KeywordTok{dbGetQuery}\NormalTok{(conn, alert_query_NC))}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+##    user  system elapsed 
+##  64.431  11.902 105.449
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{save}\NormalTok{(}\DataTypeTok{file =} \StringTok{'~/tempout/NC_view_test_2017.RData'}\NormalTok{, }\DataTypeTok{list =} \StringTok{'results'}\NormalTok{)}
+\KeywordTok{dim}\NormalTok{(results)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## [1] 5931129      27
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{alert_query_NC2 <-}\StringTok{ "SELECT * FROM dw_waze.alert}
+\StringTok{                    WHERE state='NC'}
+\StringTok{                    AND pub_utc_timestamp BETWEEN to_timestamp('2020-01-01 00:00:00','YYYY-MM-DD HH24:MI:SS') }
+\StringTok{                                          AND     to_timestamp('2020-05-31 23:59:59','YYYY-MM-DD HH24:MI:SS')}
+\StringTok{                      "} \CommentTok{# end query. }
+
+\KeywordTok{system.time}\NormalTok{(results2 <-}\StringTok{ }\KeywordTok{dbGetQuery}\NormalTok{(conn, alert_query_NC2))}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+##    user  system elapsed 
+##  64.227  14.114  92.149
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{save}\NormalTok{(}\DataTypeTok{file =} \StringTok{'~/tempout/NC_view_test_20172.RData'}\NormalTok{, }\DataTypeTok{list =} \StringTok{'results2'}\NormalTok{)}
+\KeywordTok{dim}\NormalTok{(results2)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## [1] 6965562      27
+\end{verbatim}
+
+Querying from 2017-05-01 to 2017-09-30 results in a data frame with 27
+columns and 5,931,129 rows.
+
+For comparison, the same query on \texttt{dw\_waze.alert} with the
+inclusion of \texttt{state=NC} results in a data frame of 27 columns and
+6,965,562 rows.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{proj.USGS <-}\StringTok{ "+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs +ellps=GRS80 +towgs84=0,0,0"}
+
+\NormalTok{co <-}\StringTok{ }\KeywordTok{readOGR}\NormalTok{(}\KeywordTok{file.path}\NormalTok{(}\StringTok{'~/workingdata'}\NormalTok{, }\StringTok{"census"}\NormalTok{), }\DataTypeTok{layer =} \StringTok{"cb_2017_us_county_500k"}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## OGR data source with driver: ESRI Shapefile 
+## Source: "/home/daniel/workingdata/census", layer: "cb_2017_us_county_500k"
+## with 3233 features
+## It has 9 fields
+## Integer64 fields read as strings:  ALAND AWATER
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{co <-}\StringTok{ }\KeywordTok{spTransform}\NormalTok{(co, }\KeywordTok{CRS}\NormalTok{(proj.USGS))}
+
+\CommentTok{# Subset to NC}
+\NormalTok{FIPS_i =}\StringTok{ }\KeywordTok{formatC}\NormalTok{(state.fips[state.fips}\OperatorTok{$}\NormalTok{abb }\OperatorTok{==}\StringTok{ 'NC'}\NormalTok{, }\StringTok{"fips"}\NormalTok{][}\DecValTok{1}\NormalTok{], }\DataTypeTok{width =} \DecValTok{2}\NormalTok{, }\DataTypeTok{flag =} \StringTok{"0"}\NormalTok{)}
+\NormalTok{co_i <-}\StringTok{ }\NormalTok{co[co}\OperatorTok{$}\NormalTok{STATEFP }\OperatorTok{==}\StringTok{ }\NormalTok{FIPS_i,]}
+
+
+\CommentTok{# Make NC data into spatial points data frame}
+\NormalTok{results}\OperatorTok{$}\NormalTok{location_lat <-}\StringTok{ }\KeywordTok{as.numeric}\NormalTok{(results}\OperatorTok{$}\NormalTok{location_lat)}
+\NormalTok{results}\OperatorTok{$}\NormalTok{location_lon <-}\StringTok{ }\KeywordTok{as.numeric}\NormalTok{(results}\OperatorTok{$}\NormalTok{location_lon)}
+
+\NormalTok{spdf <-}\StringTok{ }\KeywordTok{SpatialPointsDataFrame}\NormalTok{(results[,}\KeywordTok{c}\NormalTok{(}\StringTok{'location_lon'}\NormalTok{, }\StringTok{'location_lat'}\NormalTok{)], }
+\NormalTok{                               results[,}\KeywordTok{c}\NormalTok{(}\StringTok{'alert_uuid'}\NormalTok{, }\StringTok{'alert_type'}\NormalTok{,}\StringTok{'sub_type'}\NormalTok{,}\StringTok{'street'}\NormalTok{,}\StringTok{'city'}\NormalTok{,}\StringTok{'state'}\NormalTok{,}\StringTok{'location_lat'}\NormalTok{,}\StringTok{'location_lon'}\NormalTok{,}
+                                      \StringTok{'pub_millis'}\NormalTok{)], }
+                              \DataTypeTok{proj4string =} \KeywordTok{CRS}\NormalTok{(}\StringTok{"+proj=longlat +datum=WGS84"}\NormalTok{))  }
+
+\NormalTok{spdf <-}\KeywordTok{spTransform}\NormalTok{(spdf, }\KeywordTok{CRS}\NormalTok{(proj.USGS))}
+\end{Highlighting}
+\end{Shaded}
+
+Count how many points are out of the census file vs inside
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{spdf_co <-}\StringTok{ }\KeywordTok{over}\NormalTok{(spdf, co_i[}\KeywordTok{c}\NormalTok{(}\StringTok{"STATEFP"}\NormalTok{, }\StringTok{"COUNTYFP"}\NormalTok{)])}
+\NormalTok{spdf_in <-}\StringTok{ }\NormalTok{spdf[}\OperatorTok{!}\KeywordTok{is.na}\NormalTok{(spdf_co}\OperatorTok{$}\NormalTok{COUNTYFP),] }
+\NormalTok{spdf_out <-}\StringTok{ }\NormalTok{spdf[}\KeywordTok{is.na}\NormalTok{(spdf_co}\OperatorTok{$}\NormalTok{COUNTYFP),] }
+\end{Highlighting}
+\end{Shaded}
+
+Using a 2017 census shapefile, 5,926,011 of the observations (99.91\%)
+where contained in the state boundaries. There were 5,118 observations
+(0.09\%) outside of the state boundaries.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{plot}\NormalTok{(co_i, }\DataTypeTok{col =} \StringTok{'lightgrey'}\NormalTok{)}
+\KeywordTok{points}\NormalTok{(spdf_out, }\DataTypeTok{pch =} \StringTok{'+'}\NormalTok{, }\DataTypeTok{col =} \StringTok{'red'}\NormalTok{)}
+\KeywordTok{title}\NormalTok{(}\DataTypeTok{main =} \StringTok{'Plotting points outside of 2017 census boundary, 2017 query test'}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\includegraphics{NC_View_Test_files/figure-latex/plot_in_out_2017-1.pdf}
+
+Count of these points outside of the 2017 state boundary, and which have
+a city named:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{print}\NormalTok{(}\KeywordTok{sort}\NormalTok{(}\KeywordTok{table}\NormalTok{(spdf_out}\OperatorTok{$}\NormalTok{city), }\DataTypeTok{decreasing =}\NormalTok{ T))}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## 
+##         Lake Wylie, SC       Emerald Isle, NC         James City, NC 
+##                    474                     73                     32 
+##      Morehead City, NC     Atlantic Beach, NC           New Bern, NC 
+##                     24                     21                     10 
+##           Columbus, NC             Clover, SC          Fort Mill, SC 
+##                      8                      6                      3 
+##          Charlotte, NC               Cana, VA     Carolina Beach, NC 
+##                      2                      1                      1 
+## Wrightsville Beach, NC 
+##                      1
+\end{verbatim}
+
+\end{document}
