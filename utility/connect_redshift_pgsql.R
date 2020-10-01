@@ -12,15 +12,19 @@ library(RPostgres)
 library(getPass)
 
 # # Specify username and password manually, once:
-# if(Sys.getenv("sdc_waze_username")==""){
-#   cat("Please enter SDC Waze username and password manually, in the console, the first time accessing the Redshift database, using: \n Sys.setenv('sdc_waze_username' = <see email from SDC Administrator>) \n Sys.setenv('sdc_waze_password' = <see email from SDC Administrator>)")
-# 
-# }
+# Specify username and password with a file called Redshift_Credentials.csv:
+if(!file.exists('~/Redshift_Credentials.csv')){
+  root_dir = path.expand('~/')
+  stop(paste('Create a two-column, two-row Redshift_Credentials.csv file with you username and Redshift_password to store in the root directory. The root directory is', root_dir))
+} else {
+  cred <- read.csv('~/Redshift_Credentials.csv', stringsAsFactors = FALSE)
+}
+
 
 redshift_host <- "prod-dot-sdc-redshift-cluster.cctxatvt4w6t.us-east-1.redshift.amazonaws.com"
 redshift_port <- "5439"
-if(!exists("redshift_user")) redshift_user <- getPass("redshift_user") #Sys.getenv("sdc_waze_username")
-if(!exists("redshift_password")) redshift_password <- getPass("redshift_password") #Sys.getenv("sdc_waze_password")
+redshift_user <- cred$username
+redshift_password <- cred$password
 redshift_db <- "dot_sdc_redshift_db"
 
 #drv <- dbDriver("PostgreSQL")
