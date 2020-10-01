@@ -9,7 +9,7 @@
 # Check for package installations
 codeloc <- "~/SDI_Waze"
 source(file.path(codeloc, 'utility/get_packages.R')) #comment out unless needed for first setup, takes a long time to compile
-source(file.path(codeloc, 'utility/Workstation_setup.R')) # Download necessary files from S3
+# source(file.path(codeloc, 'utility/Workstation_setup.R')) # Download necessary files from S3
 
 VALIDATE = T # to display values from Redshift query for validataion in SQL Workbench
 
@@ -264,7 +264,7 @@ for(i in states){ # i = "TN"
         if(use.tz == "USE_SHAPEFILE"){
           
           # Read tz file
-          tz <- readOGR(file.path(localdir, 'TN', 'dist'), layer = 'combined-shapefile')
+          tz <- readOGR(file.path(normalizePath(localdir), 'TN', 'Shapefiles', 'dist'), layer = 'combined-shapefile')
           
           # Project to Albers equal area, ESRI 102008
           proj <- showP4(showWKT("+init=epsg:102008"))
