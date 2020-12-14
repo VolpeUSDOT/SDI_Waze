@@ -1,5 +1,6 @@
 # Random forest models of crash estimation for TN
 # 2019-02: Now focusing just on TN_crash as response, stil with both grid IDs. 
+# Friday to THursday model week
 
 # Setup ---- 
 rm(list=ls()) # Start fresh
@@ -30,13 +31,12 @@ g = grids[1] # start with square grids, now running hex also. Change between 1 a
 state = "TN"
 # <><><><><>
 
+
 # Manually setting months to run here
 do.months = c(paste("2017", c("04","05","06","07","08","09", "10", "11", "12"), sep="-"),
-              paste("2018", c("01","02","03"), sep="-"))#,"04","05","06","07","08","09"), sep="-"))
+              paste("2018", c("01","02","03"), sep="-"))
 
 # do.months = paste("2018", c("01","02","03"), sep="-")
-
-REASSESS = F # re-assess model fit and diagnostics using reassess.rf instead of do.rf
 
 # read random forest function, do.rf()
 source(file.path(codeloc, "analysis/RandomForest_WazeGrid_Fx.R"))
@@ -161,147 +161,7 @@ response.var = "MatchTN_buffer_Acc" # now could use nTN_total, for all TN crashe
 
 starttime = Sys.time()
 
-# A: Hourly, match buffer ----
-
-# 01 Base: Omit all Waze input, just special events and historical crashes
-
-
-omits = c(alwaysomit,
-          "uniqueWazeEvents",
-          grep("nWaze", names(w.allmonths), value = T), # All Waze events
-          alert_subtypes,
-          grep("Waze_UA", names(w.allmonths), value = T), # Waze Urban Area
-          grep("nHazard", names(w.allmonths), value = T), # Waze hazards
-          grep("MagVar", names(w.allmonths), value = T), # direction of travel
-          grep("medLast", names(w.allmonths), value = T), # report rating, reliability, confidence
-          grep("nWazeAcc_", names(w.allmonths), value = T), # neighboring accidents
-          grep("nWazeJam_", names(w.allmonths), value = T) # neighboring jams
-)
-
-# Check to see what we are passing as predictors
-names(w.allmonths)[is.na(match(names(w.allmonths), omits))]
-
-modelno = paste("01", g, sep = "_")
-
-# Running the models. To test, uncomment the 'thin.dat' line, which will make a randomized subsample of the data, reducing the data by that fraction. For example, when thin.dat = 0.01, only 1% of the data will be used.
-
-if(!REASSESS){
-  keyoutputs[[modelno]] = do.rf(train.dat = w.allmonths, 
-                                omits, response.var = "MatchTN_buffer_Acc", 
-                                model.no = modelno, rf.inputs = rf.inputs,
-                                cutoff = c(0.95, 0.05)
-                                 , thin.dat = 0.1
-                                ) 
-  
-  save("keyoutputs", file = paste0("Output_to_", modelno))
-  } else {
-redo_outputs[[modelno]] = reassess.rf(train.dat = w.allmonths, 
-                              omits, response.var = "MatchTN_buffer_Acc", 
-                              model.no = modelno, rf.inputs = rf.inputs) 
-}
-
-timediff <- Sys.time() - starttime
-cat(round(timediff, 2), attr(timediff, "units"), "elapsed to model", modelno)
-
-
-# 02, add base Waze features
-modelno = paste("02", g, sep = "_")
-
-omits = c(alwaysomit,
-          "uniqueWazeEvents",
-           grep("nWazeRT", names(w.allmonths), value = T), # All Waze road type
-          # grep("nWaze", names(w.allmonths), value = T), # All Waze events
-          alert_subtypes,
-          grep("Waze_UA", names(w.allmonths), value = T), # Waze Urban Area
-          grep("nHazard", names(w.allmonths), value = T), # Waze hazards
-          grep("MagVar", names(w.allmonths), value = T), # direction of travel
-          grep("medLast", names(w.allmonths), value = T), # report rating, reliability, confidence
-          grep("nWazeAcc_", names(w.allmonths), value = T), # neighboring accidents
-          grep("nWazeJam_", names(w.allmonths), value = T) # neighboring jams
-)
-
-
-if(!REASSESS){
-  keyoutputs[[modelno]] = do.rf(train.dat = w.allmonths, 
-                              omits, response.var = "MatchTN_buffer_Acc", 
-                              model.no = modelno, rf.inputs = rf.inputs,
-                              cutoff = c(0.95, 0.05)) 
-
- save("keyoutputs", file = paste0("Output_to_", modelno))
-} else {
-
-redo_outputs[[modelno]] = reassess.rf(train.dat = w.allmonths, 
-                                      omits, response.var = "MatchTN_buffer_Acc", 
-                                      model.no = modelno, rf.inputs = rf.inputs) 
-}
-
-# 03, add all Waze features
-modelno = paste("03", g, sep = "_")
-
-omits = c(alwaysomit
-          #grep("nWaze", names(w.allmonths), value = T), # All Waze events
-          #alert_subtypes,
-          #grep("Waze_UA", names(w.allmonths), value = T), # Waze Urban Area
-          #grep("nHazard", names(w.allmonths), value = T), # Waze hazards
-          #grep("MagVar", names(w.allmonths), value = T), # direction of travel
-          #grep("medLast", names(w.allmonths), value = T), # report rating, reliability, confidence
-          #grep("nWazeAcc_", names(w.allmonths), value = T), # neighboring accidents
-          #grep("nWazeJam_", names(w.allmonths), value = T) # neighboring jams
-)
-
-if(!REASSESS){
-  keyoutputs[[modelno]] = do.rf(train.dat = w.allmonths, 
-                                omits, response.var = "MatchTN_buffer_Acc", 
-                                model.no = modelno, rf.inputs = rf.inputs,
-                                cutoff = c(0.95, 0.05)) 
-  
-  save("keyoutputs", file = paste0("Output_to_", modelno))
-} else {
-  
-  redo_outputs[[modelno]] = reassess.rf(train.dat = w.allmonths, 
-                                        omits, response.var = "MatchTN_buffer_Acc", 
-                                        model.no = modelno, rf.inputs = rf.inputs) 
-}
-
-
-# B: Hourly, response is all TN crashes, binary ----
-
-# 04 - No Waze info
-# 05 - Add base Waze variables
-# 06 - Add all Waze variables
-
-omits = c(alwaysomit,
-          "uniqueWazeEvents",
-          grep("nWazeRT", names(w.allmonths), value = T), # All Waze road type
-          grep("nWaze", names(w.allmonths), value = T), # All Waze events
-          alert_subtypes,
-          grep("Waze_UA", names(w.allmonths), value = T), # Waze Urban Area
-          grep("nHazard", names(w.allmonths), value = T), # Waze hazards
-          grep("MagVar", names(w.allmonths), value = T), # direction of travel
-          grep("medLast", names(w.allmonths), value = T), # report rating, reliability, confidence
-          grep("nWazeAcc_", names(w.allmonths), value = T), # neighboring accidents
-          grep("nWazeJam_", names(w.allmonths), value = T) # neighboring jams
-)
-
-# Check to see what we are passing as predictors
-names(w.allmonths)[is.na(match(names(w.allmonths), omits))]
-
-modelno = paste("04", g, sep = "_")
-
-if(!REASSESS){
-  keyoutputs[[modelno]] = do.rf(train.dat = w.allmonths, 
-                                omits, response.var = "TN_crash", 
-                                model.no = modelno, rf.inputs = rf.inputs,
-                                cutoff = c(0.9, 0.1)) 
-  
-  
-  save("keyoutputs", file = paste0("Output_to_", modelno))
-} else {
-  
-  redo_outputs[[modelno]] = reassess.rf(train.dat = w.allmonths, 
-                                        omits, response.var = "nTN_total", 
-                                        model.no = modelno, rf.inputs = rf.inputs)
-}
+# Best Model: 'Model 05' with main waze alert types but not sub-types included
 
 # 05, add base Waze features
 modelno = paste("05", g, sep = "_")
@@ -318,6 +178,11 @@ omits = c(alwaysomit,
           grep("nWazeAcc_", names(w.allmonths), value = T), # neighboring accidents
           grep("nWazeJam_", names(w.allmonths), value = T) # neighboring jams
 )
+
+# Check to see what we are passing as predictors
+cat('Predictors to use in model', modelno, ': \n\n',
+    paste(names(w.allmonths)[is.na(match(names(w.allmonths), omits))], collapse = '\n'))
+
 
 fitvars = names(w.allmonths)[is.na(match(names(w.allmonths), omits))]
 class_fit = n_lev_fit = levs_fit = vector()
@@ -336,49 +201,13 @@ for(f in fitvars){
 fitvar_df <- data.frame(fitvars, class_fit, n_lev_fit, levs_fit)
 write.csv(fitvar_df, file = paste0('Fitvars_', modelno, ".csv"))
 
-if(!REASSESS){
-  keyoutputs[[modelno]] = do.rf(train.dat = w.allmonths, 
+# Run the Random Forest model using `do.rf()` function.
+keyoutputs[[modelno]] = do.rf(train.dat = w.allmonths, 
                                 omits, response.var = "TN_crash", 
                                 model.no = modelno, rf.inputs = rf.inputs,
                                 cutoff = c(0.9, 0.1))  
   
-  save("keyoutputs", file = paste0("Output_to_", modelno))
-} else {
-  
-  redo_outputs[[modelno]] = reassess.rf(train.dat = w.allmonths, 
-                                        omits, response.var = "nTN_total", 
-                                        model.no = modelno, rf.inputs = rf.inputs) 
-}
-
-# 06, add all Waze features
-modelno = paste("06", g, sep = "_")
-
-omits = c(alwaysomit
-          #grep("nWaze", names(w.allmonths), value = T), # All Waze events
-          #alert_subtypes,
-          #grep("Waze_UA", names(w.allmonths), value = T), # Waze Urban Area
-          #grep("nHazard", names(w.allmonths), value = T), # Waze hazards
-          #grep("MagVar", names(w.allmonths), value = T), # direction of travel
-          #grep("medLast", names(w.allmonths), value = T), # report rating, reliability, confidence
-          #grep("nWazeAcc_", names(w.allmonths), value = T), # neighboring accidents
-          #grep("nWazeJam_", names(w.allmonths), value = T) # neighboring jams
-)
-
-if(!REASSESS){
-  keyoutputs[[modelno]] = do.rf(train.dat = w.allmonths, 
-                                omits, response.var = "TN_crash", 
-                                model.no = modelno, rf.inputs = rf.inputs,
-                                cutoff = c(0.9, 0.1))  
-  
-  save("keyoutputs", file = paste0("Output_to_", modelno))
-} else {
-  
-  redo_outputs[[modelno]] = reassess.rf(train.dat = w.allmonths, 
-                                        omits, response.var = "nTN_total", 
-                                        model.no = modelno, rf.inputs = rf.inputs) 
-}
-
-
+save("keyoutputs", file = paste0("Output_to_", modelno))
 
 timediff <- Sys.time() - starttime
 cat(round(timediff, 2), attr(timediff, "units"), "to complete script")
