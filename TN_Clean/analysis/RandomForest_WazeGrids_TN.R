@@ -10,16 +10,15 @@ library(doParallel) # includes iterators and parallel
 library(tidyverse)
 library(rgdal)
 
-codeloc <- "~/TN/SDI_Waze" 
-inputdir <- "~/TN/Input"
-outputdir <-"~/TN/Output"
+inputdir <- "/Input"
+outputdir <-"/Output"
 
-source(file.path(codeloc, 'utility/get_packages.R')) # installs necessary packages
+source('utility/get_packages.R') # installs necessary packages
 
 grids = c("TN_01dd_fishnet",
           "TN_1sqmile_hexagons")
 
-source(file.path(codeloc, "utility/wazefunctions_TN.R")) 
+source("utility/wazefunctions_TN.R") 
 
 # Make outputdir if not already there
 if(!dir.exists(outputdir)) { dir.create(outputdir) }
@@ -39,7 +38,7 @@ do.months = c(paste("2017", c("04","05","06","07","08","09", "10", "11", "12"), 
 # do.months = paste("2018", c("01","02","03"), sep="-")
 
 # read random forest function, do.rf()
-source(file.path(codeloc, "analysis/RandomForest_WazeGrid_Fx.R"))
+source("analysis/RandomForest_WazeGrid_Fx.R")
 
 Waze_Prepared_Data = paste0(state, '_', do.months[1], '_to_', do.months[length(do.months)], '_', g)
 
@@ -78,11 +77,11 @@ monthfiles = sub("-", "_", monthfiles)
 # Append supplemental data ----
 
 # Both 2017 and 2018 special event data now
-source(file.path(codeloc, "utility", "Prep_SpecialEvents.R")) # gives spev.grid.time and spev.grid.time.holiday. Prep of 1sqmile ~ 4 hours, 01dd ~ 5 min.
+source("utility/Prep_SpecialEvents.R") # gives spev.grid.time and spev.grid.time.holiday. Prep of 1sqmile ~ 4 hours, 01dd ~ 5 min.
 
-source(file.path(codeloc, "utility", "Prep_HistoricalCrash.R")) # gives crash
+source("utility/Prep_HistoricalCrash.R") # gives crash
 
-source(file.path(codeloc, "utility", "Prep_HistoricalWeather.R")) # gives wx.grd.day. Weather variables, by grid ID, by day. Takes ~ 2 hrs for 0.1 dd on 16 core instance.
+source("utility/Prep_HistoricalWeather.R") # gives wx.grd.day. Weather variables, by grid ID, by day. Takes ~ 2 hrs for 0.1 dd on 16 core instance.
 # Run for 1sqmile hex, after optimizing now approx 20 hours.
 
 # Add prepared special events and historical crash data, with grid ID
