@@ -6,6 +6,10 @@ reports/Waze_04-09_GridCounts.csv
 *.Rhistory
 *.RData
 *.jpeg
+
+TN/Output/
+TN/Input/
+
 TN/Output/TN_2017-04_to_2018-03_TN_1sqmile_hexagons.csv
 TN/Output/TN_2017-04_to_2018-03_TN_01dd_fishnet.csv
 TN/Input/Weather/WeatherUnderground_171228.txt
