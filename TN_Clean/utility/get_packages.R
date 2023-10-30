@@ -27,7 +27,7 @@ loadpacks <- c(
             "randomForest",
             "raster", 
             "rgdal",  # for readOGR, , needed for reading in ArcM shapefiles
-            "rgeos",  # for gIntersection, to clip two shapefiles
+            "sf",  # for gIntersection, to clip two shapefiles
             "sp",
             "tidyverse",
             "utils",
