@@ -9,6 +9,8 @@ reports/Waze_04-09_GridCounts.csv
 
 TN/Output/
 TN/Input/
+TN_Clean/Output/
+TN_Clean/Input/
 
 TN/Output/TN_2017-04_to_2018-03_TN_1sqmile_hexagons.csv
 TN/Output/TN_2017-04_to_2018-03_TN_01dd_fishnet.csv
