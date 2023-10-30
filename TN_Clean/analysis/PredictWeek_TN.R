@@ -11,11 +11,10 @@
 # Setup ---- 
 rm(list=ls()) # Start fresh
 
-codeloc <- "~/TN/SDI_Waze"
-inputdir <- "~/TN/Input"
-outputdir<- "~/TN/Output"
+inputdir <- "/Input"
+outputdir<- "/Output"
 
-source(file.path(codeloc, 'utility/get_packages.R')) # installs necessary packages
+source('utility/get_packages.R') # installs necessary packages
 
 library(randomForest)
 library(foreach) # for parallel implementation
@@ -26,10 +25,10 @@ library(rgdal)
 grids = c("TN_01dd_fishnet",
           "TN_1sqmile_hexagons")
 
-source(file.path(codeloc, "utility/wazefunctions_TN.R")) 
+source("utility/wazefunctions_TN.R") 
 
 # read random forest function
-source(file.path(codeloc, "analysis/RandomForest_WazeGrid_Fx.R"))
+source("analysis/RandomForest_WazeGrid_Fx.R")
 
 setwd(outputdir)
 
