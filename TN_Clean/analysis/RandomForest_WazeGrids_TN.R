@@ -10,8 +10,8 @@ library(doParallel) # includes iterators and parallel
 library(tidyverse)
 library(rgdal)
 
-inputdir <- "/Input"
-outputdir <-"/Output"
+inputdir <- file.path(getwd(),"Input")
+outputdir <-file.path(getwd(),"Output")
 
 source('utility/get_packages.R') # installs necessary packages
 
@@ -22,8 +22,6 @@ source("utility/wazefunctions_TN.R")
 
 # Make outputdir if not already there
 if(!dir.exists(outputdir)) { dir.create(outputdir) }
-
-setwd(outputdir)
 
 # <><><><><>
 g = grids[1] # start with square grids, now running hex also. Change between 1 and 2.
@@ -121,7 +119,6 @@ save(w.allmonths,
 
 
 # Start from prepared data
- 
 w.allmonths <- read.csv(file.path(outputdir, paste0(Waze_Prepared_Data, ".csv")))
 
 w.allmonths$MatchTN_buffer <- as.factor(w.allmonths$MatchTN_buffer)
@@ -134,7 +131,7 @@ w.allmonths$GRID_ID <- as.character(w.allmonths$GRID_ID)
                 
 avail.cores = parallel::detectCores()
 
-# if(avail.cores > 8) avail.cores = 12 # Limit usage below max if on r4.4xlarge instance. Comment this out to run largest models.
+if(avail.cores > 8) avail.cores = 12 # Limit usage below max if on r4.4xlarge instance. Comment this out to run largest models.
 
 # Use this to set number of decision trees to use, and key RF parameters. mtry is especially important, should consider tuning this with caret package
 # For now use same parameters for all models for comparision; tune parameters after models are selected
@@ -198,7 +195,7 @@ for(f in fitvars){
 
 
 fitvar_df <- data.frame(fitvars, class_fit, n_lev_fit, levs_fit)
-write.csv(fitvar_df, file = paste0('Fitvars_', modelno, ".csv"))
+write.csv(fitvar_df, file = file.path(outputdir,paste0('Fitvars_', modelno, ".csv")))
 
 # Run the Random Forest model using `do.rf()` function.
 keyoutputs[[modelno]] = do.rf(train.dat = w.allmonths, 
@@ -206,7 +203,8 @@ keyoutputs[[modelno]] = do.rf(train.dat = w.allmonths,
                                 model.no = modelno, rf.inputs = rf.inputs,
                                 cutoff = c(0.9, 0.1))  
   
-save("keyoutputs", file = paste0("Output_to_", modelno))
+save("keyoutputs", file = file.path(outputdir,paste0("Output_to_", modelno)))
+
 
 timediff <- Sys.time() - starttime
 cat(round(timediff, 2), attr(timediff, "units"), "to complete script")
