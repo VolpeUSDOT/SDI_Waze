@@ -11,8 +11,8 @@
 # Setup ---- 
 rm(list=ls()) # Start fresh
 
-inputdir <- "/Input"
-outputdir<- "/Output"
+inputdir <- file.path(getwd(),"Input")
+outputdir<- file.path(getwd(),"Output")
 
 source('utility/get_packages.R') # installs necessary packages
 
@@ -29,8 +29,6 @@ source("utility/wazefunctions_TN.R")
 
 # read random forest function
 source("analysis/RandomForest_WazeGrid_Fx.R")
-
-setwd(outputdir)
 
 # <><><><><>
 g = grids[1] # start with square grids, now running hex also. Change between 1 and 2.
@@ -99,7 +97,7 @@ next_week <- append.hex(hexname = 'grid_x_day',
 
 # Get weather for next week ----
 
-source(file.path(codeloc, 'utility', 'Prep_ForecastWeather.R'))
+source('utility/Prep_ForecastWeather.R')
 
 wx.grd.day$day <- as.Date(wx.grd.day$day)
 

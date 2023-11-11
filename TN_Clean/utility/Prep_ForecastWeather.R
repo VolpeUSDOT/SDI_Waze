@@ -6,9 +6,9 @@
 
 # Also already in memory is `next_week`, a data frame of the grid ID and date/time for the next week
 
-censusdir <- "~/TN/Input/census"
-outputdir <- "~/TN/Output" # to hold daily output files as they are generated
-inputdir <- "~/TN/Input"
+censusdir <- file.path(getwd(),"Input","census")
+outputdir <- file.path(getwd(),"Output") # to hold daily output files as they are generated
+inputdir <- file.path(getwd(),"Input")
 
 proj.USGS <- "+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs +ellps=GRS80 +towgs84=0,0,0"
 
@@ -30,7 +30,7 @@ if(!file.exists(file.path(inputdir, 'Weather', prepname))) {
   if(file.exists(file.path(inputdir, 'Weather', paste0("TN_Forecasts_", Sys.Date(), ".RData")))) {
     load(file.path(inputdir, 'Weather', paste0("TN_Forecasts_", Sys.Date(), ".RData")))
   } else {
-    source(file.path(codeloc, 'datacleaning', 'Get_weather_forecasts.R'))
+    source('datacleaning/Get_weather_forecasts.R')
   }
   
   

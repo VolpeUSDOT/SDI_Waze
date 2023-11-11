@@ -2,11 +2,10 @@
 
 
 # Setup ----
-codeloc <- "~/TN/SDI_Waze" 
-inputdir <- "~/TN/Input"
-outputdir<-"~/TN/Output"
+inputdir <- file.path(getwd(),"Input")
+outputdir<- file.path(getwd(),"Output")
 
-source(file.path(codeloc, 'utility/get_packages.R'))
+source('utility/get_packages.R')
 ON_SDC = F
 if(ON_SDC){
   teambucket <- "s3://prod-sdc-sdi-911061262852-us-east-1-bucket"
@@ -20,7 +19,7 @@ library(xml2) # for xml parsing in tidy way
 library(XML) # for xmlToList
 library(jsonlite)
 
-setwd(inputdir)
+#setwd(inputdir)
 
 proj.USGS <- "+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 +x_0=0 +y_0=0 +wx_datum=NAD83 +units=m +no_defs +ellps=GRS80 +towgs84=0,0,0"
 
