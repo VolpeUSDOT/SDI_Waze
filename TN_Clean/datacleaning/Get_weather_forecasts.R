@@ -78,6 +78,9 @@ if(DARKSKY) {
   
   
 '''
+Key reference for cross-walking sp to sf commands:
+https://github.com/r-spatial/sf/wiki/migrating
+
 from: https://stackoverflow.com/questions/73900335/alternatives-to-sptransfrom-function-due-retirement-of-rgdal
 You have to switch to using sf spatial data frames instead of sp spatial data frames 
 in order to use st_transform with sf.
@@ -91,25 +94,38 @@ keep your workflow using sf for as much as possible, and then convert from one f
 other when necessary for interoperability:
     
 sfdata = st_as_sf(spdata)
-spdata = as(sfdata, "Spatial")'''
+spdata = as(sfdata, "Spatial")
+
+See also: https://r-spatial.github.io/sf/reference/st_as_sf.html
+See also: https://r-spatial.github.io/sf/reference/st_transform.html
+'''
   
   # Project weather to Albers equal area, ESRI 102008
   proj <- showP4(showWKT("+init=epsg:102008"))
  
-  wx_dat.proj <- SpatialPointsDataFrame(coords = wx_dat[c('lon', 'lat')],
-                                    data = wx_dat,
-                                    proj4string = CRS("+proj=longlat +datum=WGS84"))
+#  wx_dat.proj <- SpatialPointsDataFrame(coords = wx_dat[c('lon', 'lat')],
+#                                    data = wx_dat,
+#                                    proj4string = CRS("+proj=longlat +datum=WGS84"))
+  wx_dat.proj <- st_as_sf(wx_dat,
+                          coords = wx_dat[c('lon', 'lat')],
+                          crs = CRS("+proj=longlat +datum=WGS84"))
   
-  wx_dat.proj <- spTransform(wx_dat.proj, CRS(proj.USGS))
+#  wx_dat.proj <- spTransform(wx_dat.proj, CRS(proj.USGS))
+  wx_dat.proj <- st_transform(wx_dat.proj, CRS(proj.USGS))  
   
   # Overlay timezone ----
   # Read tz file
-  tz <- readOGR(file.path(inputdir,"Shapefiles", 'TimeZone'), layer = 'combined-shapefile')
   
+#  tz <- readOGR(file.path(inputdir,"Shapefiles", 'TimeZone'), layer = 'combined-shapefile')
+  tz <- read_sf(file.path(inputdir,"Shapefiles", 'TimeZone'), layer = 'combined-shapefile')  
   
-  tz <- spTransform(tz, CRS(proj.USGS))
-  
-  wx_tz <- over(wx_dat.proj, tz[,"tzid"]) # Match a tzid name to each row in wx_dat.proj weather wx_data 
+#  tz <- spTransform(tz, CRS(proj.USGS))
+  tz <- st_transform(tz, CRS(proj.USGS))
+
+# replace this next one with one of the two commands from:  https://github.com/r-spatial/sf/wiki/migrating
+# Figure out which one is appropriate
+#  wx_tz <- over(wx_dat.proj, tz[,"tzid"]) # Match a tzid name to each row in wx_dat.proj weather wx_data 
+  wx_tz <- st_intersects(wx_dat.proj, tz[,"tzid"]) # Match a tzid name to each row in wx_dat.proj weather wx_data   
   
   wx_dat.proj@data <- data.frame(wx_dat.proj@data, tzid = as.character(wx_tz$tzid))
   
