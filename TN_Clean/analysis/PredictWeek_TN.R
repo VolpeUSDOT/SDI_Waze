@@ -20,7 +20,8 @@ library(randomForest)
 library(foreach) # for parallel implementation
 library(doParallel) # includes iterators and parallel
 library(tidyverse)
-library(rgdal)
+#library(rgdal)
+library(sf)
 
 grids = c("TN_01dd_fishnet",
           "TN_1sqmile_hexagons")
@@ -154,13 +155,13 @@ colnames(prob_next_week) = c('Prob_NoCrash', 'Prob_Crash')
 
 next_week_out <- data.frame(next_week, Crash_pred = predict_next_week, prob_next_week)
 
-write.csv(next_week_out, file = paste0('TN_Model_05_Predictions', g, Sys.Date(), '.csv'), row.names = F)
+write.csv(next_week_out, file = file.path(outputdir,paste0('TN_Model_05_Predictions', g, Sys.Date(), '.csv')), row.names = F)
 
 # Visualize predictions -----
 # use the following objects to make visualizations
 # next_week_out
 
-next_week_out <- read.csv(paste0('TN_Model_05_Predictions', g, Sys.Date(), '.csv'))
+next_week_out <- read.csv(file.path(outputdir,paste0('TN_Model_05_Predictions', g, Sys.Date(), '.csv')))
 VIZ = T
 if(VIZ){
   source(file.path(codeloc, 'analysis', 'Visualize_Next_Week.R'))
