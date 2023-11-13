@@ -42,11 +42,12 @@ if(!file.exists(file.path(inputdir, 'Weather', prepname))) {
   wx.proj <- spTransform(wx_dat.proj, CRS(proj.USGS))
   
   # Read in grid
-  grid_shp <- rgdal::readOGR(file.path(inputdir, "Shapefiles"), layer = g)
+  # grid_shp <- rgdal::readOGR(file.path(inputdir, "Shapefiles"), layer = g)
+  grid_shp <- read_sf(file.path(inputdir, "Shapefiles"), layer = g)
   grid_shp <- spTransform(grid_shp, CRS(proj.USGS))
   
   # Read in buffered state shapefile
-  tn_buff <- readOGR(censusdir, layer = "TN_buffered")
+  tn_buff <- read_sf(censusdir, layer = "TN_buffered")
   tn_buff <- spTransform(tn_buff, CRS(proj.USGS))
   
   # Clip grid to county shapefile
@@ -85,7 +86,7 @@ if(!file.exists(file.path(inputdir, 'Weather', prepname))) {
   # Start parallel loop ----
   # limit to dates in the set of months we are using, see do.months specified in the RandomForest_WazeGrids file.
   all_wx_days = unique(wx$date)
-  
+ 
   wx.grd.day <- foreach(day = all_wx_days, 
                       .packages = c('raster','gstat','dplyr','rgdal'), 
                       .combine = rbind) %dopar% {
