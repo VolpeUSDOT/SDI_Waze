@@ -76,9 +76,26 @@ if(DARKSKY) {
   wx_dat$lat = as.numeric(as.character(wx_dat$lat))
   wx_dat$lon = as.numeric(as.character(wx_dat$lon))
   
+  
+'''
+from: https://stackoverflow.com/questions/73900335/alternatives-to-sptransfrom-function-due-retirement-of-rgdal
+You have to switch to using sf spatial data frames instead of sp spatial data frames 
+in order to use st_transform with sf.
+You construct these with functions like st_as_sf to convert from a data frame or st_read 
+to read from standard data formats like Shapefiles (although use GeoPackage if you can). 
+Tutorials are online.
+
+The big problem is if you want to call functions in other packages that need sp data frames, 
+and have not been converted to use sf class data frames yet. In this case you should try and 
+keep your workflow using sf for as much as possible, and then convert from one format to the 
+other when necessary for interoperability:
+    
+sfdata = st_as_sf(spdata)
+spdata = as(sfdata, "Spatial")'''
+  
   # Project weather to Albers equal area, ESRI 102008
   proj <- showP4(showWKT("+init=epsg:102008"))
-  
+ 
   wx_dat.proj <- SpatialPointsDataFrame(coords = wx_dat[c('lon', 'lat')],
                                     data = wx_dat,
                                     proj4string = CRS("+proj=longlat +datum=WGS84"))
