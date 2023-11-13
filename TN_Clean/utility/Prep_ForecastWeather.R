@@ -21,6 +21,8 @@ library(foreach)
 
 prepname =  paste0("TN_Forecasts_Gridded_", g, Sys.Date(), ".RData")
 
+# ADD FUNCTION HERE TO GENERATE PLACEHOLDER FOR WEATHER DATA. SOMETHING CALLED paste0("TN_Forecasts_", Sys.Date(), ".RData")
+
 if(!file.exists(file.path(inputdir, 'Weather', prepname))) {
 
   cat("Preparing Forecasts to", as.character(max(next_week$date)), "for", g, "\n")
