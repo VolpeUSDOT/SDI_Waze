@@ -98,16 +98,23 @@ next_week <- append.hex(hexname = 'grid_x_day',
 
 # Get weather for next week ----
 
-source('utility/Prep_ForecastWeather.R')
+#source('utility/Prep_ForecastWeather.R')
+
+next_week$PRCP <- 0
+next_week$TMIN <- 60
+next_week$TMAX <- 85
+next_week$SNOW <- 0
+
+
 
 wx.grd.day$day <- as.Date(wx.grd.day$day)
 
-next_week <- append.hex(hexname = 'next_week',
-                        data.to.add = "wx.grd.day", state = state, na.action = na.action)
+#next_week <- append.hex(hexname = 'next_week',
+#                       data.to.add = "wx.grd.day", state = state, na.action = na.action)
 
 # Generate Waze events for next week ----
 
-source(file.path(codeloc, 'utility', 'Prep_ExpectedWaze.R'))
+source('utility/Prep_ExpectedWaze.R')
 
 w.expected$mo <- as.character(w.expected$mo)
 w.expected$DayOfWeek <- as.character(w.expected$DayOfWeek)
@@ -164,5 +171,5 @@ write.csv(next_week_out, file = file.path(outputdir,paste0('TN_Model_05_Predicti
 next_week_out <- read.csv(file.path(outputdir,paste0('TN_Model_05_Predictions', g, Sys.Date(), '.csv')))
 VIZ = T
 if(VIZ){
-  source(file.path(codeloc, 'analysis', 'Visualize_Next_Week.R'))
+  source('analysis/Visualize_Next_Week.R')
 }
