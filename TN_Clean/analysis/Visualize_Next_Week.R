@@ -3,41 +3,46 @@
 # next_week_out: Created in PredictWeek_TN.R
 # g: grid name, string
 #
+library(sf)
 
-censusdir <- "~/TN/Input/census"
-outputdir<- "~/TN/Output"
+outputdir<- "~Output"
 proj.USGS <- "+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs +ellps=GRS80 +towgs84=0,0,0"
 
-grid_shp <- rgdal::readOGR(file.path(inputdir, "Shapefiles"), layer = g)
-grid_shp <- spTransform(grid_shp, CRS(proj.USGS))
+grid_shp <- read_sf(file.path(inputdir, "Shapefiles"), layer = g)
+grid_shp <- st_transform(grid_shp, sp::CRS(proj.USGS))
 
 # Read in buffered state shapefile
-tn_buff <- readOGR(censusdir, layer = "TN_buffered")
-tn_buff <- spTransform(tn_buff, CRS(proj.USGS))
+tn_buff <- read_sf(file.path(inputdir, "census"), layer = "TN_buffered")
+tn_buff <- st_transform(tn_buff, sp::CRS(proj.USGS))
 
 # Clip grid to county shapefile
-grid_intersects <- gIntersects(tn_buff, grid_shp, byid = T)
+grid_intersects <- st_intersects(tn_buff, grid_shp, byid = T)
 
 grid_shp <- grid_shp[as.vector(grid_intersects),]
+grid_shp <- grid_shp[grid_intersects,]
+grid_shp1 <- grid_shp[1,]
+
 
 plotgrid <- grid_shp
 
 # Plot by day, aggregated 
 pred_dat <- next_week_out %>%
-  group_by(GRID_ID, date.x) %>%
+  group_by(GRID_ID, date) %>%
   summarize(Crash_pred = sum(as.numeric(Crash_pred)),
             Prob_NoCrash = max(Prob_NoCrash),
             Prob_Crash = max(Prob_Crash))
 
 pred_dat$GRID_ID <- as.character(pred_dat$GRID_ID)
 
-pdf(file.path(outputdir,"Figures",paste0('Crash_prob_', g, "_", Sys.Date(),'.pdf')),
+pdf(file.path("Output/Figures",paste0('Crash_prob_', g, "_", Sys.Date(),'.pdf')),
     width = 8, height = 5)
 
-for(day in as.character(unique(pred_dat$date.x))){
+for(day in as.character(unique(pred_dat$date))){
   plotgrid <- grid_shp
   
-  plotgrid@data <- left_join(plotgrid@data, pred_dat %>% filter(date.x == day), by = "GRID_ID")
+  plotgrid@data <- left_join(plotgrid@data, 
+                             pred_dat %>% filter(date == day), 
+                             by = "GRID_ID")
   
   plotgrid@data[plotgrid@data==-Inf] = NA
   
