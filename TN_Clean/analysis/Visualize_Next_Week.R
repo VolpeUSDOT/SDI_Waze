@@ -16,12 +16,11 @@ tn_buff <- read_sf(file.path(inputdir, "census"), layer = "TN_buffered")
 tn_buff <- st_transform(tn_buff, sp::CRS(proj.USGS))
 
 # Clip grid to county shapefile
-grid_intersects <- st_intersects(tn_buff, grid_shp, byid = T)
+grid_intersects <- st_intersects(tn_buff, grid_shp, sparse = F)
 
-grid_shp <- grid_shp[as.vector(grid_intersects),]
-grid_shp <- grid_shp[grid_intersects,]
-grid_shp1 <- grid_shp[1,]
+#grid_shp_TN <- grid_shp[] # this should be updated to filter grid_shp for all grid_intersects 
 
+#grid_shp <- grid_shp[as.vector(grid_intersects),]
 
 plotgrid <- grid_shp
 
@@ -40,21 +39,21 @@ pdf(file.path("Output/Figures",paste0('Crash_prob_', g, "_", Sys.Date(),'.pdf'))
 for(day in as.character(unique(pred_dat$date))){
   plotgrid <- grid_shp
   
-  plotgrid@data <- left_join(plotgrid@data, 
-                             pred_dat %>% filter(date == day), 
-                             by = "GRID_ID")
+  plotgrid <- left_join(plotgrid, 
+                        pred_dat %>% filter(date == day), 
+                        by = "GRID_ID")
   
-  plotgrid@data[plotgrid@data==-Inf] = NA
+  # plotgrid[plotgrid==-Inf] = NA 
   
   # Make crash probability maps
   n_colors = 5
   probcol <- rev(heat.colors(n_colors))
   
-  cuts = cut(plotgrid@data$Prob_Crash, n_colors)
+  cuts = cut(plotgrid$Prob_Crash, n_colors)
   
-  plot(plotgrid, col = probcol[cuts], 
+  plot(plotgrid['Prob_Crash'], col = probcol[cuts], 
        border =  probcol[cuts],
-       bg = 'grey20')
+       bg = 'grey90', max.plot = 15)
   
   legend("bottom", 
          #bty = 'n',
@@ -65,7 +64,7 @@ for(day in as.character(unique(pred_dat$date))){
                     'High',
                     'Very high'),#levels(cuts),
          cex = 0.8, ncol = 3, pt.cex = 2,
-         bg = 'grey60')
+         bg = 'grey70')
   title(main = paste("Crash probabilities on", as.character(day)))
 }  
 dev.off()
