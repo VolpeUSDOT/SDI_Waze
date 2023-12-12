@@ -96,7 +96,7 @@ for(i in census.ls){
 
 # Tennessee data ----
 
-tn.ls = c('TN.zip', 'Weather/TN_Weather_GHCN.zip', 'DarkSky_Key.txt',
+tn.ls = c('TN.zip', 'Weather/TN_Weather_GHCN.zip', 'OpenWeatherAPI.txt',
           'Shapefiles/TN_Roadway_Shapefiles.zip', 'SpecialEvents/TN_SpecialEvent_2018.RData', 
           'Shapefiles/timezones.shapefile.zip', "SpecialEvents/TN_SpecialEvent_2017.RData",
           'SpecialEvents/2019_Special_Events.xlsx',

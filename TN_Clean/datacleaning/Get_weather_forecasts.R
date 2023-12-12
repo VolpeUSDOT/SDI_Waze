@@ -37,11 +37,11 @@ xmlnames <- wu[grep(".xml$", wu)]
 outnames <- xmlnames[nchar(xmlnames) < 15]
 innames <- xmlnames[nchar(xmlnames) > 15]
 
-# Using DarkSky now
-DARKSKY = T
-if(DARKSKY) {
+# Using OpenWeather now
+OpenWeather = T
+if(OpenWeather) {
   
-  ds_key = scan(file.path(inputdir,"Weather", 'DarkSky_Key.txt'), what = 'character')
+  ow_key = scan(file.path(inputdir,"Weather", 'OpenWeatherAPI.txt'), what = 'character')
   ds_ll_query = ll = vector()
   
   for(i in innames){
@@ -149,6 +149,22 @@ if(DARKSKY) {
   }
 }
 
+
+
+library(owmr)
+
+OpenWeather_key <- scan("OpenWeather.txt")
+
+
+# first of all you have to set up your api key
+owmr_settings("339d223da0f0b08bad2962391003c771")
+
+# or store it in an environment variable called OWM_API_KEY (recommended)
+Sys.setenv(OWM_API_KEY = "339d223da0f0b08bad2962391003c771") # if not set globally
+
+# get current weather data by city name
+(res <- get_current("London", units = "metric") %>%
+    owmr_as_tibble()) %>% names()
 
 
 
