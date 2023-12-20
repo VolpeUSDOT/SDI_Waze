@@ -40,7 +40,7 @@ innames <- xmlnames[nchar(xmlnames) > 15]
 # Using OpenWeather now
 OpenWeather = T
 if(OpenWeather) {
-  
+  #OLD
   ow_key = scan(file.path(inputdir,"Weather", 'OpenWeatherAPI.txt'), what = 'character')
   ds_ll_query = ll = vector()
   
@@ -50,10 +50,34 @@ if(OpenWeather) {
     i_ll = i_ll[[1]][[length(i_ll[[1]])]]
     i_ll = sub('.xml', '', i_ll)  
     ds_ll_query = c(ds_ll_query,
-                    paste('https://api.darksky.net/forecast', ds_key,  i_ll, sep = '/'))
+                    paste('https://api.darksky.net/forecast', ow_key,  i_ll, sep = '/'))
     ll = c(ll, i_ll)
   }
   innames = ds_ll_query
+  
+  # BELOW ARE THE BEGINNINGS OF A NEW REPLACEMENT VERSION FOR THE ABOVE, lINES 47 - 56...COMMENTING OUT FOR NOW 
+  # UNTIL CAN GET IT WORKING.
+  
+  # ow_key = scan(file.path(inputdir,"Weather", 'OpenWeatherAPI.txt'), what = 'character')
+  # ds_ll_query = ll = vector()
+  # 
+  # # This is the format needed for an API call in OpenWeather:
+  # # https://api.openweathermap.org/data/2.5/onecall?lat={lat}&lon={lon}&exclude={part}&appid={API key}
+  # # see: https://openweathermap.org/api/one-call-api#how
+  # 
+  # for(i in innames){
+  #   # extract the lat and lon separately and plug them into the query for API call
+  #   i_ll = strsplit(i, '/') 
+  #   i_ll = i_ll[[1]][[length(i_ll[[1]])]]
+  #   i_ll = sub('.xml', '', i_ll)  
+  #   i_ll = strsplit(i_ll, ',') 
+  #   i_lat = sapply(i_ll,"[[",1)
+  #   i_lon = sapply(i_ll,"[[",2)
+  #   ds_ll_query = c(ds_ll_query,
+  #                   paste0('https://api.openweathermap.org/data/2.5/onecall?lat=',i_lat,'&lon=',i_lon,'&exclude=currently, minutely,alerts&appid=', ow_key))
+  #   ll = c(ll, i_ll)
+  # }
+  # innames = ds_ll_query
   
   # Parse JSON
   
