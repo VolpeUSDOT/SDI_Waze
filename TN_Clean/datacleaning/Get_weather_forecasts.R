@@ -37,59 +37,45 @@ xmlnames <- wu[grep(".xml$", wu)]
 outnames <- xmlnames[nchar(xmlnames) < 15]
 innames <- xmlnames[nchar(xmlnames) > 15]
 
-# Using OpenWeather now
-OpenWeather = T
-if(OpenWeather) {
-  #OLD
-  ow_key = scan(file.path(inputdir,"Weather", 'OpenWeatherAPI.txt'), what = 'character')
+# Using TomorrowIO now for the actual API call
+TomorrowIO = T
+if(TomorrowIO) {
+  w_key = scan(file.path(inputdir,"Weather", 'WeatherAPI_key.txt'), what = 'character')
   ds_ll_query = ll = vector()
+
+  # This is the format needed for an API call in TomorrowIO, with three parameters that
+  # need to be filled in (latitude, longitude, and API key):
+  # https://api.tomorrow.io/v4/weather/forecast?location={latitude},{longitude}&apikey={key}
   
   for(i in innames){
-    # extract just the lat long
-    i_ll = strsplit(i, '/') 
+    # extract the lat and lon separately and plug them into the query for API call
+    i_ll = strsplit(i, '/')
     i_ll = i_ll[[1]][[length(i_ll[[1]])]]
-    i_ll = sub('.xml', '', i_ll)  
+    i_ll = sub('.xml', '', i_ll)
+    i_ll = strsplit(i_ll, ',')
+    i_lat = sapply(i_ll,"[[",1)
+    i_lon = sapply(i_ll,"[[",2)
     ds_ll_query = c(ds_ll_query,
-                    paste('https://api.darksky.net/forecast', ow_key,  i_ll, sep = '/'))
+                    paste0('https://api.tomorrow.io/v4/weather/forecast?location=',i_lat,',',i_lon,'&apikey=', w_key))
     ll = c(ll, i_ll)
   }
   innames = ds_ll_query
-  
-  # BELOW ARE THE BEGINNINGS OF A NEW REPLACEMENT VERSION FOR THE ABOVE, lINES 47 - 56...COMMENTING OUT FOR NOW 
-  # UNTIL CAN GET IT WORKING.
-  
-  # ow_key = scan(file.path(inputdir,"Weather", 'OpenWeatherAPI.txt'), what = 'character')
-  # ds_ll_query = ll = vector()
-  # 
-  # # This is the format needed for an API call in OpenWeather:
-  # # https://api.openweathermap.org/data/2.5/onecall?lat={lat}&lon={lon}&exclude={part}&appid={API key}
-  # # see: https://openweathermap.org/api/one-call-api#how
-  # 
-  # for(i in innames){
-  #   # extract the lat and lon separately and plug them into the query for API call
-  #   i_ll = strsplit(i, '/') 
-  #   i_ll = i_ll[[1]][[length(i_ll[[1]])]]
-  #   i_ll = sub('.xml', '', i_ll)  
-  #   i_ll = strsplit(i_ll, ',') 
-  #   i_lat = sapply(i_ll,"[[",1)
-  #   i_lon = sapply(i_ll,"[[",2)
-  #   ds_ll_query = c(ds_ll_query,
-  #                   paste0('https://api.openweathermap.org/data/2.5/onecall?lat=',i_lat,'&lon=',i_lon,'&exclude=currently, minutely,alerts&appid=', ow_key))
-  #   ll = c(ll, i_ll)
-  # }
-  # innames = ds_ll_query
   
   # Parse JSON
   
   wx_dat <- vector()
   
+  # uncomment this for testing/development i <- 1
+  
   # Loop over the json queries from this forecast and put into a data frame
   # Use daily data for the next week, hourly only available for next 48 hours. Could combine these for more precise estimates within 48 hour window.
   for(i in 1:length(innames)){
     
-    ll_i = strsplit(ll[i], ",")[[1]]
+    #ll_i = strsplit(ll[i], ",")[[1]]
+    ll_i = ll[i]
     
-    wx_dat_i = fromJSON(innames[i])$daily$data
+    #wx_dat_i = fromJSON(innames[i])$daily$data
+    wx_dat_i = fromJSON(innames[i])$timelines$daily
     
     wx_dat_i = data.frame(lat = ll_i[1], lon = ll_i[2], wx_dat_i)
     wx_dat = rbind(wx_dat, wx_dat_i)
