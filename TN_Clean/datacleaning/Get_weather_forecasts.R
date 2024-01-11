@@ -47,14 +47,14 @@ if(TomorrowIO) {
   # need to be filled in (latitude, longitude, and API key):
   # https://api.tomorrow.io/v4/weather/forecast?location={latitude},{longitude}&apikey={key}
   
-  for(i in innames){
+    for(i in innames){
     # extract the lat and lon separately and plug them into the query for API call
     i_ll = strsplit(i, '/')
     i_ll = i_ll[[1]][[length(i_ll[[1]])]]
     i_ll = sub('.xml', '', i_ll)
-    i_ll = strsplit(i_ll, ',')
-    i_lat = sapply(i_ll,"[[",1)
-    i_lon = sapply(i_ll,"[[",2)
+    i_ll_sep = strsplit(i_ll, ',')
+    i_lat = sapply(i_ll_sep,"[[",1)
+    i_lon = sapply(i_ll_sep,"[[",2)
     ds_ll_query = c(ds_ll_query,
                     paste0('https://api.tomorrow.io/v4/weather/forecast?location=',i_lat,',',i_lon,'&apikey=', w_key))
     ll = c(ll, i_ll)
@@ -65,24 +65,39 @@ if(TomorrowIO) {
   
   wx_dat <- vector()
   
-  # uncomment this for testing/development i <- 1
+  # uncomment this for testing/development 
+  # i <- 1
   
   # Loop over the json queries from this forecast and put into a data frame
+  
+  # THIS WAS AN OLD COMMENT BASED ON DARK SKY:
   # Use daily data for the next week, hourly only available for next 48 hours. Could combine these for more precise estimates within 48 hour window.
+  
+  # NEW RELATED COMMENT BASED ON TOMORROWIO:
+  # Daily data are available for 6 days (including the current day, so only 5 future days)
+  # Hourly data are available for 120 hours in the future (i.e. 5 future days), so about the 
+  # same timeframe. We can discuss whether we want to shift to use hourly data instead of daily.
   for(i in 1:length(innames)){
     
-    #ll_i = strsplit(ll[i], ",")[[1]]
-    ll_i = ll[i]
+    ll_i = strsplit(ll[i], ",")[[1]]
+    #ll_i = ll[i]
     
     #wx_dat_i = fromJSON(innames[i])$daily$data
-    wx_dat_i = fromJSON(innames[i])$timelines$daily
+    wx_dat_i = fromJSON(innames[i])$timelines$daily$values
     
+    wx_dat_i_test = fromJSON(innames[i])$timelines$daily$time
+    
+    wx_dat_i_timeshourly = fromJSON(innames[i])$timelines$hourly$time
+    length(wx_dat_i_timeshourly)/24
+    
+    #wx_dat_i = data.frame(lat = ll_i[1], lon = ll_i[2], wx_dat_i)
     wx_dat_i = data.frame(lat = ll_i[1], lon = ll_i[2], wx_dat_i)
     wx_dat = rbind(wx_dat, wx_dat_i)
     
   }
 
   # Get correct time zone from shapefile
+  # wx_dat$time <- as.POSIXct(wx_dat$time, origin = '1970-01-01', tz = 'America/Chicago')
   wx_dat$lat = as.numeric(as.character(wx_dat$lat))
   wx_dat$lon = as.numeric(as.character(wx_dat$lon))
 
@@ -158,26 +173,6 @@ if(TomorrowIO) {
                  file.path(teambucket, "TN", "Weather", fn)))
   }
 }
-
-
-
-library(owmr)
-
-OpenWeather_key <- scan("OpenWeather.txt")
-
-
-# first of all you have to set up your api key
-owmr_settings("339d223da0f0b08bad2962391003c771")
-
-# or store it in an environment variable called OWM_API_KEY (recommended)
-Sys.setenv(OWM_API_KEY = "339d223da0f0b08bad2962391003c771") # if not set globally
-
-# get current weather data by city name
-(res <- get_current("London", units = "metric") %>%
-    owmr_as_tibble()) %>% names()
-
-
-
 
 if(!DARKSKY){
   # WUNDERGROUND ONLY 
