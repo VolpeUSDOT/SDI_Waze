@@ -97,7 +97,7 @@ if(TomorrowIO) {
   }
 
   # Get correct time zone from shapefile
-  # wx_dat$time <- as.POSIXct(wx_dat$time, origin = '1970-01-01', tz = 'America/Chicago')
+  wx_dat$time <- as.POSIXct(wx_dat$time, origin = '1970-01-01', tz = 'America/Chicago')
   wx_dat$lat = as.numeric(as.character(wx_dat$lat))
   wx_dat$lon = as.numeric(as.character(wx_dat$lon))
 
