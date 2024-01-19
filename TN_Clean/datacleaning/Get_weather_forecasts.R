@@ -66,7 +66,7 @@ if(TomorrowIO) {
   wx_dat <- vector()
   
   # uncomment this for testing/development 
-  # i <- 1
+   i <- 1
   
   # Loop over the json queries from this forecast and put into a data frame
   
@@ -83,14 +83,24 @@ if(TomorrowIO) {
     #ll_i = ll[i]
     
     #wx_dat_i = fromJSON(innames[i])$daily$data
-    wx_dat_i = fromJSON(innames[i])$timelines$daily$values
-    
-    wx_dat_i_test = fromJSON(innames[i])$timelines$daily$time
-    
-    wx_dat_i_timeshourly = fromJSON(innames[i])$timelines$hourly$time
-    length(wx_dat_i_timeshourly)/24
+    #wx_dat_i = fromJSON(innames[i])$timelines$daily$values
+    wx_dat_i = fromJSON(innames[i])
     
     #wx_dat_i = data.frame(lat = ll_i[1], lon = ll_i[2], wx_dat_i)
+    wx_dat_daily_values = wx_dat_i$timelines$daily$values
+    wx_dat_daily_time = wx_dat_i$timelines$daily$time
+    
+    wx_dat_daily_values$day <- wx_dat_daily_time
+    
+    dailykeep <- c('temperatureMin','temperatureMax','snowAccumulationSum', 'rainAccumulationSum', 'sleetAccumulationSum','iceAccumulationSum')
+    
+    wx_dat_hourly_values = wx_dat_i$timelines$hourly$values
+    wx_dat_hourly_time = wx_dat_i$timelines$hourly$time
+    
+    wx_dat_hourly_values$hour <- wx_dat_hourly_time
+    
+    hourlykeep <- c('temperature','snowAccumulation', 'rainAccumulation', 'sleetAccumulation','iceAccumulation')
+    
     wx_dat_i = data.frame(lat = ll_i[1], lon = ll_i[2], wx_dat_i)
     wx_dat = rbind(wx_dat, wx_dat_i)
     
