@@ -82,24 +82,28 @@ if(TomorrowIO) {
     ll_i = strsplit(ll[i], ",")[[1]]
     #ll_i = ll[i]
     
-    #wx_dat_i = fromJSON(innames[i])$daily$data
-    #wx_dat_i = fromJSON(innames[i])$timelines$daily$values
     wx_dat_i = fromJSON(innames[i])
     
     #wx_dat_i = data.frame(lat = ll_i[1], lon = ll_i[2], wx_dat_i)
+    
+    # extract the weather attributes for the six days
     wx_dat_daily_values = wx_dat_i$timelines$daily$values
+    # extract the dates for the six days
     wx_dat_daily_time = wx_dat_i$timelines$daily$time
-    
+    # assign the dates as a new column in wx_dat_daily_values
     wx_dat_daily_values$day <- wx_dat_daily_time
+    # subset to only retain the necessary columns
+    dailykeep <- c('day', 'temperatureMin','temperatureMax','snowAccumulationSum', 'rainAccumulationSum', 'sleetAccumulationLweSum','iceAccumulationSum')
+    wx_dat_daily_values <- wx_dat_daily_values[,dailykeep]
     
-    dailykeep <- c('temperatureMin','temperatureMax','snowAccumulationSum', 'rainAccumulationSum', 'sleetAccumulationSum','iceAccumulationSum')
-    
+    # extract the weather attributes for the hours
     wx_dat_hourly_values = wx_dat_i$timelines$hourly$values
+    # extract the hours
     wx_dat_hourly_time = wx_dat_i$timelines$hourly$time
-    
+    # assign the hours as a new column in wx_dat_hourly_values
     wx_dat_hourly_values$hour <- wx_dat_hourly_time
-    
-    hourlykeep <- c('temperature','snowAccumulation', 'rainAccumulation', 'sleetAccumulation','iceAccumulation')
+    # subset to only retain the necessary columns
+    hourlykeep <- c('temperature','snowAccumulation', 'rainAccumulation', 'sleetAccumulationLwe','iceAccumulation')
     
     wx_dat_i = data.frame(lat = ll_i[1], lon = ll_i[2], wx_dat_i)
     wx_dat = rbind(wx_dat, wx_dat_i)
