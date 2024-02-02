@@ -20,7 +20,6 @@ library(randomForest)
 library(foreach) # for parallel implementation
 library(doParallel) # includes iterators and parallel
 library(tidyverse)
-#library(rgdal)
 library(sf)
 
 grids = c("TN_01dd_fishnet",
@@ -100,17 +99,19 @@ next_week <- append.hex(hexname = 'grid_x_day',
 
 #source('utility/Prep_ForecastWeather.R')
 
-next_week$PRCP <- 0
-next_week$TMIN <- 60
-next_week$TMAX <- 85
-next_week$SNOW <- 0
+# Placeholder wx.grd.day file
+next_week <- next_week %>%
+  mutate(PRCP = 0,
+         TMIN = 60,
+         TMAX = 85,
+         SNOW = 0) %>%
+  mutate(day = as.Date(hextime))
 
 
+#wx.grd.day$day <- as.Date(wx.grd.day$day)
 
-wx.grd.day$day <- as.Date(wx.grd.day$day)
-
-#next_week <- append.hex(hexname = 'next_week',
-#                       data.to.add = "wx.grd.day", state = state, na.action = na.action)
+# next_week <- append.hex(hexname = 'next_week',
+#                        data.to.add = "wx.grd.day", state = state, na.action = na.action)
 
 # Generate Waze events for next week ----
 
@@ -118,6 +119,7 @@ source('utility/Prep_ExpectedWaze.R')
 
 w.expected$mo <- as.character(w.expected$mo)
 w.expected$DayOfWeek <- as.character(w.expected$DayOfWeek)
+
 next_week <- left_join(next_week, w.expected,
                         by = c('GRID_ID', 'mo', 'DayOfWeek', 'hour'))
   
@@ -135,6 +137,14 @@ next_week <- left_join(next_week, w.staticvars,
 
 
 # Make predictions ----
+
+# Change urban cluster names 
+next_week <- next_week %>%
+  rename(UA_Cluster = TN_UA_C) %>%
+  rename(UA_Urban = TN_UA_U) 
+
+next_week <- next_week %>%
+  mutate(UA_Rural = UA_Urban == 0 & UA_Cluster == 0)
 
 # Use rf.out from Model 5 for this grid size
 # Make sure we have factor variables, with same levels as in the fitted data.
