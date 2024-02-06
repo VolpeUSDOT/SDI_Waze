@@ -8,7 +8,6 @@ library(randomForest)
 library(foreach) # for parallel implementation
 library(doParallel) # includes iterators and parallel
 library(tidyverse)
-library(rgdal)
 
 inputdir <- file.path(getwd(),"Input")
 outputdir <-file.path(getwd(),"Output")
