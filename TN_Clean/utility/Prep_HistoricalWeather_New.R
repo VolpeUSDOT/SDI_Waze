@@ -8,7 +8,7 @@ outputdir <- file.path(getwd(),"Output") # to hold daily output files as they ar
 inputdir <- file.path(getwd(),"Input")
 
 # Update to specify state of interest here - TN by default
-state <- 'TN'
+state <- 'VT'
 # Update to specify year of interest here - 2019 by default
 year <- 2019
 
@@ -21,7 +21,8 @@ prepname = paste("Prepared", "Weather", state, year, sep="_")
 
 if(length(grep(prepname, dir(file.path(inputdir, "Weather")))) == 0) { 
   library(gstat) # For kriging
-  library(raster) # masks several functions from dplyr, use caution
+  #library(raster) # masks several functions from dplyr, use caution
+  library(terra) # replaces the raster package (deprecated)
   library(doParallel)
   library(foreach)
   
@@ -35,17 +36,15 @@ if(length(grep(prepname, dir(file.path(inputdir, "Weather")))) == 0) {
   stations <- read.csv(file=file.path(inputdir, "Weather","GHCN", "ghcnh-station-list.csv"), 
                        header = FALSE, strip.white = TRUE)
   stations <- stations[,1:6]
-  str(stations)
   colnames(stations) <- c('Station_ID','Latitude','Longitude','Elevation','State','Station_name') 
   # Filter down to the list of stations in the state of interest
   state_stations <- stations[stations$State==state,]
   # Filter down to the list of stations for which we have data in the year of interest
   available <- logical(nrow(state_stations))
-  i <- 1
   for (i in 1:nrow(state_stations)) {
     ID = state_stations[i,'Station_ID']
     filename = paste0('GHCNh_',ID,'_',year,'.psv')
-    ifelse(dir.exists(file.path(inputdir, "Weather", "GHCN", year, filename)
+    ifelse(file.exists(file.path(inputdir, "Weather", "GHCN", year, filename)
                       ),
            available[i] <- TRUE,
            available[i] <- FALSE
@@ -53,12 +52,7 @@ if(length(grep(prepname, dir(file.path(inputdir, "Weather")))) == 0) {
     }
   state_stations <- state_stations[available,]
   
-  ## TO DO
-  # filter down to only include the stations for which we have data for this year
-  # i.e., the file path exists
-  
-  # dir.exists(file.path(
-  
+  # Initialize empty dataframe to store the data from the files
   state_hist_weather <- data.frame(Station_ID=character(),
                                    Station_name=character(),
                                    Year=integer(),
@@ -72,14 +66,14 @@ if(length(grep(prepname, dir(file.path(inputdir, "Weather")))) == 0) {
                                    precipitation=numeric(),
                                    snow_depth=numeric()
   )
-  
-  i <- 1
+  # Read in the data from each station file for the state and compile
   for (i in 1:nrow(state_stations)){
     ID = state_stations[i,'Station_ID']
     filename = paste0('GHCNh_',ID,'_',year,'.psv')
-    df_i = read.table(filename,
+    df_i = read.table(file.path(inputdir, "Weather", "GHCN", year, filename),
                       header=TRUE,
-                      sep = "|"
+                      sep = "|",
+                      fill = TRUE
     ) %>% select('Station_ID',
                  'Station_name', 
                  'Year', 
@@ -95,6 +89,11 @@ if(length(grep(prepname, dir(file.path(inputdir, "Weather")))) == 0) {
     state_hist_weather <- rbind(state_hist_weather,df_i)
   }
   
+  unique(state_hist_weather$Station_ID)
+  str(state_hist_weather)
+  summary(state_hist_weather)
+  test <- state_hist_weather[!is.na(state_hist_weather$snow_depth),]
+  unique(test$Station_ID)
   
   # Most stations don't have most of the wx variables. Simplify to core variables, per GHCN documentation:
   core_vars = c("STATION", "NAME", "DATE", 
@@ -131,6 +130,12 @@ if(length(grep(prepname, dir(file.path(inputdir, "Weather")))) == 0) {
   # snow_allday: in
 
   wx <- left_join(wx, stations[1:5], by = "STATION")
+  
+  ## TO DO: need to convert the below over to non-deprecated spatial packages
+  # E.g., replace sp functions with sf functions, 
+  # and replace raster functions with terra functions
+  # This resource provides a 1-to-1 crosswalk of sp and sf functions:
+  # https://github.com/r-spatial/sf/wiki/migrating
   
   # Interpolate over state ----
   # http://rspatial.org/analsis/rst/4-interpolation.html
