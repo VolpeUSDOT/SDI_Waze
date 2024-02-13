@@ -92,8 +92,10 @@ if(length(grep(prepname, dir(file.path(inputdir, "Weather")))) == 0) {
   unique(state_hist_weather$Station_ID)
   str(state_hist_weather)
   summary(state_hist_weather)
-  test <- state_hist_weather[!is.na(state_hist_weather$snow_depth),]
-  unique(test$Station_ID)
+  testsnow <- state_hist_weather[!is.na(state_hist_weather$snow_depth),]
+  testrain <- state_hist_weather[!is.na(state_hist_weather$precipitation),]
+  unique(testrain$Station_ID)
+  
   
   # Most stations don't have most of the wx variables. Simplify to core variables, per GHCN documentation:
   core_vars = c("STATION", "NAME", "DATE", 
