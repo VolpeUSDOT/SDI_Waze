@@ -60,10 +60,25 @@ ggplot() + geom_sf(data = nc_network) # plot roads in NC Block
 # Load Crash Data ------------------------------
 
 # load raw file 
+
+setwd("../../../../DOT OST/Volpe-Group-JPODataProgram - ROADII/Lab/Use Cases/R25_Incident Detection")
+
 crashes <- read_sf("2023-53/Shapefiles/nc19crash.shp")
+
+crs_type <- st_crs(crashes)
+target_data_type <- st_crs("+proj=longlat +datum=NAD83")
+
+crashes <- st_transform(crashes, crs_target) 
+
+crashes <- st_coordinates(crashes) 
+
+colnames(crashes)[1:2] <- c('Y','X')
+
+crashes <- st_as_sf(data.frame(crashes), coords = c("X", "Y"), crs = 4269)
 
 crashes_clean <- crashes %>% st_zm(what="ZM") %>% sf::st_coordinates() %>% as.data.frame() # this isn't a valid shapefile but the points are unplotable without.
 ggplot() + geom_sf(data = crashes_clean) # plot crashes in NC
+
 
 
 
