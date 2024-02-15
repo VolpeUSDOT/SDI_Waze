@@ -8,7 +8,7 @@ outputdir <- file.path(getwd(),"Output") # to hold daily output files as they ar
 inputdir <- file.path(getwd(),"Input")
 
 # Update to specify state of interest here - TN by default
-state <- 'VT'
+state <- 'TN'
 # Update to specify year of interest here - 2019 by default
 year <- 2019
 
@@ -25,15 +25,12 @@ if(length(grep(prepname, dir(file.path(inputdir, "Weather")))) == 0) {
   library(terra) # replaces the raster package (deprecated)
   library(doParallel)
   library(foreach)
+  library(tidyverse)
   
   cat("Preparing", "Weather", state, year, "\n")
   
-  # Read in GHCN data
-  # wx.files <- dir(file.path(inputdir, "Weather", "GHCN",year))
-  # wx <- vector()
-  
-  # Read in list of stations
-  stations <- read.csv(file=file.path(inputdir, "Weather","GHCN", "ghcnh-station-list.csv"), 
+  # Read in list of GHCN hourly stations
+  stations <- read.csv(file=file.path(inputdir, "Weather","GHCN","Hourly","ghcnh-station-list.csv"), 
                        header = FALSE, strip.white = TRUE)
   stations <- stations[,1:6]
   colnames(stations) <- c('Station_ID','Latitude','Longitude','Elevation','State','Station_name') 
@@ -44,7 +41,7 @@ if(length(grep(prepname, dir(file.path(inputdir, "Weather")))) == 0) {
   for (i in 1:nrow(state_stations)) {
     ID = state_stations[i,'Station_ID']
     filename = paste0('GHCNh_',ID,'_',year,'.psv')
-    ifelse(file.exists(file.path(inputdir, "Weather", "GHCN", year, filename)
+    ifelse(file.exists(file.path(inputdir, "Weather", "GHCN", "Hourly", year, filename)
                       ),
            available[i] <- TRUE,
            available[i] <- FALSE
@@ -52,8 +49,8 @@ if(length(grep(prepname, dir(file.path(inputdir, "Weather")))) == 0) {
     }
   state_stations <- state_stations[available,]
   
-  # Initialize empty dataframe to store the data from the files
-  state_hist_weather <- data.frame(Station_ID=character(),
+  # Initialize empty dataframe to store the hourly data from the files
+  state_hourly_hist_weather <- data.frame(Station_ID=character(),
                                    Station_name=character(),
                                    Year=integer(),
                                    Month=integer(),
@@ -70,7 +67,7 @@ if(length(grep(prepname, dir(file.path(inputdir, "Weather")))) == 0) {
   for (i in 1:nrow(state_stations)){
     ID = state_stations[i,'Station_ID']
     filename = paste0('GHCNh_',ID,'_',year,'.psv')
-    df_i = read.table(file.path(inputdir, "Weather", "GHCN", year, filename),
+    df_i = read.table(file.path(inputdir, "Weather", "GHCN", "Hourly", year, filename),
                       header=TRUE,
                       sep = "|",
                       fill = TRUE
@@ -86,16 +83,18 @@ if(length(grep(prepname, dir(file.path(inputdir, "Weather")))) == 0) {
                  'temperature', 
                  'precipitation', 
                  'snow_depth')
-    state_hist_weather <- rbind(state_hist_weather,df_i)
+    state_hourly_hist_weather <- rbind(state_hourly_hist_weather,df_i)
   }
   
-  unique(state_hist_weather$Station_ID)
-  str(state_hist_weather)
-  summary(state_hist_weather)
-  testsnow <- state_hist_weather[!is.na(state_hist_weather$snow_depth),]
-  testrain <- state_hist_weather[!is.na(state_hist_weather$precipitation),]
-  unique(testrain$Station_ID)
+  # unique(state_hist_weather$Station_ID)
+  #testsnow <- state_hist_weather[!is.na(state_hist_weather$snow_depth),]
+  #testrain <- state_hist_weather[!is.na(state_hist_weather$precipitation),]
+  #unique(testrain$Station_ID)
   
+  # Read in daily data from GHCN
+  
+  wx.files <- dir(file.path(inputdir, "Weather", "GHCN", "Daily"))
+  wx <- vector()
   
   # Most stations don't have most of the wx variables. Simplify to core variables, per GHCN documentation:
   core_vars = c("STATION", "NAME", "DATE", 
@@ -104,14 +103,14 @@ if(length(grep(prepname, dir(file.path(inputdir, "Weather")))) == 0) {
   # vars = c("STATION", "NAME", "DATE", "AWND", "DAPR", "MDPR", "PGTM", "PRCP", "SNOW", "SNWD", "TAVG", "TMAX", "TMIN", "TOBS", "WSFG", "WT01", "WT02", "WT03", "WT04", "WT05", "WT06", "WT08", "WT10", "WT11")
 
   for(k in wx.files){
-    if(length(grep('stations', k))==0){
-      wxx <- read.csv(file.path(inputdir, "Weather", "GHCN", k))
+    if(length(grep('ghcnd', k))==0){
+      wxx <- read.csv(file.path(inputdir, "Weather", "GHCN", "Daily", k))
       wx <- rbind(wx, wxx[core_vars])
       rm(wxx)
     }
   }
 
-  station_file <- file.path(inputdir, "Weather", "GHCN", wx.files[grep('stations', wx.files)])
+  station_file <- file.path(inputdir, "Weather", "GHCN", "Daily" , wx.files[grep('stations', wx.files)])
   stations <- read_fwf(station_file,
                        col_positions = fwf_empty(station_file))
   names(stations) = c("STATION", "lat", "lon", "masl", "NAME", "x1", "x2", "x3")
