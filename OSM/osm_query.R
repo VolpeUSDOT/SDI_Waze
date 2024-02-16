@@ -45,15 +45,14 @@ roadways <- c(roadways, list(map_data))
 
 }
 
-
 total_network <- do.call(c, roadways)
-
 
 nc_network <- total_network$osm_lines %>%
   select(geometry)
 
 write_sf(nc_network, "nc_road_network/nc_expanded_network.shp")
-}
+  }
+
 
 ggplot() + geom_sf(data = nc_network) # plot roads in NC Block 
 
@@ -66,20 +65,19 @@ setwd("../../../../DOT OST/Volpe-Group-JPODataProgram - ROADII/Lab/Use Cases/R25
 crashes <- read_sf("2023-53/Shapefiles/nc19crash.shp")
 
 crs_type <- st_crs(crashes)
-target_data_type <- st_crs("+proj=longlat +datum=NAD83")
+target <- st_crs("+proj=latlong +datum=NAD83")
 
-crashes <- st_transform(crashes, crs_target) 
+crashes <- st_transform(crashes, target) 
 
 crashes <- st_coordinates(crashes) 
 
-colnames(crashes)[1:2] <- c('Y','X')
-
 crashes <- st_as_sf(data.frame(crashes), coords = c("X", "Y"), crs = 4269)
 
-crashes_clean <- crashes %>% st_zm(what="ZM") %>% sf::st_coordinates() %>% as.data.frame() # this isn't a valid shapefile but the points are unplotable without.
+crashes_clean <- crashes %>%
+  filter(st_as_text(geometry) != "POINT (-156.9666 -90)")
+
 ggplot() + geom_sf(data = crashes_clean) # plot crashes in NC
 
-
-
+#crashes_clean <- crashes %>% st_zm(what="ZM") %>% sf::st_coordinates() %>% as.data.frame() # this isn't a valid shapefile but the points are unplotable without.
 
 
