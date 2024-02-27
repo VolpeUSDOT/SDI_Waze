@@ -26,6 +26,7 @@ if(length(grep(prepname, dir(file.path(inputdir, "Weather")))) == 0) {
   library(doParallel)
   library(foreach)
   library(tidyverse)
+  library(sf)
   
   cat("Preparing", "Weather", state, year, "\n")
   
@@ -86,14 +87,14 @@ if(length(grep(prepname, dir(file.path(inputdir, "Weather")))) == 0) {
     state_hourly_hist_weather <- rbind(state_hourly_hist_weather,df_i)
   }
   
-  # unique(state_hist_weather$Station_ID)
-  #testsnow <- state_hist_weather[!is.na(state_hist_weather$snow_depth),]
-  #testrain <- state_hist_weather[!is.na(state_hist_weather$precipitation),]
+  #unique(state_hourly_hist_weather$Station_ID)
+  #testsnow <- state_hourly_hist_weather[!is.na(state_hourly_hist_weather$snow_depth),]
+  #testrain <- state_hourly_hist_weather[!is.na(state_hourly_hist_weather$precipitation),]
   #unique(testrain$Station_ID)
   
   # Read in daily data from GHCN
   
-  wx.files <- dir(file.path(inputdir, "Weather", "GHCN", "Daily"))
+  wx.files <- dir(file.path(inputdir, "Weather", "GHCN", "Daily", year))
   wx <- vector()
   
   # Most stations don't have most of the wx variables. Simplify to core variables, per GHCN documentation:
@@ -103,23 +104,29 @@ if(length(grep(prepname, dir(file.path(inputdir, "Weather")))) == 0) {
   # vars = c("STATION", "NAME", "DATE", "AWND", "DAPR", "MDPR", "PGTM", "PRCP", "SNOW", "SNWD", "TAVG", "TMAX", "TMIN", "TOBS", "WSFG", "WT01", "WT02", "WT03", "WT04", "WT05", "WT06", "WT08", "WT10", "WT11")
 
   for(k in wx.files){
-    if(length(grep('ghcnd', k))==0){
-      wxx <- read.csv(file.path(inputdir, "Weather", "GHCN", "Daily", k))
+    if(length(grep(state, k))>0){
+      wxx <- read.csv(file.path(inputdir, "Weather", "GHCN", "Daily", year, k))
       wx <- rbind(wx, wxx[core_vars])
       rm(wxx)
     }
   }
-
-  station_file <- file.path(inputdir, "Weather", "GHCN", "Daily" , wx.files[grep('stations', wx.files)])
-  stations <- read_fwf(station_file,
-                       col_positions = fwf_empty(station_file))
-  names(stations) = c("STATION", "lat", "lon", "masl", "NAME", "x1", "x2", "x3")
+  
+  wx.daily.inventory.files <- dir(file.path(inputdir, "Weather", "GHCN", "Daily"))
+    
+  daily_station_file <- file.path(inputdir, "Weather", "GHCN", "Daily" , wx.daily.inventory.files[grep('stations', wx.daily.inventory.files)])
+  
+  daily_stations <- read_fwf(daily_station_file,
+                             fwf_positions(
+                               start = c(1,14,23,32,42,73,81), 
+                               end = c(11,21,30,37,70,75,85)
+                               )
+                             )
+  names(daily_stations) = c("STATION", "lat", "lon", "masl", "NAME", "x1", "x2")
   
   wx$DATE <- as.Date(as.character(wx$DATE))
   
   wx <- wx[order(wx$DATE, wx$STATION),]
 
-   
   wx$TMIN[wx$TMIN == -99] = NA
   wx$TMAX[wx$TMAX == -99] = NA
 
@@ -130,7 +137,7 @@ if(length(grep(prepname, dir(file.path(inputdir, "Weather")))) == 0) {
   # precip
   # snow_allday: in
 
-  wx <- left_join(wx, stations[1:5], by = "STATION")
+  wx <- left_join(wx, daily_stations[1:5], by = "STATION")
   
   ## TO DO: need to convert the below over to non-deprecated spatial packages
   # E.g., replace sp functions with sf functions, 
@@ -142,11 +149,18 @@ if(length(grep(prepname, dir(file.path(inputdir, "Weather")))) == 0) {
   # http://rspatial.org/analsis/rst/4-interpolation.html
   # First, make this a spatial points data frame
   # Project crashes
-  wx.proj <- SpatialPointsDataFrame(wx[c("lon", "lat")], 
-                                       wx,
-                                       proj4string = CRS("+proj=longlat +datum=WGS84"))
   
-  wx.proj <- spTransform(wx.proj, CRS(proj.USGS))
+  # wx.proj <- SpatialPointsDataFrame(wx[c("lon", "lat")], 
+  #                                      wx,
+  #                                      proj4string = CRS("+proj=longlat +datum=WGS84"))
+  
+  wx.proj <- st_as_sf(x = wx, coords = c("lon", "lat"), crs = "+proj=longlat +datum=WGS84")
+  
+  # wx.proj <- spTransform(wx.proj, CRS(proj.USGS))
+  
+  wx.proj <- st_transform(wx.proj, crs = st_crs(proj.USGS))
+  
+  ### MAY NO LONGER NEED THE BELOW? ####
   
   # Read in grid
   grid_shp <- rgdal::readOGR(file.path(inputdir, "Shapefiles"), layer = g)
@@ -161,14 +175,20 @@ if(length(grep(prepname, dir(file.path(inputdir, "Weather")))) == 0) {
   
   grid_shp <- grid_shp[as.vector(grid_intersects),]
   
+  ######################################
+  
   wx <- wx %>%
     mutate(mo = format(DATE, "%m"))
   
-  source(file.path(codeloc, 'datacleaning', 'Plot_weather_points.R'))
+  ### TO DO: the below line assumes we are using grids (fishnet or hex). 
+  ### Is there an update that makes sense for how we are currently doing it?
+  source(file.path(getwd(), 'datacleaning', 'Plot_weather_points.R'))
   
   # Options: nearest neighbor interpolation, inverse distance weighted, ordinary kriging...
   # Will make one raster for each variable of interest, per day, and then apply to grid/hour.
   # Here use kriging from gstat. Models are all based on spatial variance of the target variabel
+  
+  ### TO DO - Consider above questions, then continue from here.
   
   # Kriging. Intercept only = ordinary kriging.
   cl <- makeCluster(parallel::detectCores())
