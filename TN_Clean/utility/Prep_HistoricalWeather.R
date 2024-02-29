@@ -163,15 +163,22 @@ if(length(grep(prepname, dir(file.path(inputdir, "Weather")))) == 0) {
   ### MAY NO LONGER NEED THE BELOW? ####
   
   # Read in grid
-  grid_shp <- rgdal::readOGR(file.path(inputdir, "Shapefiles"), layer = g)
-  grid_shp <- spTransform(grid_shp, CRS(proj.USGS))
+  #grid_shp <- rgdal::readOGR(file.path(inputdir, "Shapefiles"), layer = g)
+  grid_shp <- read_sf(dsn = file.path(inputdir, "Shapefiles"), layer = g)
+  
+  #grid_shp <- spTransform(grid_shp, CRS(proj.USGS))
+  grid_shp <- st_transform(grid_shp, crs = st_crs(proj.USGS))
   
   # Read in buffered state shapefile
-  tn_buff <- readOGR(censusdir, layer = "TN_buffered")
-  tn_buff <- spTransform(tn_buff, CRS(proj.USGS))
+  #tn_buff <- readOGR(censusdir, layer = "TN_buffered")
+  tn_buff <- read_sf(dsn = censusdir, layer = "TN_buffered")
+  
+  #tn_buff <- spTransform(tn_buff, CRS(proj.USGS))
+  tn_buff <- st_transform(tn_buff, crs = st_crs(proj.USGS))
   
   # Clip grid to county shapefile
-  grid_intersects <- gIntersects(tn_buff, grid_shp, byid = T)
+  #grid_intersects <- gIntersects(tn_buff, grid_shp, byid = T)
+  grid_intersects <- st_intersects(tn_buff, grid_shp, sparse = FALSE)
   
   grid_shp <- grid_shp[as.vector(grid_intersects),]
   
@@ -186,7 +193,7 @@ if(length(grep(prepname, dir(file.path(inputdir, "Weather")))) == 0) {
   
   # Options: nearest neighbor interpolation, inverse distance weighted, ordinary kriging...
   # Will make one raster for each variable of interest, per day, and then apply to grid/hour.
-  # Here use kriging from gstat. Models are all based on spatial variance of the target variabel
+  # Here use kriging from gstat. Models are all based on spatial variance of the target variable
   
   ### TO DO - Consider above questions, then continue from here.
   
@@ -195,7 +202,28 @@ if(length(grep(prepname, dir(file.path(inputdir, "Weather")))) == 0) {
   registerDoParallel(cl)
   
   # Create an empty raster grid for the state; we will interpolate over this grid, then assign values from the raster to each grid cell. Increase n for smaller raster cells (more time-intensive)
-  grd <- as.data.frame(spsample(grid_shp, 'regular', n = 10000))
+  #grd <- as.data.frame(spsample(grid_shp, 'regular', n = 10000))
+  grd <- st_sample(x = grid_shp, size = 10000, type = 'regular')
+  
+  #tn_shape <- vect(file.path(censusdir,"TN_buffered.shp"))
+  
+  
+  class(tn_buff)
+  
+  plot(grd)
+  
+  ext(tn_buff)
+  ext(grid_shp)
+  
+  res(grid_shp)
+  sqrt(4.2143)
+  
+  test <- rast(extent = ext(grid_shp),resolution = c(1,1))
+  plot(test)
+  
+  grd <- do.call(rbind, st_geometry(grd)) %>% 
+    as_tibble() %>% setNames(c("X","Y"))
+  
   names(grd) <- c("X", "Y")
   coordinates(grd) <- c("X", "Y")
   gridded(grd) <- TRUE # for SpatialPixel
