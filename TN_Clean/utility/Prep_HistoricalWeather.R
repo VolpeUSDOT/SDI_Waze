@@ -202,37 +202,41 @@ if(length(grep(prepname, dir(file.path(inputdir, "Weather")))) == 0) {
   registerDoParallel(cl)
   
   # Create an empty raster grid for the state; we will interpolate over this grid, then assign values from the raster to each grid cell. Increase n for smaller raster cells (more time-intensive)
-  #grd <- as.data.frame(spsample(grid_shp, 'regular', n = 10000))
-  grd <- st_sample(x = grid_shp, size = 10000, type = 'regular')
+  # grd <- as.data.frame(spsample(grid_shp, 'regular', n = 10000))
+  # names(grd) <- c("X", "Y")
+  # coordinates(grd) <- c("X", "Y")
+  # gridded(grd) <- TRUE # for SpatialPixel
+  # fullgrid(grd) <- TRUE # for SpatialGrid
+  # proj4string(grd) <- proj4string(grid_shp)
   
-  #tn_shape <- vect(file.path(censusdir,"TN_buffered.shp"))
+  ## TO-DO: consider on what basis to set cell size.
   
+  # On what basis do we want to set cell size?
   
-  class(tn_buff)
+  # grd <- tn_buff %>% 
+  #   st_make_grid(cellsize = c(7540.43,2630.079), what = "centers") %>% 
+  #   st_intersection(tn_buff)                                           
   
-  plot(grd)
+  grd2 <- tn_buff %>% 
+    st_make_grid(cellsize = c(7540.43,2630.079), what = "polygons", square = T) %>% 
+    st_intersection(tn_buff)                                                       
   
-  ext(tn_buff)
-  ext(grid_shp)
+  plot(grd2)
+  #plot(grd)
   
-  res(grid_shp)
-  sqrt(4.2143)
+  #ext(tn_buff)
   
-  test <- rast(extent = ext(grid_shp),resolution = c(1,1))
-  plot(test)
-  
-  grd <- do.call(rbind, st_geometry(grd)) %>% 
-    as_tibble() %>% setNames(c("X","Y"))
-  
-  names(grd) <- c("X", "Y")
-  coordinates(grd) <- c("X", "Y")
-  gridded(grd) <- TRUE # for SpatialPixel
-  fullgrid(grd) <- TRUE # for SpatialGrid
-  proj4string(grd) <- proj4string(grid_shp)
+  # grd <- do.call(rbind, st_geometry(grd)) %>% 
+  #   as_tibble() %>% setNames(c("X","Y"))
   
   StartTime <- Sys.time()
   
-  writeLines(c(""), paste0("Prep_Weather_", g, "_log.txt"))    
+  writeLines(c(""), paste0("Prep_Weather_", g, "_log.txt"))  
+  
+  ### REMOVE THE BELOW AFTER DEVELOPMENT AND TESTING ARE COMPLETE ####
+  do.months = paste("2019", c("01","02","03","04","05","06","07","08","09", "10", "11", "12"), sep="-")
+  ####### ULTIMATELY THE ABOVE DO.MONTHS IS SPECIFIED IN RANDOMFOREST_WAZEGRIDS SCRIPT.
+  
   
   # Start parallel loop ----
   # limit to dates in the set of months we are using, see do.months specified in the RandomForest_WazeGrids file.
@@ -240,8 +244,13 @@ if(length(grep(prepname, dir(file.path(inputdir, "Weather")))) == 0) {
   all_wx_ym = format(all_wx_days, "%Y-%m")
   use_wx_days = all_wx_days[all_wx_ym %in% do.months]
   
+  ### REMOVE AFTER DEVELOPMENT AND TESTING ####
+  day <- "2019-01-01"
+  library(gstat)
+  #############################################
+  
   wx.grd.day <- foreach(day = use_wx_days, 
-                      .packages = c('raster','gstat','dplyr','rgdal'), 
+                      .packages = c('terra','gstat','dplyr','sf'), 
                       .combine = rbind) %dopar% {
                         
     cat(paste(Sys.time()), as.character(day), "\n", 
@@ -264,7 +273,9 @@ if(length(grep(prepname, dir(file.path(inputdir, "Weather")))) == 0) {
     dat.fit <- fit.variogram(vg_prcp, fit.ranges = F, fit.sills = F,
                              vgm(model = "Sph"))
     # plot(vg_prcp, dat.fit) # Plot the semi variogram. 
-    dat.krg.prcp <- krige(f.p, wx.day[!is.na(wx.day$PRCP),], grd, dat.fit)
+    dat.krg.prcp <- krige(f.p, wx.day[!is.na(wx.day$PRCP),], grd2, dat.fit)
+    
+    ####### THE ABOVE IS WHERE ANDREW LEFT OFF MARCH 1, 2024 #####
     
     # Rasterize
     prcp_r <- raster::raster(dat.krg.prcp)
