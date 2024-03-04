@@ -7,6 +7,7 @@ reports/Waze_04-09_GridCounts.csv
 *.RData
 *.jpeg
 
+
 TN/Output/
 TN/Input/
 TN_Clean/Output/
@@ -100,8 +101,7 @@ TN_Clean/Input/Weather/DarkSky_Key.txt
 TN_Clean/Input/Weather/WeatherUnderground_171228.txt
 TN_Clean/Output/TN_2017-04_to_2018-03_TN_01dd_fishnet.csv
 TN_Clean/Output/TN_2017-04_to_2018-03_TN_1sqmile_hexagons.csv
-OSM/data/gis_osm_roads_free_1.cpg
-OSM/data/gis_osm_roads_free_1.dbf
-OSM/data/gis_osm_roads_free_1.prj
-OSM/data/gis_osm_roads_free_1.shp
-OSM/data/gis_osm_roads_free_1.shx
+OSM/data/
+OSM/2023-53/
+
+
