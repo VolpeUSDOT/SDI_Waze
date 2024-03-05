@@ -28,6 +28,8 @@ proj.USGS <- "+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 +x_0=0 +y_0
 # Provided by TN: WeatherUnderground_171228.txt. This is a small script to be run in a Windows enviroment, to get XML-format files for 11 locations in TN. Here we'll read in the file as is, just to extract the API addresses
 # WUndground *no longer is providing free API keys*, so we will see if the API key in these addresses will work. Free version works through end of 2018.
 
+## TO DO ## create a more generalized approach to set the points for which to query weather data (based on state of interest).
+
 wu <- scan(file = file.path(inputdir,"Weather/WeatherUnderground_171228.txt"),
            what = 'character')
 
