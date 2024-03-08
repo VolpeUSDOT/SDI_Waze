@@ -4,6 +4,7 @@ library(dplyr)
 library(osmdata)
 library(sf)
 library(ggplot2)
+library(tigris)
 
 rm(list=ls()) # clear enviroment
 
@@ -12,72 +13,105 @@ setwd(file.path(dirname(rstudioapi::getActiveDocumentContext()$path)))
 # Load Road Data ----------------------
 
 ##select server to query OSM api
-#If you the below doesn't work, try https://overpass.kumi.systems/api/interpreter
+#If the below doesn't work, try https://overpass.kumi.systems/api/interpreter
 
 new_url <- "https://overpass-api.de/api/interpreter"
 set_overpass_url(new_url)
 
 
 ##identify state for analysis
-state <- 'North Carolina'
+state <- 'Minnesota'
 
 #Retrieves relevant coordinates; always a rectangle
 state_bbox <- getbb(state) # use nominatimlite to fix this bug 
 
 ##identify road types you'd like to query for; can pick from c('motorway', 'trunk', 'primary', 'secondary', 'tertiary', 'unclassified', 'residential')
-road_types <- c('motorway', 'trunk', 'primary')
+road_types <- c('motorway', 'trunk', 'primary', 'secondary', 'tertiary')
 
 #initialize object
 roadways <- list()
 
-if (file.exists("nc_road_network/nc_expanded_network.shp")){
-  nc_network <- read_sf("nc_road_network/nc_expanded_network.shp")
-  print("File Found")
-  } else{
-  
-for (i in road_types){
-  print("File Not Found")
-map_data <- opq(bbox = state_bbox) %>%
-  add_osm_feature(key = 'highway', value = i) %>%
-  osmdata_sf()
+state_filename <- paste0(gsub(" ", "_", state),"_network")
+file_path <- file.path(state, paste0(state_filename, '.gpkg'), paste0(state_filename,'.shp'))
 
-roadways <- c(roadways, list(map_data))
+if (file.exists(file.path(file_path))){
+  .temp <- read_sf(file_path)
+  assign(state_filename, .temp)
+  rm(.temp)
+  print("File Found")
+} else{
+  
+  for (i in road_types){
+    print("File Not Found")
+    map_data <- opq(bbox = state_bbox) %>%
+      add_osm_feature(key = 'highway', value = i) %>%
+      osmdata_sf()
+    
+    roadways <- c(roadways, list(map_data))
+    
+  }
+  
+  total_network <- do.call(c, roadways)
+  
+  state_network <- total_network$osm_lines
+  
+  if (!(dir.exists(state))){
+    dir.create(state)}
+  
+  state_network <- st_transform(state_network, crs = 'WGS84') 
+  
+# Pull state boundaries
+state_maps <- states(cb = TRUE, year = 2021) %>%
+  filter_state(state) %>%
+  st_transform(crs = 'WGS84')
+
+county_map <- counties(state = state, cb = TRUE, year = 2021)
+
+#Filter out roadways outside the state
+
+network_within_state <- st_join(state_network, state_maps, join = st_within) %>%
+  filter(!is.na(NAME)) %>%
+  select(osm_id, highway, ref, geometry)
+
+write_sf(network_within_state, paste0(state, "/", state_filename, ".gpkg"), driver = "ESRI Shapefile")
+
+assign(state_filename, network_within_state)
 
 }
 
-total_network <- do.call(c, roadways)
-
-nc_network <- total_network$osm_lines %>%
-  select(geometry)
-
-write_sf(nc_network, "nc_road_network/nc_expanded_network.shp")
-  }
-
-
-ggplot() + geom_sf(data = nc_network) # plot roads in NC Block 
-
+ggplot() + geom_sf(data = Minnesota_network)
 # Load Crash Data ------------------------------
 
 # load raw file 
 
-setwd("../../../../DOT OST/Volpe-Group-JPODataProgram - ROADII/Lab/Use Cases/R25_Incident Detection")
 
-crashes <- read_sf("2023-53/Shapefiles/nc19crash.shp")
 
-crs_type <- st_crs(crashes)
-target <- st_crs("+proj=latlong +datum=NAD83")
+timestamps <- read.csv(file.path(state, paste0(state, '_timestamps.csv'))) %>%
+  rename(INCIDEN = INCIDENT_ID) %>%
+  mutate(DATE_TIME_OF_INCIDENT = as.POSIXct(DATE_TIME_OF_INCIDENT, format = "%m/%d/%Y %H:%M"))
 
-crashes <- st_transform(crashes, target) 
+crash_files <- list.files(state, pattern = 'crash.shp$', full.names = TRUE)
 
-crashes <- st_coordinates(crashes) 
+total_crashes <- data.frame()
+for (i in crash_files){
+crash <- read_sf(i) %>%
+  left_join(timestamps, by = 'INCIDEN') %>%
+  mutate(Year = format(DATE_TIME_OF_INCIDENT, '%Y'),
+         Day = format(DATE_TIME_OF_INCIDENT, '%j'),
+         Hour = format(DATE_TIME_OF_INCIDENT, '%H'))
+total_crashes <- plyr::rbind.fill(total_crashes, crash)
+}
 
-crashes <- st_as_sf(data.frame(crashes), coords = c("X", "Y"), crs = 4269)
+total_crashes <- st_as_sf(total_crashes)
 
-crashes_clean <- crashes %>%
-  filter(st_as_text(geometry) != "POINT (-156.9666 -90)")
+joined <- st_join(total_crashes, network_within_state, join = st_nearest_feature)
 
-ggplot() + geom_sf(data = crashes_clean) # plot crashes in NC
+joined_df <- as.data.frame(joined)
+
+joined_test <- joined_df %>%
+  group_by(osm_id, Year, Day, Hour) %>%
+  summarise(num_unique_incidents = n_distinct(INCIDEN))
+
 
 #crashes_clean <- crashes %>% st_zm(what="ZM") %>% sf::st_coordinates() %>% as.data.frame() # this isn't a valid shapefile but the points are unplotable without.
-
 
