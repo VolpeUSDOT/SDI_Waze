@@ -1,12 +1,9 @@
 library(ggplot2)
+library(tigris)
+library(sf)
 
-for_graph <- Minnesota_network %>%
-  filter(highway == 'motorway' |
-           highway == 'primary' |
-           highway == 'secondary' |
-           highway == 'tertiary'
-         )
-ggplot() + geom_sf(data = for_graph)
+setwd(file.path(dirname(rstudioapi::getActiveDocumentContext()$path)))
+
 
 load_hpms <- function(states = "All", # includes all HPMS segments by default including DC and PR, though not recommended.
                       year = "2018"){ # 2018 is more recent data as of writing this 
@@ -33,40 +30,20 @@ load_hpms <- function(states = "All", # includes all HPMS segments by default in
   return(df)
 }
 
-crash <- rash 
+state <- 'Minnesota'
 
-minnesota <- load_hpms(states = 'Minnesota', year = '2018')
+state_maps <- states(cb = TRUE, year = 2021) %>%
+  filter_state(state) %>%
+  st_transform(crs = 'WGS84') 
+
+minnesota_network <- load_hpms(states = state, year = '2018')
+
+crashes <- read_sf('Minnesota/mn21crash.shp')
 
 ggplot() + 
-  geom_sf(data = crash, aes(color = 'Crash', shape = 'Crash'), alpha = .5, size = .05) +
-  geom_sf(data = minnesota, aes(color = 'Network', shape = 'Network')) +
-  geom_sf(data = state_maps, aes(color = 'Border', shape = 'Border'), fill = 'transparent') +
-  scale_color_manual(values = c('Crash' = 'blue', 'Minnesota' = 'black', 'Border' = 'black')) +
-  scale_shape_manual(values = c('Crash' = 16, 'Minnesota' = 1, 'Border' = 2)) +
-  theme_minimal() +
-  theme(axis.line = element_blank(),
-        axis.text = element_blank(),
-        axis.ticks = element_blank(),
-        panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank())
-ggplot() + 
-  geom_sf(data = crash, aes(color = 'Crash', shape = 'Crash'), alpha = .5, size = .05) +
-  geom_sf(data = minnesota, aes(color = 'Network', shape = 'Network'), alpha = 1) + # Setting alpha to 1 for consistent appearance
-  geom_sf(data = state_maps, aes(color = 'Border', shape = 'Border'), fill = 'transparent', alpha = 1) + # Setting alpha to 1 for consistent appearance
-  scale_color_manual(values = c('Crash' = 'blue', 'Network' = 'black', 'Border' = 'black')) +
-  scale_shape_manual(values = c('Crash' = 16, 'Network' = 1, 'Border' = 2)) +
-  guides(color = guide_legend(override.aes = list(shape = c(16, 1, 2), title = "Layer"),
-                              title = "Layer")) +
-  theme_minimal() +
-  theme(axis.line = element_blank(),
-        axis.text = element_blank(),
-        axis.ticks = element_blank(),
-        panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank())
-ggplot() + 
-  geom_sf(data = crash, aes(color = 'Crash', shape = 'Crash'), alpha = .5, size = .05) +
-  geom_sf(data = minnesota, aes(color = 'Network', shape = 'Network'), alpha = 1) +
-  geom_sf(data = state_maps, aes(color = 'Border', shape = 'Border'), linetype = 'dashed', fill = NA, alpha = 1) + # Setting fill to NA to remove fill
+  geom_sf(data = crashes, aes(color = 'Crash', shape = 'Crash'), alpha = .5, size = .05) +
+  geom_sf(data = minnesota_network, aes(color = 'Network', shape = 'Network'), alpha = 1) +
+  geom_sf(data = state_maps, aes(color = 'Border', shape = 'Border'), linetype = 'dashed', fill = NA, alpha = 1) +
   scale_color_manual(values = c('Crash' = 'blue', 'Network' = 'black', 'Border' = 'black')) +
   scale_shape_manual(values = c('Crash' = 16, 'Network' = 1, 'Border' = 2)) +
   guides(color = guide_legend(override.aes = list(shape = c(16, 1, 2), linetype = c("dashed", "solid", "solid")), title = "Layer"),
