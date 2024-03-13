@@ -38,11 +38,11 @@ state_maps <- states(cb = TRUE, year = 2021) %>%
 
 minnesota_network <- load_hpms(states = state, year = '2018')
 
-crashes <- read_sf('Minnesota/mn21crash.shp')
+crashes <- read_sf('Washington State/wa21crash.shp')
 
 ggplot() + 
-  geom_sf(data = crashes, aes(color = 'Crash', shape = 'Crash'), alpha = .5, size = .05) +
-  geom_sf(data = minnesota_network, aes(color = 'Network', shape = 'Network'), alpha = 1) +
+  geom_sf(data = crashes, aes(color = 'Crash', shape = 'Crash'), size = .05) +
+  geom_sf(data = Washington_State_network, aes(color = 'Network', shape = 'Network'), alpha = 1) +
   geom_sf(data = state_maps, aes(color = 'Border', shape = 'Border'), linetype = 'dashed', fill = NA, alpha = 1) +
   scale_color_manual(values = c('Crash' = 'blue', 'Network' = 'black', 'Border' = 'black')) +
   scale_shape_manual(values = c('Crash' = 16, 'Network' = 1, 'Border' = 2)) +
@@ -55,4 +55,4 @@ ggplot() +
         panel.grid.major = element_blank(),
         panel.grid.minor = element_blank())
 
-
+write_sf(state_maps, file.path(state, paste0(state,'_border.shp')))

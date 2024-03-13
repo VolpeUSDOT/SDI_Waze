@@ -19,11 +19,14 @@ new_url <- "https://overpass-api.de/api/interpreter"
 set_overpass_url(new_url)
 
 
-##identify state for analysis
-state <- 'Minnesota'
+##identify state for analysis; Need to specify 'Washington State' for Washington
+state <- 'Washington State'
 
 #Retrieves relevant coordinates; always a rectangle
 state_bbox <- getbb(state) # use nominatimlite to fix this bug 
+
+#normalize state name
+state <- gsub(" ", "_", state)
 
 ##identify road types you'd like to query for; can pick from c('motorway', 'trunk', 'primary', 'secondary', 'tertiary', 'unclassified', 'residential')
 road_types <- c('motorway', 'trunk', 'primary', 'secondary', 'tertiary')
@@ -31,7 +34,7 @@ road_types <- c('motorway', 'trunk', 'primary', 'secondary', 'tertiary')
 #initialize object
 roadways <- list()
 
-state_filename <- paste0(gsub(" ", "_", state),"_network")
+state_filename <- paste0(state,"_network")
 file_path <- file.path(state, paste0(state_filename, '.gpkg'), paste0(state_filename,'.shp'))
 
 if (file.exists(file.path(file_path))){
@@ -61,9 +64,15 @@ if (file.exists(file.path(file_path))){
   state_network <- st_transform(state_network, crs = 'WGS84') 
   
 # Pull state boundaries
+  if (state == 'Washington_State'){
+    state_border <- 'Washington'
+  }else{
+    state_border <- state
+  }
 state_maps <- states(cb = TRUE, year = 2021) %>%
-  filter_state(state) %>%
+  filter_state('Washington') %>%
   st_transform(crs = 'WGS84')
+rm(state_border)
 
 county_map <- counties(state = state, cb = TRUE, year = 2021)
 
@@ -79,28 +88,54 @@ assign(state_filename, network_within_state)
 
 }
 
-ggplot() + geom_sf(data = Minnesota_network)
+ggplot() + geom_sf(data = Washington_State_network)
 # Load Crash Data ------------------------------
 
 # load raw file 
 
+crash_files <- list.files(state, pattern = 'crash.shp$', full.names = TRUE)
 
-
+if(state == 'Minnesota'){
 timestamps <- read.csv(file.path(state, paste0(state, '_timestamps.csv'))) %>%
   rename(INCIDEN = INCIDENT_ID) %>%
   mutate(DATE_TIME_OF_INCIDENT = as.POSIXct(DATE_TIME_OF_INCIDENT, format = "%m/%d/%Y %H:%M"))
 
-crash_files <- list.files(state, pattern = 'crash.shp$', full.names = TRUE)
-
 total_crashes <- data.frame()
+
+add_date_time_info <- function(data, date_time_column) {
+  data %>%
+    mutate(Year = format({{ date_time_column }}, '%Y'),
+           Day = format({{ date_time_column }}, '%j'),
+           Hour = format({{ date_time_column }}, '%H'))
+}
+
 for (i in crash_files){
-crash <- read_sf(i) %>%
+temp <- read_sf(i) %>%
   left_join(timestamps, by = 'INCIDEN') %>%
   mutate(Year = format(DATE_TIME_OF_INCIDENT, '%Y'),
          Day = format(DATE_TIME_OF_INCIDENT, '%j'),
          Hour = format(DATE_TIME_OF_INCIDENT, '%H'))
-total_crashes <- plyr::rbind.fill(total_crashes, crash)
+total_crashes <- plyr::rbind.fill(total_crashes, temp)
+  }
 }
+
+if(state == 'Washington_State'){
+  total_crashes <- data.frame()
+  for (i in crash_files){
+    temp <- read_sf(i) %>%
+      mutate(ACC)
+    total_crashes <- plyr::rbind.fill(total_crashes, temp)
+  }
+  
+
+}
+
+total_crashes_test <- total_crashes %>%
+  mutate(ACC_DATE = as.POSIXct(ACC_DATE, format = "%Y-%m-%d"),
+         Year = format(ACC_DATE, '%Y'),
+         Day = format(ACC_DATE, '%j'),
+         TIME = strptime(TIME, format = '%H%M'),
+         Hour = format(TIME, '%H'))
 
 total_crashes <- st_as_sf(total_crashes)
 
