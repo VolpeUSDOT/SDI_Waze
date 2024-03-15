@@ -1,4 +1,4 @@
-# Get Weather forecasts for Tennessee, using TomorrowIO API
+# Get weather forecasts for state of interest
 
 # Setup ----
 inputdir <- file.path(getwd(),"Input")
@@ -50,7 +50,8 @@ grd <- state_map %>%
   st_make_grid(cellsize = c(1,1), what = "centers") %>% 
   st_intersection(state_map) 
 
-# ggplot() + 
+# Uncomment the below code to view the grid overlay
+# ggplot() +
 #   geom_sf(data = state_map, aes(), fill = NA, alpha = 1) +
 #   geom_sf(data = grd, aes())
 
@@ -68,64 +69,74 @@ if(TomorrowIO) {
   # need to be filled in (latitude, longitude, and API key):
   # https://api.tomorrow.io/v4/weather/forecast?location={latitude},{longitude}&apikey={key}
   # Next line appends a column to the queries dataframe with the constructed url for each query.
-  queries <- queries %>% 
+  queries = queries %>% 
     mutate(url = paste0('https://api.tomorrow.io/v4/weather/forecast?location=',Y,',',X,'&apikey=', w_key))
   
-  # Parse JSON
-  
-  wx_dat <- vector()
-  
-  # uncomment this for testing/development 
-   i <- 1
-  
-  # Loop over the json queries from this forecast and put into a data frame
-  
-  # THIS WAS AN OLD COMMENT BASED ON DARK SKY:
-  # Use daily data for the next week, hourly only available for next 48 hours. Could combine these for more precise estimates within 48 hour window.
-  
-  # NEW RELATED COMMENT BASED ON TOMORROWIO:
   # Daily data are available for 6 days (including the current day, so only 5 future days)
   # Hourly data are available for 120 hours in the future (i.e. 5 future days), so about the 
   # same timeframe. We can discuss whether we want to shift to use hourly data instead of daily.
   # By default, time zone is Coordinated Universal Time (UTC)... the offset will vary by state
   # based on the time zone(s). May also vary based on whether it is daylight savings or standard time?
    
-  # TO-DO: convert character vector to an actual date format (use lubridate package to parse?)
-  # TO-DO: create empty placeholder dataframes for daily and hourly below, to be populated in the 
-  # for loop that follows.
+  # TO-DO: figure out what to do for the larger states (limit for TomorrowIO is 25 requests per hour,
+  # so grd object created above should not have more than 25 points).
+  
+  # create blank dataframes to populate with weather data
    
-  weather_day <- data.frame(day = double(), 
-                            Col2 = integer(), 
-                            Col3 = character(), 
-                            stringsAsFactors = FALSE)
+  weather_daily <- data.frame(lon = numeric(),
+                              lat = numeric(),
+                              date = Date(), 
+                              temperatureMin = numeric(),
+                              temperatureMax = numeric(),
+                              snowAccumulationSum = numeric(),
+                              rainAccumulationSum = numeric(),
+                              sleetAccumulationLweSum = numeric(),
+                              iceAccumulationLweSum = numeric())
+  
+  weather_hourly <- data.frame(lon = numeric(),
+                               lat = numeric(),
+                               hour = POSIXct(), 
+                               temperature = numeric(),
+                               snowAccumulation = numeric(),
+                               rainAccumulation = numeric(),
+                               sleetAccumulationLwe = numeric(),
+                               iceAccumulation = numeric())
+  
+  # uncomment this for testing/development 
+  # i <- 14
+  
+  # Loop over the json queries for each forecast point and add to the data frames (daily and hourly)
+  # Pause for 0.34 seconds in between each query because the limit is 3 requests per second
+  # Note there are also limits of 25 requests per hour and 500 requests per day.
    
   for(i in 1:nrow(queries)){
     wx_dat_i = fromJSON(queries$url[i])
     
-    #wx_dat_i = data.frame(lat = ll_i[1], lon = ll_i[2], wx_dat_i)
-    
     # extract the weather attributes for the six days as a dataframe
     wx_dat_daily_values = wx_dat_i$timelines$daily$values %>%
       # extract the dates and assign to a new column
-      mutate(date = wx_dat_i$timelines$daily$time) %>%
+      mutate(date = as.Date(wx_dat_i$timelines$daily$time),
+             lon = queries$X[i],
+             lat = queries$Y[i]) %>%
       # subset to only retain the necessary columns
-      select(date, temperatureMin,temperatureMax,snowAccumulationSum, rainAccumulationSum, sleetAccumulationLweSum,iceAccumulationSum)
+      select(lon, lat, date, temperatureMin,temperatureMax,snowAccumulationSum, rainAccumulationSum, sleetAccumulationLweSum,iceAccumulationSum)
     
-    dateRep = ymd(dateRep)
-    
-    
-    # extract the weather attributes for the hours as a dataframe
+    # extract the weather attributes for the 120 hours as a dataframe
     wx_dat_hourly_values = wx_dat_i$timelines$hourly$values %>% 
       # extract the hours and assign to a new column
-      mutate(hour = wx_dat_i$timelines$hourly$time) %>%
+      mutate(hour = ymd_hms(wx_dat_i$timelines$hourly$time),
+             lon = queries$X[i],
+             lat = queries$Y[i]) %>%
       # subset to only retain the necessary columns
-      select(hour,temperature,snowAccumulation, rainAccumulation, sleetAccumulationLwe,iceAccumulation)
+      select(lon, lat, hour,temperature,snowAccumulation, rainAccumulation, sleetAccumulationLwe,iceAccumulation)
     
-    wx_dat_i = data.frame(lat = ll_i[1], lon = ll_i[2], wx_dat_i)
-    wx_dat = rbind(wx_dat, wx_dat_i)
+    # add forecasts for this point to the data frames along with the rest of the points
+    weather_daily <- rbind(weather_daily,wx_dat_daily_values)
+    weather_hourly <- rbind(weather_hourly,wx_dat_hourly_values)
     
+    Sys.sleep(0.34)
   }
-
+  
   ## TO-DO: need generic method for automatically getting/setting time zone. What to do if state
   ## crosses multiple time zones?
   # By default, TomorrowIO reported time zone is Coordinated Universal Time (UTC)... the offset 
@@ -134,8 +145,6 @@ if(TomorrowIO) {
   
   # Get correct time zone from shapefile
   wx_dat$time <- as.POSIXct(wx_dat$time, origin = '1970-01-01', tz = 'America/Chicago')
-  wx_dat$lat = as.numeric(as.character(wx_dat$lat))
-  wx_dat$lon = as.numeric(as.character(wx_dat$lon))
 
 # Key reference for cross-walking sp to sf commands:
 # https://github.com/r-spatial/sf/wiki/migrating
@@ -166,22 +175,22 @@ if(TomorrowIO) {
 #  wx_dat.proj <- SpatialPointsDataFrame(coords = wx_dat[c('lon', 'lat')],
 #                                    data = wx_dat,
 #                                    proj4string = CRS("+proj=longlat +datum=WGS84"))
-  wx_dat.proj <- st_as_sf(wx_dat,
-                          coords = wx_dat[c('lon', 'lat')],
-                          crs = CRS("+proj=longlat +datum=WGS84"))
-  
-#  wx_dat.proj <- spTransform(wx_dat.proj, CRS(proj.USGS))
-  wx_dat.proj <- st_transform(wx_dat.proj, CRS(proj.USGS))  
+  weather_daily.proj <- st_as_sf(weather_daily,
+                          coords = weather_daily[c('lon', 'lat')],
+                          crs = 4269)
+# CRS("+proj=longlat +datum=WGS84")
+## TO-DO - determine whether we need to come up with a customized projection, or if we can just use 
+## epsg 4269 for all of North America. For now, just go with that. Commenting out the below for now.
+#    wx_dat.proj <- st_transform(wx_dat.proj, CRS(proj.USGS))  
   
   # Overlay timezone ----
   # Read tz file
   
 #  tz <- readOGR(file.path(inputdir,"Shapefiles", 'TimeZone'), layer = 'combined-shapefile')
   tz <- read_sf(file.path(inputdir,"Shapefiles", 'TimeZone'), layer = 'combined-shapefile')  
-  
-#  tz <- spTransform(tz, CRS(proj.USGS))
-  tz <- st_transform(tz, CRS(proj.USGS))
+  tz <- st_transform(tz, crs = 4269)
 
+## TO DO ##
 # replace this next one with one of the two commands from:  https://github.com/r-spatial/sf/wiki/migrating
 # Figure out which one is appropriate
 #  wx_tz <- over(wx_dat.proj, tz[,"tzid"]) # Match a tzid name to each row in wx_dat.proj weather wx_data 
