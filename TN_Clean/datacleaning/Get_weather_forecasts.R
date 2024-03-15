@@ -87,35 +87,51 @@ if(TomorrowIO) {
   # Daily data are available for 6 days (including the current day, so only 5 future days)
   # Hourly data are available for 120 hours in the future (i.e. 5 future days), so about the 
   # same timeframe. We can discuss whether we want to shift to use hourly data instead of daily.
+  # By default, time zone is Coordinated Universal Time (UTC)... the offset will vary by state
+  # based on the time zone(s). May also vary based on whether it is daylight savings or standard time?
+   
+  # TO-DO: convert character vector to an actual date format (use lubridate package to parse?)
+  # TO-DO: create empty placeholder dataframes for daily and hourly below, to be populated in the 
+  # for loop that follows.
+   
+  weather_day <- data.frame(day = double(), 
+                            Col2 = integer(), 
+                            Col3 = character(), 
+                            stringsAsFactors = FALSE)
+   
   for(i in 1:nrow(queries)){
-    wx_dat_i = fromJSON(url[i])
+    wx_dat_i = fromJSON(queries$url[i])
     
     #wx_dat_i = data.frame(lat = ll_i[1], lon = ll_i[2], wx_dat_i)
     
-    # extract the weather attributes for the six days
-    wx_dat_daily_values = wx_dat_i$timelines$daily$values
-    # extract the dates for the six days
-    wx_dat_daily_time = wx_dat_i$timelines$daily$time
-    # assign the dates as a new column in wx_dat_daily_values
-    wx_dat_daily_values$day <- wx_dat_daily_time
-    # subset to only retain the necessary columns
-    dailykeep <- c('day', 'temperatureMin','temperatureMax','snowAccumulationSum', 'rainAccumulationSum', 'sleetAccumulationLweSum','iceAccumulationSum')
-    wx_dat_daily_values <- wx_dat_daily_values[,dailykeep]
+    # extract the weather attributes for the six days as a dataframe
+    wx_dat_daily_values = wx_dat_i$timelines$daily$values %>%
+      # extract the dates and assign to a new column
+      mutate(date = wx_dat_i$timelines$daily$time) %>%
+      # subset to only retain the necessary columns
+      select(date, temperatureMin,temperatureMax,snowAccumulationSum, rainAccumulationSum, sleetAccumulationLweSum,iceAccumulationSum)
     
-    # extract the weather attributes for the hours
-    wx_dat_hourly_values = wx_dat_i$timelines$hourly$values
-    # extract the hours
-    wx_dat_hourly_time = wx_dat_i$timelines$hourly$time
-    # assign the hours as a new column in wx_dat_hourly_values
-    wx_dat_hourly_values$hour <- wx_dat_hourly_time
-    # subset to only retain the necessary columns
-    hourlykeep <- c('temperature','snowAccumulation', 'rainAccumulation', 'sleetAccumulationLwe','iceAccumulation')
+    dateRep = ymd(dateRep)
+    
+    
+    # extract the weather attributes for the hours as a dataframe
+    wx_dat_hourly_values = wx_dat_i$timelines$hourly$values %>% 
+      # extract the hours and assign to a new column
+      mutate(hour = wx_dat_i$timelines$hourly$time) %>%
+      # subset to only retain the necessary columns
+      select(hour,temperature,snowAccumulation, rainAccumulation, sleetAccumulationLwe,iceAccumulation)
     
     wx_dat_i = data.frame(lat = ll_i[1], lon = ll_i[2], wx_dat_i)
     wx_dat = rbind(wx_dat, wx_dat_i)
     
   }
 
+  ## TO-DO: need generic method for automatically getting/setting time zone. What to do if state
+  ## crosses multiple time zones?
+  # By default, TomorrowIO reported time zone is Coordinated Universal Time (UTC)... the offset 
+  # to convert will vary by state based on the time zone(s). May also vary based on whether it is 
+  # daylight savings or standard time?
+  
   # Get correct time zone from shapefile
   wx_dat$time <- as.POSIXct(wx_dat$time, origin = '1970-01-01', tz = 'America/Chicago')
   wx_dat$lat = as.numeric(as.character(wx_dat$lat))
