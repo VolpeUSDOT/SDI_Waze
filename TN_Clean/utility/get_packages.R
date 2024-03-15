@@ -16,7 +16,6 @@ loadpacks <- c(
             "kableExtra",
             "lubridate",
             "maps",
-            "maptools",
             "mapproj",  # for coord_map, 
             "maptree", # for better graphing of decision trees
             "mlbench",
@@ -26,10 +25,11 @@ loadpacks <- c(
             "pROC",
             "randomForest",
             "raster", 
-            "rgdal",  # for readOGR, , needed for reading in ArcM shapefiles
             "sf",  # for gIntersection, to clip two shapefiles
             "sp",
+            "terra",
             "tidyverse",
+            "tigris",
             "utils",
 			"dplyr")
 

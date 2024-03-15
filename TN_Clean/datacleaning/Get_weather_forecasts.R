@@ -1,5 +1,4 @@
-# Get Weather forecasts for Tennessee, using Weatherunderground API
-
+# Get Weather forecasts for Tennessee, using TomorrowIO API
 
 # Setup ----
 inputdir <- file.path(getwd(),"Input")
@@ -18,50 +17,59 @@ library(tidyverse)
 library(xml2) # for xml parsing in tidy way
 library(XML) # for xmlToList
 library(jsonlite)
+library(tigris) # for state shapefiles (or other census geographies)
+library(sf)
 
-#setwd(inputdir)
-
+#### TO DO ... need more generic way of setting projection ###
+#### note the default projection for the state boundaries (from running 'states' function below
+#### from tigris package) is EPSG 4269 for all states, including Hawaii and Alaska
 proj.USGS <- "+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 +x_0=0 +y_0=0 +wx_datum=NAD83 +units=m +no_defs +ellps=GRS80 +towgs84=0,0,0"
 
 # Get weather wx_data ----
 
-# Provided by TN: WeatherUnderground_171228.txt. This is a small script to be run in a Windows enviroment, to get XML-format files for 11 locations in TN. Here we'll read in the file as is, just to extract the API addresses
-# WUndground *no longer is providing free API keys*, so we will see if the API key in these addresses will work. Free version works through end of 2018.
+# The below is a more generalized approach to set the points for which to query weather data 
+# (based on state of interest). For TN it comes up with 14 points, whereas the original version for TN had
+# 11 points throughout the state. Method seems to work for all states except for Alaska. It does work
+# for Hawaii, but only puts 2 points there.
+# Eventual TO - DO item - figure out why it doesn't work for Alaska and fix it.
 
-## TO DO ## create a more generalized approach to set the points for which to query weather data (based on state of interest).
+## Setting State here for now, but will likely move to main script/location later
+state <- "Tennessee"
 
-wu <- scan(file = file.path(inputdir,"Weather/WeatherUnderground_171228.txt"),
-           what = 'character')
+# Access state boundary using tigris package, which loads Census TIGER/Line Shapefiles
+state_map <- states(cb = TRUE, year = 2021) %>%
+  filter_state(state)
+# default projection from the above is EPSG 4269 for all states, including Hawaii and Alaska
 
+# Overlay a grid of points within the state - current resolution is 1 degree by 1 degree - 
+# This is imperfect because the distances between longitude degrees are greater as one 
+# moves closer to the equator and smaller as one moves closer to one of the poles.
+# Close enough for our purposes as it puts about the right number of query points in each 
+# state.
+grd <- state_map %>% 
+  st_make_grid(cellsize = c(1,1), what = "centers") %>% 
+  st_intersection(state_map) 
 
-xmlnames <- wu[grep(".xml$", wu)]
+# ggplot() + 
+#   geom_sf(data = state_map, aes(), fill = NA, alpha = 1) +
+#   geom_sf(data = grd, aes())
 
-outnames <- xmlnames[nchar(xmlnames) < 15]
-innames <- xmlnames[nchar(xmlnames) > 15]
+# Create dataframe with the longitude and latitude of the grid points.
+queries <- st_coordinates(grd) %>% as.data.frame()
 
-# Using TomorrowIO now for the actual API call
+# Using TomorrowIO now for the actual API call (can add NOAA GFS as an option later)
 TomorrowIO = T
 if(TomorrowIO) {
+  # User needs to visit the tomorrow io website to obtain a free account and then put their api key into
+  # a text file called "WeatherAPI_key.txt" in the "Weather" folder within the "Input" folder.
+  # Next line obtains the user's api key.
   w_key = scan(file.path(inputdir,"Weather", 'WeatherAPI_key.txt'), what = 'character')
-  ds_ll_query = ll = vector()
-
   # This is the format needed for an API call in TomorrowIO, with three parameters that
   # need to be filled in (latitude, longitude, and API key):
   # https://api.tomorrow.io/v4/weather/forecast?location={latitude},{longitude}&apikey={key}
-  
-    for(i in innames){
-    # extract the lat and lon separately and plug them into the query for API call
-    i_ll = strsplit(i, '/')
-    i_ll = i_ll[[1]][[length(i_ll[[1]])]]
-    i_ll = sub('.xml', '', i_ll)
-    i_ll_sep = strsplit(i_ll, ',')
-    i_lat = sapply(i_ll_sep,"[[",1)
-    i_lon = sapply(i_ll_sep,"[[",2)
-    ds_ll_query = c(ds_ll_query,
-                    paste0('https://api.tomorrow.io/v4/weather/forecast?location=',i_lat,',',i_lon,'&apikey=', w_key))
-    ll = c(ll, i_ll)
-  }
-  innames = ds_ll_query
+  # Next line appends a column to the queries dataframe with the constructed url for each query.
+  queries <- queries %>% 
+    mutate(url = paste0('https://api.tomorrow.io/v4/weather/forecast?location=',Y,',',X,'&apikey=', w_key))
   
   # Parse JSON
   
@@ -79,12 +87,8 @@ if(TomorrowIO) {
   # Daily data are available for 6 days (including the current day, so only 5 future days)
   # Hourly data are available for 120 hours in the future (i.e. 5 future days), so about the 
   # same timeframe. We can discuss whether we want to shift to use hourly data instead of daily.
-  for(i in 1:length(innames)){
-    
-    ll_i = strsplit(ll[i], ",")[[1]]
-    #ll_i = ll[i]
-    
-    wx_dat_i = fromJSON(innames[i])
+  for(i in 1:nrow(queries)){
+    wx_dat_i = fromJSON(url[i])
     
     #wx_dat_i = data.frame(lat = ll_i[1], lon = ll_i[2], wx_dat_i)
     
@@ -138,6 +142,8 @@ if(TomorrowIO) {
 # See also: https://r-spatial.github.io/sf/reference/st_as_sf.html
 # See also: https://r-spatial.github.io/sf/reference/st_transform.html
 
+  ### TO DO - check with Dan about the below.... this 'proj' object appears to never get used... rationale
+  ### for Albers equal area projection versus the WGS84, versus the original projection identified above?
   # Project weather to Albers equal area, ESRI 102008
   proj <- showP4(showWKT("+init=epsg:102008"))
  
