@@ -26,13 +26,54 @@ prepname = paste("Prepared", "Weather", state, year, sep="_")
   library(gstat) # For kriging
   #library(raster) # masks several functions from dplyr, use caution
   library(terra) # replaces the raster package (deprecated)
+  library(tidyterra)
   library(doParallel)
   library(foreach)
   library(tidyverse)
   library(sf)
   library(sp)
+  library(osmdata)
+  library(stars)
+  library(starsExtra)
+
+  # Change out for road network? 
+  # Read in grid
+  #grid_shp <- rgdal::readOGR(file.path(inputdir, "Shapefiles"), layer = g)
+  grid_shp <- read_sf(dsn = file.path(inputdir, "Shapefiles"), layer = g)
   
+  #grid_shp <- spTransform(grid_shp, CRS(proj.USGS))
+  grid_shp <- st_transform(grid_shp, crs = st_crs(proj.USGS))
+  
+  # Read in buffered state shapefile
+  #tn_buff <- readOGR(censusdir, layer = "TN_buffered")
+  tn_buff <- read_sf(dsn = censusdir, layer = "TN_buffered")
+  
+  #tn_buff <- spTransform(tn_buff, CRS(proj.USGS))
+  tn_buff <- st_transform(tn_buff, crs = st_crs(proj.USGS))
+  
+  grd1 <- make_grid(tn_buff, res = 1000) # make a star grid object with 1 km cubes 
+  plot(grd1, breaks="equal")
+  
+  # Clip grid to county shapefile
+  #grid_intersects <- gIntersects(tn_buff, grid_shp, byid = T)
+  grid_intersects <- st_intersects(tn_buff, grid_shp, sparse = FALSE)
+  
+  grid_shp <- grid_shp[as.vector(grid_intersects),]
+  
+  
+  grd2 <- tn_buff %>% 
+    st_make_grid(cellsize = c(7540.43,2630.079), what = "polygons", square = T) %>% 
+    st_intersection(tn_buff) 
+  
+  plot(grd2)
+  
+  grd2.SP <- as_Spatial(grd2)
+
+
   cat("Preparing", "Weather", state, year, "\n")
+  
+
+  
   
   # Read in list of GHCN hourly stations
   stations <- read.csv(file=file.path(inputdir, "Weather","GHCN","Hourly","ghcnh-station-list.csv"), 
@@ -77,7 +118,7 @@ prepname = paste("Prepared", "Weather", state, year, sep="_")
                       header=TRUE,
                       sep = "|",
                       fill = TRUE
-    ) %>% select('Station_ID',
+    ) %>% dplyr::select('Station_ID',
                  'Station_name', 
                  'Year', 
                  'Month', 
@@ -92,6 +133,152 @@ prepname = paste("Prepared", "Weather", state, year, sep="_")
     state_hourly_hist_weather <- rbind(state_hourly_hist_weather,df_i)
   }
   
+  # data processing 
+  
+  wx <- state_hourly_hist_weather %>% 
+    dplyr::filter(Month == 1 & Day == 1) %>% 
+    mutate(Date = ymd_h(paste0(Year, "-", Month, "-", Day, " ", Hour))) %>% 
+    group_by(Date, Station_ID, Longitude, Latitude, Elevation) %>% # variables to keep 
+    summarise(precipitation = mean(precipitation, na.rm = TRUE)) %>% # gets rid of duplicate hour reports for a station
+    mutate_all(~ifelse(is.nan(.), NA, .)) %>%
+    st_as_sf(coords = c("Longitude", "Latitude"), crs=4326) %>% 
+    st_transform(crs = proj.USGS)
+  
+  all_wx_hours <- unique(wx$Date)
+  
+  x = all_wx_hours[1]
+  
+  wx.hour <- wx %>% dplyr::filter(Date == x)
+  
+  f.p <- as.formula(precipitation ~ 1)
+  
+  vg_prcp <- gstat::variogram(precipitation ~ 1, locations = wx.hour %>% filter(!is.na(precipitation)))
+  dat.fit <- fit.variogram(vg_prcp, fit.ranges = F, fit.sills = F,
+                           vgm(model = "Sph"))
+  #plot(vg_prcp, dat.fit) # Plot the semi variogram. 
+  dat.krg.precipitation <- krige(f.p, wx.hour %>% filter(!is.na(precipitation)), grd2.stars, dat.fit)
+  
+  dat.krg.precipitation_df <- dat.krg.precipitation %>% as.data.frame 
+  
+  
+  
+  wx.SP <- as_Spatial(wx)
+
+    # Kriging. Intercept only = ordinary kriging.
+    cl <- makeCluster(parallel::detectCores())
+  registerDoParallel(cl)
+  
+  # 
+  wx_test <- wx %>% dplyr::filter(Date == x)
+  
+  ggplot() +
+    geom_sf(data = wx_test)
+  
+  ggplot() +
+    geom_sf(data = grd2) + 
+    geom_sf(data = wx_test)
+   
+  ggplot() +
+    geom_sf(data = grid_shp) + 
+    geom_sf(data = wx_test)
+    
+  for(x in all_wx_hours){
+    
+    x = all_wx_hours[1]
+    wx.hour = wx.SP[wx.SP$Date == x,]
+  
+  f.p <- as.formula(precipitation ~ 1)
+  
+  vg_prcp <- gstat::variogram(precipitation ~ 1, locations = wx.hour[!is.na(wx.hour$precipitation),])
+  dat.fit <- fit.variogram(vg_prcp, fit.ranges = F, fit.sills = F,
+                           vgm(model = "Sph"))
+  #plot(vg_prcp, dat.fit) # Plot the semi variogram. 
+  dat.krg.precipitation <- krige(f.p, wx.hour[!is.na(wx.hour$precipitation),], grd2.SP, dat.fit)
+  
+  dat.krg.precipitation_df <- dat.krg.precipitation %>% as.data.frame 
+  
+  # Rasterize
+  precipitation_r <- terra::rast(dat.krg.precipitation)
+  precipitation_r <- mask(precipitation_r, grid_shp)
+
+  plot(precipitation_r, values)
+  
+  # Now do tmin, tmax, and snow
+  f.tmin <- as.formula(TMIN ~ 1)
+  vg_tmin <- variogram(TMIN ~ 1, wx.day[!is.na(wx.day$TMIN),])
+  dat.fit <- fit.variogram(vg_tmin, fit.ranges = F, fit.sills = F,
+                           vgm(model = "Sph"))
+  dat.krg.tmin <- krige(f.tmin, wx.day[!is.na(wx.day$TMIN),], grd, dat.fit)
+  tmin_r <- raster::raster(dat.krg.tmin)
+  tmin_r <- mask(tmin_r, grid_shp)
+  
+  f.tmax <- as.formula(TMAX ~ 1)
+  vg_tmax <- variogram(TMAX ~ 1, wx.day[!is.na(wx.day$TMAX),])
+  dat.fit <- fit.variogram(vg_tmax, fit.ranges = F, fit.sills = F,
+                           vgm(model = "Sph"))
+  dat.krg.tmax <- krige(f.tmax, wx.day[!is.na(wx.day$TMAX),], grd, dat.fit)
+  tmax_r <- raster::raster(dat.krg.tmax)
+  tmax_r <- mask(tmax_r, grid_shp)
+  
+  f.snow <- as.formula(SNOW ~ 1)
+  vg_snow <- variogram(SNOW ~ 1, wx.day[!is.na(wx.day$SNOW),])
+  dat.fit <- fit.variogram(vg_snow, fit.ranges = F, fit.sills = F,
+                           vgm(model = "Sph"))
+  dat.krg.snow <- krige(f.snow, wx.day[!is.na(wx.day$SNOW),], grd, dat.fit)
+  snow_r <- raster::raster(dat.krg.snow)
+  snow_r <- mask(snow_r, grid_shp)
+  
+  # Apply to grid cells in year-day ----
+  
+  # Need to extract values from the raster layers to the polygons
+  prcp_extr <- raster::extract(x = prcp_r,   # Raster object
+                               y = grid_shp, # SpatialPolygons
+                               fun = mean,
+                               df = TRUE)
+  
+  names(prcp_extr)[2] = "PRCP"
+  prcp_extr$ID = grid_shp$GRID_ID
+  
+  daily_result <- data.frame(day, prcp_extr)
+  
+  tmin_extr <- raster::extract(x = tmin_r,   # Raster object
+                               y = grid_shp, # SpatialPolygons
+                               fun = mean,
+                               df = TRUE)
+  names(tmin_extr)[2] = "TMIN"
+  tmin_extr$ID = grid_shp$GRID_ID
+  
+  daily_result <- full_join(daily_result, tmin_extr)
+  
+  tmax_extr <- raster::extract(x = tmax_r,   # Raster object
+                               y = grid_shp, # SpatialPolygons
+                               fun = mean,
+                               df = TRUE)
+  names(tmax_extr)[2] = "TMAX"
+  tmax_extr$ID = grid_shp$GRID_ID
+  
+  daily_result <- full_join(daily_result, tmax_extr)
+  
+  snow_extr <- raster::extract(x = snow_r,   # Raster object
+                               y = grid_shp, # SpatialPolygons
+                               fun = mean,
+                               df = TRUE)
+  names(snow_extr)[2] = "SNOW"
+  snow_extr$ID = grid_shp$GRID_ID
+  
+  daily_result <- full_join(daily_result, snow_extr)
+  
+  # Save to S3 as temporary location in case the process is interrupted
+  fn = paste("Prep_Weather_Daily_", day,"_", g, ".RData", sep="")
+  
+  save(list="daily_result", file = file.path(outputdir, fn))
+  
+  EndTime <- Sys.time()-StartTime
+  cat(as.character(day), 'completed', round(EndTime, 2), attr(EndTime, 'units'), '\n',
+      file = paste0("Prep_Weather_", g, "_log.txt"), append = T) 
+  
+  }
+    
   #unique(state_hourly_hist_weather$Station_ID)
   #testsnow <- state_hourly_hist_weather[!is.na(state_hourly_hist_weather$snow_depth),]
   #testrain <- state_hourly_hist_weather[!is.na(state_hourly_hist_weather$precipitation),]
@@ -109,6 +296,9 @@ prepname = paste("Prepared", "Weather", state, year, sep="_")
                              )
   )
   names(daily_stations) = c("STATION", "lat", "lon", "masl", "NAME", "x1", "x2")
+  
+  daily_stations$NAME <- NULL 
+  
   
   
   # Read in daily data from GHCN
@@ -148,7 +338,7 @@ prepname = paste("Prepared", "Weather", state, year, sep="_")
   # precip
   # snow_allday: in
 
-  wx <- left_join(wx %>% select(-NAME), daily_stations[1:5], by = "STATION") # merge hourly data with station info 
+  wx <- left_join(wx %>% dplyr::select(-NAME), daily_stations[1:5], by = "STATION") # merge hourly data with station info 
   
   ## TO DO: need to convert the below over to non-deprecated spatial packages
   # E.g., replace sp functions with sf functions, 
@@ -165,54 +355,18 @@ prepname = paste("Prepared", "Weather", state, year, sep="_")
   #                                      wx,
   #                                      proj4string = CRS("+proj=longlat +datum=WGS84"))
   
-  wx.proj <- wx %>% st_as_sf(coords = c("lon", "lat"), crs = "proj.USGS") %>% 
-    filter(DATE < '2019-02-01') # only keep Jan 
+  wx.proj <- wx %>% st_as_sf(coords = c("lon", "lat"), crs = "proj.USGS") 
   
   ggplot() +
-    geom_sf(data=wx.proj, size=10)
+    geom_sf(data=wx.proj, size=2)
   
   # wx.proj <- spTransform(wx.proj, CRS(proj.USGS))
   
  # wx.proj <- st_transform(wx.proj, crs = st_crs(proj.USGS))
   
-
-  wx.proj.sp <- as_Spatial(wx.proj)
-  
-  wx.vgm <- variogram(PRCP~1, wx.proj.sp)
-  
-  class(wx.vgm)
-  
-  wx.fit <-
-    fit.variogram(wx.vgm, model = vgm(1,"Lin",900,1)) # fit model
-  
-  # vgm() list of models
-  
-  plot(wx.vgm, wx.fit)
-  
-  
-  
-  
   ### MAY NO LONGER NEED THE BELOW? ####
 
-  # Read in grid
-  #grid_shp <- rgdal::readOGR(file.path(inputdir, "Shapefiles"), layer = g)
-  grid_shp <- read_sf(dsn = file.path(inputdir, "Shapefiles"), layer = g)
 
-  #grid_shp <- spTransform(grid_shp, CRS(proj.USGS))
-  grid_shp <- st_transform(grid_shp, crs = st_crs(proj.USGS))
-
-  # Read in buffered state shapefile
-  #tn_buff <- readOGR(censusdir, layer = "TN_buffered")
-  tn_buff <- read_sf(dsn = censusdir, layer = "TN_buffered")
-
-  #tn_buff <- spTransform(tn_buff, CRS(proj.USGS))
-  tn_buff <- st_transform(tn_buff, crs = st_crs(proj.USGS))
-
-  # Clip grid to county shapefile
-  #grid_intersects <- gIntersects(tn_buff, grid_shp, byid = T)
-  grid_intersects <- st_intersects(tn_buff, grid_shp, sparse = FALSE)
-
-  grid_shp <- grid_shp[as.vector(grid_intersects),]
   
   ######################################
   
@@ -228,11 +382,7 @@ prepname = paste("Prepared", "Weather", state, year, sep="_")
   # Here use kriging from gstat. Models are all based on spatial variance of the target variable
   
   ### TO DO - Consider above questions, then continue from here.
-  
-  # Kriging. Intercept only = ordinary kriging.
-  cl <- makeCluster(parallel::detectCores())
-  registerDoParallel(cl)
-  
+
   # Create an empty raster grid for the state; we will interpolate over this grid, then assign values from the raster to each grid cell. Increase n for smaller raster cells (more time-intensive)
   # grd <- as.data.frame(spsample(grid_shp, 'regular', n = 10000))
   # names(grd) <- c("X", "Y")
@@ -249,11 +399,7 @@ prepname = paste("Prepared", "Weather", state, year, sep="_")
   #   st_make_grid(cellsize = c(7540.43,2630.079), what = "centers") %>% 
   #   st_intersection(tn_buff)                                           
   
-  grd2 <- tn_buff %>% 
-    st_make_grid(cellsize = c(7540.43,2630.079), what = "polygons", square = T) %>% 
-    st_intersection(tn_buff)                                                       
-  
-  plot(grd2)
+
   #plot(grd)
   
   #ext(tn_buff)
@@ -278,7 +424,6 @@ prepname = paste("Prepared", "Weather", state, year, sep="_")
   
   ### REMOVE AFTER DEVELOPMENT AND TESTING ####
   day <- "2019-01-01"
-  library(gstat)
   #############################################
   
   wx.grd.day <- foreach(day = use_wx_days, 
