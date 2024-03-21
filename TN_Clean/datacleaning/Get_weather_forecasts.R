@@ -20,11 +20,6 @@ library(jsonlite)
 library(tigris) # for state shapefiles (or other census geographies)
 library(sf)
 
-#### TO DO ... need more generic way of setting projection ###
-#### note the default projection for the state boundaries (from running 'states' function below
-#### from tigris package) is EPSG 4269 for all states, including Hawaii and Alaska
-proj.USGS <- "+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 +x_0=0 +y_0=0 +wx_datum=NAD83 +units=m +no_defs +ellps=GRS80 +towgs84=0,0,0"
-
 # Get weather wx_data ----
 
 # The below is a more generalized approach to set the points for which to query weather data 
@@ -136,6 +131,8 @@ if(TomorrowIO) {
     
     Sys.sleep(0.34)
   }
+}
+rm(list=c("wx_dat_daily_values","wx_dat_hourly_values"))
   
   ## TO-DO: need generic method for automatically getting/setting time zone. What to do if state
   ## crosses multiple time zones?
@@ -143,8 +140,8 @@ if(TomorrowIO) {
   # to convert will vary by state based on the time zone(s). May also vary based on whether it is 
   # daylight savings or standard time?
   
-  # Get correct time zone from shapefile
-  wx_dat$time <- as.POSIXct(wx_dat$time, origin = '1970-01-01', tz = 'America/Chicago')
+# Get correct time zone from shapefile
+wx_dat$time <- as.POSIXct(wx_dat$time, origin = '1970-01-01', tz = 'America/Chicago')
 
 # Key reference for cross-walking sp to sf commands:
 # https://github.com/r-spatial/sf/wiki/migrating
@@ -167,17 +164,21 @@ if(TomorrowIO) {
 # See also: https://r-spatial.github.io/sf/reference/st_as_sf.html
 # See also: https://r-spatial.github.io/sf/reference/st_transform.html
 
-  ### TO DO - check with Dan about the below.... this 'proj' object appears to never get used... rationale
-  ### for Albers equal area projection versus the WGS84, versus the original projection identified above?
-  # Project weather to Albers equal area, ESRI 102008
-  proj <- showP4(showWKT("+init=epsg:102008"))
+### TO DO - check with Dan about the below.... this 'proj' object appears to never get used... rationale
+### for Albers equal area projection versus the WGS84, versus the original projection identified above?
+# Project weather to Albers equal area, ESRI 102008
+proj <- showP4(showWKT("+init=epsg:102008"))
  
 #  wx_dat.proj <- SpatialPointsDataFrame(coords = wx_dat[c('lon', 'lat')],
 #                                    data = wx_dat,
 #                                    proj4string = CRS("+proj=longlat +datum=WGS84"))
-  weather_daily.proj <- st_as_sf(weather_daily,
-                          coords = weather_daily[c('lon', 'lat')],
-                          crs = 4269)
+weather_daily.proj <- st_as_sf(weather_daily,
+                               coords = c('lon', 'lat'),
+                               crs = 4269)
+  
+weather_hourly.proj <- st_as_sf(weather_hourly,
+                                coords = c('lon', 'lat'),
+                                crs = 4269)
 # CRS("+proj=longlat +datum=WGS84")
 ## TO-DO - determine whether we need to come up with a customized projection, or if we can just use 
 ## epsg 4269 for all of North America. For now, just go with that. Commenting out the below for now.
@@ -187,17 +188,27 @@ if(TomorrowIO) {
   # Read tz file
   
 #  tz <- readOGR(file.path(inputdir,"Shapefiles", 'TimeZone'), layer = 'combined-shapefile')
-  tz <- read_sf(file.path(inputdir,"Shapefiles", 'TimeZone'), layer = 'combined-shapefile')  
-  tz <- st_transform(tz, crs = 4269)
+tz <- read_sf(file.path(inputdir,"Shapefiles", 'TimeZone'), layer = 'combined-shapefile')  
+tz <- st_transform(tz, crs = 4269)
 
-## TO DO ##
-# replace this next one with one of the two commands from:  https://github.com/r-spatial/sf/wiki/migrating
-# Figure out which one is appropriate
-#  wx_tz <- over(wx_dat.proj, tz[,"tzid"]) # Match a tzid name to each row in wx_dat.proj weather wx_data 
-  wx_tz <- st_intersects(wx_dat.proj, tz[,"tzid"]) # Match a tzid name to each row in wx_dat.proj weather wx_data   
-  
-  wx_dat.proj@data <- data.frame(wx_dat.proj@data, tzid = as.character(wx_tz$tzid))
-  
+# Assign time zone ID ('tzid') to each row for daily and hourly based on intersection with the time zones shapefile, 'tz'
+## TO - DO... fix the below... assign the time zones.
+## https://stackoverflow.com/questions/74367652/having-trouble-testing-point-geometry-intersections-in-sf
+
+weather_daily.proj$tzid <- st_intersects(weather_daily.proj, tz[,"tzid"])
+weather_hourly.proj$tzid <- st_intersects(weather_hourly.proj, tz[,"tzid"])
+
+weather_daily.proj <- st_join(weather_daily.proj, tz[,"tzid"], join = st_intersects)
+
+weather_hourly.proj$local_time <- with_tz(weather_hourly.proj$hour, "GMT")
+
+# ggplot() +
+#   geom_sf(data=tz, aes(), fill = NA) +
+#   geom_sf(data = state_map, aes(), fill = NA, alpha = 1) +
+#   geom_sf(data = weather_daily.proj, aes())+
+#   coord_sf(xlim = c(-80, -91), ylim = c(34.9, 36.7), expand = FALSE)+
+#   theme_minimal()
+
   # Loop over every row and apply the correct time zone to the weather forecast times
   local_time = vector()
   for(k in 1:nrow(wx_dat.proj)) {
