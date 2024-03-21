@@ -20,7 +20,7 @@ set_overpass_url(new_url)
 
 
 ##identify state for analysis; Need to specify 'Washington State' for Washington
-state <- 'Washington State'
+state <- 'Tennessee'
 
 #Retrieves relevant coordinates; always a rectangle
 state_bbox <- getbb(state) # use nominatimlite to fix this bug 
@@ -34,13 +34,11 @@ road_types <- c('motorway', 'trunk', 'primary', 'secondary', 'tertiary')
 #initialize object
 roadways <- list()
 
-state_filename <- paste0(state,"_network")
-file_path <- file.path(state, paste0(state_filename, '.gpkg'), paste0(state_filename,'.shp'))
+network_file <- paste0(state,"_network")
+file_path <- file.path('States', state, paste0(network_file, '.gpkg'), paste0(network_file,'.shp'))
 
 if (file.exists(file.path(file_path))){
-  .temp <- read_sf(file_path)
-  assign(state_filename, .temp)
-  rm(.temp)
+  state_network <- read_sf(file_path)
   print("File Found")
 } else{
   
@@ -56,12 +54,12 @@ if (file.exists(file.path(file_path))){
   
   total_network <- do.call(c, roadways)
   
-  state_network <- total_network$osm_lines
+  total_network <- total_network$osm_lines
   
   if (!(dir.exists(state))){
     dir.create(state)}
   
-  state_network <- st_transform(state_network, crs = 'WGS84') 
+  total_network <- st_transform(total_network, crs = 'WGS84') 
   
 # Pull state boundaries
   if (state == 'Washington_State'){
@@ -70,30 +68,51 @@ if (file.exists(file.path(file_path))){
     state_border <- state
   }
 state_maps <- states(cb = TRUE, year = 2021) %>%
-  filter_state('Washington') %>%
+  filter_state(state) %>%
   st_transform(crs = 'WGS84')
 rm(state_border)
 
-county_map <- counties(state = state, cb = TRUE, year = 2021)
-
 #Filter out roadways outside the state
 
-network_within_state <- st_join(state_network, state_maps, join = st_within) %>%
+state_network <- st_join(total_network, state_maps, join = st_within) %>%
   filter(!is.na(NAME)) %>%
   select(osm_id, highway, ref, geometry)
 
-write_sf(network_within_state, paste0(state, "/", state_filename, ".gpkg"), driver = "ESRI Shapefile")
+write_sf(state_network, paste0('States', '/', state, "/", state, "_network.gpkg"), driver = "ESRI Shapefile")
 
-assign(state_filename, network_within_state)
 
 }
 
-ggplot() + geom_sf(data = Washington_State_network)
+
+ggplot() + geom_sf(data = state_network)
+
+# Convert to hourly ---------------------------------
+
+days <- data.frame(Day = c(1:365)) %>%
+  mutate(Day = paste0('000', Day),
+         Day = substr(Day, nchar(Day)-2, nchar(Day)))
+
+hours <- data.frame(Hour = c(1:24)) %>%
+  mutate(Hour = paste0('00', Hour),
+         Hour = substr(Hour, nchar(Hour)-1, nchar(Hour)))
+
+hourly_network <- state_network %>%
+  as.data.frame() %>%
+  group_by(osm_id) %>%
+  cross_join(days) %>%
+#  filter(Day == '001') %>%
+  group_by(osm_id, Day) %>%
+  cross_join(hours) 
+
+rm(days, hours)
+
+# write_sf(hourly_network, file.path(state, 'jan_01_hourly_TN_network.shp'))
+
 # Load Crash Data ------------------------------
 
 # load raw file 
 
-crash_files <- list.files(state, pattern = 'crash.shp$', full.names = TRUE)
+crash_files <- list.files(file.path('States', state, 'Crashes'), pattern = 'crash.shp$', full.names = TRUE)
 
 if(state == 'Minnesota'){
 timestamps <- read.csv(file.path(state, paste0(state, '_timestamps.csv'))) %>%
@@ -102,19 +121,13 @@ timestamps <- read.csv(file.path(state, paste0(state, '_timestamps.csv'))) %>%
 
 total_crashes <- data.frame()
 
-add_date_time_info <- function(data, date_time_column) {
-  data %>%
-    mutate(Year = format({{ date_time_column }}, '%Y'),
-           Day = format({{ date_time_column }}, '%j'),
-           Hour = format({{ date_time_column }}, '%H'))
-}
-
 for (i in crash_files){
 temp <- read_sf(i) %>%
   left_join(timestamps, by = 'INCIDEN') %>%
   mutate(Year = format(DATE_TIME_OF_INCIDENT, '%Y'),
          Day = format(DATE_TIME_OF_INCIDENT, '%j'),
-         Hour = format(DATE_TIME_OF_INCIDENT, '%H'))
+         Hour = format(DATE_TIME_OF_INCIDENT, '%H'),
+         Weekday = weekdays(DATE_TIME_OF_INCIDENT))
 total_crashes <- plyr::rbind.fill(total_crashes, temp)
   }
 }
@@ -122,30 +135,37 @@ total_crashes <- plyr::rbind.fill(total_crashes, temp)
 if(state == 'Washington_State'){
   total_crashes <- data.frame()
   for (i in crash_files){
-    temp <- read_sf(i) %>%
-      mutate(ACC)
+  temp <- read_sf(i) %>%
+    mutate(TIME = ifelse(nchar(TIME) == 3, paste0(0, TIME), TIME),
+           ACC_DATE = paste(ACC_DATE, " ", TIME),
+           ACC_DATE = as.POSIXct(ACC_DATE, format = '%Y-%m-%d %H%M'),
+           Year = format(ACC_DATE, '%Y', trim = FALSE),
+           Day = format(ACC_DATE, '%j', trim = FALSE),
+           Hour = format(ACC_DATE, '%H', trim = FALSE),
+           Weekday = weekdays(ACC_DATE))
+  
     total_crashes <- plyr::rbind.fill(total_crashes, temp)
   }
   
 
 }
 
-total_crashes_test <- total_crashes %>%
-  mutate(ACC_DATE = as.POSIXct(ACC_DATE, format = "%Y-%m-%d"),
-         Year = format(ACC_DATE, '%Y'),
-         Day = format(ACC_DATE, '%j'),
-         TIME = strptime(TIME, format = '%H%M'),
-         Hour = format(TIME, '%H'))
+total_crashes <- st_as_sf(total_crashes) %>%
+  st_transform('WGS84') %>%
+  filter(Year == '2019')
 
-total_crashes <- st_as_sf(total_crashes)
+joined <- st_join(first_day_crash_frame, state_network, join = st_nearest_feature)
 
-joined <- st_join(total_crashes, network_within_state, join = st_nearest_feature)
+joined_df <- as.data.frame(joined) %>%
+  mutate(crash = 1) %>%
+  select(osm_id, Day, Hour, crash) %>%
+  group_by(osm_id, Day, Hour) %>%
+  summarise(crash = sum(crash)) %>%
+  ungroup()
 
-joined_df <- as.data.frame(joined)
-
-joined_test <- joined_df %>%
-  group_by(osm_id, Year, Day, Hour) %>%
-  summarise(num_unique_incidents = n_distinct(INCIDEN))
+training_frame <- hourly_network %>%
+  left_join(joined_df, by = c('osm_id', 'Day', 'Hour')) %>%
+  mutate(crash = ifelse(is.na(crash), 0, crash))
 
 
 #crashes_clean <- crashes %>% st_zm(what="ZM") %>% sf::st_coordinates() %>% as.data.frame() # this isn't a valid shapefile but the points are unplotable without.
