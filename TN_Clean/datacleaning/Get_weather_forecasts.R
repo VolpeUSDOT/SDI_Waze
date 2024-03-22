@@ -60,12 +60,18 @@ if(TomorrowIO) {
   # a text file called "WeatherAPI_key.txt" in the "Weather" folder within the "Input" folder.
   # Next line obtains the user's api key.
   w_key = scan(file.path(inputdir,"Weather", 'WeatherAPI_key.txt'), what = 'character')
-  # This is the format needed for an API call in TomorrowIO, with three parameters that
-  # need to be filled in (latitude, longitude, and API key):
-  # https://api.tomorrow.io/v4/weather/forecast?location={latitude},{longitude}&apikey={key}
+  # This is the format needed for an API call in TomorrowIO using "Forecast" endpoint, with four parameters that
+  # need to be filled in (latitude, longitude, API key, units):
+  # https://api.tomorrow.io/v4/weather/forecast?location={latitude},{longitude}&apikey={key}&units={imperial/metric}
+  # there are additional parameters that the user can specify - view this page and click on one of the 'recipes':
+  # https://docs.tomorrow.io/reference/weather-forecast
+  # If additional flexibility/customizability is needed, one can use the "Timelines" endpoint instead - 
+  # View this page and click on one of the 'recipes' for detail: https://docs.tomorrow.io/reference/post-timelines
+  # There is also the "Realtime" endpoint: https://docs.tomorrow.io/reference/realtime-weather
+  
   # Next line appends a column to the queries dataframe with the constructed url for each query.
   queries = queries %>% 
-    mutate(url = paste0('https://api.tomorrow.io/v4/weather/forecast?location=',Y,',',X,'&apikey=', w_key))
+    mutate(url = paste0('https://api.tomorrow.io/v4/weather/forecast?location=',Y,',',X,'&apikey=', w_key,'&units=imperial'))
   
   # Daily data are available for 6 days (including the current day, so only 5 future days)
   # Hourly data are available for 120 hours in the future (i.e. 5 future days), so about the 
