@@ -27,7 +27,7 @@ g = grids[1] # start with square grids, now running hex also. Change between 1 a
 state = "TN"
 # <><><><><>
 
-
+# TO-DO - figure out the easiest way for user to set the desired timeframe for training
 # Manually setting months to run here
 do.months = c(paste("2017", c("04","05","06","07","08","09", "10", "11", "12"), sep="-"),
               paste("2018", c("01","02","03"), sep="-"))
