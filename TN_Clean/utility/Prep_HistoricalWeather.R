@@ -35,6 +35,7 @@ prepname = paste("Prepared", "Weather", state, year, sep="_")
   library(osmdata)
   library(stars)
   library(starsExtra)
+  library(cubelyr)
 
   # Change out for road network? 
   # Read in grid
@@ -51,8 +52,15 @@ prepname = paste("Prepared", "Weather", state, year, sep="_")
   #tn_buff <- spTransform(tn_buff, CRS(proj.USGS))
   tn_buff <- st_transform(tn_buff, crs = st_crs(proj.USGS))
   
-  grd1 <- make_grid(tn_buff, res = 1000) # make a star grid object with 1 km cubes 
-  plot(grd1, breaks="equal")
+  grd1 <- tn_buff %>% 
+    st_make_grid(cellsize = c(7540.43,2630.079), what = "polygons", square = T) %>% 
+    st_as_stars()
+    
+  data(meuse.grid)
+  
+  ggplot() +
+    geom_stars(data = grd1) + 
+    geom_sf(data = tn_buff)
   
   # Clip grid to county shapefile
   #grid_intersects <- gIntersects(tn_buff, grid_shp, byid = T)
@@ -156,7 +164,7 @@ prepname = paste("Prepared", "Weather", state, year, sep="_")
   dat.fit <- fit.variogram(vg_prcp, fit.ranges = F, fit.sills = F,
                            vgm(model = "Sph"))
   #plot(vg_prcp, dat.fit) # Plot the semi variogram. 
-  dat.krg.precipitation <- krige(f.p, wx.hour %>% filter(!is.na(precipitation)), grd2.stars, dat.fit)
+  dat.krg.precipitation <- krige(f.p, wx.hour %>% filter(!is.na(precipitation)), grd1, dat.fit)
   
   dat.krg.precipitation_df <- dat.krg.precipitation %>% as.data.frame 
   
