@@ -20,7 +20,7 @@ set_overpass_url(new_url)
 
 
 ##identify state for analysis; Need to specify 'Washington State' for Washington
-state <- 'Tennessee'
+state <- 'Washington State'
 
 #Retrieves relevant coordinates; always a rectangle
 state_bbox <- getbb(state) # use nominatimlite to fix this bug 
@@ -100,7 +100,7 @@ hourly_network <- state_network %>%
   as.data.frame() %>%
   group_by(osm_id) %>%
   cross_join(days) %>%
-#  filter(Day == '001') %>%
+  filter(Day == '001') %>%
   group_by(osm_id, Day) %>%
   cross_join(hours) 
 
@@ -151,12 +151,13 @@ if(state == 'Washington_State'){
 }
 
 total_crashes <- st_as_sf(total_crashes) %>%
-  st_transform('WGS84') %>%
-  filter(Year == '2019')
+  filter(Year == '2019') %>%
+  st_transform('WGS84') 
+  
 
-joined <- st_join(first_day_crash_frame, state_network, join = st_nearest_feature)
+joined <- st_join(total_crashes, state_network, join = st_nearest_feature)
 
-joined_df <- as.data.frame(joined) %>%
+joined <- as.data.frame(joined) %>%
   mutate(crash = 1) %>%
   select(osm_id, Day, Hour, crash) %>%
   group_by(osm_id, Day, Hour) %>%
@@ -164,7 +165,7 @@ joined_df <- as.data.frame(joined) %>%
   ungroup()
 
 training_frame <- hourly_network %>%
-  left_join(joined_df, by = c('osm_id', 'Day', 'Hour')) %>%
+  left_join(joined, by = c('osm_id', 'Day', 'Hour')) %>%
   mutate(crash = ifelse(is.na(crash), 0, crash))
 
 
