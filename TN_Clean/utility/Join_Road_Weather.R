@@ -23,8 +23,7 @@ inputdir <- file.path(getwd(),"Input")
 # Define Variables 
 state <- 'TN'
 year <- 2019
-projection <- 9311 # equal area best for nearest neighbor calc 
-
+projection <- 5070 
 
 
 # Load in Data -------------------------------------------------------
