@@ -11,7 +11,7 @@ rm(list=ls()) # clear enviroment
 setwd(file.path(dirname(rstudioapi::getActiveDocumentContext()$path)))
 
 # Identify state for analysis; Need to specify 'Washington State' for Washington
-state <- "MN" 
+state <- "WA" 
 
 state_osm <- ifelse(state == "WA", 'Washington State',
                     ifelse(state == "MN", "Minnesota", NA))
@@ -48,21 +48,27 @@ if (file.exists(file.path(file_path))){
   state_network <- read_sf(file_path)
   print("File Found")
 } else{
+
+  n = as.numeric(length(road_types)) 
+  datalist <- list()
+  datalist = vector("list", length = n)
+  
+  l = 0
   
   for (i in road_types){
+    l = l + 1 
     print(paste("File Not Found. Pulling", state, i, "OSM Data from Server"))
     map_data <- opq(bbox = state_bbox) %>%
       add_osm_feature(key = 'highway', value = i) %>%
-      osmdata_sf()
+      osmdata_sf() 
+    lines <- map_data$osm_lines
     
-    roadways <- c(roadways, list(map_data))
+    datalist[[l]] <- lines
     
   }
   
-  total_network <- do.call(c, roadways)
-  
-  total_network <- total_network$osm_lines
-  # 
+  total_network <- do.call(bind_rows, datalist)
+
   # if (!(dir.exists(state_osm))){
   #   dir.create(state_osm)}
   
@@ -119,27 +125,32 @@ rm(days, hours)
 
 crash_files <- list.files(file.path('States', state_osm, 'Crashes'), pattern = 'crash.shp$', full.names = TRUE)
 
+n = as.numeric(length(crash_files)) 
+datalist <- list()
+datalist = vector("list", length = n)
+
+l = 0
+
 if(state == "MN"){
 timestamps <- read.csv(file.path('States', state_osm, paste0(state_osm, '_timestamps.csv'))) %>%
   rename(INCIDEN = INCIDENT_ID) %>%
   mutate(DATE_TIME_OF_INCIDENT = as.POSIXct(DATE_TIME_OF_INCIDENT, format = "%m/%d/%Y %H:%M"))
 
-total_crashes <- data.frame()
-
 for (i in crash_files){
+  l <- l + 1 
 temp <- read_sf(i) %>%
   left_join(timestamps, by = 'INCIDEN') %>%
   mutate(Year = format(DATE_TIME_OF_INCIDENT, '%Y'),
          Day = format(DATE_TIME_OF_INCIDENT, '%j'),
          Hour = format(DATE_TIME_OF_INCIDENT, '%H'),
          Weekday = weekdays(DATE_TIME_OF_INCIDENT))
-total_crashes <- plyr::rbind.fill(total_crashes, temp)
+
   }
 }
 
 if(state == "WA"){
-  total_crashes <- data.frame()
   for (i in crash_files){
+    l <- l + 1 
   temp <- read_sf(i) %>%
     mutate(TIME = ifelse(nchar(TIME) == 3, paste0(0, TIME), TIME),
            ACC_DATE = paste(ACC_DATE, " ", TIME),
@@ -149,11 +160,12 @@ if(state == "WA"){
            Hour = format(ACC_DATE, '%H', trim = FALSE),
            Weekday = weekdays(ACC_DATE))
   
-    total_crashes <- plyr::rbind.fill(total_crashes, temp)
+    datalist[[l]] <- temp
   }
   
-
 }
+
+total_crashes <- do.call(bind_rows, datalist)
 
 total_crashes <- st_as_sf(total_crashes) %>%
   filter(Year == '2019') %>%

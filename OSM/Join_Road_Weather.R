@@ -94,13 +94,15 @@ wx <- state_hourly_hist_weather %>%
   st_transform(crs = st_crs(projection))
 
 if(max(as.numeric(training_frame_rc$Hour), na.rm=TRUE)==24){ # swap from 1-24 to 0-23
-  training_frame_rc <- training_frame_rc %>% rename(Hour_del = Hour) %>% 
-    mutate(Hour = as.numeric(Hour_del)-1) %>% 
+  training_frame_rc <- training_frame_rc %>% rename(Hour_del = Hour) %>%
+    mutate(Hour = as.numeric(Hour_del)-1) %>%
     select(-Hour_del)
 }
 
-temp_empty_weather <- wx %>% slice(0) %>% select(-y_day, -Hour) %>% st_drop_geometry()
-training_frame_rcw <- training_frame_rc %>% slice(0) %>% bind_cols(temp_empty_weather) # w is weather
+n = as.numeric(length(unique(wx$y_day))) * as.numeric(length(unique(wx$Hour)))
+datalist <- list()
+datalist = vector("list", length = n)
+
 
 # These are to test without the loop
 # x <- 1
@@ -142,12 +144,12 @@ for(x in 1:length(unique(wx$y_day))){
       working_df <- working_df %>% st_join(snow, join=st_nearest_feature) # if there is weather station data, nearest join 
     }
     
-    training_frame_rcw <- training_frame_rcw %>% bind_rows(working_df) # binding together the resutls 
+    datalist[[(x*(y+1))]] <- working_df
       
   }
 }
 
-Sys.time() # took 1 minute and 15 seconds for Jan 1st in TN 
+training_frame_rcw <- do.call(bind_rows, datalist) # more efficient 
 
 ggplot() + 
   geom_sf(data = working_df, aes(color = temperature)) + 
