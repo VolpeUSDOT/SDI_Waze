@@ -6,6 +6,9 @@ reports/Waze_04-09_GridCounts.csv
 *.Rhistory
 *.RData
 *.jpeg
+*.psv
+*.csv
+*.RDataTmp
 
 TN/Output/
 TN/Input/
