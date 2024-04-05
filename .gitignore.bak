@@ -6,6 +6,9 @@ reports/Waze_04-09_GridCounts.csv
 *.Rhistory
 *.RData
 *.jpeg
+*.psv
+*.csv
+*.RDataTmp
 
 TN/Output/
 TN/Input/
@@ -106,6 +109,4 @@ OSM/data/gis_osm_roads_free_1.prj
 OSM/data/gis_osm_roads_free_1.shp
 OSM/data/gis_osm_roads_free_1.shx
 OSM/2023-53
-OSM/Minnesota
-OSM/North_Carolina
-OSM/Washington_State
+OSM/States

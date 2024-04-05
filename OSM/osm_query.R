@@ -99,6 +99,12 @@ write_sf(state_network, paste0('States', '/', state_osm, "/", state_osm, "_netwo
 
 ggplot() + geom_sf(data = state_network)
 
+#Transform state_network crs to NAD83 before joining with crash_files; should probably change this in the files we have and bring this into the query loop
+
+if(st_crs(state_network) != projection){
+  state_network <- st_transform(state_network, projection)
+}
+
 # Convert to hourly ---------------------------------
 
 days <- data.frame(Day = c(1:365)) %>%
