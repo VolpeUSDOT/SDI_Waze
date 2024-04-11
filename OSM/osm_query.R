@@ -74,24 +74,24 @@ if (file.exists(file.path(file_path))){
   
   total_network <- st_transform(total_network, crs = projection) 
   
-# Pull state boundaries
+  # Pull state boundaries
   if (state_osm == 'Washington_State'){
     state_border <- 'Washington'
   }else{
     state_border <- state_osm
   }
-state_maps <- states(cb = TRUE, year = 2021) %>%
-  filter_state(state_border) %>%
-  st_transform(crs = projection)
-rm(state_border)
+  state_maps <- states(cb = TRUE, year = 2021) %>%
+    filter_state(state_border) %>%
+    st_transform(crs = projection)
+  rm(state_border)
 
-#Filter out roadways outside the state
+  #Filter out roadways outside the state
 
-state_network <- st_join(total_network, state_maps, join = st_within) %>%
-  filter(!is.na(NAME)) %>%
-  select(osm_id, highway, ref, geometry)
+  state_network <- st_join(total_network, state_maps, join = st_within) %>%
+    filter(!is.na(NAME)) %>%
+    select(osm_id, highway, ref, geometry)
 
-write_sf(state_network, paste0('States', '/', state_osm, "/", state_osm, "_network.gpkg"), driver = "ESRI Shapefile")
+  write_sf(state_network, file.path(getwd(),paste0('States', '/', state_osm, "/", state_osm, "_network.gpkg")), driver = "ESRI Shapefile")
 
 
 }
@@ -99,7 +99,7 @@ write_sf(state_network, paste0('States', '/', state_osm, "/", state_osm, "_netwo
 
 ggplot() + geom_sf(data = state_network)
 
-#Transform state_network crs to NAD83 before joining with crash_files; should probably change this in the files we have and bring this into the query loop
+#Transform state_network crs to NAD83 before joining with crash_files.
 
 if(st_crs(state_network) != projection){
   state_network <- st_transform(state_network, projection)
