@@ -6,34 +6,18 @@
 # Notes: 
 # Some crazy high numbers for precip and temp. 
 
-# Prep --------------------------------------------------------------------
+# Prep --------------------------------------------------------------------W
 
-# Clear 
-rm(list=ls())
+# directory 
+inputdir <- file.path(getwd(), "Input")
 
 # Load packages 
 library(tidyverse)
 library(sf)
 
-# Directories
-censusdir <- file.path(getwd(),"Input","census")
-outputdir <- file.path(getwd(),"Output") # to hold daily output files as they are generated
-inputdir <- file.path(getwd(),"Input")
-
-# Define Variables 
-state <- 'TN'
-year <- 2019
-projection <- 5070 
-
-
-# Load in Data -------------------------------------------------------
-# This script will likely get referenced and will not need this seciton in future. 
-road_network <- read_sf(file.path(inputdir, "shapefiles", "TN_daily", "jan_01_hourly_TN_network.shp"))
-road_network <- st_transform(road_network, crs=projection)
-
 
 # Read in list of GHCN hourly stations
-stations <- read.csv(file=file.path(inputdir, "Weather","GHCN","Hourly","ghcnh-station-list.csv"), 
+stations <- read.csv(file=file.path(inputdir, "Weather","Hourly","ghcnh-station-list.csv"), 
                      header = FALSE, strip.white = TRUE)
 stations <- stations[,1:6]
 colnames(stations) <- c('Station_ID','Latitude','Longitude','Elevation','State','Station_name') 
@@ -47,7 +31,7 @@ for (i in 1:nrow(state_stations)) {
   ID = state_stations[i,'Station_ID']
   filename = paste0('GHCNh_',ID,'_',year,'.psv')
   print(filename) # check what it is checking
-  ifelse(file.exists(file.path(inputdir, "Weather", "GHCN", "Hourly", year, state, filename)
+  ifelse(file.exists(file.path(inputdir, "Weather", "Hourly", year, state, filename)
   ),
   available[i] <- TRUE,
   available[i] <- FALSE
@@ -74,7 +58,7 @@ state_hourly_hist_weather <- data.frame(Station_ID=character(),
 for (i in 1:nrow(state_stations)){
   ID = state_stations[i,'Station_ID']
   filename = paste0('GHCNh_',ID,'_',year,'.psv')
-  df_i = read.table(file.path(inputdir, "Weather", "GHCN", "Hourly", year, state, filename),
+  df_i = read.table(file.path(inputdir, "Weather", "Hourly", year, state, filename),
                     header=TRUE,
                     sep = "|",
                     fill = TRUE
@@ -98,7 +82,7 @@ for (i in 1:nrow(state_stations)){
 # data processing 
 
 wx <- state_hourly_hist_weather %>% 
-  dplyr::filter(Month == 1 & Day == 1) %>% 
+  dplyr::filter(Month == 1 & Day == 1) %>% # remove this filter when doing all of it 
   mutate(Date = ymd_h(paste0(Year, "-", Month, "-", Day, " ", Hour)),
          y_day = yday(Date)) %>% 
   group_by(y_day, Hour, Longitude, Latitude) %>% # variables to keep 
@@ -109,10 +93,18 @@ wx <- state_hourly_hist_weather %>%
   st_as_sf(coords = c("Longitude", "Latitude"), crs=4326) %>% # these are in crs 4326, so need to load, then convert 
   st_transform(crs = st_crs(projection))
 
-temp_empty_weather <- wx %>% slice(0) %>% select(-y_day, -Hour) %>% st_drop_geometry()
-weather_merged <- road_network %>% slice(0) %>% bind_cols(temp_empty_weather)
+if(max(as.numeric(training_frame_rc$Hour), na.rm=TRUE)==24){ # swap from 1-24 to 0-23
+  training_frame_rc <- training_frame_rc %>% rename(Hour_del = Hour) %>%
+    mutate(Hour = as.numeric(Hour_del)-1) %>%
+    select(-Hour_del)
+}
 
-# DELETE THESE ONCE FOR LOOP IS TESTED
+n = as.numeric(length(unique(wx$y_day))) * as.numeric(length(unique(wx$Hour)))
+datalist <- list()
+datalist = vector("list", length = n)
+
+
+# These are to test without the loop
 # x <- 1
 # y <- 1
 
@@ -120,7 +112,7 @@ Sys.time()
 
 for(x in 1:length(unique(wx$y_day))){
   for(y in 0:(length(unique(wx$Hour))-1)){ 
-    roads <- road_network %>% filter(as.numeric(Day) == x & as.numeric(Hour) == y) # road filter
+    roads <- training_frame_rc %>% filter(as.numeric(Day) == x & as.numeric(Hour) == y) # road filter
     
     # precipitation 
     precip <- wx %>% filter(y_day == x & Hour == y & !is.na(precipitation)) %>% 
@@ -152,12 +144,12 @@ for(x in 1:length(unique(wx$y_day))){
       working_df <- working_df %>% st_join(snow, join=st_nearest_feature) # if there is weather station data, nearest join 
     }
     
-    weather_merged <- weather_merged %>% bind_rows(working_df) # binding together the resutls 
+    datalist[[(x*(y+1))]] <- working_df
       
   }
 }
 
-Sys.time() # took 1 minute and 15 seconds for Jan 1st in TN 
+training_frame_rcw <- do.call(bind_rows, datalist) # more efficient 
 
 ggplot() + 
   geom_sf(data = working_df, aes(color = temperature)) + 
