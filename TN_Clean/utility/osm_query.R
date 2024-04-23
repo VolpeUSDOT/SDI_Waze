@@ -98,7 +98,7 @@ rm(state_border)
 }
 
 
-ggplot() + geom_sf(data = state_network)
+#ggplot() + geom_sf(data = state_network)
 
 #Transform state_network crs to NAD83 before joining with crash_files; should probably change this in the files we have and bring this into the query loop
 
