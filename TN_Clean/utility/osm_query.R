@@ -8,9 +8,11 @@ library(tigris)
 
 rm(list=ls()) # clear enviroment
 
+outputdir <- file.path(getwd(),"Output") # to hold daily output files as they are generated
+inputdir <- file.path(getwd(),"Input")
 
 # Identify state for analysis; Need to specify 'Washington State' for Washington
-state <- "WA" 
+state <- "MN" 
 
 state_osm <- ifelse(state == "WA", 'Washington State',
                     ifelse(state == "MN", "Minnesota", NA))
@@ -41,7 +43,8 @@ road_types <- c('motorway', 'trunk', 'primary', 'secondary', 'tertiary')
 roadways <- list()
 
 network_file <- paste0(state_osm,"_network")
-file_path <- file.path('Input','States', state_osm, paste0(network_file, '.gpkg'), paste0(network_file,'.shp'))
+boundary_file <- paste0(state_osm,"_boundary")
+file_path <- file.path(inputdir,'Roads_Boundary', state_osm, paste0(network_file, '.gpkg'), paste0(network_file,'.shp'))
 
 if (file.exists(file.path(file_path))){
   state_network <- read_sf(file_path)
@@ -82,7 +85,6 @@ if (file.exists(file.path(file_path))){
 state_maps <- states(cb = TRUE, year = 2021) %>%
   filter_state(state_border) %>%
   st_transform(crs = projection)
-rm(state_border)
 
 #Filter out roadways outside the state
 
@@ -90,9 +92,9 @@ state_network <- st_join(total_network, state_maps, join = st_within) %>%
   filter(!is.na(NAME)) %>%
   select(osm_id, highway, ref, geometry)
 
-write_sf(state_network, paste0('Input', '/', 'States', '/', state_osm, "/", state_osm, "_network.gpkg"), driver = "ESRI Shapefile")
-
-
+write_sf(state_network, file.path(inputdir,'Roads_Boundary', state_osm, paste0(network_file, '.gpkg')), driver = "ESRI Shapefile")
+write_sf(state_border, file.path(inputdir,'Roads_Boundary', state_osm, paste0(boundary_file, '.gpkg')), driver = "ESRI Shapefile")
+rm(state_border)
 }
 
 
