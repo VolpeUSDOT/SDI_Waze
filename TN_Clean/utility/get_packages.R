@@ -19,6 +19,7 @@ loadpacks <- c(
             "mapproj",  # for coord_map, 
             "maptree", # for better graphing of decision trees
             "mlbench",
+            "osmdata",
             "pander",
             "party",
             "partykit",

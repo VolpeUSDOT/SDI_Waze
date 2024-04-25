@@ -12,7 +12,7 @@ outputdir <- file.path(getwd(),"Output") # to hold daily output files as they ar
 inputdir <- file.path(getwd(),"Input")
 
 # Identify state for analysis; Need to specify 'Washington State' for Washington
-state <- "MN" 
+state <- "WA" 
 
 state_osm <- ifelse(state == "WA", 'Washington State',
                     ifelse(state == "MN", "Minnesota", NA))
@@ -116,6 +116,9 @@ hours <- data.frame(Hour = c(1:24)) %>%
   mutate(Hour = paste0('00', Hour),
          Hour = substr(Hour, nchar(Hour)-1, nchar(Hour)))
 
+starttime = Sys.time()
+
+
 training_frame_r <- state_network %>% # r = road
   as.data.frame() %>%
   group_by(osm_id) %>%
@@ -130,7 +133,7 @@ rm(days, hours)
 
 # load raw file 
 
-crash_files <- list.files(file.path('Input','States', state_osm, 'Crashes'), pattern = 'crash.shp$', full.names = TRUE)
+crash_files <- list.files(file.path(inputdir,"Crash", state_osm), pattern = 'crash.shp$', full.names = TRUE)
 
 n = as.numeric(length(crash_files)) 
 datalist <- list()
@@ -139,7 +142,7 @@ datalist = vector("list", length = n)
 l = 0
 
 if(state == "MN"){
-timestamps <- read.csv(file.path('Input','States', state_osm, paste0(state_osm, '_timestamps.csv'))) %>%
+timestamps <- read.csv(file.path(inputdir,'Crash', state_osm, paste0(state_osm, '_timestamps.csv'))) %>%
   rename(INCIDEN = INCIDENT_ID) %>%
   mutate(DATE_TIME_OF_INCIDENT = as.POSIXct(DATE_TIME_OF_INCIDENT, format = "%m/%d/%Y %H:%M"))
 
@@ -151,7 +154,7 @@ temp <- read_sf(i) %>%
          Day = format(DATE_TIME_OF_INCIDENT, '%j'),
          Hour = format(DATE_TIME_OF_INCIDENT, '%H'),
          Weekday = weekdays(DATE_TIME_OF_INCIDENT))
-
+datalist[[l]] <- temp
   }
 }
 
@@ -175,7 +178,7 @@ if(state == "WA"){
 total_crashes <- do.call(bind_rows, datalist)
 
 total_crashes <- st_as_sf(total_crashes) %>%
-  filter(Year == '2019') %>%
+  filter(Year == year) %>%
   st_transform(projection) 
   
 
@@ -192,6 +195,9 @@ training_frame_rc <- training_frame_r %>% # c is crashes
   left_join(joined, by = c('osm_id', 'Day', 'Hour')) %>%
   mutate(crash = ifelse(is.na(crash), 0, crash)) %>% 
   st_as_sf()
+
+timediff = Sys.time() - starttime
+cat(round(timediff,2), attr(timediff, "unit"), "elapsed", "\n")
 
 # Merging Weather ---------------------------------------------------------
 
