@@ -5,6 +5,7 @@ library(osmdata)
 library(sf)
 library(ggplot2)
 library(tigris)
+library(doParallel)
 
 rm(list=ls()) # clear enviroment
 
@@ -108,6 +109,12 @@ if(st_crs(state_network) != projection){
 
 # Convert to hourly ---------------------------------
 
+starttime = Sys.time()
+# make a cluster of available cores (mimus 1 in case needed for other activities)
+# nCores <- detectCores() - 1
+# cl <- makeCluster(nCores, useXDR = F) 
+# registerDoParallel(cl)
+
 days <- data.frame(Day = c(1:365)) %>%
   mutate(Day = paste0('000', Day),
          Day = substr(Day, nchar(Day)-2, nchar(Day)))
@@ -115,9 +122,6 @@ days <- data.frame(Day = c(1:365)) %>%
 hours <- data.frame(Hour = c(1:24)) %>%
   mutate(Hour = paste0('00', Hour),
          Hour = substr(Hour, nchar(Hour)-1, nchar(Hour)))
-
-starttime = Sys.time()
-
 
 training_frame_r <- state_network %>% # r = road
   as.data.frame() %>%
@@ -128,6 +132,21 @@ training_frame_r <- state_network %>% # r = road
   cross_join(hours) 
 
 rm(days, hours)
+
+# Possible alternate method to explore
+# state_network_df <- state_network %>% as.data.frame()
+# # replicate each row 8760 times because there are 24 x 365 = 8760 hours in one year
+# # r = road
+# training_frame_r2 <- do.call(bind_rows, replicate(8760, state_network_df, simplify = FALSE)) %>% arrange(osm_id)
+# # repeat first day 24 times (for each hour), then do the same for day 2, etc.
+# day_vector <- rep(1:365, each=24)
+# # repeat the 24-hour sequence 365 times
+# hour_vector <- rep(0:23,365)
+
+# stopCluster(cl); rm(cl); gc(verbose = F) # Stop the cluster
+# 
+# timediff = Sys.time() - starttime
+# cat(round(timediff,2), attr(timediff, "unit"), "elapsed", "\n")
 
 # Load Crash Data ------------------------------
 
@@ -180,7 +199,6 @@ total_crashes <- do.call(bind_rows, datalist)
 total_crashes <- st_as_sf(total_crashes) %>%
   filter(Year == year) %>%
   st_transform(projection) 
-  
 
 joined <- st_join(total_crashes, state_network, join = st_nearest_feature)
 
@@ -195,6 +213,8 @@ training_frame_rc <- training_frame_r %>% # c is crashes
   left_join(joined, by = c('osm_id', 'Day', 'Hour')) %>%
   mutate(crash = ifelse(is.na(crash), 0, crash)) %>% 
   st_as_sf()
+
+stopCluster(cl); rm(cl); gc(verbose = F) # Stop the cluster
 
 timediff = Sys.time() - starttime
 cat(round(timediff,2), attr(timediff, "unit"), "elapsed", "\n")
