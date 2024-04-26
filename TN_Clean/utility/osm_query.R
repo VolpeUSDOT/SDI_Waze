@@ -6,6 +6,7 @@ library(sf)
 library(ggplot2)
 library(tigris)
 library(doParallel)
+library(lubridate)
 
 rm(list=ls()) # clear enviroment
 
@@ -27,6 +28,31 @@ projection <- 5070
 
 # Year
 year <- 2019
+
+# Switching to operate month-by-month to avoid running out of memory 
+# when trying to work with an entire year all at the same time.
+monthIDs <- formatC(1:12, width = 2, flag = "0")
+yearmonths <- c(paste(year, monthIDs, sep="-"))
+yearmonths.1 <- paste(yearmonths, "01", sep="-")
+lastdays <- days_in_month(as.POSIXct(yearmonths.1)) # from lubridate
+yearmonths.end <- paste(yearmonths, lastdays, sep="-")
+
+month_frames = list()
+for (m in 1:12){
+  num_days = lastdays[m]
+  month = rep(monthIDs[m],times = 24 * num_days)
+  day = seq(from=1, to=num_days, by=1)
+  day = formatC(day, width = 2, flag = "0")
+  day = rep(day, each=24)
+  hour = rep(0:23,times=num_days)
+  hour = formatC(hour, width = 2, flag = "0")
+  temp <- cbind(month,day,hour)
+  month_frames[[m]] <- temp
+}
+gc()
+
+# yearmonths.1 <- paste(yearmonths.1,"00:00:00", sep=" ")
+# yearmonths.end <- paste(yearmonths.end, "23:59:59", sep=" ")
 
 # Load Road Data ----------------------
 
@@ -110,7 +136,7 @@ if(st_crs(state_network) != projection){
 # Convert to hourly ---------------------------------
 
 starttime = Sys.time()
-# make a cluster of available cores (mimus 1 in case needed for other activities)
+# make a cluster of available cores (minus 1 in case needed for other activities)
 # nCores <- detectCores() - 1
 # cl <- makeCluster(nCores, useXDR = F) 
 # registerDoParallel(cl)
@@ -133,20 +159,30 @@ training_frame_r <- state_network %>% # r = road
 
 rm(days, hours)
 
-# Possible alternate method to explore
-# state_network_df <- state_network %>% as.data.frame()
-# # replicate each row 8760 times because there are 24 x 365 = 8760 hours in one year
-# # r = road
-# training_frame_r2 <- do.call(bind_rows, replicate(8760, state_network_df, simplify = FALSE)) %>% arrange(osm_id)
-# # repeat first day 24 times (for each hour), then do the same for day 2, etc.
-# day_vector <- rep(1:365, each=24)
-# # repeat the 24-hour sequence 365 times
-# hour_vector <- rep(0:23,365)
+timediff = Sys.time() - starttime
+cat(round(timediff,2), attr(timediff, "unit"), "elapsed", "\n")
 
+# Possible alternate method to create training_frame_r for each 
+# of the 12 months - alternative to lines 144-158 above. New method can accomplish the
+# task in 15% of the time (takes 15.69 minutes now for one year, but not yet adding
+# in the residential roads). Not yet using the parallel processing, but can uncomment
+# the corresponding lines at beginning and end to try that as well (173-176 and 185).
+m <- 1
+gc()
+starttime = Sys.time()
+# # start cluster for parallel processing
+# nCores <- detectCores() - 1
+# cl <- makeCluster(nCores, useXDR = F)
+# registerDoParallel(cl)
+training_frame_r <- state_network %>% as.data.frame()
+for (m in 1:12){
+  num_days = lastdays[m]
+  temp = do.call(bind_rows, replicate(24*num_days, training_frame_r, simplify = FALSE)) %>% arrange(osm_id)
+  month_frames[[m]] <- cbind(temp,month_frames[[m]])
+}
+timediff = Sys.time() - starttime
+cat(round(timediff,2), attr(timediff, "unit"), "elapsed", "\n")
 # stopCluster(cl); rm(cl); gc(verbose = F) # Stop the cluster
-# 
-# timediff = Sys.time() - starttime
-# cat(round(timediff,2), attr(timediff, "unit"), "elapsed", "\n")
 
 # Load Crash Data ------------------------------
 
