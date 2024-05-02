@@ -149,11 +149,18 @@ hours <- data.frame(Hour = c(1:24)) %>%
   mutate(Hour = paste0('00', Hour),
          Hour = substr(Hour, nchar(Hour)-1, nchar(Hour)))
 
+daily_for_snow <- state_network %>% # r = road
+  as.data.frame() %>%
+  cross_join(days) %>%
+  select(osm_id, Day, geometry) %>% 
+  distinct() %>% 
+  st_as_sf()
+
 training_frame_r <- state_network %>% # r = road
   as.data.frame() %>%
   group_by(osm_id) %>%
   cross_join(days) %>%
-  filter(Day == '001') %>% # delete when using the whole system 
+  filter(as.numeric(Day) <= 7) %>% # delete when using the whole system 
   group_by(osm_id, Day) %>%
   cross_join(hours) 
 
@@ -175,7 +182,7 @@ starttime = Sys.time()
 # cl <- makeCluster(nCores, useXDR = F)
 # registerDoParallel(cl)
 training_frame_r <- state_network %>% as.data.frame()
-for (m in 1:12){
+for (m in 1:12){ 
   num_days = lastdays[m]
   temp = do.call(bind_rows, replicate(24*num_days, training_frame_r, simplify = FALSE)) %>% arrange(osm_id)
   month_frames[[m]] <- cbind(temp,month_frames[[m]])
