@@ -6,6 +6,7 @@
 # Notes: 
 # Some crazy high numbers for precip and temp. 
 # Will need to consider how we are handling the timezone factor. Simply adjusting the time zone will leave a couple hours without data. 
+# There is still a lot of NAs for snow when doing it weekly
 
 # Prep --------------------------------------------------------------------
 
@@ -183,7 +184,7 @@ data_list = vector("list", length = n)
 # Daily Snow 
 for(x in 1:length(unique(xy$y_day))){
   roads <- daily_for_snow %>% filter(as.numeric(Day) == x)
-  snow <- xy %>% filter(y_day == x) %>% select(SNOW)
+  snow <- xy %>% filter(y_day == x & !is.na(SNOW)) %>% select(SNOW)
 
   if(nrow(snow) == 0){
     working_df <- roads %>% mutate(SNOW = 0) %>% st_drop_geometry() # if all weather stations were NA, set to zero
@@ -196,7 +197,7 @@ for(x in 1:length(unique(xy$y_day))){
 
 daily_merge <- do.call(bind_rows, data_list)
 
-training_frame_rcws <- training_frame_rcw %>% left_join(daily_merge, by=c("osm_id", "Days"))
+training_frame_rcws <- training_frame_rcw %>% left_join(daily_merge, by=c("osm_id", "Day"))
 
 ggplot() + 
   geom_sf(data = working_df, aes(color = temperature)) + 
