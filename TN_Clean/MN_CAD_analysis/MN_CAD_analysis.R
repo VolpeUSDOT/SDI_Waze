@@ -1,3 +1,6 @@
+
+# Beginning here copied from osm_query.R, but removing the weather part.
+
 # Background ----------------------------
 
 library(dplyr)
@@ -10,11 +13,11 @@ library(lubridate)
 
 rm(list=ls()) # clear enviroment
 
-outputdir <- file.path(getwd(),"Output") # to hold daily output files as they are generated
+outputdir <- file.path(getwd(),"Output")
 inputdir <- file.path(getwd(),"Input")
 
 # Identify state for analysis; Need to specify 'Washington State' for Washington
-state <- "WA" 
+state <- "MN" 
 
 state_osm <- ifelse(state == "WA", 'Washington State',
                     ifelse(state == "MN", "Minnesota", NA))
@@ -27,7 +30,7 @@ state_osm <- gsub(" ", "_", state_osm) # Normalize state name
 projection <- 5070 
 
 # Year
-year <- 2019
+year <- 2020
 
 # Switching to operate month-by-month to avoid running out of memory 
 # when trying to work with an entire year all at the same time.
@@ -49,6 +52,7 @@ for (m in 1:12){
   temp <- cbind(month,day,hour)
   month_frames[[m]] <- temp
 }
+rm(temp)
 gc()
 
 # yearmonths.1 <- paste(yearmonths.1,"00:00:00", sep=" ")
@@ -77,7 +81,7 @@ if (file.exists(file.path(file_path))){
   state_network <- read_sf(file_path)
   print("File Found")
 } else{
-
+  
   n = as.numeric(length(road_types)) 
   datalist <- list()
   datalist = vector("list", length = n)
@@ -97,31 +101,31 @@ if (file.exists(file.path(file_path))){
   }
   
   total_network <- do.call(bind_rows, datalist)
-
+  
   # if (!(dir.exists(state_osm))){
   #   dir.create(state_osm)}
   
   total_network <- st_transform(total_network, crs = projection) 
   
-# Pull state boundaries
+  # Pull state boundaries
   if (state_osm == 'Washington_State'){
     state_border <- 'Washington'
   }else{
     state_border <- state_osm
   }
-state_maps <- states(cb = TRUE, year = 2021) %>%
-  filter_state(state_border) %>%
-  st_transform(crs = projection)
-
-#Filter out roadways outside the state
-
-state_network <- st_join(total_network, state_maps, join = st_within) %>%
-  filter(!is.na(NAME)) %>%
-  select(osm_id, highway, ref, geometry)
-
-write_sf(state_network, file.path(inputdir,'Roads_Boundary', state_osm, paste0(network_file, '.gpkg')), driver = "ESRI Shapefile")
-write_sf(state_border, file.path(inputdir,'Roads_Boundary', state_osm, paste0(boundary_file, '.gpkg')), driver = "ESRI Shapefile")
-rm(state_border)
+  state_maps <- states(cb = TRUE, year = 2021) %>%
+    filter_state(state_border) %>%
+    st_transform(crs = projection)
+  
+  #Filter out roadways outside the state
+  
+  state_network <- st_join(total_network, state_maps, join = st_within) %>%
+    filter(!is.na(NAME)) %>%
+    select(osm_id, highway, ref, geometry)
+  
+  write_sf(state_network, file.path(inputdir,'Roads_Boundary', state_osm, paste0(network_file, '.gpkg')), driver = "ESRI Shapefile")
+  write_sf(state_border, file.path(inputdir,'Roads_Boundary', state_osm, paste0(boundary_file, '.gpkg')), driver = "ESRI Shapefile")
+  rm(state_border)
 }
 
 
@@ -135,46 +139,46 @@ if(st_crs(state_network) != projection){
 
 # Convert to hourly ---------------------------------
 
-starttime = Sys.time()
-# make a cluster of available cores (minus 1 in case needed for other activities)
-# nCores <- detectCores() - 1
-# cl <- makeCluster(nCores, useXDR = F) 
-# registerDoParallel(cl)
-
-days <- data.frame(Day = c(1:365)) %>%
-  mutate(Day = paste0('000', Day),
-         Day = substr(Day, nchar(Day)-2, nchar(Day)))
-
-hours <- data.frame(Hour = c(1:24)) %>%
-  mutate(Hour = paste0('00', Hour),
-         Hour = substr(Hour, nchar(Hour)-1, nchar(Hour)))
-
-daily_for_snow <- state_network %>% # r = road
-  as.data.frame() %>%
-  cross_join(days) %>%
-  select(osm_id, Day, geometry) %>% 
-  distinct() %>% 
-  st_as_sf()
-
-training_frame_r <- state_network %>% # r = road
-  as.data.frame() %>%
-  group_by(osm_id) %>%
-  cross_join(days) %>%
-  filter(as.numeric(Day) <= 7) %>% # delete when using the whole system 
-  group_by(osm_id, Day) %>%
-  cross_join(hours) 
-
-rm(days, hours)
-
-timediff = Sys.time() - starttime
-cat(round(timediff,2), attr(timediff, "unit"), "elapsed", "\n")
+# starttime = Sys.time()
+# # make a cluster of available cores (minus 1 in case needed for other activities)
+# # nCores <- detectCores() - 1
+# # cl <- makeCluster(nCores, useXDR = F) 
+# # registerDoParallel(cl)
+# 
+# days <- data.frame(Day = c(1:365)) %>%
+#   mutate(Day = paste0('000', Day),
+#          Day = substr(Day, nchar(Day)-2, nchar(Day)))
+# 
+# hours <- data.frame(Hour = c(1:24)) %>%
+#   mutate(Hour = paste0('00', Hour),
+#          Hour = substr(Hour, nchar(Hour)-1, nchar(Hour)))
+# 
+# daily_for_snow <- state_network %>% # r = road
+#   as.data.frame() %>%
+#   cross_join(days) %>%
+#   select(osm_id, Day, geometry) %>% 
+#   distinct() %>% 
+#   st_as_sf()
+# 
+# training_frame_r <- state_network %>% # r = road
+#   as.data.frame() %>%
+#   group_by(osm_id) %>%
+#   cross_join(days) %>%
+#   filter(as.numeric(Day) <= 7) %>% # delete when using the whole system 
+#   group_by(osm_id, Day) %>%
+#   cross_join(hours) 
+# 
+# rm(days, hours)
+# 
+# timediff = Sys.time() - starttime
+# cat(round(timediff,2), attr(timediff, "unit"), "elapsed", "\n")
 
 # Possible alternate method to create training_frame_r for each 
 # of the 12 months - alternative to lines 144-158 above. New method can accomplish the
 # task in 15% of the time (takes 15.69 minutes now for one year, but not yet adding
 # in the residential roads). Not yet using the parallel processing, but can uncomment
 # the corresponding lines at beginning and end to try that as well (173-176 and 185).
-m <- 1
+#m <- 1
 gc()
 starttime = Sys.time()
 # # start cluster for parallel processing
@@ -186,6 +190,8 @@ for (m in 1:12){
   num_days = lastdays[m]
   temp = do.call(bind_rows, replicate(24*num_days, training_frame_r, simplify = FALSE)) %>% arrange(osm_id)
   month_frames[[m]] <- cbind(temp,month_frames[[m]])
+  rm(temp)
+  gc()
 }
 timediff = Sys.time() - starttime
 cat(round(timediff,2), attr(timediff, "unit"), "elapsed", "\n")
@@ -207,11 +213,12 @@ if(state == "MN"){
   timestamps <- read.csv(file.path(inputdir,'Crash', state_osm, paste0(state_osm, '_timestamps.csv'))) %>%
     rename(INCIDEN = INCIDENT_ID) %>%
     mutate(DATE_TIME_OF_INCIDENT = as.POSIXct(DATE_TIME_OF_INCIDENT, format = "%m/%d/%Y %H:%M"))
-
+  
   for (i in crash_files){
     l <- l + 1 
     temp <- read_sf(i) %>%
       left_join(timestamps, by = 'INCIDEN') %>%
+      select(!YEAR) %>%
       mutate(Year = format(DATE_TIME_OF_INCIDENT, '%Y'),
              Day = format(DATE_TIME_OF_INCIDENT, '%j'),
              Hour = format(DATE_TIME_OF_INCIDENT, '%H'),
@@ -219,24 +226,27 @@ if(state == "MN"){
              CRASH_S = as.numeric(CRASH_S),
              LIGHT_C = as.numeric(LIGHT_C),
              WORKERS = as.numeric(WORKERS)) %>%
-             #print(st_crs(temp))
+      #print(st_crs(temp))
       st_transform(projection)
     datalist[[l]] <- temp
   }
 }
+# for MN, the first 5 shapefiles were originally in WGS84 coordinate reference system (4326)
+# and the 6th shapefile was in UTM zone 15N coordinate reference system (4269)...
+# for CAD we'll have to assume that the coordinates are in 4326
 
 if(state == "WA"){
   for (i in crash_files){
     l <- l + 1 
-  temp <- read_sf(i) %>%
-    mutate(TIME = ifelse(nchar(TIME) == 3, paste0(0, TIME), TIME),
-           ACC_DATE = paste(ACC_DATE, " ", TIME),
-           ACC_DATE = as.POSIXct(ACC_DATE, format = '%Y-%m-%d %H%M'),
-           Year = format(ACC_DATE, '%Y', trim = FALSE),
-           Day = format(ACC_DATE, '%j', trim = FALSE),
-           Hour = format(ACC_DATE, '%H', trim = FALSE),
-           Weekday = weekdays(ACC_DATE))
-  
+    temp <- read_sf(i) %>%
+      mutate(TIME = ifelse(nchar(TIME) == 3, paste0(0, TIME), TIME),
+             ACC_DATE = paste(ACC_DATE, " ", TIME),
+             ACC_DATE = as.POSIXct(ACC_DATE, format = '%Y-%m-%d %H%M'),
+             Year = format(ACC_DATE, '%Y', trim = FALSE),
+             Day = format(ACC_DATE, '%j', trim = FALSE),
+             Hour = format(ACC_DATE, '%H', trim = FALSE),
+             Weekday = weekdays(ACC_DATE))
+    
     datalist[[l]] <- temp
   }
   
@@ -248,7 +258,25 @@ total_crashes <- st_as_sf(total_crashes) %>%
   filter(Year == year) %>%
   st_transform(projection) 
 
+# st_crs(temp)
+
+#### Modifying this to take in CAD data
+CAD20 <- read.csv(file.path(inputdir,"Crash","2020_mndot_cadevents.csv")) %>% 
+  mutate(lat=as.numeric(lat),
+         lon=as.numeric(lon)) %>%
+  filter(!is.na(lon)&!is.na(lat))
+
+
+#apply(X = is.na(CAD20), MARGIN = 2, FUN = sum)
+
+CAD20 <- st_as_sf(CAD20, coords = c("lon", "lat"), crs=4326) %>%
+  st_transform(projection) 
+
+CAD20 <- st_join(CAD20, state_network, join = st_nearest_feature)
+
 joined <- st_join(total_crashes, state_network, join = st_nearest_feature)
+
+
 
 joined <- as.data.frame(joined) %>%
   mutate(crash = 1) %>%
@@ -267,6 +295,4 @@ stopCluster(cl); rm(cl); gc(verbose = F) # Stop the cluster
 timediff = Sys.time() - starttime
 cat(round(timediff,2), attr(timediff, "unit"), "elapsed", "\n")
 
-# Merging Weather ---------------------------------------------------------
 
-source("utility/Join_Road_Weather.R")
