@@ -6,7 +6,7 @@ library(sf)
 library(ggplot2)
 library(tigris)
 
-rm(list=ls()) # clear enviroment
+rm(list=ls()) # clear environment
 
 setwd(file.path(dirname(rstudioapi::getActiveDocumentContext()$path)))
 
@@ -178,9 +178,9 @@ total_crashes <- st_as_sf(total_crashes) %>%
   st_transform(projection) 
   
 
-joined <- st_join(total_crashes, state_network, join = st_nearest_feature)
+joined_sf <- st_join(total_crashes, state_network, join = st_nearest_feature)
 
-joined <- as.data.frame(joined) %>%
+joined <- as.data.frame(joined_sf) %>%
   mutate(crash = 1) %>%
   select(osm_id, Day, Hour, crash) %>%
   group_by(osm_id, Day, Hour) %>%
