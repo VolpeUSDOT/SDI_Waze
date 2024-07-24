@@ -160,6 +160,7 @@ parked_veh_match_files <- get_matches_by_type(CADtypes = c("STALL"),
 parked_veh_match_CAD <- parked_veh_match_files$CADfull
 parked_veh_match_waze <- parked_veh_match_files$wazefull
 rm(parked_veh_match_files)
+save(list = c("parked_veh_match_CAD", "parked_veh_match_waze"), file = file.path(getwd(),'MN_CAD_Analysis','parked_veh_matches.Rdata'))
 
 unique(CAD20$class)
 unique(crash_match_waze$alert_type)

@@ -58,11 +58,10 @@ get_matches_by_type <- function(near_dist = 0.5,
 ){
   starttime = Sys.time()
   for(m in 1:12){
+    sub_or_alert = enquo(sub_or_alert)
     # read in data frames for that month
-    waze.month <- read.csv(waze.files.year[m]) 
-    waze.month <- waze.month[waze.month$,]
-    %>% 
-      filter(sub_or_alert %in% Wazetypes) %>%
+    waze.month <- read.csv(waze.files.year[m]) %>% 
+      filter(!!sub_or_alert %in% Wazetypes) %>%
       st_as_sf(coords = c("lon", "lat"), crs = 4326) %>%
       st_transform(projection) %>%
       st_join(state_network, join = st_nearest_feature) %>% 
