@@ -110,6 +110,11 @@ get_matches_by_type <- function(near_dist = 0.5,
     rm(list = c('CAD.month','waze.month'))
     cat("Loaded month ", m, "...  ")
   }
+  # add a column for "matched"
+  CADfull$matched = ifelse(CADfull$matches > 0, 1, 0)
+  wazefull$matched = ifelse(wazefull$matches > 0, 1, 0)
+  
+  # wrap up
   timediff = Sys.time() - starttime
   cat("Completed processing ", m, "...   ")
   cat(round(timediff, 2), attr(timediff, "unit"), "elapsed in total.", "\n")
@@ -117,6 +122,91 @@ get_matches_by_type <- function(near_dist = 0.5,
   return(match_files)
 }
 ##########################################
+# create function to summarize matches by county
+sum_by_county <- function(CAD_sf,
+                          Waze_sf,
+                          county_file){
+  # summarize by county from CAD perspective looking for Waze matches
+  CAD_sf = st_join(CAD_sf, county_file %>% select(CTY_FIPS), join = st_nearest_feature)
+  
+  CAD_sf$matched = ifelse(CAD_sf$matches > 0, 1, 0)
+  
+  by_county = CAD_sf %>% group_by(CTY_FIPS) %>% summarize(CAD_match_percentage = mean(matched)*100) %>% st_drop_geometry()
+  
+  cty_file = county_file %>% left_join(by_county, by = join_by(CTY_FIPS == CTY_FIPS))
+  
+  # same for Waze in the opposite direction
+  Waze_sf = st_join(Waze_sf,  county_file %>% select(CTY_FIPS), join = st_nearest_feature)
+  
+  Waze_sf$matched = ifelse(Waze_sf$matches > 0, 1, 0)
+  
+  by_county_w = Waze_sf %>% group_by(CTY_FIPS) %>% summarize(waze_match_percentage = mean(matched)*100) %>% st_drop_geometry()
+  
+  cty_file = cty_file %>% left_join(by_county_w, by = join_by(CTY_FIPS == CTY_FIPS))
+  
+  # return counties
+  return(cty_file)
+}
+########################################
+# function to make and save county maps
+make_county_maps <- function(county_file_with_matches,
+                             CAD_class,
+                             Waze_type,
+                             year){
+  
+  CADmap = ggplot() +
+    geom_sf(data = state_boundary, aes(), linetype = 'solid', linewidth = 2, fill = NA, alpha = 1) +
+    geom_sf(data = county_file_with_matches, aes(fill = CAD_match_percentage), alpha = 0.5, size = 0.5) +
+    labs(title = paste0("Percentage of CAD ", CAD_class , " Records with a \nWaze Match (by County)")) +
+    theme(axis.line = element_blank(),
+          axis.text = element_blank(),
+          panel.grid.major = element_blank(),
+          panel.grid.minor = element_blank())
+  
+  ggsave(file.path(outputdir, paste0("CADmap_", CAD_class, "_", year, ".png")), CADmap)
+  
+  wazemap = ggplot() +
+    geom_sf(data = state_boundary, aes(), linetype = 'solid', linewidth = 2, fill = NA, alpha = 1) +
+    geom_sf(data = county_file_with_matches, aes(fill = waze_match_percentage), alpha = 0.5, size = 0.5) +
+    labs(title = paste0("Percentage of Waze", Waze_type , "Records with a \nCAD Match (by County)")) +
+    theme(axis.line = element_blank(),
+          axis.text = element_blank(),
+          panel.grid.major = element_blank(),
+          panel.grid.minor = element_blank())
+  
+  ggsave(file.path(outputdir, paste0("Wazemap_", Waze_type, "_", year, ".png")), wazemap)
+}
+
+###########################################
+
+# function to view by road type
+view_by_road_type <- function(CAD_sf,
+                              Waze_sf,
+                              CAD_class,
+                              Waze_type,
+                              year){
+  
+  by_roadtype_CAD <- CAD_sf %>% group_by(highway) %>% summarize(match_percentage = mean(matched)*100) %>% st_drop_geometry()
+  
+  by_roadtype_Waze <- Waze_sf %>% group_by(highway) %>% summarize(match_percentage = mean(matched)*100) %>% st_drop_geometry()
+  
+  CADchart = ggplot(by_roadtype_CAD) + 
+    geom_col(aes(x = highway, y = match_percentage)) +
+    labs(title = "Percentage of CAD Crash Records with a \nWaze Match (by Road Class)")  +
+    theme_minimal()
+  ggsave(file.path(outputdir, paste0("CAD_by_roadtype_", CAD_class, "_", year, ".png")), CADchart)
+  
+  Wazechart = ggplot(by_roadtype_Waze) + 
+    geom_col(aes(x = highway, y = match_percentage)) +
+    labs(title = "Percentage of Waze Crash Records with a \nCAD Match (by Road Class)")  +
+    theme_minimal()
+  ggsave(file.path(outputdir, paste0("Waze_by_roadtype_", Waze_type, "_", year, ".png")), Wazechart)
+}
+
+##########################################
+
+
+
 
 # Below is scratch
 

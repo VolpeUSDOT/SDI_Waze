@@ -146,14 +146,21 @@ unique(waze_jan$sub_type)
 
 source('MN_CAD_analysis/CAD_Waze_functions.R')
 
+
+############################# COMPUTE MATCHES FOR DIFFERENT EVENT TYPES #######################
 gc()
-crash_match_files <- get_matches_by_type(CADtypes = "CRASH", Wazetypes = "ACCIDENT")
+## FOR CRASH/ACCIDENT
+crash_match_files <- get_matches_by_type(CADtypes = C("CRASH"), 
+                                         Wazetypes = C("ACCIDENT"),
+                                         sub_or_alert = alert_type)
 crash_match_CAD <- crash_match_files$CADfull
 crash_match_waze <- crash_match_files$wazefull
 rm(crash_match_files)
 save(list = c("crash_match_CAD", "crash_match_waze"), file = file.path(getwd(),'MN_CAD_Analysis','CAD_Waze_matches.Rdata'))
 
+
 gc()
+## FOR STALL/ CAR STOPPED ON ROAD OR SHOULDER
 parked_veh_match_files <- get_matches_by_type(CADtypes = c("STALL"), 
                                               Wazetypes = c("HAZARD_ON_SHOULDER_CAR_STOPPED", "HAZARD_ON_ROAD_CAR_STOPPED"),
                                               sub_or_alert = sub_type)
@@ -162,10 +169,66 @@ parked_veh_match_waze <- parked_veh_match_files$wazefull
 rm(parked_veh_match_files)
 save(list = c("parked_veh_match_CAD", "parked_veh_match_waze"), file = file.path(getwd(),'MN_CAD_Analysis','parked_veh_matches.Rdata'))
 
+gc()
+## FOR ROADWORK/ CONSTRUCTION
+roadwork_match_files <- get_matches_by_type(CADtypes = c("ROADWORK"), 
+                                            Wazetypes = c("HAZARD_ON_ROAD_CONSTRUCTION", "ROAD_CLOSED_CONSTRUCTION"),
+                                            sub_or_alert = sub_type)
+roadwork_match_CAD <- roadwork_match_files$CADfull
+roadwork_match_waze <- roadwork_match_files$wazefull
+rm(roadwork_match_files)
+save(list = c("roadwork_match_CAD", "roadwork_match_waze"), file = file.path(getwd(),'MN_CAD_Analysis','roadwork_matches.Rdata'))
+
+gc()
+## FOR HAZARD
+hazard_match_files <- get_matches_by_type(CADtypes = c("HAZARD"), 
+                                            Wazetypes = c("HAZARD_ON_ROAD_ICE", 
+                                                          "HAZARD_ON_ROAD",
+                                                          "HAZARD_ON_ROAD_POT_HOLE",
+                                                          "HAZARD_WEATHER_HEAVY_SNOW",
+                                                          "HAZARD_WEATHER_FOG",
+                                                          "HAZARD_WEATHER_FLOOD",
+                                                          "ROAD_CLOSED_HAZARD",
+                                                          "HAZARD_ON_SHOULDER_MISSING_SIGN",
+                                                          "HAZARD_ON_ROAD_OBJECT",
+                                                          "HAZARD_ON_ROAD_TRAFFIC_LIGHT_FAULT",
+                                                          "HAZARD_WEATHER_HAIL",
+                                                          "HAZARD_ON_SHOULDER",
+                                                          "HAZARD_ON_ROAD_ROAD_KILL",
+                                                          "HAZARD_ON_SHOULDER_ANIMALS",
+                                                          "HAZARD_WEATHER",
+                                                          "HAZARD_ON_ROAD_LANE_CLOSED"),
+                                            sub_or_alert = sub_type)
+hazard_match_CAD <- hazard_match_files$CADfull
+hazard_match_waze <- hazard_match_files$wazefull
+rm(hazard_match_files)
+save(list = c("hazard_match_CAD", "hazard_match_waze"), file = file.path(getwd(),'MN_CAD_Analysis','hazard_matches.Rdata'))
+
+
+######################################################################################################
+
+#######################LOAD MATCH FILES PREVIOUSLY CREATED AND SAVED#################################
+load(file = file.path(getwd(),'MN_CAD_Analysis','CAD_Waze_matches.Rdata'))
+load(file = file.path(getwd(),'MN_CAD_Analysis','parked_veh_matches.Rdata'))
+
+
+# # add "matched" column if not yet there
+# crash_match_CAD$matched = ifelse(crash_match_CAD$matches > 0, 1, 0)
+# crash_match_waze$matched = ifelse(crash_match_waze$matches > 0, 1, 0)
+# 
+# parked_veh_match_CAD$matched = ifelse(parked_veh_match_CAD$matches > 0, 1, 0)
+# parked_veh_match_waze$matched = ifelse(parked_veh_match_waze$matches > 0, 1, 0)
+
+#####################################################################################################
+
 unique(CAD20$class)
 unique(crash_match_waze$alert_type)
 unique(crash_match_waze$sub_type)
 
+
+######################## SUMMARIZE MATCHES BY COUNTY ##########################
+
+## Creating base objects for all maps
 boundary_file <- paste0(state_osm, "_boundary")
 boundary_file_path <- file.path(inputdir, 'Roads_Boundary', state_osm, paste0(boundary_file, '.gpkg'), paste0(state_osm, '_border.shp'))
 
@@ -179,62 +242,80 @@ state_boundary <- state_boundary %>% st_transform(crs = projection)
 counties <- read_sf(file.path(inputdir, "Roads_Boundary", state_osm, "shp_bdry_counties_in_minnesota","mn_county_boundaries.shp")) %>%
   st_transform(crs = projection)
 
-# summarize by county
-CADfull <- st_join(CADfull, counties %>% select(CTY_FIPS), join = st_nearest_feature)
+## Creating specific summaries and maps for each type
 
-CADfull$matched <- ifelse(CADfull$matches > 0, 1, 0)
+crash_counties <- sum_by_county(CAD_sf = crash_match_CAD, 
+                                Waze_sf = crash_match_waze,
+                                county_file = counties)
 
-by_county <- CADfull %>% group_by(CTY_FIPS) %>% summarize(CAD_match_percentage = mean(matched)*100) %>% st_drop_geometry()
+parked_veh_counties <- sum_by_county(CAD_sf = parked_veh_match_CAD, 
+                                     Waze_sf = parked_veh_match_waze,
+                                     county_file = counties)
 
-counties <- counties %>% left_join(by_county, by = join_by(CTY_FIPS == CTY_FIPS))
+make_county_maps(county_file_with_matches = crash_counties,
+                 CAD_class = "Crash",
+                 Waze_type = "Accident",
+                 year = 2020)
 
-# same for Waze in the opposite direction
-wazefull <- st_join(wazefull, counties %>% select(CTY_FIPS), join = st_nearest_feature)
+make_county_maps(county_file_with_matches = parked_veh_counties,
+                 CAD_class = "Stall",
+                 Waze_type = "Parked Vehicle (Roadway or Shoulder)",
+                 year = 2020)
 
-wazefull$matched <- ifelse(wazefull$matches > 0, 1, 0)
 
-by_county_w <- wazefull %>% group_by(CTY_FIPS) %>% summarize(waze_match_percentage = mean(matched)*100) %>% st_drop_geometry()
+####################### BY ROADTYPE ##############################
 
-counties <- counties %>% left_join(by_county_w, by = join_by(CTY_FIPS == CTY_FIPS))
+view_by_road_type(CAD_sf = crash_match_CAD,
+                  Waze_sf = crash_match_waze,
+                  CAD_class = "Crash",
+                  Waze_type = "Accident",
+                  year = 2020)
 
-save(list = c('CAD20','CADfull','wazefull'), file = file.path(getwd(),'MN_CAD_Analysis','CAD_Waze_matches.Rdata'))
+view_by_road_type(CAD_sf = parked_veh_match_CAD,
+                  Waze_sf = parked_veh_match_waze,
+                  CAD_class = "Stall",
+                  Waze_type = "Parked Vehicle (Roadway or Shoulder)",
+                  year = 2020)
 
-CADmap <- ggplot() +
-  geom_sf(data = state_boundary, aes(), linetype = 'solid', linewidth = 2, fill = NA, alpha = 1) +
-  geom_sf(data = counties, aes(fill = CAD_match_percentage), alpha = 0.5, size = 0.5) +
-  labs(title = "Percentage of CAD Crash Records with a \nWaze Match (by County)") +
-  theme(axis.line = element_blank(),
-        axis.text = element_blank(),
-        panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank())
+###################### BY PEAK VERSUS OFF-PEAK#########################
 
-ggsave(file.path(outputdir, "CADmap2020.png"), CADmap)
+# add column for "time_of_day" if not already there
+crash_match_CAD$time_of_day = case_when(
+  hour(crash_match_CAD$centraltime) >= 6 & hour(crash_match_CAD$centraltime) < 9 ~ "peak",
+  hour(crash_match_CAD$centraltime) >= 16 & hour(crash_match_CAD$centraltime) < 19 ~ "peak",
+  .default="off-peak"
+  )
 
-wazemap <- ggplot() +
-  geom_sf(data = state_boundary, aes(), linetype = 'solid', linewidth = 2, fill = NA, alpha = 1) +
-  geom_sf(data = counties, aes(fill = waze_match_percentage), alpha = 0.5, size = 0.5) +
-  labs(title = "Percentage of Waze Crash Records with a \nCAD Match (by County)") +
-  theme(axis.line = element_blank(),
-        axis.text = element_blank(),
-        panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank())
+crash_match_waze$matched = ifelse(crash_match_waze$matches > 0, 1, 0)
+parked_veh_match_CAD$matched = ifelse(parked_veh_match_CAD$matches > 0, 1, 0)
+parked_veh_match_waze$matched = ifelse(parked_veh_match_waze$matches > 0, 1, 0)
 
-ggsave(file.path(outputdir, "Wazemap2020.png"), wazemap)
 
-# View separately by road type
-by_roadtype_CAD <- CADfull %>% group_by(highway) %>% summarize(match_percentage = mean(matched)*100) %>% st_drop_geometry()
+# create function to view by peak versus off-peak
+view_by_time <- function(CAD_sf,
+                         Waze_sf,
+                         CAD_class,
+                         Waze_type,
+                         year){
+  
+  by_time_CAD <- CAD_sf %>% group_by(time_of_day) %>% summarize(match_percentage = mean(matched)*100) %>% st_drop_geometry()
+  
+  by_time_Waze <- Waze_sf %>% group_by(time_of_day) %>% summarize(match_percentage = mean(matched)*100) %>% st_drop_geometry()
+  
+  CADchart = ggplot(by_time_CAD) + 
+    geom_col(aes(x = time_of_day, y = match_percentage)) +
+    labs(title = "Percentage of CAD Crash Records with a \nWaze Match (for Peak/Off-Peak)")  +
+    theme_minimal()
+  ggsave(file.path(outputdir, paste0("CAD_by_time_", CAD_class, "_", year, ".png")), CADchart)
+  
+  Wazechart = ggplot(by_time_Waze) + 
+    geom_col(aes(x = time_of_day, y = match_percentage)) +
+    labs(title = "Percentage of Waze Crash Records with a \nCAD Match (for Peak/Off-Peak)")  +
+    theme_minimal()
+  ggsave(file.path(outputdir, paste0("Waze_by_time_", Waze_type, "_", year, ".png")), Wazechart)
+}
 
-by_roadtype_Waze <- wazefull %>% group_by(highway) %>% summarize(match_percentage = mean(matched)*100) %>% st_drop_geometry()
 
-ggplot(by_roadtype_CAD) + 
-  geom_col(aes(x = highway, y = match_percentage)) +
-  labs(title = "Percentage of CAD Crash Records with a \nWaze Match (by Road Class)")  +
-  theme_minimal()
-
-ggplot(by_roadtype_Waze) + 
-  geom_col(aes(x = highway, y = match_percentage)) +
-  labs(title = "Percentage of Waze Crash Records with a \nCAD Match (by Road Class)")  +
-  theme_minimal()
 
 
 # Load HSIS crash data for 2020
