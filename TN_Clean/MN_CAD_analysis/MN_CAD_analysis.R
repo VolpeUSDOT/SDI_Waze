@@ -167,7 +167,11 @@ parked_veh_match_files <- get_matches_by_type(CADtypes = c("STALL"),
 parked_veh_match_CAD <- parked_veh_match_files$CADfull
 parked_veh_match_waze <- parked_veh_match_files$wazefull
 rm(parked_veh_match_files)
-save(list = c("parked_veh_match_CAD", "parked_veh_match_waze"), file = file.path(getwd(),'MN_CAD_Analysis','parked_veh_matches.Rdata'))
+
+parked_road_match_waze <- parked_veh_match_waze %>% filter(sub_type == "HAZARD_ON_ROAD_CAR_STOPPED")
+parked_shoulder_match_waze <- parked_veh_match_waze %>% filter(sub_type == "HAZARD_ON_SHOULDER_CAR_STOPPED")
+
+save(list = c("parked_veh_match_CAD", "parked_veh_match_waze","parked_road_match_waze","parked_shoulder_match_waze"), file = file.path(getwd(),'MN_CAD_Analysis','parked_veh_matches.Rdata'))
 
 gc()
 ## FOR ROADWORK/ CONSTRUCTION
@@ -252,6 +256,23 @@ parked_veh_counties <- sum_by_county(CAD_sf = parked_veh_match_CAD,
                                      Waze_sf = parked_veh_match_waze,
                                      county_file = counties)
 
+## Now just for onroad waze
+parked_road_counties <- sum_by_county(CAD_sf = parked_veh_match_CAD, 
+                                      Waze_sf = parked_road_match_waze,
+                                      county_file = counties)
+
+## Now just for shoulder waze
+parked_shoulder_counties <- sum_by_county(CAD_sf = parked_veh_match_CAD, 
+                                          Waze_sf = parked_shoulder_match_waze,
+                                          county_file = counties)
+
+parked_road_counties <- parked_road_counties %>% rename(CAD_match_percentage = CAD_match_percentage.x,
+                                                        waze_match_percentage = waze_match_percentage.x)
+
+parked_shoulder_counties <- parked_shoulder_counties %>% rename(CAD_match_percentage = CAD_match_percentage.x,
+                                                                waze_match_percentage = waze_match_percentage.x)
+
+
 make_county_maps(county_file_with_matches = crash_counties,
                  CAD_class = "Crash",
                  Waze_type = "Accident",
@@ -260,6 +281,16 @@ make_county_maps(county_file_with_matches = crash_counties,
 make_county_maps(county_file_with_matches = parked_veh_counties,
                  CAD_class = "Stall",
                  Waze_type = "Parked Vehicle (Roadway or Shoulder)",
+                 year = 2020)
+
+make_county_maps(county_file_with_matches = parked_road_counties,
+                 CAD_class = "Stall",
+                 Waze_type = "Parked Vehicle (Roadway)",
+                 year = 2020)
+
+make_county_maps(county_file_with_matches = parked_shoulder_counties,
+                 CAD_class = "Stall",
+                 Waze_type = "Parked Vehicle (Shoulder)",
                  year = 2020)
 
 
@@ -277,6 +308,8 @@ view_by_road_type(CAD_sf = parked_veh_match_CAD,
                   Waze_type = "Parked Vehicle (Roadway or Shoulder)",
                   year = 2020)
 
+
+
 ###################### BY PEAK VERSUS OFF-PEAK#########################
 
 # add column for "time_of_day" if not already there
@@ -286,9 +319,23 @@ crash_match_CAD$time_of_day = case_when(
   .default="off-peak"
   )
 
-crash_match_waze$matched = ifelse(crash_match_waze$matches > 0, 1, 0)
-parked_veh_match_CAD$matched = ifelse(parked_veh_match_CAD$matches > 0, 1, 0)
-parked_veh_match_waze$matched = ifelse(parked_veh_match_waze$matches > 0, 1, 0)
+crash_match_waze$time_of_day = case_when(
+  hour(crash_match_waze$time_local) >= 6 & hour(crash_match_waze$time_local) < 9 ~ "peak",
+  hour(crash_match_waze$time_local) >= 16 & hour(crash_match_waze$time_local) < 19 ~ "peak",
+  .default="off-peak"
+)
+  
+parked_veh_match_CAD$time_of_day = case_when(
+  hour(parked_veh_match_CAD$centraltime) >= 6 & hour(parked_veh_match_CAD$centraltime) < 9 ~ "peak",
+  hour(parked_veh_match_CAD$centraltime) >= 16 & hour(parked_veh_match_CAD$centraltime) < 19 ~ "peak",
+  .default="off-peak"
+)
+  
+parked_veh_match_waze$time_of_day = case_when(
+  hour(parked_veh_match_waze$time_local) >= 6 & hour(parked_veh_match_waze$time_local) < 9 ~ "peak",
+  hour(parked_veh_match_waze$time_local) >= 16 & hour(parked_veh_match_waze$time_local) < 19 ~ "peak",
+  .default="off-peak"
+)
 
 
 # create function to view by peak versus off-peak
@@ -315,7 +362,17 @@ view_by_time <- function(CAD_sf,
   ggsave(file.path(outputdir, paste0("Waze_by_time_", Waze_type, "_", year, ".png")), Wazechart)
 }
 
+view_by_time(CAD_sf = crash_match_CAD,
+             Waze_sf = crash_match_waze,
+             CAD_class = "Crash",
+             Waze_type = "Accident",
+             year = 2020)
 
+view_by_time(CAD_sf = parked_veh_match_CAD,
+             Waze_sf = parked_veh_match_waze,
+             CAD_class = "Stall",
+             Waze_type = "Parked Vehicle (Roadway or Shoulder)",
+             year = 2020)
 
 
 # Load HSIS crash data for 2020
