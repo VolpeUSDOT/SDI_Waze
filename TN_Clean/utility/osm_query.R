@@ -27,7 +27,7 @@ state_osm <- gsub(" ", "_", state_osm) # Normalize state name
 projection <- 5070 
 
 # Year
-year <- 2019
+year <- 2021
 
 # Switching to operate month-by-month to avoid running out of memory 
 # when trying to work with an entire year all at the same time.
