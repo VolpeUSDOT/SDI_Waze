@@ -47,6 +47,7 @@ file_path <- file.path(inputdir,'Roads_Boundary', state_osm, paste0(network_file
 
 if (file.exists(file.path(file_path))){
   state_network <- read_sf(file_path)
+  
   print("File Found")
 } else{
   
@@ -81,18 +82,18 @@ if (file.exists(file.path(file_path))){
   }else{
     state_border <- state_osm
   }
-  state_maps <- states(cb = TRUE, year = 2021) %>%
+  state_map <- states(cb = TRUE, year = 2021) %>%
     filter_state(state_border) %>%
     st_transform(crs = projection)
   
   #Filter out roadways outside the state
   
-  state_network <- st_join(total_network, state_maps, join = st_within) %>%
+  state_network <- st_join(total_network, state_map, join = st_within) %>%
     filter(!is.na(NAME)) %>%
     select(osm_id, highway, ref, geometry)
   
   write_sf(state_network, file.path(inputdir,'Roads_Boundary', state_osm, paste0(network_file, '.gpkg')), driver = "ESRI Shapefile")
-  write_sf(state_border, file.path(inputdir,'Roads_Boundary', state_osm, paste0(boundary_file, '.gpkg')), driver = "ESRI Shapefile")
+  write_sf(state_map, file.path(inputdir,'Roads_Boundary', state_osm, paste0(boundary_file, '.gpkg')), driver = "ESRI Shapefile")
   rm(state_border)
 }
 
