@@ -47,7 +47,7 @@ file_path <- file.path(inputdir,'Roads_Boundary', state_osm, paste0(network_file
 
 if (file.exists(file.path(file_path))){
   state_network <- read_sf(file_path)
-  
+  state_map <- read_sf(file.path(inputdir,'Roads_Boundary', state_osm, paste0(boundary_file, '.gpkg')))
   print("File Found")
 } else{
   
@@ -135,5 +135,5 @@ observations <- do.call(bind_rows,
   # merge with expanded version of date/time training frame
   cbind(dates_exp, row.names = NULL)
   
-rm(dates, dates_exp, roadways, days, file_path, hours, network_file, new_url, num_days, today)
+rm(dates, dates_exp, roadways, file_path, hours, network_file, new_url, num_days)
 
