@@ -70,25 +70,14 @@ training_frame <- test_frame <-  data.frame(osm_id = character(),
                                             Hour = numeric(),
                                             day_of_week = factor(),
                                             weekday = logical(),
-                                            alert_type = factor(),
-                                            sub_type = factor(),
+                                            ACCIDENT = numeric(),
+                                            JAM = numeric(),
+                                            ROAD_CLOSED = numeric(),
+                                            WEATHERHAZARD = numeric(),
                                             precipitation = numeric(),
                                             temperature = numeric(),
                                             SNOW = numeric(),
                                             crash = factor())
-
-# test_frame <- data.frame(osm_id = character(),
-#                          Month = numeric(),
-#                          Day = numeric(),
-#                          Hour = numeric(),
-#                          day_of_week = factor(),
-#                          weekday = logical(),
-#                          alert_type = factor(),
-#                          sub_type = factor(),
-#                          precipitation = numeric(),
-#                          temperature = numeric(),
-#                          SNOW = numeric(),
-#                          crash = factor())
 
 for(m in 1:12){
 #for(m in 1:12){
@@ -174,7 +163,7 @@ bin.mod.diagnostics <- function(predtab){
 }
 
 # read random forest function, do.rf()
-source("analysis/RandomForest_WazeGrid_Fx.R")
+source("analysis/RandomForest_Fx.R")
 
 
 # <><><><><><><><><><><><><><><><><><><><><><><><>
