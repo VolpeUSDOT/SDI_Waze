@@ -336,17 +336,15 @@ for(m in 1:12){
            day = as.numeric(lubridate::day(time_local)),
            hour = as.numeric(lubridate::hour(time_local))
     ) %>%
-    select(osm_id, month, day, hour, alert_type, sub_type)
+    select(osm_id, month, day, hour, alert_type) %>%
+    mutate(n = 1) %>%
+    group_by(osm_id, month, day, hour, alert_type) %>% 
+    summarize(n = sum(n)) %>%
+    pivot_wider(names_from = alert_type, values_from = n)
     
   temp_train <- temp_train %>% 
     left_join(waze_temp, by = c('osm_id', 'month', 'day', 'hour')) %>%
-    replace_na(list(alert_type = "NONE", sub_type = "NONE"))
-  
-  temp_train$alert_type = as.factor(temp_train$alert_type)
-  temp_train$sub_type = as.factor(temp_train$sub_type)  
-  
-  
-  #temp_test <- temp_test %>% left_join(waze_temp %>% select(!time_local), by = c('osm_id', 'month', 'day', 'hour'))
+    replace_na(list(ACCIDENT = 0, JAM = 0, ROAD_CLOSED = 0, WEATHERHAZARD = 0))
   
   # save the objects
   save(list = c('temp_train'), file = file.path(intermediatedir,'Month_Frames',paste(state, year, "month_frame_waze", m,".RData", sep = "_")))
