@@ -5,6 +5,7 @@ loadpacks <- c(
             "aws.s3", # AWS convenience functions s3save and s3load
             "circular", # circular transformation of magvar
             "corrplot",
+            "data.table",
             "doParallel",
             "DT",
             "foreach", # for parallel implementation
@@ -24,15 +25,20 @@ loadpacks <- c(
             "party",
             "partykit",
             "pROC",
+            "performanceEstimation",
             "randomForest",
+            "RANN",
             "raster", 
+            "ROSE",
+            "RPostgres",
             "sf",  # for gIntersection, to clip two shapefiles
             "sp",
+            "stringr",
             "terra",
             "tidyverse",
             "tigris",
             "utils",
-			"dplyr")
+			      "dplyr")
 
 
 for(i in loadpacks){if(length(grep(i, (.packages(all.available=T))))==0) install.packages(i, dependencies =TRUE)}
