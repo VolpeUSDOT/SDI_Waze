@@ -16,7 +16,7 @@ top_time <- Sys.time()
 
 ##Parameters to enter ------------------------------------------------------------------
 
-#test_proportion <- 0.3 # proportion of data to set aside for testing
+keep_prop <- NULL # proportion of data to keep when thinning
 
 #------------------------------------------------------------------------
 
@@ -284,6 +284,8 @@ for (m in 1:12){
     mutate(crash = ifelse(is.na(crash), 0, crash))
   
   # save the temp object
+  if(!dir.exists(file.path(intermediatedir,'Month_Frames'))) { dir.create(file.path(intermediatedir,'Month_Frames')) }
+  
   save(list = c('temp_train'), file = file.path(intermediatedir,'Month_Frames',paste(state, year, "month_frame", m,".RData", sep = "_")))
   timediff = Sys.time() - starttime
   
@@ -342,9 +344,14 @@ for(m in 1:12){
     summarize(n = sum(n)) %>%
     pivot_wider(names_from = alert_type, values_from = n)
     
-  temp_train <- temp_train %>% 
+  temp_train = temp_train %>% 
     left_join(waze_temp, by = c('osm_id', 'month', 'day', 'hour')) %>%
     replace_na(list(ACCIDENT = 0, JAM = 0, ROAD_CLOSED = 0, WEATHERHAZARD = 0))
+  
+  # thin data, if needed, to avoid running out of memory when running Join_Road_Weather.R script
+  if(!is.null(keep_prop)){
+    temp_train = temp_train[sample(1:nrow(temp_train), size = nrow(temp_train)*keep_prop),]
+  }
   
   # save the objects
   save(list = c('temp_train'), file = file.path(intermediatedir,'Month_Frames',paste(state, year, "month_frame_waze", m,".RData", sep = "_")))
@@ -362,6 +369,8 @@ cat(paste0("Created all month frames with crashes and waze data. ", dif_time, " 
 cat("Now adding weather.")
 
 #load(file.path(intermediatedir,'Month_Frames',paste(state, year, "month_frame_waze", m,".RData", sep = "_")))
+
+gc()
 
 # Run Weather Script ------------------------------------------------------
 source(file.path("Utility", "Join_Road_weather.R"))

@@ -15,7 +15,7 @@ library(caret)
 
 inputdir <- file.path(getwd(),"Input")
 outputdir <-file.path(getwd(),"Output")
-intermediatedir <- file.path("Intermediate")
+intermediatedir <- file.path(getwd(), "Intermediate")
 
 # Make outputdir and intermediatedir if not already there
 if(!dir.exists(intermediatedir)) { dir.create(intermediatedir) }

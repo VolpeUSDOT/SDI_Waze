@@ -213,9 +213,9 @@ gc()
 
 ####### Define function to join the weather for a given data frame (will be applied month-by-month) ######
 
-join_road_weather <- function(training_frame){
+join_road_weather <- function(training_frame_rc){
   
-training_frame_rc <- training_frame
+#training_frame_rc <- training_frame
 colnames(training_frame_rc)[2:4] <- str_to_title(colnames(training_frame_rc[,2:4]))
 
 # k_hourly <- nrow(state_stations_sf)
@@ -230,19 +230,20 @@ training_frame_rc <- training_frame_rc %>% st_drop_geometry() %>%
 
 rm(state_stations_sf, KNN, state_network_KNN)
 
-## Commenting out the below for now and instead assigning N_Day as just the original day. 
-## Follow up with Matthew Menne at NOAA to understand how the date assignment works.
+## Following up with Matthew Menne at NOAA to understand how the date assignment works.
+## Depending on his reply, may comment out the below and instead assign N_Day as original day.
 
-# if(year2 > year){
-# # this approach is pretty slow but I'm not sure how else to do it.
-# training_frame_rc <- training_frame_rc %>% # create a column on the "real" Day adjusted for timezone
-#   mutate(Date = ymd_h(paste0(year, "-", Month, "-", Day, " ", Hour)),
-#          N_Day = case_when(as.numeric(Hour)+abs(tz_adjust)>23 ~ as.numeric(yday(Date))+1,
-#                            .default = as.numeric(yday(Date)))) %>% 
-#   select(-Date)
-# } else { # if in Guam - needs to be fixed, no time as of now}
+if(year2 > year){
+# this approach is pretty slow but I'm not sure how else to do it.
+training_frame_rc <- training_frame_rc %>% # create a column on the "real" Day adjusted for timezone
+  mutate(Date = ymd_h(paste0(year, "-", Month, "-", Day, " ", Hour)),
+         N_Day = case_when(as.numeric(Hour)+abs(tz_adjust)>23 ~ as.numeric(yday(Date))+1,
+                           .default = as.numeric(yday(Date)))) %>%
+  select(-Date)
+} else { # if in Guam - needs to be fixed, no time as of now
+  }
   
-training_frame_rc$N_Day <- lubridate::yday(training_frame_rc$Day)
+#training_frame_rc$N_Day <- lubridate::yday(training_frame_rc$Day)
 
 
 # Merge with KNN ------------------------------------------------------------
@@ -393,19 +394,48 @@ for(m in 1:12){
   gc()
   innertime = Sys.time()
   
+  # Do first half of the month first
   load(file.path(intermediatedir,'Month_Frames',paste(state, year, "month_frame_waze", m,".RData", sep = "_")))
   
+  temp_train = temp_train %>% filter(day <= 15)
+  gc()
+  
+  temp_trainA = join_road_weather(temp_train)
+  rm(temp_train)
+  gc()
+  
+  save(temp_trainA, file = file.path(intermediatedir, 'Month_Frames', paste(state, year, m, 'month_frame_full_A.Rdata', sep = "_")))
+  
+  rm(temp_trainA, training_frame_rc)
+  
+  gc()
+  
+  # then do second half of the month
+  load(file.path(intermediatedir,'Month_Frames',paste(state, year, "month_frame_waze", m,".RData", sep = "_")))
+  
+  temp_train = temp_train %>% filter(day > 15)
+  gc()
+  
   temp_train = join_road_weather(temp_train)
+  rm(training_frame_rc)
+  gc()
+  
+  # load back up the first half of the month
+  load(file.path(intermediatedir, 'Month_Frames', paste(state, year, m, 'month_frame_full_A.Rdata', sep = "_")))
+  
+  temp_train = bind_rows(temp_trainA, temp_train)
   
   save(temp_train, file = file.path(intermediatedir, 'Month_Frames', paste(state, year, m, 'month_frame_full.Rdata', sep = "_")))
   
-  rm(temp_train, training_frame_rc)
+  rm(temp_train, temp_trainA)
+  
+  gc()
   
   dif_time <- round(difftime(Sys.time(), innertime, units = "mins"), 2)
   cat(paste0("Added weather for month ", m, " in ", dif_time, " minutes."))
   
   dif_time <- round(difftime(Sys.time(), top_time, units = "mins"), 2)
-  cat(paste0(dif_time, " minutes elapsed thus far in total in the creation of training/test frames."))
+  cat(paste0(dif_time, " minutes elapsed thus far in total in the creation of training/test frames.\n\n"))
 }
 
 timeB <- Sys.time()
