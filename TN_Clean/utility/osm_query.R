@@ -118,14 +118,13 @@ if(st_crs(state_network) != projection){
   state_network <- st_transform(state_network, projection)
 }
 
-# if the state has multiple time zones, create a dataframe that maps each road segment (osm_id) to its corresponding time zone
-if(!one_zone){
-  osm_id_zones <- state_network %>%
-    select(osm_id) %>%
-    st_join(timezone_adj, join = st_nearest_feature) %>%
-    st_drop_geometry()
-}
-
+# # if the state has multiple time zones, create a dataframe that maps each road segment (osm_id) to its corresponding time zone
+# if(!one_zone){
+#   osm_id_zones <- state_network %>%
+#     select(osm_id) %>%
+#     st_join(timezone_adj, join = st_nearest_feature) %>%
+#     st_drop_geometry()
+# }
 
 # Load Crash Data ------------------------------
 
